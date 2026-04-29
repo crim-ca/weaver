@@ -22,13 +22,14 @@ from webob.headers import ResponseHeaders
 from yaml.scanner import ScannerError
 
 from weaver import __meta__
+from weaver.base import Constants
 from weaver.datatype import AutoBase
 from weaver.exceptions import AuthenticationError, PackageRegistrationError
 from weaver.execute import (
     ExecuteResponse,
     ExecuteReturnPreference,
     ExecuteTransmissionMode,
-    resolve_execution_parameters
+    resolve_execution_parameters, ExecuteControlOption
 )
 from weaver.formats import (
     ContentEncoding,
@@ -66,10 +67,12 @@ from weaver.utils import (
     import_target,
     load_file,
     null,
+    parse_kvp,
     parse_link_header,
     request_extra,
     setup_loggers
 )
+from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.constants import ConformanceCategory
 
@@ -1044,7 +1047,7 @@ class WeaverClient(object):
             LOGGER.debug("Performing requested undeploy of process: [%s]", p_id)
             result = self.undeploy(process_id=p_id, url=base)
             if result.code not in [200, 204, 404]:
-                return OperationResult(False, "Failed requested undeployment prior deployment.",
+                return OperationResult(False, "Failed requested undeployment prior to deployment.",
                                        body=result.body, text=result.text, code=result.code, headers=result.headers)
         LOGGER.debug("Deployment Body:\n%s", OutputFormat.convert(data, OutputFormat.JSON_STR))
         path = f"{base}/processes"
@@ -1090,6 +1093,237 @@ class WeaverClient(object):
                              headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
         return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
+
+    def replace(
+        self,
+        process_id,             # type: str
+        body=None,              # type: Optional[Union[JSON, str]]
+        cwl=None,               # type: Optional[Union[CWL, str]]
+        inputs=None,            # type: Optional[Union[JSON, str]]
+        outputs=None,           # type: Optional[Union[JSON, str]]
+        version=None,           # type: Optional[str]
+        metadata=None,          # type: Optional[Union[JSON, str, List[str]]]
+        http_method=None,       # type: Optional[str]
+        url=None,               # type: Optional[URL]
+        auth=None,              # type: Optional[AuthBase]
+        headers=None,           # type: Optional[AnyHeadersContainer]
+        with_links=True,        # type: bool
+        with_headers=False,     # type: bool
+        request_timeout=None,   # type: Optional[int]
+        request_retries=None,   # type: Optional[int]
+        output_format=None,     # type: Optional[AnyOutputFormat]
+    ):                          # type: (...) -> OperationResult
+        """
+        Update an existing :term:`Process`.
+
+        All parameters are additive, meaning they can be combined. For example, providing ``body`` with
+        additional ``metadata`` will use the body as base and merge/override with the metadata fields.
+
+        :param process_id: Identifier or :term:`URI` of the process to update.
+        :param body: Full process body for replacement. Can be JSON string or file path.
+        :param cwl: Application Package CWL. Can be JSON string or file path.
+        :param inputs: Updated input definitions. Can be JSON string or file path.
+        :param outputs: Updated output definitions. Can be JSON string or file path.
+        :param version: Explicit version to assign. If not provided, automatically bumped based on changes.
+        :param metadata:
+            Process update fields (note: not just the process ``metadata`` field).
+            Can update simple fields (title, description) and complex fields (keywords, metadata, links).
+
+            **Supported Fields by Update Level:**
+
+            - **PATCH-level** (metadata only): ``title``, ``description``, ``keywords``, ``metadata``, ``links``
+            - **MINOR-level** (capabilities): ``jobControlOptions``, ``outputTransmission``, ``visibility``
+            - **MAJOR-level** (full process): Use ``body``/``cwl`` parameters instead
+
+            **Input Formats:**
+
+            1. **Key=Value pairs** (simple string fields only):
+
+               .. code-block:: python
+
+                   client.replace("my-process", metadata=["title=New Title", "description=Updated"])
+
+            2. **JSON string**:
+
+               .. code-block:: python
+
+                   client.replace("my-process", metadata='{"title": "New Title", "keywords": ["tag1"]}')
+
+            3. **File path** (JSON/YAML file):
+
+               .. code-block:: python
+
+                   client.replace("my-process", metadata="/path/to/updates.json")
+
+            4. **Dictionary** (supports all field types and behaviors):
+
+               .. code-block:: python
+
+                   # Comprehensive example combining multiple update fields
+                   client.replace("my-process", metadata={
+                       "title": "New Process Title",
+                       "description": "Updated process description",
+                       "keywords": ["climate", "weather", "analysis"],
+                       "metadata": [
+                           {"role": "https://schema.org/author",
+                            "rel": "https://schema.org/author",
+                            "href": "https://orcid.org/0000-0001-2345-6789",
+                            "title": "Author ORCID"},
+                           {"role": "https://schema.org/name",
+                            "value": "John Doe",
+                            "title": "Author Name"}
+                       ],
+                       "links": [
+                           {"rel": "documentation",
+                            "href": "https://example.com/docs",
+                            "title": "Documentation"}
+                       ],
+                       "jobControlOptions": ["async-execute"],
+                       "visibility": "public"
+                   })
+
+        :param http_method:
+            HTTP method to use (PUT or PATCH).
+            If not specified, automatically determined based on operation:
+            - PUT when ``body``/``cwl``/``inputs``/``outputs`` provided (full process replacement or MAJOR changes)
+            - PATCH when only ``metadata``/``version`` provided (granular metadata updates)
+        :param url: Instance URL if not already provided during client creation.
+        :param auth:
+            Instance authentication handler if not already created during client creation.
+            Should perform required adjustments to request to allow access control of protected contents.
+        :param headers:
+            Additional headers to employ when sending request.
+            Note that this can break functionalities if expected headers are overridden. Use with care.
+        :param with_links: Indicate if ``links`` section should be preserved in returned result body.
+        :param with_headers: Indicate if response headers should be returned in result output.
+        :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
+        :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
+        :param output_format: Select an alternate output representation of the result body contents.
+        :returns: Results of the operation.
+        """
+        base = self._get_url(url)
+        path = f"{base}/processes/{process_id}"
+
+        # Start with body/cwl if provided, then merge additional parameters
+        data = {}
+        has_body_or_cwl = body is not None or cwl is not None
+
+        if has_body_or_cwl:
+            result = self._parse_deploy_body(body, process_id)
+            if not result.success:
+                return result
+            req_headers = copy.deepcopy(self._headers)
+            settings = copy.deepcopy(self._settings)
+            settings["weaver.wps_restapi_url"] = base
+            data = result.body
+            result = self._parse_deploy_package(data, cwl, None, process_id, req_headers, settings)
+            if not result.success:
+                return result
+            data = result.body
+
+        # Merge additional parameters additively
+        if inputs is not None:
+            parsed_inputs = self._parse_file_or_json(inputs, "inputs")
+            if isinstance(parsed_inputs, OperationResult):
+                return parsed_inputs
+            data["inputs"] = parsed_inputs
+
+        if outputs is not None:
+            parsed_outputs = self._parse_file_or_json(outputs, "outputs")
+            if isinstance(parsed_outputs, OperationResult):
+                return parsed_outputs
+            data["outputs"] = parsed_outputs
+
+        if metadata is not None:
+            parsed_metadata = self._parse_metadata_updates(metadata)
+            if isinstance(parsed_metadata, OperationResult):
+                return parsed_metadata
+            data.update(parsed_metadata)
+
+        if version is not None:
+            data["version"] = version
+
+        if not data:
+            return OperationResult(
+                False,
+                "At least one field (body, cwl, inputs, outputs, version, or metadata) must be provided.",
+                None
+            )
+
+        # Determine HTTP method based on operation type
+        # PUT: full process replacement (body/cwl/inputs/outputs = MAJOR changes)
+        # PATCH: metadata/capability updates only (MINOR/PATCH changes)
+        # Inputs/outputs changes require MAJOR update since they redefine process signature
+        if http_method:
+            method = http_method.upper()
+        elif has_body_or_cwl or inputs is not None or outputs is not None:
+            method = "PUT"  # MAJOR changes: full replacement or signature changes
+        else:
+            method = "PATCH"  # MINOR/PATCH changes: metadata/capability updates only
+
+        LOGGER.info("Replacement Body:\n%s", OutputFormat.convert(data, OutputFormat.JSON_STR))
+        resp = self._request(method, path, json=data,
+                             headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
+                             request_timeout=request_timeout, request_retries=request_retries)
+        return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
+
+    def _parse_metadata_updates(self, metadata):
+        # type: (Union[JSON, str, List[str]]) -> Union[JSON, OperationResult]
+        """
+        Parse process update fields from various input formats.
+
+        Supports key=value pairs (for simple fields), JSON strings, file paths, or dictionaries.
+        See :meth:`replace` for detailed field descriptions and usage examples.
+
+        :param metadata: Update fields to parse (list of key=value, JSON string, file path, or dict).
+        :returns: Parsed dictionary with process update fields or OperationResult on error.
+        """
+        if isinstance(metadata, list):
+            # Parse key=value pairs using parse_kvp
+            kvp_string = ";".join(metadata)
+            parsed_metadata = parse_kvp(kvp_string, pair_sep=";")
+            # parse_kvp returns lists for values, extract single values for simple fields
+            result = {}
+            for key, value in parsed_metadata.items():
+                result[key] = value[0] if isinstance(value, list) and len(value) == 1 else value
+            return result
+        else:
+            parsed_metadata = self._parse_file_or_json(metadata, "metadata")
+            if isinstance(parsed_metadata, OperationResult):
+                return parsed_metadata
+            if isinstance(parsed_metadata, dict):
+                return parsed_metadata
+            else:
+                return OperationResult(
+                    False,
+                    "Metadata must be a dictionary/object with process metadata fields.",
+                    None
+                )
+
+
+    def _parse_file_or_json(self, param, param_name):
+        # type: (Union[JSON, str], str) -> Union[JSON, OperationResult]
+        """
+        Parse a parameter that can be a dictionary, JSON string, or file path.
+
+        :param param: Parameter value to parse.
+        :param param_name: Name of the parameter for error messages.
+        :returns: Parsed JSON data or OperationResult on error.
+        """
+        if isinstance(param, dict):
+            return param
+        if isinstance(param, str):
+            try:
+                if param.startswith(("{", "[")):
+                    data = yaml.safe_load(param)
+                else:
+                    data = load_file(param, text=False)
+                    if isinstance(data, str):
+                        data = yaml.safe_load(data)
+                return data
+            except (ValueError, TypeError, ScannerError) as exc:
+                return OperationResult(False, f"Failed to parse {param_name}: {exc}", None)
+        return param
 
     def capabilities(
         self,
@@ -2330,7 +2564,8 @@ class WeaverClient(object):
                                       with_headers=with_headers, output_format=output_format)
         return OperationResult(False, msg)
 
-    def _download_references(self, outputs, out_links, out_dir, job_id, auth=None):
+    @staticmethod
+    def _download_references(outputs, out_links, out_dir, job_id, auth=None):
         # type: (ExecutionResults, AnyHeadersContainer, str, str, Optional[AuthBase]) -> ExecutionResults
         """
         Download file references from results response contents and link headers.
@@ -2394,6 +2629,78 @@ class WeaverClient(object):
                 outputs[output] = [link] if is_array else link
         return outputs
 
+    @staticmethod
+    def _filter_outputs(outputs, output_ids=None):
+        # type: (ExecutionResults, Optional[Sequence[Union[str, Tuple[str, int]]]]) -> OperationResult
+        """
+        Filter outputs IDs and N indices in case the API did not support pre-filtering.
+
+        The ``../{N}`` indices cannot be indicated in the results request queries,
+        so these must be filtered after the fact regardless of filtered output IDs.
+        Fill the omitted indices by :class`None` to preverse the original amount.
+
+        .. seealso::
+            - ``/req/core/job-results-param-outputs``
+            - https://docs.ogc.org/DRAFTS/18-062r3.html#req_core_job-results-param-outputs
+        """
+        if not output_ids:
+            # nothing to parse, but no error since 'no outputs' *body* might be because all is requested by header Link
+            return OperationResult(True, body=outputs)
+
+        # Collect requested IDs and their indices in a single pass
+        requested_ids = {}  # type: Dict[str, Optional[Set[int]]]
+        for out_spec in output_ids:
+            if isinstance(out_spec, tuple):
+                out_id, out_idx = out_spec
+                if out_id not in requested_ids:
+                    requested_ids[out_id] = set()
+                requested_ids[out_id].add(out_idx)
+            else:
+                # Simple ID without index - mark with None to keep as-is
+                if out_spec not in requested_ids:
+                    requested_ids[out_spec] = None
+
+        # Filter and modify outputs in-place
+        for out_id in list(outputs.keys()):
+            if out_id not in requested_ids:
+                # Remove unrequested outputs
+                del outputs[out_id]
+                continue
+
+            indices = requested_ids[out_id]
+            if indices is None:
+                # Simple ID - keep output as-is
+                continue
+
+            # Specific indices requested - validate and filter
+            out_val = outputs[out_id]
+            if isinstance(out_val, list):
+                # Validate indices are within range
+                for idx in indices:
+                    if idx < 0 or idx >= len(out_val):
+                        return OperationResult(
+                            False,
+                            f"Output '{out_id}' index {idx} is out of range [0, {len(out_val) - 1}].",
+                            outputs
+                        )
+                # Create array with None placeholders, keeping only requested indices
+                max_idx = max(max(indices), len(out_val) - 1)
+                filtered_array = [None] * (max_idx + 1)
+                for idx in indices:
+                    filtered_array[idx] = out_val[idx]
+                outputs[out_id] = filtered_array
+            else:
+                # Single value - allow index 0 to "slip through"
+                if 0 not in indices:
+                    invalid_indices = ", ".join(str(idx) for idx in sorted(indices))
+                    return OperationResult(
+                        False,
+                        f"Output '{out_id}' is not an array but indices [{invalid_indices}] were requested. "
+                        f"Only index 0 is allowed for single values.",
+                        outputs
+                    )
+        return OperationResult(True, body=outputs)
+
     def results(
         self,
         job_reference,          # type: Union[URL, AnyUUID]
@@ -2409,6 +2716,7 @@ class WeaverClient(object):
         results_profile=null,   # type: Union[Type[null], Optional[str]]
         output_format=None,     # type: Optional[AnyOutputFormat]
         output_links=None,      # type: Optional[Sequence[str]]
+        output_ids=None,        # type: Optional[Sequence[Union[str, Tuple[str, int]]]]
     ):                          # type: (...) -> OperationResult
         """
         Obtain the results of a successful :term:`Job` execution.
@@ -2433,6 +2741,13 @@ class WeaverClient(object):
             Output IDs that are expected in ``Link`` headers, and that should be retrieved (or downloaded) as results.
             This is not performed automatically since there can be a lot of ``Links`` in responses, and output IDs
             could have conflicting ``rel`` names with other indicative links.
+        :param output_ids:
+            Output IDs that should be collected from the results.
+            If omitted, all available outputs from the :term:`Job` will be retrieved.
+            If an output happens to be an array of data/file results, an optional index can also be provided to
+            extract only these entries. In such case, the resulting array will only contain the requested elements.
+            To ensure index consistency, other outputs will be represented by :class:`None` instead of the data/file.
+            If combined with the download option, only the requested outputs will be retrieved and saved locally.
         :returns: Result details and local paths if downloaded.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
@@ -2447,22 +2762,31 @@ class WeaverClient(object):
         headers = headers or {}
         headers.update({
             "Accept": ContentType.APP_JSON,
-            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
+            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",  # limit data transfer, prefer href if possible
         })
-        # if profile was omitted but outputs were explicitly requested as links,
+        # If profile was omitted but outputs were explicitly requested as links,
         # consider that the user intends to retrieve them as Link headers, and therefore
-        # the Results JSON response profile embedding outputs is not expected behaviour
-        if results_profile is null and not output_links:
+        # the Results JSON response profile embedding outputs is not expected behaviour.
+        # If specific output ID/index are requested, we prefer the results profile to filter.
+        if (results_profile is null and not output_links) or output_ids:
             headers["Accept-Profile"] = sd.OGC_API_PROC_PROFILE_RESULTS_URI
         elif results_profile:
             headers["Accept-Profile"] = results_profile
+        params = {}
+        if output_ids:
+            # preemptyively filter outputs IDs if possible/supported by the API to reduce data transfer
+            params["outputs"] = ",".join(out if isinstance(out, str) else out[0] for out in output_ids)
         resp = self._request("GET", result_url,
-                             headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
+                             params=params, headers=self._headers, x_headers=headers,
+                             settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
         res_out = self._parse_result(resp, output_format=output_format,
                                      with_links=with_links, with_headers=with_headers)
-
-        outputs = res_out.body
+        # parse job results
+        res_outputs = self._filter_outputs(res_out.body, output_ids)
+        if not res_outputs.success:
+            return res_outputs
+        outputs = res_outputs.body
         headers = res_out.headers
         out_links = res_out.links(["Link"])
         out_links_meta = [(link, parse_link_header(link[-1])) for link in list(out_links.items())]
@@ -3610,6 +3934,89 @@ def make_parser():
     add_shared_options(op_undeploy)
     add_process_param(op_undeploy)
 
+    op_replace = WeaverArgumentParser(
+        "replace",
+        description="Update an existing process.",
+        formatter_class=ParagraphFormatter,
+    )
+    set_parser_sections(op_replace)
+    add_url_param(op_replace)
+    add_shared_options(op_replace)
+    add_process_param(op_replace)
+    op_replace.add_argument(
+        "-b", "--body", dest="body",
+        help="Full process body for replacement. Allows both JSON and YAML format when using file reference. "
+             "Can be provided either with a local file, an URL or literal string contents formatted as JSON."
+    )
+    op_replace.add_argument(
+        "--cwl", dest="cwl",
+        help="Application Package CWL for process replacement. Can be provided as JSON/YAML file reference or literal."
+    )
+    op_replace.add_argument(
+        "-i", "--inputs", dest="inputs",
+        help="Updated input definitions for the process. "
+             "Can be provided as JSON string, or file path containing JSON/YAML."
+    )
+    op_replace.add_argument(
+        "-o", "--outputs", dest="outputs",
+        help="Updated output definitions for the process. "
+             "Can be provided as JSON string, or file path containing JSON/YAML."
+    )
+    op_replace.add_argument(
+        "-v", "--version", dest="version",
+        help="Explicit version to assign to the updated process (e.g., '2.0.0'). "
+             "If not provided, version will be automatically bumped based on changes."
+    )
+    op_replace.add_argument(
+        "-m", "--metadata", dest="metadata", action="append",
+        help=inspect.cleandoc(f"""
+            Process metadata fields to update based on semantic versining.
+
+            FORMATS:
+              1. Key=value pairs (simple fields): -m title='New Title' -m description='Updated'
+              2. JSON string (any fields): -m '{{"title": "New", "keywords": ["tag1"]}}'
+              3. File path: -m /path/to/updates.json
+
+            PATCH-LEVEL FIELDS (metadata only):
+              - title, description: Simple strings
+                Example: -m title='New Process Title'
+
+              - keywords: List appended to existing (empty list resets)
+                Example: -m '{{"keywords": ["climate", "weather"]}}'
+
+              - metadata: Process-level metadata entries are appended.
+                    Metatat entires can be in Link format (rel+href) or value format (role+value).
+                    Links require 'rel' field (IANA relation or URL), and it is recommented to provide an
+                    additional 'role' using https://schema.org definitions for semantic meaning of these concepts.
+                Example:
+                  {{
+                    "metadata": [
+                      {{"role": "https://schema.org/author", "rel": "author",
+                       "href": "https://orcid.org/0000-0000-0000-0000", "title": "Author ORCID"}},
+                      {{"role": "https://schema.org/name", "value": "John Doe"}},
+                      {{"role": "https://schema.org/codeRepository", "rel": "repository",
+                       "href": "https://github.com/org/repo"}}
+                    ]
+                  }}
+
+              - links: Additional links (appended). Each has rel and href.
+                Example: -m '{{"links": [{{"rel": "service-doc", "href": "https://docs", "type": "text/html"}}]}}'
+
+            MINOR-LEVEL FIELDS (capabilities, full override):
+              - jobControlOptions: {ExecuteControlOption.values()}
+              - outputTransmission: {ExecuteTransmissionMode.values()}
+              - visibility: {Visibility.values()}
+
+            MAJOR-LEVEL (full process):
+              Use --body/--cwl instead for complete process replacement.
+        """)
+    )
+    op_replace.add_argument(
+        "-M", "--http-method", dest="http_method", choices=["PUT", "PATCH"], type=str.upper,
+        help="HTTP method for replacement. Auto-selected if not specified: "
+             "PUT when --body/--cwl provided (full replacement), PATCH for metadata updates only."
+    )
+
     op_register = WeaverArgumentParser(
         "register",
         description="Register a remote provider.",
@@ -3875,8 +4282,19 @@ def make_parser():
         help="Output directory where to store downloaded files from job results if requested "
              "(default: ``${CURDIR}/{JobID}/<outputs.files>``)."
     )
-    # FIXME: support filtering outputs on 'jobs/{jobId}/results/{id}' (https://github.com/crim-ca/weaver/issues/18)
-    #   reuse same '-oF' parameter as for 'outputs' submitted during 'execute' operation
+    parser.add_argument(
+        "-oI", "--output-ids", metavar="OUTPUT", dest="output_ids",
+        nargs=1, action="append",  # collect max 1 item per '-oI'
+        help=(
+            "Output IDs that should be collected from the results."
+            "\n\n"
+            "If omitted, all available outputs from the Job will be retrieved. "
+            "If an output happens to be an array of data/file results, an optional index can also be provided to "
+            "extract only these entries. In such case, the resulting array will only contain the requested elements. "
+            "To ensure index consistency, other outputs will be represented by 'null' instead of the data/file. "
+            "If combined with the download option, only the requested outputs will be retrieved and saved locally."
+        )
+    )
     op_results.add_argument(
         "-oL", "--output-link", dest="output_links", nargs=1,
         help="Output IDs in 'Link' headers to retrieve as results for matching relationship ('rel') links."
@@ -3911,6 +4329,7 @@ def make_parser():
         op_conformance,
         op_deploy,
         op_undeploy,
+        op_replace,
         op_register,
         op_unregister,
         op_capabilities,
