@@ -128,9 +128,9 @@ STATUS_PYWPS_IDS = {k.lower(): v for v, k in STATUS_PYWPS_MAP.items()}
 
 if TYPE_CHECKING:
     from typing import Any, Union
+    from typing_extensions import Annotated
 
     from weaver.typedefs import Literal
-    from typing_extensions import Annotated
 
     # Using Annotated to preserve origin references while using valid literal types
     StatusType = Union[
