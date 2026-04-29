@@ -572,8 +572,14 @@ class TestWeaverClient(TestWeaverClientBase):
         assert result.success
         assert "metadata" in result.body
         # Find the value entries
-        name_entry = next((m for m in result.body["metadata"] if m.get("role") == "https://schema.org/name"), None)
-        license_entry = next((m for m in result.body["metadata"] if m.get("role") == "https://schema.org/license"), None)
+        name_entry = next(
+            (m for m in result.body["metadata"] if m.get("role") == "https://schema.org/name"),
+            None
+        )
+        license_entry = next(
+            (m for m in result.body["metadata"] if m.get("role") == "https://schema.org/license"),
+            None
+        )
         assert name_entry is not None
         assert name_entry["value"] == "John Doe"
         assert license_entry is not None

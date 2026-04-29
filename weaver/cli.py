@@ -22,13 +22,14 @@ from webob.headers import ResponseHeaders
 from yaml.scanner import ScannerError
 
 from weaver import __meta__
+from weaver.base import Constants
 from weaver.datatype import AutoBase
 from weaver.exceptions import AuthenticationError, PackageRegistrationError
 from weaver.execute import (
     ExecuteResponse,
     ExecuteReturnPreference,
     ExecuteTransmissionMode,
-    resolve_execution_parameters
+    resolve_execution_parameters, ExecuteControlOption
 )
 from weaver.formats import (
     ContentEncoding,
@@ -71,6 +72,7 @@ from weaver.utils import (
     request_extra,
     setup_loggers
 )
+from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.constants import ConformanceCategory
 
@@ -3967,12 +3969,12 @@ def make_parser():
     )
     op_replace.add_argument(
         "-m", "--metadata", dest="metadata", action="append",
-        help=inspect.cleandoc("""
+        help=inspect.cleandoc(f"""
             Process metadata fields to update based on semantic versining.
 
             FORMATS:
               1. Key=value pairs (simple fields): -m title='New Title' -m description='Updated'
-              2. JSON string (any fields): -m '{"title": "New", "keywords": ["tag1"]}'
+              2. JSON string (any fields): -m '{{"title": "New", "keywords": ["tag1"]}}'
               3. File path: -m /path/to/updates.json
 
             PATCH-LEVEL FIELDS (metadata only):
@@ -3980,29 +3982,30 @@ def make_parser():
                 Example: -m title='New Process Title'
 
               - keywords: List appended to existing (empty list resets)
-                Example: -m '{"keywords": ["climate", "weather"]}'
+                Example: -m '{{"keywords": ["climate", "weather"]}}'
 
-              - metadata: Process-level metadata entries (appended). Link format (rel+href) or value format (value).
-                Links require 'rel' field (IANA relation or URL). Use schema.org roles for semantic meaning.
-                Example: -m '{"metadata": [{"role": "https://schema.org/author", "rel": "author", "href": "https://orcid.org/0000-0000-0000-0000", "title": "Author ORCID"}]}'
-                File example (updates.json):
-                  {
+              - metadata: Process-level metadata entries are appended.
+                    Metatat entires can be in Link format (rel+href) or value format (role+value).
+                    Links require 'rel' field (IANA relation or URL), and it is recommented to provide an
+                    additional 'role' using https://schema.org definitions for semantic meaning of these concepts.
+                Example:
+                  {{
                     "metadata": [
-                      {"role": "https://schema.org/author", "rel": "author",
-                       "href": "https://orcid.org/0000-0000-0000-0000", "title": "Author ORCID"},
-                      {"role": "https://schema.org/name", "value": "John Doe"},
-                      {"role": "https://schema.org/codeRepository",
-                       "rel": "repository", "href": "https://github.com/org/repo"}
+                      {{"role": "https://schema.org/author", "rel": "author",
+                       "href": "https://orcid.org/0000-0000-0000-0000", "title": "Author ORCID"}},
+                      {{"role": "https://schema.org/name", "value": "John Doe"}},
+                      {{"role": "https://schema.org/codeRepository", "rel": "repository",
+                       "href": "https://github.com/org/repo"}}
                     ]
-                  }
+                  }}
 
               - links: Additional links (appended). Each has rel and href.
-                Example: -m '{"links": [{"rel": "service-doc", "href": "https://docs", "type": "text/html"}]}'
+                Example: -m '{{"links": [{{"rel": "service-doc", "href": "https://docs", "type": "text/html"}}]}}'
 
             MINOR-LEVEL FIELDS (capabilities, full override):
-              - jobControlOptions: ["async-execute", "sync-execute"]
-              - outputTransmission: ["value", "reference"]
-              - visibility: "public" or "private"
+              - jobControlOptions: {ExecuteControlOption.values()}
+              - outputTransmission: {ExecuteTransmissionMode.values()}
+              - visibility: {Visibility.values()}
 
             MAJOR-LEVEL (full process):
               Use --body/--cwl instead for complete process replacement.
