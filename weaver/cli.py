@@ -2562,7 +2562,8 @@ class WeaverClient(object):
                                       with_headers=with_headers, output_format=output_format)
         return OperationResult(False, msg)
 
-    def _download_references(self, outputs, out_links, out_dir, job_id, auth=None):
+    @staticmethod
+    def _download_references(outputs, out_links, out_dir, job_id, auth=None):
         # type: (ExecutionResults, AnyHeadersContainer, str, str, Optional[AuthBase]) -> ExecutionResults
         """
         Download file references from results response contents and link headers.
@@ -2626,6 +2627,78 @@ class WeaverClient(object):
                 outputs[output] = [link] if is_array else link
         return outputs
 
+    @staticmethod
+    def _filter_outputs(outputs, output_ids=None):
+        # type: (ExecutionResults, Optional[Sequence[Union[str, Tuple[str, int]]]]) -> OperationResult
+        """
+        Filter outputs IDs and N indices in case the API did not support pre-filtering.
+
+        The ``../{N}`` indices cannot be indicated in the results request queries,
+        so these must be filtered after the fact regardless of filtered output IDs.
+        Fill the omitted indices by :class`None` to preverse the original amount.
+
+        .. seealso::
+            - ``/req/core/job-results-param-outputs``
+            - https://docs.ogc.org/DRAFTS/18-062r3.html#req_core_job-results-param-outputs
+        """
+        if not output_ids:
+            # nothing to parse, but no error since 'no outputs' *body* might be because all is requested by header Link
+            return OperationResult(True, body=outputs)
+
+        # Collect requested IDs and their indices in a single pass
+        requested_ids = {}  # type: Dict[str, Optional[Set[int]]]
+        for out_spec in output_ids:
+            if isinstance(out_spec, tuple):
+                out_id, out_idx = out_spec
+                if out_id not in requested_ids:
+                    requested_ids[out_id] = set()
+                requested_ids[out_id].add(out_idx)
+            else:
+                # Simple ID without index - mark with None to keep as-is
+                if out_spec not in requested_ids:
+                    requested_ids[out_spec] = None
+
+        # Filter and modify outputs in-place
+        for out_id in list(outputs.keys()):
+            if out_id not in requested_ids:
+                # Remove unrequested outputs
+                del outputs[out_id]
+                continue
+
+            indices = requested_ids[out_id]
+            if indices is None:
+                # Simple ID - keep output as-is
+                continue
+
+            # Specific indices requested - validate and filter
+            out_val = outputs[out_id]
+            if isinstance(out_val, list):
+                # Validate indices are within range
+                for idx in indices:
+                    if idx < 0 or idx >= len(out_val):
+                        return OperationResult(
+                            False,
+                            f"Output '{out_id}' index {idx} is out of range [0, {len(out_val) - 1}].",
+                            outputs
+                        )
+                # Create array with None placeholders, keeping only requested indices
+                max_idx = max(max(indices), len(out_val) - 1)
+                filtered_array = [None] * (max_idx + 1)
+                for idx in indices:
+                    filtered_array[idx] = out_val[idx]
+                outputs[out_id] = filtered_array
+            else:
+                # Single value - allow index 0 to "slip through"
+                if 0 not in indices:
+                    invalid_indices = ", ".join(str(idx) for idx in sorted(indices))
+                    return OperationResult(
+                        False,
+                        f"Output '{out_id}' is not an array but indices [{invalid_indices}] were requested. "
+                        f"Only index 0 is allowed for single values.",
+                        outputs
+                    )
+        return OperationResult(True, body=outputs)
+
     def results(
         self,
         job_reference,          # type: Union[URL, AnyUUID]
@@ -2668,8 +2741,11 @@ class WeaverClient(object):
             could have conflicting ``rel`` names with other indicative links.
         :param output_ids:
             Output IDs that should be collected from the results.
-            If the output happens to be an array of data/file results, an optional index can also be provided to
-            extract only these entries. However,
+            If omitted, all available outputs from the :term:`Job` will be retrieved.
+            If an output happens to be an array of data/file results, an optional index can also be provided to
+            extract only these entries. In such case, the resulting array will only contain the requested elements.
+            To ensure index consistency, other outputs will be represented by :class:`None` instead of the data/file.
+            If combined with the download option, only the requested outputs will be retrieved and saved locally.
         :returns: Result details and local paths if downloaded.
         """
         job_id, job_url = self._parse_job_ref(job_reference, url)
@@ -2684,7 +2760,7 @@ class WeaverClient(object):
         headers = headers or {}
         headers.update({
             "Accept": ContentType.APP_JSON,
-            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
+            "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",  # limit data transfer, prefer href if possible
         })
         # If profile was omitted but outputs were explicitly requested as links,
         # consider that the user intends to retrieve them as Link headers, and therefore
@@ -2694,18 +2770,21 @@ class WeaverClient(object):
             headers["Accept-Profile"] = sd.OGC_API_PROC_PROFILE_RESULTS_URI
         elif results_profile:
             headers["Accept-Profile"] = results_profile
-        # FIXME:
-        #   use query param to prefilter outputs IDs, however we must proceed manually for ../{N} indices
-        #   (https://docs.ogc.org/DRAFTS/18-062r3.html#req_core_job-results-param-outputs)
-        # if output_ids:
-
+        params = {}
+        if output_ids:
+            # preemptyively filter outputs IDs if possible/supported by the API to reduce data transfer
+            params["outputs"] = ",".join(out if isinstance(out, str) else out[0] for out in output_ids)
         resp = self._request("GET", result_url,
-                             headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
+                             params=params, headers=self._headers, x_headers=headers,
+                             settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
         res_out = self._parse_result(resp, output_format=output_format,
                                      with_links=with_links, with_headers=with_headers)
-
-        outputs = res_out.body
+        # parse job results
+        res_outputs = self._filter_outputs(res_out.body, output_ids)
+        if not res_outputs.success:
+            return res_outputs
+        outputs = res_outputs.body
         headers = res_out.headers
         out_links = res_out.links(["Link"])
         out_links_meta = [(link, parse_link_header(link[-1])) for link in list(out_links.items())]
@@ -4200,8 +4279,19 @@ def make_parser():
         help="Output directory where to store downloaded files from job results if requested "
              "(default: ``${CURDIR}/{JobID}/<outputs.files>``)."
     )
-    # FIXME: support filtering outputs on 'jobs/{jobId}/results/{id}' (https://github.com/crim-ca/weaver/issues/18)
-    #   reuse same '-oF' parameter as for 'outputs' submitted during 'execute' operation
+    parser.add_argument(
+        "-oI", "--output-ids", metavar="OUTPUT", dest="output_ids",
+        nargs=1, action="append",  # collect max 1 item per '-oI'
+        help=(
+            "Output IDs that should be collected from the results."
+            "\n\n"
+            "If omitted, all available outputs from the Job will be retrieved. "
+            "If an output happens to be an array of data/file results, an optional index can also be provided to "
+            "extract only these entries. In such case, the resulting array will only contain the requested elements. "
+            "To ensure index consistency, other outputs will be represented by 'null' instead of the data/file. "
+            "If combined with the download option, only the requested outputs will be retrieved and saved locally."
+        )
+    )
     op_results.add_argument(
         "-oL", "--output-link", dest="output_links", nargs=1,
         help="Output IDs in 'Link' headers to retrieve as results for matching relationship ('rel') links."

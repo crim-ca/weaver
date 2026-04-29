@@ -4,6 +4,7 @@ Unit test for :mod:`weaver.cli` utilities.
 import argparse
 import base64
 import contextlib
+import copy
 import inspect
 import itertools
 import json
@@ -11,6 +12,7 @@ import os
 import tempfile
 import uuid
 from contextlib import ExitStack
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 import mock
@@ -30,6 +32,11 @@ from weaver.cli import (
 )
 from weaver.exceptions import AuthenticationError
 from weaver.formats import ContentEncoding, ContentType, get_cwl_file_format
+
+if TYPE_CHECKING:
+    from typing import List, Optional, Tuple, Union
+
+    from weaver.typedefs import ExecutionResults
 
 
 @pytest.mark.cli
@@ -1244,7 +1251,7 @@ def test_auth_request_handler_no_url_or_token_init():
         BearerAuthHandler(token=str(uuid.uuid4()))  # OK
         BearerAuthHandler(url="https://example.com")  # OK
     except Exception as exc:
-        pytest.fail(msg=f"Expected no init error from valid combinations. Got [{exc}]")
+        pytest.fail(f"Expected no init error from valid combinations. Got [{exc}]")
 
 
 @pytest.mark.cli
@@ -1849,3 +1856,319 @@ def test_cli_replace_multiple_fields_combined():
     assert payload["visibility"] == "public"
 
 
+@pytest.mark.cli
+@pytest.mark.parametrize(
+    ["outputs", "output_ids", "expect_success", "expect_result", "expect_error_msg"],
+    [
+        # No filtering - return unchanged
+        (
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output2": [{"href": "http://example.com/data2"}, {"href": "http://example.com/data3"}]
+            },
+            None,
+            True,
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output2": [{"href": "http://example.com/data2"}, {"href": "http://example.com/data3"}]
+            },
+            None
+        ),
+        # Simple ID filtering
+        (
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output2": {"href": "http://example.com/data2"},
+                "output3": {"href": "http://example.com/data3"}
+            },
+            ["output1", "output3"],
+            True,
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output3": {"href": "http://example.com/data3"}
+            },
+            None
+        ),
+        # Array with specific indices (with None placeholders)
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"},
+                    {"href": "http://example.com/data2"},
+                    {"href": "http://example.com/data3"}
+                ]
+            },
+            [("output1", 1), ("output1", 3)],
+            True,
+            {
+                "output1": [
+                    None,
+                    {"href": "http://example.com/data1"},
+                    None,
+                    {"href": "http://example.com/data3"}
+                ]
+            },
+            None
+        ),
+        # Array preserve length with None placeholders
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"},
+                    {"href": "http://example.com/data2"}
+                ]
+            },
+            [("output1", 0), ("output1", 2)],
+            True,
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    None,
+                    {"href": "http://example.com/data2"}
+                ]
+            },
+            None
+        ),
+        # Single value with index 0 (allowed)
+        (
+            {"output1": {"href": "http://example.com/data"}},
+            [("output1", 0)],
+            True,
+            {"output1": {"href": "http://example.com/data"}},
+            None
+        ),
+        # Single value with invalid index (error)
+        (
+            {"output1": {"href": "http://example.com/data"}},
+            [("output1", 1)],
+            False,
+            None,
+            "not an array"
+        ),
+        # Array index out of range (error)
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"}
+                ]
+            },
+            [("output1", 5)],
+            False,
+            None,
+            "out of range"
+        ),
+        # Negative array index (error)
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"}
+                ]
+            },
+            [("output1", -1)],
+            False,
+            None,
+            "out of range"
+        ),
+        # Mixed simple and indexed IDs
+        (
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output2": [
+                    {"href": "http://example.com/data2-0"},
+                    {"href": "http://example.com/data2-1"},
+                    {"href": "http://example.com/data2-2"}
+                ],
+                "output3": {"href": "http://example.com/data3"}
+            },
+            ["output1", ("output2", 1)],
+            True,
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output2": [
+                    None,
+                    {"href": "http://example.com/data2-1"},
+                    None
+                ]
+            },
+            None
+        ),
+        # Multiple indices for same output
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"},
+                    {"href": "http://example.com/data2"},
+                    {"href": "http://example.com/data3"},
+                    {"href": "http://example.com/data4"}
+                ]
+            },
+            [("output1", 0), ("output1", 2), ("output1", 4)],
+            True,
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    None,
+                    {"href": "http://example.com/data2"},
+                    None,
+                    {"href": "http://example.com/data4"}
+                ]
+            },
+            None
+        ),
+        # Non-existent output ID (filtered out)
+        (
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output2": {"href": "http://example.com/data2"}
+            },
+            ["output1", "output999"],
+            True,
+            {"output1": {"href": "http://example.com/data1"}},
+            None
+        ),
+        # Empty array with index (error)
+        (
+            {"output1": []},
+            [("output1", 0)],
+            False,
+            None,
+            "out of range"
+        ),
+        # Single element array
+        (
+            {"output1": [{"href": "http://example.com/data0"}]},
+            [("output1", 0)],
+            True,
+            {"output1": [{"href": "http://example.com/data0"}]},
+            None
+        ),
+        # Simple values (string literals)
+        (
+            {"out1": "val1", "out2": "val2", "out3": "val3"},
+            ["out1", "out3"],
+            True,
+            {"out1": "val1", "out3": "val3"},
+            None
+        ),
+        # Array with string values
+        (
+            {"out1": ["a", "b", "c"]},
+            [("out1", 0), ("out1", 2)],
+            True,
+            {"out1": ["a", None, "c"]},
+            None
+        ),
+        # Array without index - returns full array, filters other outputs
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"},
+                    {"href": "http://example.com/data2"}
+                ],
+                "output2": {"href": "http://example.com/other"},
+                "output3": ["a", "b", "c"]
+            },
+            ["output1"],
+            True,
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"},
+                    {"href": "http://example.com/data2"}
+                ]
+            },
+            None
+        ),
+        # Single value without index - returns as-is, filters other outputs
+        (
+            {
+                "output1": {"href": "http://example.com/data"},
+                "output2": ["a", "b"],
+                "output3": {"href": "http://example.com/other"}
+            },
+            ["output1"],
+            True,
+            {"output1": {"href": "http://example.com/data"}},
+            None
+        ),
+        # Array with index 0 - returns only that element with None placeholders, filters other outputs
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"},
+                    {"href": "http://example.com/data2"}
+                ],
+                "output2": {"href": "http://example.com/other"},
+                "output3": ["x", "y", "z"]
+            },
+            [("output1", 0)],
+            True,
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    None,
+                    None
+                ]
+            },
+            None
+        ),
+        # Mix of array without index and single value without index
+        (
+            {
+                "arr1": ["a", "b", "c"],
+                "single1": "value1",
+                "arr2": [1, 2, 3, 4],
+                "single2": "value2",
+                "arr3": ["x", "y"]
+            },
+            ["arr1", "single1", "arr2"],
+            True,
+            {
+                "arr1": ["a", "b", "c"],
+                "single1": "value1",
+                "arr2": [1, 2, 3, 4]
+            },
+            None
+        ),
+        # Mix of array with index and array without index
+        (
+            {
+                "arr1": ["a", "b", "c"],
+                "arr2": [1, 2, 3, 4],
+                "arr3": ["x", "y", "z"]
+            },
+            ["arr1", ("arr2", 1), ("arr2", 3)],
+            True,
+            {
+                "arr1": ["a", "b", "c"],
+                "arr2": [None, 2, None, 4]
+            },
+            None
+        ),
+    ]
+)
+def test_filter_outputs(
+    outputs,            # type: ExecutionResults
+    output_ids,         # type: Optional[List[Union[str, Tuple[str, int]]]]
+    expect_success,     # type: bool
+    expect_result,      # type: Optional[ExecutionResults]
+    expect_error_msg,   # type: Optional[str]
+):                      # type: (...) -> None
+    outputs_copy = copy.deepcopy(outputs)
+    result = WeaverClient._filter_outputs(outputs_copy, output_ids)
+
+    assert isinstance(result, OperationResult)
+    if expect_success:
+        assert result.success
+        assert result.body == expect_result
+    else:
+        assert not result.success
+        if expect_error_msg:
+            assert expect_error_msg in result.message.lower()
