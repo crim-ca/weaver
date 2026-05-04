@@ -410,6 +410,8 @@ class VaultFileException(WeaverException):
     """
 
     locator = "vault"
+
+
 class VaultFileNotFound(HTTPNotFound, OWSNotFound, VaultFileException):
     """
     Error related to a non-existent vault file definition.
@@ -435,6 +437,8 @@ class VaultFileInstanceError(HTTPInternalServerError, OWSNoApplicableCode, Vault
     Error indicating that a given object doesn't correspond to an expected
     instance of :class:`weaver.datatype.VaultFile`.
     """
+
+
 # FIXME:
 #   https://github.com/crim-ca/weaver/issues/215
 #   define common Exception classes that won't require this type of conversion
