@@ -207,6 +207,7 @@ class DecimalCodec(TypeCodec):
     """
     Converter that will automatically perform necessary encoding/decoding of decimal types for `MongoDB`.
     """
+
     python_type = decimal.Decimal
     bson_type = bson.Decimal128
 
