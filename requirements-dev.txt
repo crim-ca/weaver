@@ -14,7 +14,7 @@ bump-my-version
 codacy-coverage
 coverage
 doc8>=2.0.0
-docformatter>=1.7.7
+docformatter>=1.7.8
 flake8>=7
 flynt
 isort>=5
