@@ -4,6 +4,7 @@ Errors raised during the Weaver flow.
 Some of these error inherit from :class:`weaver.owsexceptions.OWSException` and their derived classes to allow
 :mod:`pywps` to automatically understand and render those exception if raised by an underlying :mod:`weaver` operation.
 """
+
 import functools
 import logging
 from typing import TYPE_CHECKING
@@ -44,6 +45,7 @@ class WeaverException(Exception):
     """
     Base class of exceptions defined by :mod:`weaver` package.
     """
+
     code = 500
     title = "Internal Server Error"
     detail = message = comment = explanation = "Unknown error"
@@ -65,6 +67,7 @@ class ListingInvalidParameter(WeaverException, OWSInvalidParameterValue, ValueEr
     """
     Error related to an invalid parameter for listing queries.
     """
+
     code = 400
 
 
@@ -75,6 +78,7 @@ class InvalidIdentifierValue(HTTPBadRequest, OWSInvalidParameterValue, WeaverExc
     Error indicating that an ID to be employed for following operations
     is not considered as valid to allow further processing or usage.
     """
+
     code = 400
     locator = "identifier"
 
@@ -86,6 +90,7 @@ class MissingIdentifierValue(HTTPBadRequest, OWSMissingParameterValue, WeaverExc
     Error indicating that an ID to be employed for following operations
     was missing and cannot continue further processing or usage.
     """
+
     code = 400
     locator = "identifier"
 
@@ -94,6 +99,7 @@ class ServiceException(OWSException, WeaverException):
     """
     Base exception related to a :class:`weaver.datatype.Service`.
     """
+
     locator = "service"
 
 
@@ -134,6 +140,7 @@ class ProcessException(OWSException, WeaverException):
     """
     Base exception related to a :class:`weaver.datatype.Process`.
     """
+
     locator = "process"
 
 
@@ -183,6 +190,7 @@ class JobException(WeaverException):
     """
     Base exception related to a :class:`weaver.datatype.Job`.
     """
+
     locator = "job"
 
 
@@ -247,6 +255,7 @@ class PackageException(WeaverException):
     """
     Base exception related to a :class:`weaver.processes.wps_package.Package`.
     """
+
     locator = "package"
 
 
@@ -317,6 +326,7 @@ class QuoteException(WeaverException):
     """
     Base exception related to a :class:`weaver.datatype.Quote`.
     """
+
     locator = "quote"
 
 
@@ -363,6 +373,7 @@ class BillException(WeaverException):
     """
     Base exception related to a :class:`weaver.datatype.Bill`.
     """
+
     locator = "bill"
 
 
@@ -397,9 +408,8 @@ class VaultFileException(WeaverException):
     """
     Base exception related to a :class:`weaver.datatype.VaultFile`.
     """
+
     locator = "vault"
-
-
 class VaultFileNotFound(HTTPNotFound, OWSNotFound, VaultFileException):
     """
     Error related to a non-existent vault file definition.
@@ -425,8 +435,6 @@ class VaultFileInstanceError(HTTPInternalServerError, OWSNoApplicableCode, Vault
     Error indicating that a given object doesn't correspond to an expected
     instance of :class:`weaver.datatype.VaultFile`.
     """
-
-
 # FIXME:
 #   https://github.com/crim-ca/weaver/issues/215
 #   define common Exception classes that won't require this type of conversion
