@@ -14,7 +14,11 @@ bump-my-version
 codacy-coverage
 coverage
 doc8>=2.0.0
-docformatter>=1.7.7
+# avoid 1.7.8 with many regressions
+# - https://github.com/PyCQA/docformatter/issues/343
+# - https://github.com/PyCQA/docformatter/issues/344
+# - https://github.com/PyCQA/docformatter/issues/345
+docformatter>=1.7.7,!=1.7.8
 flake8>=7
 flynt
 isort>=5
