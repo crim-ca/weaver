@@ -119,7 +119,7 @@ python-box
 python-dateutil
 pytz
 pywps==4.7.0
-pyyaml>=5.4
+pyyaml>=6.0.3
 rdflib>=5  # pyup: ignore
 requests>=2.33.1
 requests_file
