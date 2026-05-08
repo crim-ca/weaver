@@ -813,22 +813,16 @@ def get_job_results(request):
 @sd.provider_results_index_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
     schema=sd.ProviderResultsIndexEndpoint(),
-    accept=ContentType.APP_JSON,
-    renderer=OutputFormat.JSON,
     response_schemas=sd.get_provider_results_index_responses,
 )
 @sd.process_results_index_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
     schema=sd.ProcessResultsIndexEndpoint(),
-    accept=ContentType.APP_JSON,
-    renderer=OutputFormat.JSON,
     response_schemas=sd.get_job_results_index_responses,
 )
 @sd.job_results_index_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS],
     schema=sd.JobResultsIndexEndpoint(),
-    accept=ContentType.APP_JSON,
-    renderer=OutputFormat.JSON,
     response_schemas=sd.get_job_results_index_responses,
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
@@ -845,6 +839,8 @@ def get_job_result_index(request):
         /jobs/{jobId}/results/output_array/1  -> returns second element
     """
     job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_success(job, request)
     output_id = request.matchdict.get("output_id")
 
     try:

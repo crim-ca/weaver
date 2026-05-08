@@ -956,7 +956,8 @@ def get_job_result_by_index(
     Retrieve a specific indexed value from a job result array.
 
     Given an output that is an array (or multi-value result), this function retrieves
-    a specific element by its zero-based index and returns it as JSON.
+    a specific element by its zero-based index. The output format respects content negotiation
+    via Accept headers and follows the same transmission mode and formatting logic as single outputs.
 
     For Example
         /jobs/{jobId}/results/output_array/0  -> returns first element
@@ -965,8 +966,8 @@ def get_job_result_by_index(
     :param job: Job from which to retrieve the indexed result.
     :param output_id: Identifier of the output containing the array.
     :param index: Zero-based index of the element to retrieve (must be a valid integer).
-    :param container: Container giving access to instance settings.
-    :return: HTTP response with the indexed element as JSON.
+    :param container: Container giving access to instance settings and request context for format negotiation.
+    :return: HTTP response with the indexed element in the appropriate format (raw data, JSON, reference, etc.).
     :raises HTTPBadRequest: If index is negative or out of range.
     :raises HTTPNotFound: If the output ID is not found in the job results.
     :raises HTTPUnprocessableEntity: If the output is not an array.
@@ -1023,7 +1024,16 @@ def get_job_result_by_index(
 
     indexed_element = output_value[index]
 
-    return HTTPOk(json=indexed_element)
+    if isinstance(indexed_element, dict) and "href" in indexed_element:
+        result = indexed_element
+    else:
+        result = {"value": indexed_element}
+
+    settings = get_settings(container)
+    headers = ResponseHeaders()
+    request = container if not isinstance(container, dict) else None
+    accept = str(request.accept) if request and request.accept else None
+    return resolve_result_single(job, result, output_id, accept, headers, settings=settings)
 
 
 def generate_or_resolve_result(
@@ -1081,7 +1091,11 @@ def generate_or_resolve_result(
     else:
         typ = get_field(result, "mime_type", search_variations=True, default=ContentType.TEXT_PLAIN)
 
-    out = clean_media_type_format(get_field(output_format, "mime_type", search_variations=True, default=None))
+    # Handle output_format as either string (Accept header) or dict (format spec)
+    if isinstance(output_format, str):
+        out = clean_media_type_format(output_format, strip_parameters=True)
+    else:
+        out = clean_media_type_format(get_field(output_format, "mime_type", search_variations=True, default=None))
 
     # Apply transform if type is different from desired output and desired output is different from plain
     if out and out not in EXCLUDED_TYPES and out != typ:
@@ -1257,7 +1271,16 @@ def get_job_results_single(
 
     ctype = out_headers.get("Content-Type")
     if not ctype:
-        ctype = get_field(result, "mediaType", search_variations=True, default=ContentType.TEXT_PLAIN)
+        ctype = get_field(result, "mediaType", search_variations=True, default=None)
+
+    # If no explicit content-type and data is JSON-serializable, return as JSON
+    if not ctype and isinstance(out_data, (dict, list)):
+        return HTTPOk(json=out_data, headers=headers)
+
+    # Default to text/plain if no content-type specified
+    if not ctype:
+        ctype = ContentType.TEXT_PLAIN
+
     c_enc = cast("AnyContentEncoding", headers.get("Content-Encoding") or "UTF-8")  # type: AnyContentEncoding
     out_data = data2str(out_data)
     out_data = ContentEncoding.encode(out_data, c_enc)

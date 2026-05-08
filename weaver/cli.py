@@ -3154,6 +3154,7 @@ class ValidateSettingAction(argparse._AppendAction):  # noqa: W0212
 
         setting_name=setting_value
     """
+
     def __call__(self, parser, namespace, values, option_string=None):
         # type: (argparse.ArgumentParser, argparse.Namespace, Union[str, Sequence[Any], None], Optional[str]) -> None
         """
