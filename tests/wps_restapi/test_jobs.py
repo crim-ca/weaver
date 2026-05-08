@@ -2248,7 +2248,7 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/processes/{self.process_public.identifier}/jobs/{new_job.id}/results/output/1"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.json == "b"
+        assert resp.text == "b"
 
     @pytest.mark.job
     @pytest.mark.oap_part4
