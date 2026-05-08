@@ -604,10 +604,9 @@ if TYPE_CHECKING:
         "inputs": JobInputs,
         "outputs": JobOutputs,
     })
-    QuoteStepOutput = Union[
-        TypedDict("QuoteStepOutputLiteral", {"value": Number}, total=True),
-        TypedDict("QuoteStepOutputComplex", {"size": Number}, total=True),
-    ]
+    QuoteStepOutputLiteral = TypedDict("QuoteStepOutputLiteral", {"value": Number}, total=True)
+    QuoteStepOutputComplex = TypedDict("QuoteStepOutputComplex", {"size": Number}, total=True)
+    QuoteStepOutput = Union[QuoteStepOutputLiteral, QuoteStepOutputComplex]
     QuoteStepOutputParameters = Dict[str, QuoteStepOutput]
     QuoteProcessResults = TypedDict("QuoteProcessResults", {
         "flat": NotRequired[Number],
@@ -676,7 +675,7 @@ if TYPE_CHECKING:
         "title": NotRequired[str],
         "description": NotRequired[str],
         "enum": NotRequired[List[Union[str, Number]]],
-        "items": NotRequired[List[_OpenAPISchema, OpenAPISchemaReference]],
+        "items": NotRequired[List[Union[_OpenAPISchema, OpenAPISchemaReference]]],
         "required": NotRequired[List[str]],
         "nullable": NotRequired[bool],
         "deprecated": NotRequired[bool],

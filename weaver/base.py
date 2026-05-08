@@ -1,6 +1,7 @@
 """
 Definitions of base classes employed across multiple modules to avoid circular import errors.
 """
+
 import abc
 import enum
 import inspect

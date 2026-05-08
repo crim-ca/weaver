@@ -144,6 +144,7 @@ class OperationResult(AutoBase):
     :param body: Content of :term:`JSON` response or fallback in plain text.
     :param text: Pre-formatted text representation of :paramref:`body`.
     """
+
     success = False     # type: Optional[bool]
     message = ""        # type: Optional[str]
     headers = {}        # type: Optional[AnyHeadersContainer]
@@ -420,6 +421,7 @@ class WeaverClient(object):
     """
     Client that handles common HTTP requests with a `Weaver` or similar :term:`OGC API - Processes` instance.
     """
+
     # default configuration parameters, overridable by corresponding method parameters
     monitor_timeout = 60    # maximum delay to wait for job completion
     monitor_interval = 5    # interval between monitor pooling job status requests
@@ -2448,7 +2450,7 @@ class WeaverClient(object):
         # with this endpoint, outputs IDs are directly at the root of the body
         result_url = f"{job_url}/results"
         LOGGER.info("Retrieving results from [%s]", result_url)
-        headers = headers or {}
+        headers = CaseInsensitiveDict(headers or {})
         headers.update({
             "Accept": ContentType.APP_JSON,
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
@@ -3132,6 +3134,7 @@ class ValidateMethodAction(argparse.Action):
     """
     Action that will validate that the input argument one of the accepted HTTP methods.
     """
+
     methods = ["GET", "HEAD", "POST", "PUT", "DELETE"]
 
     def __call__(self, parser, namespace, values, option_string=None):

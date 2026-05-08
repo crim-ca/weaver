@@ -35,7 +35,7 @@ colander<2
 cornice
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
-cryptography>=46.0.5
+cryptography>=47.0.0
 # FIXME: properly support GPU execution
 #   - https://github.com/crim-ca/weaver/issues/104
 #   - https://github.com/crim-ca/weaver/issues/138
@@ -105,8 +105,8 @@ pymongo>=4.6.3  # either (pymongo>=4, kombu>=5.3.0b2) or (pymongo<4, celery<5.2)
 # below setuptools pin is placed here purposely instead of 'requirements-sys.txt' in order to keep it
 # aligned with its upstream 'pyramid' dependency expecting 'pkg_resources' that has official been removed
 setuptools<82
-pyramid>=1.7.3
-pyramid_beaker>=0.8
+pyramid>=2.1
+pyramid_beaker>=0.9
 # see https://github.com/sontek/pyramid_celery/pull/102 to fix Python 3.12 support and other improvements
 #pyramid_celery>=4.0.0   # required for celery>=5
 pyramid_celery @ git+https://github.com/crim-ca/pyramid_celery.git@5.0.0a
@@ -119,7 +119,7 @@ python-box
 python-dateutil
 pytz
 pywps==4.7.0
-pyyaml>=5.4
+pyyaml>=6.0.3
 rdflib>=5  # pyup: ignore
 requests>=2.33.1
 requests_file
@@ -137,4 +137,4 @@ urlmatch
 xmltodict>=1.0.2
 webob
 werkzeug>=3.1.5
-zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=3.23.1 # not directly required, pinned by Snyk to avoid a vulnerability

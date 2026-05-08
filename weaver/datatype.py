@@ -1,6 +1,7 @@
 """
 Definitions of types used by tokens.
 """
+
 import abc
 import base64
 import copy
@@ -2086,6 +2087,7 @@ class VaultFile(Authentication):
     """
     Dictionary that contains :term:`Vault` file and its authentication information.
     """
+
     type = AuthenticationTypes.VAULT
     bytes = 32
 
@@ -3153,6 +3155,7 @@ class Quote(PriceMixin, Base):
 
     It always has ``id`` and ``process`` keys.
     """
+
     # pylint: disable=C0103,invalid-name
 
     def __init__(self, *args, **kwargs):
