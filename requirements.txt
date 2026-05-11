@@ -128,7 +128,7 @@ requests_toolbelt @ git+https://github.com/crim-ca/requests-toolbelt.git@patch-m
 ruamel.yaml>=0.19.1
 # force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
 # employed by cwltool -> schema-salad -> mistune
-schema-salad>=8.3.20221209165047,<9
+schema-salad>=8.9.20260417192335,<9
 shapely
 simplejson
 # urllib3 not directly required, pinned by Snyk to avoid CVE-2024-37891
