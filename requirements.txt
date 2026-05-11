@@ -104,7 +104,7 @@ pymongo>=4.6.3  # either (pymongo>=4, kombu>=5.3.0b2) or (pymongo<4, celery<5.2)
 #   (https://github.com/Pylons/pyramid/issues/3731, https://github.com/pypa/setuptools/pull/5007)
 # below setuptools pin is placed here purposely instead of 'requirements-sys.txt' in order to keep it
 # aligned with its upstream 'pyramid' dependency expecting 'pkg_resources' that has official been removed
-setuptools<82
+setuptools<83
 pyramid>=2.1
 pyramid_beaker>=0.9
 # see https://github.com/sontek/pyramid_celery/pull/102 to fix Python 3.12 support and other improvements
