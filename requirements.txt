@@ -120,7 +120,7 @@ python-dateutil
 pytz
 pywps==4.7.0
 pyyaml>=6.0.3
-rdflib>=5  # pyup: ignore
+rdflib>=7.6.0  # pyup: ignore
 requests>=2.33.1
 requests_file
 # FIXME: https://github.com/requests/toolbelt/pull/380
