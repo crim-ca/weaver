@@ -1132,8 +1132,17 @@ stop-worker: 		## stop worker instance(s) started with celery
 	fi'
 
 .PHONY: status
-status: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
-	@lsof -i :4001 || echo "No instance running"
+status:		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
+	@bash -c 'if [ -f "$(MANAGER_PIDFILE)" ]; then \
+		pid=$$(cat "$(MANAGER_PIDFILE)" 2>/dev/null || true); \
+		if [ -n "$$pid" ] && kill -0 $$pid 2>/dev/null; then \
+			ps -p $$pid -o pid,cmd; \
+		else \
+			echo "No manager instance running"; \
+		fi; \
+	else \
+		lsof -i :4001 || echo "No instance running"; \
+	fi'
 
 # Reapply config if overrides were defined.
 # Ensure overrides take precedence over targets and auto-resolution logic of variables.
