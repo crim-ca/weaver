@@ -136,5 +136,5 @@ urllib3>=2.6.3
 urlmatch
 xmltodict>=1.0.4
 webob
-werkzeug>=3.1.5
+werkzeug>=3.1.8
 zipp>=3.23.1 # not directly required, pinned by Snyk to avoid a vulnerability
