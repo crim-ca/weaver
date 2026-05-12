@@ -32,19 +32,26 @@ done
 # Check for broken cross-references
 echo ""
 echo "Checking cross-references..."
+broken_refs=()
 for skill in .agents/skills/*/SKILL.md; do
-  grep -o '\.\./[^/)]*)' "$skill" 2>/dev/null | while read ref; do
+  while IFS= read -r ref; do
     target=$(echo "$ref" | sed 's/\.\.\/\([^/]*\).*/\1/')
     if [ ! -d ".agents/skills/$target" ]; then
-      echo "✗ Broken reference in $skill: $ref"
-      ERRORS=$((ERRORS + 1))
+      broken_refs+=("✗ Broken reference in $skill: $ref")
     fi
-  done
+  done < <(grep -o '\.\./[^/)]*)' "$skill" 2>/dev/null)
 done
+
+ERRORS=${#broken_refs[@]}
+if [ "$ERRORS" -gt 0 ]; then
+  for ref in "${broken_refs[@]}"; do
+    echo "$ref"
+  done
+fi
 
 echo ""
 echo "=========================="
-if [ $ERRORS -eq 0 ]; then
+if [ "$ERRORS" -eq 0 ]; then
   echo "✅ All validations passed"
   exit 0
 else

@@ -8,12 +8,12 @@ import sys
 
 import yaml
 
-skills_dir = ".agents/skills"
+SKILLS_DIR = ".agents/skills"
 errors = []
 warnings = []
 
-for skill_name in sorted(os.listdir(skills_dir)):
-    skill_path = os.path.join(skills_dir, skill_name, "SKILL.md")
+for skill_name in sorted(os.listdir(SKILLS_DIR)):
+    skill_path = os.path.join(SKILLS_DIR, skill_name, "SKILL.md")
     if not os.path.isfile(skill_path):
         continue
 
