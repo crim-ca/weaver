@@ -26,7 +26,7 @@ Register an external WPS or OGC API - Processes service as a remote provider.
 
 ### Required
 
-- **provider\_id** (string): Unique provider identifier
+- **provider_id** (string): Unique provider identifier
 - **url** (string): Provider service URL
 
 ### Optional

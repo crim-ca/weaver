@@ -25,7 +25,7 @@ Retrieve the CWL application package definition for a deployed process.
 
 ### Required
 
-- **process\_id** (string): Process identifier
+- **process_id** (string): Process identifier
 
 ### Optional
 

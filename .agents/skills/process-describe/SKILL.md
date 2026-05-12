@@ -25,7 +25,7 @@ Retrieve complete process description including inputs, outputs, and metadata.
 
 ### Required
 
-- **process\_id** (string): Process identifier to describe
+- **process_id** (string): Process identifier to describe
 
 ### Optional
 

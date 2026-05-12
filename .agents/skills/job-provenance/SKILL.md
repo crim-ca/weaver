@@ -5,7 +5,7 @@ description: |
   Includes information about inputs, outputs, processes, agents, and temporal relationships for
   reproducibility and data lineage tracking.
 license: Apache-2.0
-compatibility: Requires Weaver API access with provenance feature enabled (weaver.cwl\_prov=true).
+compatibility: Requires Weaver API access with provenance feature enabled (weaver.cwl_prov=true).
 metadata:
 ---
 
@@ -26,7 +26,7 @@ Retrieve W3C PROV provenance metadata for tracking execution lineage and data de
 
 ### Required
 
-- **job\_id** (string): Job identifier
+- **job_id** (string): Job identifier
 
 ### Optional
 

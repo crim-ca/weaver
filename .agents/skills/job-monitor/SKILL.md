@@ -23,7 +23,7 @@ Continuously monitor a job until completion or timeout with regular status polli
 
 ### Required
 
-- **job\_id** (string): Job identifier to monitor
+- **job_id** (string): Job identifier to monitor
 
 ### Optional
 

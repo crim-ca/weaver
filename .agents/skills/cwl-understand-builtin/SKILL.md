@@ -1,7 +1,7 @@
 ---
 name: cwl-understand-builtin
 description: |
-  Use Weaver's built-in processes including jsonarray2netcdf, file2string\_array, and other utility
+  Use Weaver's built-in processes including jsonarray2netcdf, file2string_array, and other utility
   processes. Learn when to use builtins instead of custom Docker containers for common operations.
   Use to simplify workflows and avoid unnecessary Docker complexity.
 license: Apache-2.0
@@ -75,7 +75,7 @@ steps:
     out: [output]
 ```
 
-### file2string\_array
+### file2string_array
 
 Convert a file to an array of strings (one per line).
 

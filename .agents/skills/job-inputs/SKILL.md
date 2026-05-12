@@ -26,7 +26,7 @@ Retrieve the input values that were provided when a job was executed.
 
 ### Required
 
-- **job\_id** (string): Job identifier
+- **job_id** (string): Job identifier
 
 ## CLI Usage
 

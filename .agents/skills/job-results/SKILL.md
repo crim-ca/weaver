@@ -23,11 +23,11 @@ Retrieve output results from a successfully completed job.
 
 ### Required
 
-- **job\_id** (string): Job identifier
+- **job_id** (string): Job identifier
 
 ### Optional
 
-- **output\_dir** (path): Directory to download output files
+- **output_dir** (path): Directory to download output files
 - **download** (boolean): Whether to download files locally
 
 ## CLI Usage

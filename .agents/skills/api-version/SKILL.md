@@ -85,7 +85,7 @@ Weaver application version (e.g., "6.8.3")
 - Minor version: New features
 - Patch version: Bug fixes
 
-### db\_version
+### db_version
 
 Database schema version
 

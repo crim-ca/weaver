@@ -24,7 +24,7 @@ Execute a deployed process with specified inputs in synchronous or asynchronous 
 
 ### Required
 
-- **process\_id** (string): Process identifier to execute
+- **process_id** (string): Process identifier to execute
 - **inputs** (object or file): Process input values
   - Can be JSON/YAML file path
   - Can be inline key=value pairs
@@ -39,7 +39,7 @@ Execute a deployed process with specified inputs in synchronous or asynchronous 
 - **response** (string): Response format
   - `document`: Full job status document (default)
   - `raw`: Direct output results
-- **output\_transmission** (string): How outputs are returned
+- **output_transmission** (string): How outputs are returned
   - `reference`: URLs to output files (default)
   - `value`: Inline output values
 - **subscribers** (object): Notification callbacks for job events

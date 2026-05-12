@@ -24,7 +24,7 @@ Deploy a new process or application package to Weaver using CWL (Common Workflow
 
 ### Required
 
-- **process\_id** (string): Unique identifier for the process (lowercase, hyphens allowed)
+- **process_id** (string): Unique identifier for the process (lowercase, hyphens allowed)
 - **package** (CWL object or file path): Application package definition
   - Can be CWL YAML/JSON file
   - Can be reference URL to remote process

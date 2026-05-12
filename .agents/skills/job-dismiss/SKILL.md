@@ -25,7 +25,7 @@ Cancel a running or pending job and mark it as dismissed.
 
 ### Required
 
-- **job\_id** (string): Job identifier to cancel
+- **job_id** (string): Job identifier to cancel
 
 ## CLI Usage
 

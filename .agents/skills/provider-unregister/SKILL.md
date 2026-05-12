@@ -25,7 +25,7 @@ Remove a registered remote provider from Weaver.
 
 ### Required
 
-- **provider\_id** (string): Provider identifier to remove
+- **provider_id** (string): Provider identifier to remove
 
 ## CLI Usage
 

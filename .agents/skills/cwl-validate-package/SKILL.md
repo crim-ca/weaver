@@ -25,12 +25,12 @@ Validate CWL package syntax and structure before deploying to Weaver.
 
 ### Required
 
-- **package\_file** (path): CWL file to validate (.cwl or .yaml)
+- **package_file** (path): CWL file to validate (.cwl or .yaml)
 
 ### Optional
 
 - **strict** (boolean): Enable strict validation mode
-- **check\_docker** (boolean): Verify Docker images are accessible
+- **check_docker** (boolean): Verify Docker images are accessible
 
 ## CLI Usage
 

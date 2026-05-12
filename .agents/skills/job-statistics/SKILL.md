@@ -26,7 +26,7 @@ Retrieve execution statistics and resource usage for a job.
 
 ### Required
 
-- **job\_id** (string): Job identifier
+- **job_id** (string): Job identifier
 
 ## CLI Usage
 

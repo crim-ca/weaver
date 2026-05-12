@@ -23,7 +23,7 @@ Remove a deployed process from Weaver permanently.
 
 ### Required
 
-- **process\_id** (string): Process identifier to remove
+- **process_id** (string): Process identifier to remove
 
 ### Optional
 

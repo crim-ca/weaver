@@ -25,7 +25,7 @@ Retrieve detailed exception and error information for failed jobs.
 
 ### Required
 
-- **job\_id** (string): Job identifier
+- **job_id** (string): Job identifier
 
 ## CLI Usage
 
