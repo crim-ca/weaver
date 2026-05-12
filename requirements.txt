@@ -80,7 +80,7 @@ mako
 # provides multibase and multihash encoding for resource integrity verification
 multiformats>=0.3.1
 mypy_boto3_s3
-numpy>=1.22.2
+numpy>=2.2.6
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
 owslib==0.35.0
