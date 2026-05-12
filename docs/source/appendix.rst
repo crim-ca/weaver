@@ -65,6 +65,12 @@ Glossary
         Please refer to the :term:`OGC` official |ogc-collection|_ for more details
         and complementary terminology.
 
+    CURIE
+    Compact URI
+        A shortened representation of a :term:`URI` that uses a prefix and a reference separated by a colon,
+        such as ``prefix:reference``. In the context of :term:`OGC API`, this is often used to represent a
+        link relation (``rel``) value in HTTP headers or other locations (e.g.: ``[ogc-rel:results]``).
+
     CRS
     Coordinate Reference System
         Geospatial data encoding of the representation parameters, describing the structure to locate entities,
@@ -195,7 +201,8 @@ Glossary
         | String representation of a set of key-value pairs, usually but not limited to, ``=`` character
           separating keys from their values, ``,`` for multi-value (array) definitions, and another separator
           such as ``&`` or ``;`` to distinguish between distinct pairs. Specific separators, and any applicable
-          escaping methods, depend on context, such as in URL query, HTTP header, :term:`CLI` parameter, etc.
+          escaping methods, depend on context, such as in URL query, HTTP header, :term:`CLI` parameter,
+          within :ref:`proc_exec_kvp` request parameters, etc.
 
     Media-Type
     Media-Types
@@ -226,10 +233,19 @@ Glossary
         .. seealso::
             |ogc|_
 
+    OGC API
+        Regroups all the :term:`API` standards defined by :term:`OGC`, including :term:`OGC API - Processes`.
+        These are often distinguished from the older :term:`OWS` standards such as :term:`WPS`.
+
     OAP
     OGC API - Processes
         The new :term:`API` that defines :term:`JSON` REST-binding representation
-        of :term:`WPS` :term:`Process` collection.
+        of the older :term:`WPS` representation of :term:`Process` descriptions.
+
+        This is the **main** interface that `Weaver` employs.
+
+        .. seealso::
+            :ref:`proc_ogc_api`
 
     ONNX
         The |ONNX-long|_ standard is an open format employed for sharing machine learning model representations

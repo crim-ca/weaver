@@ -60,6 +60,7 @@ from weaver.utils import (
     apply_number_with_unit,
     assert_sane_name,
     bytes2str,
+    compute_file_digest_multibase,
     create_metalink,
     explode_headers,
     fetch_directory,
@@ -105,8 +106,8 @@ if TYPE_CHECKING:
     from responses import _Body as BodyType  # noqa: W0212
 
     from tests.utils import S3Scheme
-    from weaver.typedefs import AnyRequestType, HeadersType
-    from weaver.utils import AnyDownloadOutputMethod
+    from weaver.typedefs import AnyRequestType, HeadersType, SettingsType
+    from weaver.utils import AnyDownloadOutputMethod, AnyRequestMethod, RequestOptions
 
 AWS_S3_REGION_SUBSET = set(random.choices(AWS_S3_REGIONS, k=4))
 AWS_S3_REGION_SUBSET_WITH_MOCK = {MOCK_AWS_REGION} | AWS_S3_REGION_SUBSET
@@ -605,30 +606,115 @@ def test_get_ssl_verify_option():
         assert get_ssl_verify_option(method, url, any_wps_conf)
 
 
-def test_get_request_options():
-    assert get_request_options("get", "http://test.com", {
-        "weaver.request_options": {"requests": [
-            {"url": "http://test.com/*", "verify": False}
-        ]}
-    }) == {"verify": False}
-    assert get_request_options("get", "http://test.com", {
-        "weaver.request_options": {"requests": [
-            {"url": "http://other.com/*", "verify": False},
-            {"url": "http://test.com/*", "verify": True, "timeout": 30}
-        ]}
-    }) == {"verify": True, "timeout": 30}
-    assert get_request_options("get", "http://test.com/random", {
-        "weaver.request_options": {"requests": [
-            {"url": "http://*/random", "verify": False},  # stop at first match
-            {"url": "http://test.com/*", "verify": True, "timeout": 30}
-        ]}
-    }) == {"verify": False}
-    assert get_request_options("get", "http://test.com", {
-        "weaver.request_options": {"requests": [
-            {"url": "http://*.com", "method": "post", "verify": False},
-            {"url": "http://test.com/*", "timeout": 30}
-        ]}
-    }) == {"timeout": 30}
+@pytest.mark.parametrize(
+    ["method", "url", "request_options_spec", "expect_request_options"],
+    [
+        (
+            "GET",
+            "http://test.com",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://*", "verify": False}
+                    ]
+                }
+            },
+            {"verify": False}
+        ),
+        (
+            "GET",
+            "http://test.com",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://*", "timeout": 10, "method": "POST"},
+                        {"url": "http://*", "timeout": 20, "method": "*"},
+                    ]
+                }
+            },
+            {"timeout": 20}
+        ),
+        (
+            "POST",
+            "http://test.com",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://*", "timeout": 10, "method": "POST"},
+                        {"url": "http://*", "timeout": 20, "method": "*"},
+                    ]
+                }
+            },
+            {"timeout": 10}
+        ),
+        (
+            "GET",
+            "http://test.com",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://test.com/*", "verify": False}
+                    ]
+                }
+            },
+            {"verify": False}
+        ),
+        (
+            "GET",
+            "http://test.com",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://test.com/*", "verify": False, "timeout": 10}
+                    ]
+                }
+            },
+            {"verify": False, "timeout": 10}
+        ),
+        (
+            "GET",
+            "http://test.com",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://other.com/*", "verify": False},
+                        {"url": "http://test.com/*", "verify": True, "timeout": 30}
+                    ]
+                }
+            },
+            {"verify": True, "timeout": 30}
+        ),
+        (
+            "GET",
+            "http://test.com/random",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://*/random", "verify": False},  # stop at first match
+                        {"url": "http://test.com/*", "verify": True, "timeout": 30}
+                    ]
+                }
+            },
+            {"verify": False}
+        ),
+        (
+            "GET",
+            "http://test.com/random",
+            {
+                "weaver.request_options": {
+                    "requests": [
+                        {"url": "http://*.com", "method": "post", "verify": False},
+                        {"url": "http://test.com/*", "timeout": 30}
+                    ]
+                }
+            },
+            {"timeout": 30}
+        ),
+    ],
+)
+def test_get_request_options(method, url, request_options_spec, expect_request_options):
+    # type: (AnyRequestMethod, str, SettingsType, RequestOptions) -> None
+    assert get_request_options(method, url, request_options_spec) == expect_request_options
 
 
 def test_request_extra_allowed_codes():
@@ -2121,6 +2207,7 @@ def test_localize_datetime():
     assert dt_est_tz.timetuple()[:6] == (2000, 10, 10, 1, 12, 50)
 
 
+@pytest.mark.kvp
 @pytest.mark.parametrize(["query", "params", "expected"], [
     ("key1=val1;key2=val21,val22;key3=val3;key4", {},
      {"key1": ["val1"], "key2": ["val21", "val22"], "key3": ["val3"], "key4": []}),
@@ -2255,6 +2342,53 @@ def test_retry_on_condition(errors, raises, conditions, retries):
 
     run_test()
     run_test(1, keyword="test")
+
+
+def test_compute_file_digest_multibase():
+    """
+    Test computation of digestMultibase for W3C VC Data Integrity resource integrity verification.
+    """
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Create a test file with known content
+        test_file = os.path.join(tmpdir, "test_file.txt")
+        test_content = b"Hello, World! This is a test file for digestMultibase."
+        with open(test_file, "wb") as f:
+            f.write(test_content)
+
+        # Compute digest
+        digest = compute_file_digest_multibase(test_file)
+
+        # Verify digest format
+        assert isinstance(digest, str), "Digest should be a string"
+        assert digest.startswith("m"), "Digest should start with 'm' (base64 encoding)"
+        assert len(digest) > 10, "Digest should be a reasonable length"
+
+        # Verify digest is deterministic
+        digest2 = compute_file_digest_multibase(test_file)
+        assert digest == digest2, "Same file should produce the same digest"
+
+        # Modify file and verify digest changes
+        with open(test_file, "wb") as f:
+            f.write(test_content + b" Modified!")
+        digest3 = compute_file_digest_multibase(test_file)
+        assert digest != digest3, "Modified file should produce different digest"
+
+        # Test with different hash algorithm
+        digest_sha512 = compute_file_digest_multibase(test_file, hash_algorithm="sha512")
+        assert digest_sha512.startswith("m"), "SHA-512 digest should also use base64"
+        assert digest_sha512 != digest3, "Different hash algorithms should produce different digests"
+
+        # Test error cases
+        with pytest.raises(ValueError, match="File not found"):
+            compute_file_digest_multibase(os.path.join(tmpdir, "nonexistent.txt"))
+
+        with pytest.raises(ValueError, match="Unsupported hash algorithm"):
+            compute_file_digest_multibase(test_file, hash_algorithm="unsupported_algo")
+
+        # e.g., blake2b is in hashlib but not in hash_codes mapping
+        with pytest.raises(ValueError, match=r"not supported for multihash encoding"):
+            compute_file_digest_multibase(test_file, hash_algorithm="blake2b")
 
 
 def test_create_metalink():

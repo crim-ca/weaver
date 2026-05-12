@@ -1,15 +1,15 @@
 import itertools
 import sys
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Union, cast
 from typing_extensions import Literal, get_args
 
 from weaver.base import Constants
 
 if TYPE_CHECKING:
-    from typing import Dict, TypeAlias
+    from typing import Dict, Set, TypeAlias
 
-    from weaver.typedefs import CWL_NamespaceDefinition
+    from weaver.typedefs import CWL_IO_LiteralType, CWL_NamespaceDefinition
 
 IO_SelectInput_Type = Literal["input"]
 IO_SelectOutput_Type = Literal["output"]
@@ -337,13 +337,13 @@ PACKAGE_INTEGER_TYPES = frozenset(["int", "integer", "long"])
 PACKAGE_FLOATING_TYPES = frozenset(["float", "double"])
 PACKAGE_NUMERIC_TYPES = frozenset(PACKAGE_INTEGER_TYPES | PACKAGE_FLOATING_TYPES)
 PACKAGE_BASIC_TYPES = frozenset({"string", "boolean"} | PACKAGE_NUMERIC_TYPES)
-PACKAGE_LITERAL_TYPES = frozenset(PACKAGE_BASIC_TYPES | {"null", "Any"})
-PACKAGE_FILE_TYPE = "File"
-PACKAGE_DIRECTORY_TYPE = "Directory"
+PACKAGE_LITERAL_TYPES = cast("Set[CWL_IO_LiteralType]", frozenset(PACKAGE_BASIC_TYPES | {"null", "Any"}))
+PACKAGE_FILE_TYPE = "File"  # type: Literal["File"]
+PACKAGE_DIRECTORY_TYPE = "Directory"  # type: Literal["Directory"]
 PACKAGE_COMPLEX_TYPES = frozenset([PACKAGE_FILE_TYPE, PACKAGE_DIRECTORY_TYPE])
-PACKAGE_ENUM_BASE = "enum"
+PACKAGE_ENUM_BASE = "enum"  # type: Literal["enum"]
 PACKAGE_CUSTOM_TYPES = frozenset([PACKAGE_ENUM_BASE])  # can be anything, but support "enum" which is more common
-PACKAGE_ARRAY_BASE = "array"
+PACKAGE_ARRAY_BASE = "array"  # type: Literal["array"]
 PACKAGE_ARRAY_MAX_SIZE = sys.maxsize  # pywps doesn't allow None, so use max size  # FIXME: unbounded (weaver #165)
 PACKAGE_ARRAY_ITEMS = frozenset(PACKAGE_BASIC_TYPES | PACKAGE_CUSTOM_TYPES | PACKAGE_COMPLEX_TYPES)
 PACKAGE_ARRAY_TYPES = frozenset([f"{item}[]" for item in PACKAGE_ARRAY_ITEMS])
@@ -393,6 +393,14 @@ ProcessSchemaType = Union[
     ProcessSchemaWPSType,
     ProcessSchemaConstType,
 ]
+JobProcessingEntityOGCAPIProcessesType = Literal["ogc-api-processes"]
+JobProcessingEntityOpenEOType = Literal["openeo"]
+JobProcessingEntityConstType = "JobProcessingEntityType"  # type: TypeAlias
+AnyJobProcessingEntityType = Union[
+    JobProcessingEntityOGCAPIProcessesType,
+    JobProcessingEntityOpenEOType,
+    JobProcessingEntityConstType,
+]
 JobStatusTypeProcess = Literal["process"]
 JobStatusTypeService = Literal["service"]
 JobStatusTypeProvider = Literal["provider"]
@@ -436,6 +444,19 @@ class ProcessSchema(Constants):
     WPS = "WPS"  # type: ProcessSchemaWPSType
 
 
+class JobProcessingEntityType(Constants):
+    """
+    Entity that represent an "*executor*" that ran the :term:`Job` from a certain :term:`Process` definition.
+
+    .. seealso::
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/statusInfo.yaml
+        - https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/apis.yaml
+    """
+    # technically, other OGC APIs are allowed, but they do not make sense in this context
+    OGC_API_PROCESSES = "ogc-api-processes"     # type: JobProcessingEntityOGCAPIProcessesType
+    OPENEO = "openeo"                           # type: JobProcessingEntityOpenEOType
+
+
 class JobInputsOutputsSchema(Constants):
     """
     Schema selector to represent a :term:`Job` output results.
@@ -476,7 +497,7 @@ class JobStatusType(Constants):
 
 if TYPE_CHECKING:
     # pylint: disable=invalid-name
-    CWL_RequirementNames = Literal[
+    CWL_RequirementNames = Union[
         CWL_RequirementBuiltinType,
         CWL_RequirementESGFCWTType,
         CWL_RequirementOGCAPIType,

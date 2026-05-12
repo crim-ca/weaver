@@ -2,6 +2,7 @@ import difflib
 import errno
 import fnmatch
 import functools
+import hashlib
 import importlib.util
 import inspect
 import io
@@ -20,7 +21,7 @@ from concurrent.futures import ALL_COMPLETED, CancelledError, ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Iterable, Protocol, overload
+from typing import TYPE_CHECKING, Any, Iterable, Protocol, cast, overload
 from urllib.parse import ParseResult, parse_qsl, unquote, urlparse, urlunsplit
 
 import boto3
@@ -36,6 +37,7 @@ from botocore.exceptions import ClientError, HTTPClientError
 from bs4 import BeautifulSoup
 from celery.app import Celery
 from dateutil.parser import parse as parse_dt
+from multiformats import multibase, multihash
 from mypy_boto3_s3.literals import RegionName
 from pyramid.config import Configurator
 from pyramid.exceptions import ConfigurationError
@@ -83,6 +85,7 @@ if TYPE_CHECKING:
         AnyStr,
         Callable,
         Dict,
+        Generator,
         IO,
         Iterator,
         List,
@@ -146,12 +149,23 @@ if TYPE_CHECKING:
         "max_retries": NotRequired[int],
         "backoff": NotRequired[Number],
         "backoff_factor": NotRequired[Number],
-        "headers": NotRequired[AnyHeadersContainer],
-        "cookies": NotRequired[AnyCookiesContainer],
+        "ssl_verify": NotRequired[bool],
+        "verify": NotRequired[bool],
+        "headers": NotRequired[Optional[AnyHeadersContainer]],
+        "cookies": NotRequired[Optional[AnyCookiesContainer]],
+        "params": NotRequired[Optional[Dict[str, AnyValueType]]],
         "stream": NotRequired[bool],
         "cache": NotRequired[bool],
         "cache_enabled": NotRequired[bool],
     }, total=False)
+    RequestOptionsConfigMatcher = TypedDict("RequestOptionsConfigMatcher", {
+        "url": Required[Union[str, List[str]]],
+        "method": NotRequired[Union[AnyRequestMethod, Literal["*"], List[Union[AnyRequestMethod, Literal["*"]]]]],
+    }, total=True)
+    RequestOptionsConfigEntry = Union[RequestOptions, RequestOptionsConfigMatcher]
+    RequestOptionsSpecification = TypedDict("RequestOptionsSpecification", {
+        "requests": List[RequestOptionsConfigEntry],
+    }, total=True)
     RequestCachingKeywords = Dict[str, AnyValueType]
     RequestCachingFunction = Callable[[AnyRequestMethod, str, RequestCachingKeywords], Response]
 
@@ -673,8 +687,8 @@ def get_cookie_headers(header_container, cookie_header_name="Cookie"):
         return {}
 
 
-def get_response_profile(request, request_headers=None):
-    # type: (AnyRequestType, Optional[AnyHeadersContainer]) -> Optional[str]
+def get_response_profile(request=None, request_headers=None):
+    # type: (Optional[AnyRequestType], Optional[AnyHeadersContainer]) -> Optional[str]
     """
     Obtains the desired response profile based on request parameters.
 
@@ -697,16 +711,18 @@ def get_response_profile(request, request_headers=None):
     :param request_headers: Additional headers to consider for profile extraction.
     :return: Matched profile value if found.
     """
-    query_params = get_request_args(request)
+    query_params = get_request_args(request) if request else {}
     profile_query = query_params.get("profile")
     if profile_query:
         return profile_query or None
 
     headers = {}
-    if hasattr(request, "headers"):
+    if request and hasattr(request, "headers"):
         headers.update(request.headers)
     if request_headers:
         headers.update(request_headers)
+    if not headers:
+        return None
 
     content_profile = get_header("Accept-Profile", headers)
     if content_profile:
@@ -721,6 +737,8 @@ def get_response_profile(request, request_headers=None):
             pair_sep=";",
             nested_pair_sep=None,
             accumulate_keys=False,
+            unescape_quotes=True,
+            strip_spaces=True,
         )
         content_profile = content_params.get("profile")
         if content_profile:
@@ -756,16 +774,18 @@ def get_request_args(request):
     return dict(params)
 
 
-def parse_kvp(query,                    # type: str
-              key_value_sep="=",        # type: str
-              pair_sep=";",             # type: str
-              nested_pair_sep="",       # type: Optional[str]
-              multi_value_sep=",",      # type: Optional[str]
-              accumulate_keys=True,     # type: bool
-              unescape_quotes=True,     # type: bool
-              strip_spaces=True,        # type: bool
-              case_insensitive=True,    # type: bool
-              ):                        # type: (...) -> KVP
+def parse_kvp(
+    query,                  # type: Union[str, Dict[str, Any]]
+    key_value_sep="=",      # type: str
+    pair_sep=";",           # type: str
+    nested_pair_sep="",     # type: Optional[str]
+    multi_value_sep=",",    # type: Optional[str]
+    accumulate_keys=True,   # type: bool
+    unescape_quotes=True,   # type: bool
+    strip_spaces=True,      # type: bool
+    case_insensitive=True,  # type: bool
+    deep_object=False,      # type: bool
+):                          # type: (...) -> KVP
     """
     Parse key-value pairs using specified separators.
 
@@ -782,18 +802,44 @@ def parse_kvp(query,                    # type: str
     the top level :term:`KVP` entry ``{key}``. Separators are passed down for nested parsing,
     except :paramref:`pair_sep` that is replaced by :paramref:`nested_pair_sep`.
 
-    .. code-blocK:: python
+    .. code-block:: python
 
         >> parse_kvp("format=json&inputs=key1=value1;key2=val2,val3", pair_sep="&", nested_pair_sep=";")
         {
-            'format': ['json'],
-            'inputs': {
-                'key1': ['value1'],
-                'key2': ['val2', 'val3']
+            "format": ["json"],
+            "inputs": {
+                "key1": ["value1"],
+                "key2": ["val2", "val3"]
             }
         }
 
-    :param query: Definition to be parsed as :term:`KVP`.
+    When :paramref:`deep_object` is enabled, keys with bracket notation like ``{key}[{qualifier}]={val}`` will be
+    parsed into nested dictionaries. This follows the :term:`OpenAPI` ``deepObject`` style parameter serialization.
+
+    .. code-block:: python
+
+        >> parse_kvp("input[href]=url&input[type]=text", pair_sep="&", deep_object=True)
+        {
+            "input": {
+                "href": ["url"],
+                "type": ["text"]
+            }
+        }
+
+    With :paramref:`deep_object` enabled, if the case where both ``{key}`` and ``{key}[{qualifier}]`` is encountered,
+    the simple value (without qualifier) will be stored under ``None`` key within the nested dictionary.
+
+    .. code-block:: python
+
+        >> parse_kvp("bbox=1,2,3,4&bbox[crs]=EPSG:4326", pair_sep="&", deep_object=True)
+        {
+            "bbox": {
+                None: ["1,2,3,4"],
+                "crs": ["EPSG:4326"]
+            }
+        }
+
+    :param query: Definition to be parsed as :term:`KVP`. Can be a query string or an already-parsed dict.
     :param key_value_sep: Separator that delimits the keys from their values.
     :param pair_sep: Separator that distinguish between different ``(key, value)`` entries.
     :param nested_pair_sep: Separator to parse values of pairs containing nested :term:`KVP` definition.
@@ -806,57 +852,87 @@ def parse_kvp(query,                    # type: str
     :param case_insensitive:
         Whether to consider keys as case-insensitive.
         If ``True``, resulting keys will be normalized to lowercase. Otherwise, original keys are employed.
-    :return: Parsed KVP.
+    :param deep_object:
+        Whether to parse bracket notation ``key[qualifier]`` as nested objects similar to :term:`OpenAPI` ``deepObject``
+        style serialization. When collisions occur (both ``key`` and ``key[qualifier]`` exist), the simple value
+        is stored under ``None`` key. Parsing is performed more like a "shallow-object" since nested objects will not
+        be parsed into deeper levels to preserve the original parsing of sub-values as encoded binary data,
+        array lists, :term:`JSON` structures, etc.
+    :return: Parsed :term:`KVP`.
     :raises HTTPBadRequest: If parsing cannot be accomplished based on parsing conditions.
     """
     if not query:
         return {}
-    kvp_items = query.split(pair_sep)
-    kvp = {}
-    for item in kvp_items:
-        k_v = item.split(key_value_sep, 1)
-        if len(k_v) < 2:
-            key = k_v[0]
-            val = []
-        else:
-            key, val = k_v
-            if key_value_sep in val and nested_pair_sep:
-                val = parse_kvp(val, key_value_sep=key_value_sep, multi_value_sep=multi_value_sep,
-                                pair_sep=nested_pair_sep, nested_pair_sep=None,
-                                accumulate_keys=accumulate_keys, unescape_quotes=unescape_quotes,
-                                strip_spaces=strip_spaces, case_insensitive=case_insensitive)
-        if isinstance(val, str):  # in case nested KVP already processed
-            arr = val.split(multi_value_sep) if multi_value_sep else [val]
-            for i, val_item in enumerate(list(arr)):
-                if strip_spaces:
-                    val_item = val_item.strip()
-                if unescape_quotes and (
-                    (val_item.startswith("'") and val_item.endswith("'")) or
-                    (val_item.startswith("\"") and val_item.endswith("\""))
-                ):
-                    val_item = val_item[1:-1]
-                arr[i] = val_item
-            val = arr
-        if case_insensitive:
-            key = key.lower()
-        if strip_spaces:
-            key = key.strip()
-        if key in kvp:
-            if not accumulate_keys:
-                raise HTTPBadRequest(json={
-                    "code": "InvalidParameterValue",
-                    "description": f"Accumulation of replicated key {key} is not permitted for this query.",
-                    "value": str(query),
-                })
-            if isinstance(val, dict) or isinstance(kvp[key], dict):
-                raise HTTPBadRequest(json={
-                    "code": "InvalidParameterValue",
-                    "description": f"Accumulation of replicated key {key} is not permitted for nested definitions.",
-                    "value": str(query),
-                })
-            kvp[key].extend(val)
-        else:
-            kvp[key] = val
+
+    # If query is already a dict, skip string parsing and
+    # use it directly as KVP base for further processing
+    if isinstance(query, dict):
+        kvp = query
+    else:
+        # Parse query string into KVP dict
+        kvp_items = query.split(pair_sep)
+        kvp = {}
+        for item in kvp_items:
+            k_v = item.split(key_value_sep, 1)
+            if len(k_v) < 2:
+                key = k_v[0]
+                val = []
+            else:
+                key, val = k_v
+                if key_value_sep in val and nested_pair_sep:
+                    val = parse_kvp(val, key_value_sep=key_value_sep, multi_value_sep=multi_value_sep,
+                                    pair_sep=nested_pair_sep, nested_pair_sep=None,
+                                    accumulate_keys=accumulate_keys, unescape_quotes=unescape_quotes,
+                                    strip_spaces=strip_spaces, case_insensitive=case_insensitive)
+            if isinstance(val, str):  # in case nested KVP already processed
+                arr = val.split(multi_value_sep) if multi_value_sep else [val]
+                for i, val_item in enumerate(list(arr)):
+                    if strip_spaces:
+                        val_item = val_item.strip()
+                    if unescape_quotes and (
+                        (val_item.startswith("'") and val_item.endswith("'")) or
+                        (val_item.startswith("\"") and val_item.endswith("\""))
+                    ):
+                        val_item = val_item[1:-1]
+                    arr[i] = val_item
+                val = arr
+            if case_insensitive:
+                key = key.lower()
+            if strip_spaces:
+                key = key.strip()
+            if key in kvp:
+                if not accumulate_keys:
+                    raise HTTPBadRequest(json={
+                        "code": "InvalidParameterValue",
+                        "description": f"Accumulation of replicated key {key} is not permitted for this query.",
+                        "value": str(query),
+                    })
+                if isinstance(val, dict) or isinstance(kvp[key], dict):
+                    raise HTTPBadRequest(json={
+                        "code": "InvalidParameterValue",
+                        "description": f"Accumulation of replicated key {key} is not permitted for nested definitions.",
+                        "value": str(query),
+                    })
+                kvp[key].extend(val)
+            else:
+                kvp[key] = val
+
+    if deep_object:
+        deep_kvp = {}
+        for key, val in kvp.items():
+            if "[" in key and key.endswith("]"):
+                base_key, qualifier = key[:-1].split("[", 1)
+                # Handle collision: both 'key' and 'key[qualifier]' exist
+                if base_key in deep_kvp and not isinstance(deep_kvp[base_key], dict):
+                    deep_kvp[base_key] = {None: deep_kvp[base_key]}
+                deep_kvp.setdefault(base_key, {})[qualifier] = val
+            else:
+                if key in deep_kvp and isinstance(deep_kvp[key], dict):
+                    deep_kvp[key][None] = val
+                else:
+                    deep_kvp[key] = val
+        return deep_kvp
+
     return kvp
 
 
@@ -1249,6 +1325,65 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
+def compute_file_digest_multibase(file_path, hash_algorithm="sha256", multibase_encoding="base64"):
+    # type: (str, str, str) -> str
+    """
+    Computes the multibase-encoded multihash digest of a file for resource integrity verification.
+
+    Implements W3C VC Data Integrity specification for ``digestMultibase``.
+
+    .. seealso::
+        - :rfc:`4648`: Base64 encoding
+        - :rfc:`9052`: COSE hash algorithms
+        - `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_
+        - `Multibase <https://github.com/multiformats/multibase>`_
+        - `Multihash <https://github.com/multiformats/multihash>`_
+
+    :param file_path: Path to the file to compute the digest for.
+    :param hash_algorithm: Hash algorithm to use (default: ``sha256``).
+    :param multibase_encoding:
+        Multibase encoding to use (default: ``base64`` for techno-agnostic compatibility).
+        Common options include ``base64``, ``base64url``, ``base58btc``.
+    :return: Multibase-encoded multihash string (e.g., ``mEiB7M...`` for ``base64``, ``zQmdf...`` for ``base58btc``).
+    :raises ValueError: If the file does not exist or cannot be read.
+    """
+
+    if not os.path.isfile(file_path):
+        raise ValueError(f"File not found or not accessible: [{file_path}]")
+
+    # Compute the file hash
+    hash_func = getattr(hashlib, hash_algorithm, None)
+    if not hash_func:
+        raise ValueError(f"Unsupported hash algorithm: [{hash_algorithm}]")
+
+    hash_obj = hash_func()
+    with open(file_path, "rb") as f:
+        while chunk := f.read(8192):
+            hash_obj.update(chunk)
+    digest = hash_obj.digest()
+
+    # Create multihash (includes hash algorithm identifier)
+    # Map common hash algorithms to multihash codes
+    # See: `multicodec table <https://github.com/multiformats/multicodec/blob/master/table.csv>`_
+    hash_codes = {
+        "sha256": 0x12,  # sha2-256
+        "sha512": 0x13,  # sha2-512
+        "sha1": 0x11,    # sha1
+        "md5": 0xd5,     # md5
+    }
+    hash_code = hash_codes.get(hash_algorithm)
+    if not hash_code:
+        raise ValueError(f"Hash algorithm [{hash_algorithm}] not supported for multihash encoding")
+
+    # Encode as multihash: <hash-code><digest-length><digest-bytes>
+    mhash = multihash.wrap(digest, hash_code)
+
+    # Encode with multibase
+    digest_multibase = multibase.encode(mhash, multibase_encoding)
+
+    return digest_multibase
+
+
 def get_href_headers(
     path,                                   # type: str
     download_headers=False,                 # type: bool
@@ -1342,8 +1477,8 @@ def get_href_headers(
                 if path.startswith("https://s3."):
                     path, s3_region = resolve_s3_from_http(path)
                 s3_params = resolve_s3_http_options(**options["http"], **kwargs)
-                s3_region = s3_region or options["s3"].pop("region_name", None)
-                s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
+                s3_region = cast("RegionName", s3_region or options["s3"].pop("region_name", None))
+                s3_client = boto3.client("s3", region_name=s3_region, **s3_params)
                 s3_bucket, file_key = path[5:].split("/", 1)
                 s3_file = s3_client.head_object(Bucket=s3_bucket, Key=file_key)
                 f_type = content_type or s3_file["ContentType"]
@@ -1533,13 +1668,15 @@ def pass_http_error(exception, expected_http_error):
     """
     Silently ignore a raised HTTP error that matches the specified error code of the reference exception class.
 
-    Given an :class:`HTTPError` of any type (:mod:`pyramid`, :mod:`requests`), ignores the exception if the actual
-    error matches the status code. Other exceptions are re-raised.
-    This is equivalent to capturing a specific ``Exception`` within an ``except`` block and calling ``pass`` to drop it.
+    Given an ``HTTPError`` of any type (i.e.: :class:`PyramidHTTPError` or :class:`RequestsHTTPError` of
+    corresponding :mod:`pyramid` and :mod:`requests` modules), ignores the exception if the
+    actual error matches the status code. Other exceptions are re-raised.
+    This is equivalent to capturing a specific :class:`Exception`` within an ``except`` block
+    and calling ``pass`` to drop it.
 
     :param exception: Any :class:`Exception` instance.
-    :param expected_http_error: Single or list of specific pyramid `HTTPError` to handle and ignore.
-    :raise exception: If it doesn't match the status code or is not an `HTTPError` of any module.
+    :param expected_http_error: Single or list of specific pyramid ``HTTPError`` to handle and ignore.
+    :raise exception: If it doesn't match the status code or is not an ``HTTPError`` of any module.
     """
     if not hasattr(expected_http_error, "__iter__"):
         expected_http_error = [expected_http_error]
@@ -1894,7 +2031,7 @@ def invalidate_region(caching_args):
 
 
 def get_ssl_verify_option(method, url, settings, request_options=None):
-    # type: (str, str, AnySettingsContainer, Optional[RequestOptions]) -> bool
+    # type: (str, str, Optional[AnySettingsContainer], Optional[RequestOptions]) -> bool
     """
     Obtains the SSL verification option considering multiple setting definitions and the provided request context.
 
@@ -1919,7 +2056,7 @@ def get_ssl_verify_option(method, url, settings, request_options=None):
 
 
 def get_no_cache_option(request_headers, **cache_options):
-    # type: (HeadersType, **bool | RequestOptions) -> bool
+    # type: (AnyHeadersContainer, **bool | RequestOptions) -> bool
     """
     Obtains the ``No-Cache`` result from request headers and configured :term:`Request Options`.
 
@@ -1934,12 +2071,12 @@ def get_no_cache_option(request_headers, **cache_options):
     no_cache_header = str(get_header("Cache-Control", request_headers)).lower().replace(" ", "")
     no_cache = no_cache_header in ["no-cache", "max-age=0", "max-age=0,must-revalidate"]
     cache_params = ["cache", "cache_enabled"]
-    no_cache = no_cache is True or any(cache_options.get(cache, True) is False for cache in cache_params)
+    no_cache = no_cache is True or any(asbool(cache_options.get(cache, True)) is False for cache in cache_params)
     return no_cache
 
 
 def get_request_options(method, url, settings):
-    # type: (str, str, AnySettingsContainer) -> RequestOptions
+    # type: (str, str, Optional[AnySettingsContainer]) -> RequestOptions
     """
     Obtains the :term:`Request Options` corresponding to the request from the configuration file.
 
@@ -1962,21 +2099,21 @@ def get_request_options(method, url, settings):
         )
         return {}
     settings = get_settings(settings)  # ensure settings, could be any container
-    req_opts_specs = settings.get("weaver.request_options", None)
+    req_opts_specs = cast("RequestOptionsSpecification", settings.get("weaver.request_options", None))
     if not isinstance(req_opts_specs, dict):
         # empty request options is valid (no file specified),
         # but none pre-processed by app means the settings come from unexpected source
         LOGGER.warning("Settings container provided by [%s] missing request options specification. "
                        "Request might not be executed with expected configuration.", get_caller_name(skip=2))
         return {}
-    request_options = {}
+    request_options = cast("RequestOptions", {})
     request_entries = req_opts_specs.get("requests", []) or []
     for req_opts in request_entries:
         req_meth = req_opts.get("method", "")
         if req_meth:
-            methods = req_meth if isinstance(req_meth, list) else [req_meth]
+            methods = req_meth if isinstance(req_meth, list) else req_meth.split(",")
             methods = [meth.upper() for meth in methods]
-            if method.upper() not in methods:
+            if method.upper() not in methods and "*" not in methods:
                 continue
         req_urls = req_opts.get("url")
         req_urls = [req_urls] if not isinstance(req_urls, list) else req_urls
@@ -2127,7 +2264,7 @@ def _patch_cached_request_stream(response, stream=False):
             iter_content = getattr(response, "iter_content")
 
             def cached_iter_content(*_, **__):
-                # type: (*Any, **Any) -> None
+                # type: (*Any, **Any) -> Generator[bytes, None, None]
                 cached_content = b""
                 for chunk in iter_content(*_, **__):
                     cached_content += chunk
@@ -2159,6 +2296,26 @@ def request_extra(method,                           # type: AnyRequestMethod
                   ):                                # type: (...) -> AnyResponseType
     """
     Standard library :mod:`requests` with additional functional utilities.
+
+    :param method: HTTP method to set request.
+    :param url: URL of the request to execute.
+    :param retries: Number of request retries to attempt if first attempt failed (according to allowed codes or error).
+    :param backoff: Factor by which to multiply delays between retries.
+    :param intervals: Explicit intervals in seconds between retries.
+    :param retry_after: If enabled, honor ``Retry-After`` response header of provided by a failing request attempt.
+    :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
+    :param ssl_verify: Explicit parameter to disable SSL verification (overrides any settings, default: ``True``).
+    :param cache_request: Decorated function with :func:`cache_region` to perform the request if cache was not hit.
+    :param cache_enabled: Whether caching must be used for this request. Disable overrides request options and headers.
+    :param settings: Additional settings from which to retrieve configuration details for requests.
+    :param only_server_errors:
+        Only HTTP status codes in the 5xx values will be considered for retrying the request (default: ``True``).
+        This catches sporadic server timeout, connection error, etc., but 4xx errors are still considered valid results.
+        This parameter is ignored if allowed codes are explicitly specified.
+    :param request_kwargs: All other keyword arguments are passed down to the request call.
+    :returns: Response object of the request or an appropriate ``HTTPError`` object.
+    :raises requests.ConnectionError: If the connexion as failed and retries are exhausted or not specified.
+    :raises requests.Timeout: If the request timed out and retries are exhausted or not specified.
 
     Retry operation
     ~~~~~~~~~~~~~~~~~~~~~~
@@ -2200,7 +2357,7 @@ def request_extra(method,                           # type: AnyRequestMethod
     Any other :py:exc:`IOError` types are converted to 400 responses.
 
     .. seealso::
-        - :class:`FileAdapter`
+        - :class:`requests_file.FileAdapter`
 
     SSL Verification
     ~~~~~~~~~~~~~~~~~~~~~~
@@ -2210,8 +2367,8 @@ def request_extra(method,                           # type: AnyRequestMethod
     then application settings are retrieved from ``weaver.ini`` to parse additional SSL options that could disable it.
 
     Following :mod:`weaver` settings are considered :
-        - `weaver.ssl_verify = True|False`
-        - `weaver.request_options = request_options.yml`
+        - ``weaver.ssl_verify = True|False``
+        - ``weaver.request_options = request_options.yml``
 
     .. note::
         Argument :paramref:`settings` must also be provided through any supported container by :func:`get_settings`
@@ -2220,23 +2377,6 @@ def request_extra(method,                           # type: AnyRequestMethod
     .. seealso::
         - :func:`get_request_options`
         - :func:`get_ssl_verify_option`
-
-    :param method: HTTP method to set request.
-    :param url: URL of the request to execute.
-    :param retries: Number of request retries to attempt if first attempt failed (according to allowed codes or error).
-    :param backoff: Factor by which to multiply delays between retries.
-    :param intervals: Explicit intervals in seconds between retries.
-    :param retry_after: If enabled, honor ``Retry-After`` response header of provided by a failing request attempt.
-    :param allowed_codes: HTTP status codes that are considered valid to stop retrying (default: any non-4xx/5xx code).
-    :param ssl_verify: Explicit parameter to disable SSL verification (overrides any settings, default: True).
-    :param cache_request: Decorated function with :func:`cache_region` to perform the request if cache was not hit.
-    :param cache_enabled: Whether caching must be used for this request. Disable overrides request options and headers.
-    :param settings: Additional settings from which to retrieve configuration details for requests.
-    :param only_server_errors:
-        Only HTTP status codes in the 5xx values will be considered for retrying the request (default: True).
-        This catches sporadic server timeout, connection error, etc., but 4xx errors are still considered valid results.
-        This parameter is ignored if allowed codes are explicitly specified.
-    :param request_kwargs: All other keyword arguments are passed down to the request call.
     """
     # obtain file request-options arguments, then override any explicitly provided source-code keywords
     settings = get_settings(settings) or {}
@@ -2265,7 +2405,7 @@ def request_extra(method,                           # type: AnyRequestMethod
     # process request
     resp = None
     failures = []
-    no_cache = get_no_cache_option(request_kwargs.get("headers", {}), cache_enabled=cache_enabled, **request_options)
+    no_cache = get_no_cache_option(request_kwargs.get("headers") or {}, cache_enabled=cache_enabled, **request_options)
     # remove leftover options unknown to requests method in case of multiple entries
     # see 'requests.request' detailed signature for applicable args
     known_req_opts = set(inspect.signature(requests.Session.request).parameters)
@@ -2528,7 +2668,7 @@ def resolve_s3_from_http(reference):
     """
     s3 = boto3.client("s3")         # type: S3Client  # created with default, environment, or ~/.aws/config
     s3_url = s3.meta.endpoint_url   # includes the region name, to be used to check if we must switch region
-    s3_region = s3.meta.region_name
+    s3_region = cast("RegionName", s3.meta.region_name)
     try:
         if not reference.startswith(s3_url):
             LOGGER.warning(
@@ -2703,12 +2843,12 @@ class OutputMethod(ExtendedEnum):
     Methodology employed to handle generation of a file or directory output that was fetched.
     """
     # download operations
-    AUTO = "auto"
-    LINK = "link"
-    MOVE = "move"
-    COPY = "copy"
+    AUTO = "auto"  # type: Literal["auto"]
+    LINK = "link"  # type: Literal["link"]
+    MOVE = "move"  # type: Literal["move"]
+    COPY = "copy"  # type: Literal["copy"]
     # metadata operations
-    META = "meta"
+    META = "meta"  # type: Literal["meta"]
 
 
 def fetch_file(file_reference,                      # type: str
@@ -2774,7 +2914,7 @@ def fetch_file(file_reference,                      # type: str
             raise ValueError("Invalid AWS S3 reference. "
                              f"Input region name [{s3_region}] mismatches reference region [{s3_region_ref}].")
         s3_region = s3_region_ref or s3_region
-        s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
+        s3_client = boto3.client("s3", region_name=s3_region, **s3_params)
         s3_client.download_file(s3_bucket, file_key, file_path, Callback=callback)
     elif file_href.startswith("http"):
         # pseudo-http URL referring to S3 bucket, try to redirect to above S3 handling method if applicable
@@ -3021,8 +3161,8 @@ def fetch_files_s3(location,                            # type: str
     configs = get_request_options("GET", location, settings)
     options["http"].update(**configs)
     s3_params = resolve_s3_http_options(**options["http"], **kwargs)
-    s3_region = options["s3"].pop("region_name", None)
-    s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
+    s3_region = cast("RegionName", options["s3"].pop("region_name", None))
+    s3_client = boto3.client("s3", region_name=s3_region, **s3_params)
     s3_bucket, dir_key = location[5:].split("/", 1)
     base_url = f"{s3_client.meta.endpoint_url.rstrip('/')}/"
 

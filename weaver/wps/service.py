@@ -12,6 +12,7 @@ from pywps.app import Process as ProcessWPS, WPSRequest
 from pywps.app.Service import Service as ServiceWPS
 from pywps.response.basic import WPSResponse
 from pywps.response.execute import ExecuteResponse
+from pywps.validator.mode import MODE
 from requests.structures import CaseInsensitiveDict
 from werkzeug.datastructures import Headers
 from werkzeug.wrappers.request import Request as WerkzeugRequest
@@ -24,6 +25,7 @@ from weaver.owsexceptions import OWSException, OWSInvalidParameterValue, OWSNoAp
 from weaver.processes.convert import get_field, wps2json_job_payload
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process
+from weaver.processes.wps_package import format_extension_validator
 from weaver.store.base import StoreProcesses
 from weaver.utils import (
     extend_instance,
@@ -289,6 +291,13 @@ class WorkerService(ServiceWPS):
                     data_format.schema = get_field(input_data, "schema", default=data_format.schema)
                     patched_formats.append(data_format)
             input_def.supported_formats = tuple(patched_formats)
+
+        # make sure pywps does not "help us" pre-validating the formats incorrectly
+        # (when 'emptyvalidator' and some validation is enabled, it is a guaranteed failure)
+        if input_def.valid_mode >= MODE.SIMPLE:
+            input_def.valid_mode = MODE.SIMPLE
+            input_def.data_format.validate = format_extension_validator
+            input_def.supported_formats[0].validate = format_extension_validator
 
         return super(WorkerService, self).create_complex_inputs(input_def, inputs)
 

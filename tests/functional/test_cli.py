@@ -44,13 +44,20 @@ from weaver.cli import AuthHandler, BearerAuthHandler, WeaverClient, main as wea
 from weaver.config import WeaverConfiguration
 from weaver.datatype import DockerAuthentication, Service
 from weaver.execute import ExecuteReturnPreference
-from weaver.formats import ContentType, OutputFormat, clean_media_type_format, get_cwl_file_format, repr_json
+from weaver.formats import (
+    ContentType,
+    OutputFormat,
+    clean_media_type_format,
+    get_cwl_file_format,
+    get_extension,
+    repr_json
+)
 from weaver.notify import decrypt_email
 from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, ProcessSchema
 from weaver.processes.types import ProcessType
 from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import fully_qualified_name, get_registry
+from weaver.utils import compute_file_digest_multibase, fully_qualified_name, get_registry, load_file
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_url, map_wps_output_location
 
@@ -102,9 +109,12 @@ class TestWeaverClientBase(WpsConfigBase, ResourcesUtil, JobUtils):
         # make one process available for testing features
         self.test_process = {}
         self.test_payload = {}
-        for process in ["Echo", "CatFile"]:
+        for process in ["Echo", "CatFile", "FileInfo"]:
             self.test_process[process] = f"{self.test_process_prefix}{process}"
-            self.test_payload[process] = self.retrieve_payload(process, "deploy", local=True)
+            self.test_payload[process] = (
+                 self.retrieve_payload(process, "deploy", local=True) or
+                 self.retrieve_payload(process, "package", local=True)
+            )
             self.deploy_process(self.test_payload[process], process_id=self.test_process[process])
 
     @classmethod
@@ -175,6 +185,7 @@ class TestWeaverClient(TestWeaverClientBase):
             # test process
             self.test_process["CatFile"],
             self.test_process["Echo"],
+            self.test_process["FileInfo"],
             # builtin
             *self.get_builtin_process_names(),
         }
@@ -185,6 +196,7 @@ class TestWeaverClient(TestWeaverClientBase):
             # test process
             self.test_process["CatFile"],
             self.test_process["Echo"],
+            self.test_process["FileInfo"],
             # builtin
             *self.get_builtin_process_names(),
         }
@@ -197,6 +209,7 @@ class TestWeaverClient(TestWeaverClientBase):
             # test process
             self.test_process["CatFile"],
             self.test_process["Echo"],
+            self.test_process["FileInfo"],
             # builtin
             *self.get_builtin_process_names(),
         }
@@ -444,8 +457,7 @@ class TestWeaverClient(TestWeaverClientBase):
 
         result = mocked_sub_requests(self.app, self.client.undeploy, other_process)
         assert result.success
-        assert result.body.get("undeploymentDone", None) is True
-        assert "undefined" not in result.message
+        assert not result.body
 
         path = f"/processes/{other_process}"
         resp = mocked_sub_requests(self.app, "get", path, expect_errors=True)
@@ -486,14 +498,14 @@ class TestWeaverClient(TestWeaverClientBase):
         inputs_param,           # type: Union[JSON, str]
         process="Echo",         # type: str
         preload=False,          # type: bool
-        location=False,         # type: Optional[str]
+        location=False,         # type: bool
         expect_success=True,    # type: bool
         expect_status=None,     # type: Optional[AnyStatusType]
         mock_exec=True,         # type: bool
         **exec_kwargs,          # type: Any
     ):                          # type: (...) -> OperationResult
         if isinstance(inputs_param, str):
-            ref = {"location": inputs_param} if location else {"ref_name": inputs_param}
+            ref = {"location": inputs_param, "ref_found": True} if location else {"ref_name": inputs_param}
             if preload:
                 inputs_param = self.retrieve_payload(process=process, local=True, **ref)
             else:
@@ -676,9 +688,13 @@ class TestWeaverClient(TestWeaverClientBase):
             #   even though both of these statuses are used internally at distinct execution steps.
             running_statuses = JOB_STATUS_CATEGORIES[StatusCategory.RUNNING]
             job_id = result.body["jobID"]
+            output_href = f"{get_wps_output_url(self.settings)}/{job_id}/output/stdout.log"
+            output_path = map_wps_output_location(output_href, self.settings, exists=True)
+            digest_multibase = compute_file_digest_multibase(output_path)
             expect_outputs = {
                 "output": {
-                    "href": f"{get_wps_output_url(self.settings)}/{job_id}/output/stdout.log",
+                    'digestMultibase': digest_multibase,
+                    "href": output_href,
                     "type": ContentType.TEXT_PLAIN,
                     "format": {"mediaType": ContentType.TEXT_PLAIN},
                 }
@@ -749,6 +765,56 @@ class TestWeaverClient(TestWeaverClientBase):
     @pytest.mark.vault
     def test_execute_inputs_old_listing_literal_schema_auto_resolve_vault(self):
         self.run_execute_inputs_with_vault_file("Execute_CatFile_old_listing_schema.yml", "CatFile", preload=True)
+
+    @pytest.mark.format
+    @pytest.mark.vault
+    def test_execute_inputs_cwi_file_format_forward_media_type_vault(self):
+        """
+        Test that uses the vault feature to upload a local file and validate that its media-type is properly resolved.
+        """
+        content_type = ContentType.APP_JSON
+        ext = get_extension(content_type)
+        fmt = get_cwl_file_format(content_type, make_reference=True)
+        with contextlib.ExitStack() as stack:
+            tmp_input_file = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=ext))
+            tmp_input_file.write("test")
+            tmp_input_file.flush()
+            tmp_input_file.seek(0)
+            tmp_job_file = stack.enter_context(tempfile.NamedTemporaryFile(mode="w", suffix=".json"))
+            tmp_job_file.write(json.dumps({
+                "file": {
+                    "class": "File",
+                    "path": tmp_input_file.name,
+                    "format": fmt,
+                }
+            }))
+            tmp_job_file.flush()
+            tmp_job_file.seek(0)
+
+            result = self.run_execute_inputs_schema_variant(
+                tmp_job_file.name,  # should be uploaded to vault for resolution
+                location=True,      # above is the file path
+                preload=False,      # pass the file path as is to the CLI
+                process="FileInfo",
+                mock_exec=False,
+            )
+
+        job_id = result.body["jobID"]
+        result = mocked_sub_requests(self.app, self.client.results, job_id)
+        assert result.success, result.message
+        output = result.body["output"]["href"]
+        output = map_wps_output_location(output, self.settings, exists=True)
+        assert os.path.isfile(output)
+        with open(output, mode="r", encoding="utf-8") as out_file:
+            out_data = json.load(out_file)
+
+        # 'FileInfo' simply returns the JSON path/format of the input file
+        # validate that they match expectation (but path can be a random CWL directory)
+        assert out_data["path"] != tmp_input_file.name  # make sure CWL was involved, not just directly the input file
+        assert not out_data["path"].endswith(os.path.basename(tmp_input_file.name))
+        assert out_data["path"].startswith("/var/lib/cwl/")  # default, ensures vault->docker file handling occured
+        assert out_data["path"].endswith(".json")
+        assert out_data["format"] == fmt
 
     @pytest.mark.vault
     def test_execute_inputs_representation_literal_schema_auto_resolve_vault(self):
@@ -1013,6 +1079,49 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("\"id\": \"test-provider\"" in line for line in lines)
         assert any(f"\"url\": \"{resources.TEST_REMOTE_SERVER_URL}\"" in line for line in lines)
         assert any(f"\"type\": \"{ProcessType.WPS_REMOTE}\"" in line for line in lines)
+
+    def test_deploy_cwl_data_no_body_or_process_id_option(self):
+        package = self.retrieve_payload("Echo", "package", local=True)
+        package.pop("id", None)
+        p_id = f"{self.test_process_prefix}deploy-cwl-data-no-body-only-process-id"
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-u", self.url,
+                "-p", p_id,  # no ID via --body or --cwl
+                "--cwl", package,
+                "-D",  # avoid conflict just in case
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any(f"\"id\": \"{p_id}\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
+
+    def test_deploy_cwl_file_no_body_or_process_id_option(self):
+        package = self.retrieve_payload("Echo", "package", local=True, ref_found=True)
+        data = load_file(package)
+        assert "id" not in data, "Undefined ID test precondition failed."
+        p_id = f"{self.test_process_prefix}deploy-cwl-file-no-body-only-process-id"
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "deploy",
+                "-u", self.url,
+                "-p", p_id,  # no ID via --body or --cwl
+                "--cwl", package,
+                "-D",  # avoid conflict just in case
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any(f"\"id\": \"{p_id}\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
 
     def test_deploy_no_process_id_option(self):
         payload = self.retrieve_payload("Echo", "deploy", local=True, ref_found=True)
@@ -1498,7 +1607,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                             "type": "string", "format": "binary"}
             out_json_type = {"contentMediaType": ContentType.APP_JSON, "type": "string"}
             out_oas_oneof = {"oneOf": [out_cwl_type, out_json_type, out_oas]}
-            out_cwl_fmt = {"default": False, "mediaType": io_fmt}
+            out_cwl_fmt = {"default": False, "mediaType": io_fmt, "encoding": "base64"}
             out_oas_fmt = {"default": True, "mediaType": ContentType.APP_JSON}
             out_any_fmt = [out_cwl_fmt, out_oas_fmt]
             # ignore schema specifications for comparison only of contents
@@ -1558,6 +1667,7 @@ class TestWeaverCLI(TestWeaverClientBase):
     def test_package_process(self):
         payload = self.retrieve_payload("Echo", "deploy", local=True, ref_found=True)
         package = self.retrieve_payload("Echo", "package", local=True)
+        p_id = "test-echo-get-package"
         lines = mocked_sub_requests(
             self.app, run_command,
             [
@@ -1566,13 +1676,13 @@ class TestWeaverCLI(TestWeaverClientBase):
                 "-u", self.url,
                 "--body", payload,
                 "--cwl", package,
-                "--id", "test-echo-get-package"
+                "--id", p_id
             ],
             trim=False,
             entrypoint=weaver_cli,
             only_local=True,
         )
-        assert any("\"id\": \"test-echo-get-package\"" in line for line in lines)
+        assert any(f"\"id\": \"{p_id}\"" in line for line in lines)
 
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -1580,7 +1690,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 # weaver
                 "package",
                 "-u", self.url,
-                "-p", "test-echo-get-package"
+                "-p", p_id
             ],
             trim=False,
             entrypoint=weaver_cli,
@@ -1594,6 +1704,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         cwl.pop("$id", None)
         cwl.pop("$schema", None)
         pkg = package.copy()
+        pkg["id"] = p_id  # if only CWL package is provided (no extra body), the ID is injected to allow resolving it
         pkg["inputs"] = [{"id": key, **val} for key, val in package["inputs"].items()]  # pylint: disable=E1136
         pkg["outputs"] = [{"id": key, **val} for key, val in package["outputs"].items()]  # pylint: disable=E1136
         assert cwl == pkg
@@ -1728,7 +1839,7 @@ class TestWeaverCLI(TestWeaverClientBase):
                 entrypoint=weaver_cli,
                 only_local=True,
             )
-            assert any(line.startswith("jobID: ") for line in lines[:2])  # don't care value, self-handled
+            assert any(line.startswith("jobID: ") for line in lines[:5])  # don't care value, self-handled
             assert any(f"status: {Status.SUCCESSFUL}" in line for line in lines)
             for line in lines:
                 if line.startswith("jobID: "):

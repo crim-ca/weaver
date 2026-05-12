@@ -154,7 +154,13 @@ if TYPE_CHECKING:
     CWL_IO_ArrayBaseType = Literal["array"]
     CWL_IO_BaseType = Union[CWL_IO_LiteralType, CWL_IO_ComplexType, CWL_IO_ArrayBaseType, CWL_IO_SpecialType]
     CWL_IO_NullableType = Union[str, List[CWL_IO_BaseType]]  # "<type>?" or ["<type>", "null"]
-    CWL_IO_NestedType = TypedDict("CWL_IO_NestedType", {"type": CWL_IO_NullableType}, total=True)
+    CWL_IO_NestedType = TypedDict(
+        "CWL_IO_NestedType", {
+            "type": CWL_IO_NullableType,
+            "format": NotRequired[Optional[Union[str, List[str]]]],
+        },
+        total=True,
+    )
     CWL_IO_EnumSymbols = Union[List[str], List[int], List[float]]
     CWL_IO_EnumType = TypedDict("CWL_IO_EnumType", {
         "type": Literal["enum"],
@@ -353,8 +359,8 @@ if TYPE_CHECKING:
 
     KVP_Value = Optional[str]
     KVP_Item = Union[KVP_Value, Sequence[KVP_Value]]
-    KVP_Container = Union[Sequence[Tuple[str, KVP_Item]], Dict[str, KVP_Item]]
-    KVP = Dict[str, List[KVP_Item]]
+    KVP_Container = Union[Sequence[Tuple[Optional[str], KVP_Item]], Dict[Optional[str], KVP_Item]]
+    KVP = Dict[str, KVP_Container]
 
     AnyContainer = Union[Configurator, Registry, PyramidRequest, WerkzeugRequest, Celery]
     EnvContainer = Dict[str, AnyValueType]
@@ -598,10 +604,9 @@ if TYPE_CHECKING:
         "inputs": JobInputs,
         "outputs": JobOutputs,
     })
-    QuoteStepOutput = Union[
-        TypedDict("QuoteStepOutputLiteral", {"value": Number}, total=True),
-        TypedDict("QuoteStepOutputComplex", {"size": Number}, total=True),
-    ]
+    QuoteStepOutputLiteral = TypedDict("QuoteStepOutputLiteral", {"value": Number}, total=True)
+    QuoteStepOutputComplex = TypedDict("QuoteStepOutputComplex", {"size": Number}, total=True)
+    QuoteStepOutput = Union[QuoteStepOutputLiteral, QuoteStepOutputComplex]
     QuoteStepOutputParameters = Dict[str, QuoteStepOutput]
     QuoteProcessResults = TypedDict("QuoteProcessResults", {
         "flat": NotRequired[Number],
@@ -670,7 +675,7 @@ if TYPE_CHECKING:
         "title": NotRequired[str],
         "description": NotRequired[str],
         "enum": NotRequired[List[Union[str, Number]]],
-        "items": NotRequired[List[_OpenAPISchema, OpenAPISchemaReference]],
+        "items": NotRequired[List[Union[_OpenAPISchema, OpenAPISchemaReference]]],
         "required": NotRequired[List[str]],
         "nullable": NotRequired[bool],
         "deprecated": NotRequired[bool],

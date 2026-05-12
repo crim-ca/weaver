@@ -1,7 +1,8 @@
 ---
-
-name: Bug Report about: Create a report to help us improve labels: triage/bug assignees: fmigneault
-
+name: Bug Report
+about: Create a report to help us improve
+labels: triage/bug
+assignees: fmigneault
 ---
 
 ## Describe the bug
@@ -10,7 +11,7 @@ name: Bug Report about: Create a report to help us improve labels: triage/bug as
 
 ## How to Reproduce
 
-<!-- 
+<!--
 Steps to reproduce the behavior:
 1. Deploy process with payload '...'
 2. Execute using payload '....'
@@ -25,7 +26,7 @@ Steps to reproduce the behavior:
 
 ## Context
 
-<!-- 
+<!--
     If applicable, add screenshots or drag-drop files to help explain your problem.
     Also, please complete the following information.
 -->

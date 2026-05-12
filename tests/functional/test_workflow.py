@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 import mock
 import pytest
 from pyramid import testing
-from pyramid.httpexceptions import HTTPConflict, HTTPCreated, HTTPNotFound, HTTPOk
+from pyramid.httpexceptions import HTTPConflict, HTTPCreated, HTTPNoContent, HTTPNotFound, HTTPOk
 from pyramid.settings import asbool
 
 # use 'Web' prefix to avoid pytest to pick up these classes and throw warnings
@@ -495,7 +495,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         """
 
     @classmethod
-    def clean_test_processes(cls, allowed_codes=frozenset([HTTPOk.code, HTTPNotFound.code])):
+    def clean_test_processes(cls, allowed_codes=frozenset([HTTPOk.code, HTTPNoContent.code, HTTPNotFound.code])):
         for process_info in cls.test_processes_info.values():
             cls.clean_test_processes_iter_before(process_info)
 

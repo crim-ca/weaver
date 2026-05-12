@@ -461,6 +461,8 @@ linkcheck_ignore = [
     # URLs causing 403 (USer-Agent blocked or bot protection)
     "https://www.iso.org/iso-4217-currency-codes.html",
     "https://www.mongodb.com/.*",
+    "https://zenodo.org/.*",
+    "https://prairieclimatecentre.ca/",
     # ignore the various weaver instances that could be down temporarily from the hosting server
     # their corresponding version checks in the readme's shields will indicate if such an error occurs
     "https://hirondelle.crim.ca/weaver",
@@ -468,8 +470,6 @@ linkcheck_ignore = [
     "https://pavics.ouranos.ca/weaver/",
     "https://redoak.cs.toronto.edu/weaver/",
     "https://pavics.climatedata.ca/",
-    # FIXME: openEO API direct link access error (https://github.com/Open-EO/openeo.org/issues/101)
-    "https://openeo.org/documentation/1.0/developers/api/reference.html",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md

@@ -145,7 +145,7 @@ def get_process_list_links(request, paging, total, provider=None):
         links.append({"href": prov_url, "rel": "up", "type": ContentType.APP_JSON, "title": "Provider description."})
     else:
         links.extend([
-            {"href": sd.OGC_API_PROC_PROFILE_PROC_LIST_URL, "rel": "profile", "title": "Process listing profile."},
+            {"href": sd.OGC_API_PROC_PROFILE_PROC_LIST_URI, "rel": "profile", "title": "Process listing profile."},
             {"href": base_url, "rel": "up", "type": ContentType.APP_JSON, "title": "API entrypoint."}
         ])
 

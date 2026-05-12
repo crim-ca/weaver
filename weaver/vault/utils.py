@@ -132,6 +132,10 @@ def parse_vault_token(header, unique=False):
     """
     if not isinstance(header, str):
         return {}
+    # Check if header is already just a plain token string (no "token " prefix)
+    # This happens when the token is passed directly (e.g., from WPS process)
+    if REGEX_VAULT_TOKEN.match(header):
+        return {None: header}
     header = header.lower()
     if unique and "," in header:
         return {}
@@ -208,13 +212,14 @@ def get_authorized_file(file_id, auth_token, container=None):
     Obtain the requested file if access is granted.
 
     :param file_id: Vault storage reference file UUID.
-    :param auth_token: Token to obtain access to the file.
+    :param auth_token: Token or multi-token to obtain access to the file.
     :param container: Application settings.
     :return: Authorized file.
     :raises: Appropriate HTTP exception according to use case.
     """
-    vault_token = parse_vault_token(auth_token, unique=True)
-    token = vault_token.get(None, vault_token.get(file_id))
+    vault_token = parse_vault_token(auth_token, unique=False)
+    token = vault_token.get(file_id, vault_token.get(None))
+
     if not token:
         # note:
         #   401 not applicable since no no Authentication endpoint for the Vault
@@ -222,7 +227,7 @@ def get_authorized_file(file_id, auth_token, container=None):
         msg = "Missing authorization token to obtain access to vault file."
         if auth_token:  # if header provided but parsed as invalid
             msg = "Incorrectly formed authorization token to obtain access to vault file."
-        if vault_token and list(vault_token)[0] not in [None, file_id]:
+        if vault_token and file_id not in vault_token and None not in vault_token:
             msg = "Mismatching Vault UUID specified in authorization header."
         raise HTTPForbidden(json={
             "code": "InvalidHeaderValue",

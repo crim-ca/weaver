@@ -584,7 +584,7 @@ class WpsRestApiProvidersTest(WpsProviderBase):
 
         assert outputs[0]["id"] == "output"
         assert len(outputs[0]["formats"]) == 2
-        assert outputs[0]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
+        assert outputs[0]["formats"][0]["mediaType"] == ContentType.APP_X_NETCDF
         assert outputs[0]["formats"][0]["encoding"] == "base64"
         assert outputs[0]["formats"][0]["default"] is True
         assert "maximumMegabytes" not in outputs[0]["formats"][0]  # never applies, even with OWSLib update

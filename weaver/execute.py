@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from pyramid.httpexceptions import HTTPBadRequest
 
 from weaver.base import Constants
+from weaver.exceptions import ProcessInvalidParameter
 from weaver.utils import get_header, parse_kvp
 
 if TYPE_CHECKING:
@@ -313,3 +314,78 @@ def update_preference_applied_return_header(
 
     response_headers.update({"Preference-Applied": applied_prefer_header})
     return response_headers
+
+
+def resolve_execution_parameters(
+    job_control_options,    # type: List[ExecuteControlOption]
+    execute_headers,        # type: AnyHeadersContainer
+    execute_mode=None,      # type: Optional[AnyExecuteMode]
+    execute_return=None,    # type: Optional[AnyExecuteReturnPreference]
+    execute_max_wait=None,  # type: Optional[int]
+):                          # type: (...) -> Tuple[AnyExecuteMode, AnyExecuteResponse, AnyHeadersContainer]
+    """
+    Resolve execution parameters from provided :term:`Job` control options and :term:`Process` execution headers.
+
+    The execution mode override, if provided, takes precedence over any header preference.
+    If the :term:`Process` only supports a single execution mode, it is enforced regardless of any preference.
+    If that option mismatches the override, an exception is raised.
+
+    If no override is provided, or no preference is specified in headers, the asynchronous mode will be employed
+    in case of multiple supported modes.
+
+    .. seealso::
+        :ref:`proc_exec_body`, :ref:`proc_exec_mode` and :ref:`proc_exec_results` provide combination matrices
+        and details on how execution parameters interact and affect the execution and response strategies.
+
+    .. note::
+        Returned parameters include multiple "equivalent" or "redundant" variants to handle
+        both :term:`OGC API - Processes` ``v1`` and ``v2``, and various combinations the servers could implement.
+
+    :param job_control_options: The allowed execution methods that the :term:`Process` supports.
+    :param execute_headers: Any preestablished headers that could hint a preferred execution mode.
+    :param execute_mode: Explicit execution mode to enforce, if any.
+    :param execute_return: Explicit return preference to enforce, if any.
+    :param execute_max_wait: Maximum wait time for synchronous execution, as applicable.
+    :return: Resolved execution mode and corresponding headers to apply.
+    :raises ProcessInvalidParameter: If the requested execution mode does not respect the supported ones.
+    """
+    from weaver.wps_restapi.swagger_definitions import OGC_API_PROC_PROFILE_RESULTS_URI
+
+    exec_headers = execute_headers.copy()
+    exec_headers.setdefault("Prefer", "respond-async")
+    exec_mode = None
+    execute_max_wait = execute_max_wait or 10
+    if execute_mode:
+        exec_mode = ExecuteMode.get(execute_mode)
+        if exec_mode == ExecuteMode.SYNC:
+            exec_headers["Prefer"] = f"wait={execute_max_wait}"
+
+    mode, _, applied = parse_prefer_header_execute_mode(exec_headers, job_control_options, execute_max_wait)
+    if exec_mode and mode != exec_mode:
+        raise ProcessInvalidParameter(
+            f"Requested execution mode '{exec_mode}' does not match supported modes: {job_control_options}."
+        )
+    if applied:
+        applied["Prefer"] = applied.pop("Preference-Applied")
+
+    if execute_return:
+        exec_return = ExecuteReturnPreference.get(execute_return)
+    else:
+        exec_return = parse_prefer_header_return(exec_headers)
+    if exec_return:
+        applied["Prefer"] += f"; return={exec_return}" if applied["Prefer"] else f"return={exec_return}"
+
+    profile = None
+    if mode == ExecuteMode.ASYNC:
+        profile = OGC_API_PROC_PROFILE_RESULTS_URI
+        exec_resp = ExecuteResponse.DOCUMENT
+    elif mode == ExecuteMode.SYNC and exec_return in [ExecuteReturnPreference.MINIMAL, None]:
+        profile = OGC_API_PROC_PROFILE_RESULTS_URI
+        exec_resp = ExecuteResponse.DOCUMENT
+    else:
+        exec_resp = ExecuteResponse.RAW
+    if profile:
+        exec_headers["Accept-Profile"] = profile
+        applied["Prefer"] += f"; profile={profile}" if applied["Prefer"] else f"profile={profile}"
+
+    return mode, exec_resp, applied

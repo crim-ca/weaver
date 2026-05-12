@@ -71,6 +71,63 @@ def test_parse_vault_token(header, unique, expected):
 
 
 @pytest.mark.vault
+@pytest.mark.parametrize("unique,lookup_id,use_unknown,expected_token", [
+    # With unique=True, multiple tokens are rejected, returns empty dict
+    (True, "file_id_1", False, None),
+    (True, "file_id_2", False, None),
+    # With unique=False, multiple tokens are parsed correctly
+    (False, "file_id_1", False, "token1"),
+    (False, "file_id_2", False, "token2"),
+    # Fallback pattern: vault_token.get(None, vault_token.get(file_id))
+    (False, None, False, None),  # No None key exists in multi-token scenario
+    # When requesting a file_id not in the dict
+    (False, "file_id_1", True, None),  # unknown_id returns None
+])
+def test_parse_vault_token_multiple_tokens_behavior(unique, lookup_id, use_unknown, expected_token):
+    """
+    Test that demonstrates the behavior when retrieving tokens with multiple token entries.
+
+    When an auth header contains multiple tokens (comma-separated):
+    - With unique=True: Returns empty dict {} because multiple tokens are not allowed
+    - With unique=False: Returns dict mapping UUID -> token for each entry
+
+    To retrieve a token for a specific file_id:
+    - Use vault_token.get(file_id) to get the token for that UUID
+    - Use vault_token.get(None) as fallback when no UUID is specified in the token
+    - Pattern: vault_token.get(None, vault_token.get(file_id)) tries both
+    """
+    token1 = VaultFile("").token
+    token2 = VaultFile("").token
+    file_id_1 = str(uuid.uuid4())
+    file_id_2 = str(uuid.uuid4())
+    unknown_id = str(uuid.uuid4())
+
+    # Multi-token auth header (e.g., for batch operations)
+    auth_header = f"token {token1}; id={file_id_1}, token {token2}; id={file_id_2}"
+
+    vault_token = parse_vault_token(auth_header, unique=unique)
+
+    # Map lookup_id string to actual UUID
+    id_map = {
+        "file_id_1": file_id_1,
+        "file_id_2": file_id_2,
+        None: None
+    }
+    token_map = {
+        "token1": token1,
+        "token2": token2,
+        None: None
+    }
+
+    actual_id = unknown_id if use_unknown else id_map[lookup_id]
+    expected = token_map[expected_token]
+
+    # Test retrieval with fallback pattern
+    result = vault_token.get(None, vault_token.get(actual_id))
+    assert result == expected
+
+
+@pytest.mark.vault
 def test_encrypt_decrypt():
     vault_file = VaultFile("")
     assert isinstance(vault_file.secret, bytes) and len(vault_file.secret)
