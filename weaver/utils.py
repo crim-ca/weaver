@@ -1333,6 +1333,7 @@ def create_content_id(resource_id, context_id):
     .. seealso::
         - Format of ``Content-ID`` header is defined under :rfc:`2392`.
         - Integration with ``multipart`` :term:`Media-Types` is defined under :rfc:`1521`.
+
     :param resource_id: Identifier of the resource unique within the context.
     :param context_id: Identifier that provides a unique reference across contexts.
     :returns: The ``Content-ID`` representation that can be directly employed as header.

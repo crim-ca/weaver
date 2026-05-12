@@ -6,10 +6,12 @@ import os
 import re
 import socket
 from functools import cache
+from io import StringIO
 from typing import TYPE_CHECKING, cast, overload
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
+import pandas as pd
 import yaml
 from json2xml.json2xml import Json2xml
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk
@@ -428,7 +430,6 @@ class OutputFormat(Constants):
             Unused for other representations.
         :return: Formatted output.
         """
-        from io import StringIO
 
         from weaver.utils import bytes2str
 
@@ -456,8 +457,6 @@ class OutputFormat(Constants):
                 yml = yml[:-4]
             return yml
         if fmt == OutputFormat.CSV:
-            import pandas as pd
-
             df = pd.json_normalize(data) if isinstance(data, dict) else pd.DataFrame(data)
             csv_buffer = StringIO()
             df.to_csv(csv_buffer, index=False)

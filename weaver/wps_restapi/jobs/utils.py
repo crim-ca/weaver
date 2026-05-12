@@ -950,7 +950,7 @@ def get_job_result_by_index(
     output_id,      # type: str
     index,          # type: int
     *,              # force named keyword arguments after
-    container,      # type: AnySettingsContainer
+    request,        # type: AnyRequestType
 ):                  # type: (...) -> AnyResponseType
     """
     Retrieve a specific indexed value from a job result array.
@@ -966,14 +966,14 @@ def get_job_result_by_index(
     :param job: Job from which to retrieve the indexed result.
     :param output_id: Identifier of the output containing the array.
     :param index: Zero-based index of the element to retrieve (must be a valid integer).
-    :param container: Container giving access to instance settings and request context for format negotiation.
+    :param request: Request providing access to instance settings and content negotiation context.
     :return: HTTP response with the indexed element in the appropriate format (raw data, JSON, reference, etc.).
     :raises HTTPBadRequest: If index is negative or out of range.
     :raises HTTPNotFound: If the output ID is not found in the job results.
     :raises HTTPUnprocessableEntity: If the output is not an array.
     """
-    raise_job_dismissed(job, container)
-    raise_job_bad_status_success(job, container)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_success(job, request)
 
     if index < 0:
         raise HTTPBadRequest(json={
@@ -1029,11 +1029,8 @@ def get_job_result_by_index(
     else:
         result = {"value": indexed_element}
 
-    settings = get_settings(container)
-    headers = ResponseHeaders()
-    request = container if not isinstance(container, dict) else None
-    accept = str(request.accept) if request and request.accept else None
-    return resolve_result_single(job, result, output_id, accept, headers, settings=settings)
+    accept = guess_target_format(request, default=None)
+    return resolve_result_single(job, result, output_id, accept, headers={}, settings=request)
 
 
 def generate_or_resolve_result(

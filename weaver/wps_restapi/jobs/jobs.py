@@ -854,7 +854,7 @@ def get_job_result_index(request):
             "value": request.matchdict.get("index")
         })
 
-    return get_job_result_by_index(job, output_id, index, container=request)
+    return get_job_result_by_index(job, output_id, index, request=request)
 
 
 @sd.provider_exceptions_service.get(

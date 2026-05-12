@@ -48,8 +48,7 @@ Changes:
 
 Fixes:
 ------
-- Fix ``OutputFormat.convert()`` returning ``bytes`` instead of ``str`` for XML/HTML conversions, causing write errors when
-  saving transformation results to files.
+- No change.
 
 .. _changes_6.11.0:
 
