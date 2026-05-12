@@ -17,26 +17,26 @@ can easily understand and utilize. Each skill is self-contained with:
 ```
 .agents/
 └── skills/
-    ├── deploy-process/
+    ├── weaver-skill-create/
     │   └── SKILL.md
-    ├── execute-process/
+    ├── process-deploy/
     │   └── SKILL.md
-    ├── monitor-job/
+    ├── job-monitor/
     │   └── SKILL.md
     └── ...
 ```
 
 ## Available Skills
 
-All 33 skills are now organized by category for easy discovery:
+All skills are organized by category for easy discovery:
 
-### API Information (3 skills)
+### API Information
 
 - **[api-conformance](skills/api-conformance/)** - Check OGC standards conformance
 - **[api-info](skills/api-info/)** - Get API metadata and endpoints
 - **[api-version](skills/api-version/)** - Get Weaver version information
 
-### CWL Comprehension (8 skills)
+### CWL Comprehension
 
 - **[cwl-create-commandlinetool](skills/cwl-create-commandlinetool/)** - Create CWL CommandLineTool packages from
   scratch
@@ -48,7 +48,7 @@ All 33 skills are now organized by category for easy discovery:
 - **[cwl-use-expressions](skills/cwl-use-expressions/)** - Use JavaScript expressions for dynamic behavior
 - **[cwl-validate-package](skills/cwl-validate-package/)** - Validate CWL syntax before deployment
 
-### Job Operations (11 skills)
+### Job Operations
 
 - **[job-dismiss](skills/job-dismiss/)** - Cancel running or pending jobs
 - **[job-exceptions](skills/job-exceptions/)** - Get detailed error information
@@ -62,7 +62,7 @@ All 33 skills are now organized by category for easy discovery:
 - **[job-statistics](skills/job-statistics/)** - Retrieve resource usage metrics
 - **[job-status](skills/job-status/)** - Check job execution status
 
-### Process Management (5 skills)
+### Process Management
 
 - **[process-deploy](skills/process-deploy/)** - Deploy CWL application packages
 - **[process-describe](skills/process-describe/)** - Get process details and capabilities
@@ -70,18 +70,19 @@ All 33 skills are now organized by category for easy discovery:
 - **[process-list](skills/process-list/)** - Discover available processes
 - **[process-undeploy](skills/process-undeploy/)** - Remove deployed processes
 
-### Provider Management (3 skills)
+### Provider Management
 
 - **[provider-list](skills/provider-list/)** - List all registered providers
 - **[provider-register](skills/provider-register/)** - Register remote WPS/OGC services
 - **[provider-unregister](skills/provider-unregister/)** - Remove provider registrations
 
-### Setup Operations (2 skills)
+### Setup Operations
 
 - **[weaver-install](skills/weaver-install/)** - Install and configure Weaver (Docker or from source)
+- **[weaver-skill-create](skills/weaver-skill-create/)** - Create new Agent Skills
 - **[weaver-skills-update](skills/weaver-skills-update/)** - Maintain and update skills documentation
 
-### Vault Operations (1 skill)
+### Vault Operations
 
 - **[vault-upload](skills/vault-upload/)** - Store sensitive data securely
 
@@ -125,90 +126,23 @@ Configure your IDE to recognize these skills for autocomplete and suggestions:
 }
 ```
 
-### For Developers
+## Creating New Skills
 
-1. **Browse skills**: Each skill directory contains complete documentation
-2. **Follow examples**: Code examples show CLI, Python, and API usage
-3. **Check compatibility**: Frontmatter lists requirements and dependencies
+For detailed guidance on creating new Agent Skills, see [weaver-skill-create](skills/weaver-skill-create/).
+This includes naming conventions, metadata requirements, structure, examples, and best practices.
 
 ## Skill Metadata
 
-Each SKILL.md file contains YAML frontmatter with:
-
-```yaml
----
-name: skill-name                # Unique identifier
-description: What it does       # Clear description with keywords
-license: Apache-2.0             # License information
-compatibility: Requirements     # Environment/system requirements
-metadata:                        # Additional metadata
-  category: process-management
-  version: "1.0.0"
-  api_endpoint: GET /endpoint
-  cli_command: weaver command
-  author: CRIM
-allowed-tools: tools it can use # Pre-approved tool access
----
-```
-
-## Creating New Skills
-
-When adding new Weaver capabilities:
-
-1. Create a new directory: `.agents/skills/my-new-skill/`
-2. Add `SKILL.md` with proper frontmatter
-3. Include usage examples (CLI, Python, API)
-4. Document parameters and return values
-5. Link to related skills
-6. Reference official documentation
-
-### Skill Naming
-
-- Use lowercase with hyphens: `my-skill-name`
-- Be descriptive but concise
-- Match directory name to skill name
-
-### Description Guidelines
-
-- Start with what the skill does
-- Include when to use it
-- Add specific keywords for discoverability
-- Keep under 1024 characters
-
-## Spec Compliance
-
-These skills follow the [Agent Skills Specification](https://agentskills.io/specification):
-
-- ✅ Proper directory structure
-- ✅ YAML frontmatter with required fields
-- ✅ Markdown body content
-- ✅ Progressive disclosure (simple to detailed)
-- ✅ Machine-readable and human-friendly
+Each SKILL.md file contains YAML frontmatter with metadata. For complete metadata documentation and best practices,
+see [weaver-skill-create](skills/weaver-skill-create/).
 
 ## Additional Resources
 
-- **Main Documentation**: [SKILLS.md](../../SKILLS.md) - Legacy format, comprehensive reference
-- **IDE Integration**: [IDE\_INTEGRATION.md](../../IDE_INTEGRATION.md) - Setup instructions
 - **Weaver Docs**: [https://pavics-weaver.readthedocs.io/](https://pavics-weaver.readthedocs.io/)
 - **Agent Skills Spec**: [https://agentskills.io/specification](https://agentskills.io/specification)
-
-## Validation
-
-Validate skills against the spec:
-
-```bash
-# If agent skills validator is available
-agentskills validate .agents/skills/
-```
 
 ## Support
 
 - **Issues**: [https://github.com/crim-ca/weaver/issues](https://github.com/crim-ca/weaver/issues)
 - **Discussions**: [https://github.com/crim-ca/weaver/discussions](https://github.com/crim-ca/weaver/discussions)
 - **Documentation**: [https://pavics-weaver.readthedocs.io/](https://pavics-weaver.readthedocs.io/)
-
-## License
-
-Apache License 2.0 - See LICENSE.txt for details
-
-Copyright © 2020-2026, CRIM

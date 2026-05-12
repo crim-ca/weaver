@@ -436,8 +436,6 @@ compatibility: Requirements here
 metadata:
   category: category-name
   version: "1.0.0"
-  api_endpoint: GET /endpoint
-  cli_command: weaver command
   author: CRIM
 allowed-tools: tool1 tool2
 ---

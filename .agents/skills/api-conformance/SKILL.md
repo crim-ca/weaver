@@ -8,8 +8,6 @@ compatibility: Requires Weaver API access.
 metadata:
   category: system-information
   version: 1.0.0
-  api_endpoint: GET /conformance
-  cli_command: weaver conformance
   author: CRIM
 allowed-tools: http_request
 ---
