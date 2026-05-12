@@ -26,6 +26,19 @@ can easily understand and utilize. Each skill is self-contained with:
     └── ...
 ```
 
+## Project Structure & Skill Integration
+
+For a complete overview of the Weaver project structure and how Agent Skills integrate with the codebase, see [/AGENTS.md](/AGENTS.md).
+
+### Quick Reference: Skills to Code Mapping
+
+| Skill Category                        | Code Location         | Interface          |
+|---------------------------------------|-----------------------|--------------------|
+| **job-**, **process-**, **provider-** | `weaver/cli.py`       | CLI commands       |
+| **API skills**                        | `weaver/wps_restapi/` | REST endpoints     |
+| **process-**                          | `weaver/processes/`   | Process operations |
+| **cwl-**                              | `weaver/`             | CWL support        |
+
 ## Available Skills
 
 All skills are organized by category for easy discovery:
@@ -128,13 +141,13 @@ Configure your IDE to recognize these skills for autocomplete and suggestions:
 
 ## Creating New Skills
 
-For detailed guidance on creating new Agent Skills, see [weaver-skill-create](skills/weaver-skill-create/).
+For detailed guidance on creating new Agent Skills, see [weaver-skill-create](skills/weaver-skill-create/SKILL.md).
 This includes naming conventions, metadata requirements, structure, examples, and best practices.
 
 ## Skill Metadata
 
 Each SKILL.md file contains YAML frontmatter with metadata. For complete metadata documentation and best practices,
-see [weaver-skill-create](skills/weaver-skill-create/).
+see [weaver-skill-create](skills/weaver-skill-create/SKILL.md).
 
 ## Additional Resources
 
