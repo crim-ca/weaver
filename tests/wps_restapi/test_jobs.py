@@ -2251,7 +2251,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.text == "b"
 
     @pytest.mark.job
-    @pytest.mark.oap_part4
+    @pytest.mark.oap_part1
     def test_job_result_index_with_file_references(self):
         """
         Test indexed result access with file references (href) in an array.
@@ -2269,6 +2269,7 @@ class WpsRestApiJobsTest(JobUtils):
             results=[
                 {
                     "id": "file_array",
+                    "type": ContentType.APP_RAW_JSON,
                     "value": [
                         {"href": f"{wps_out_dir}/file1.txt", "type": ContentType.TEXT_PLAIN},
                         {"href": f"{wps_out_dir}/file2.json", "type": ContentType.APP_JSON},
@@ -2296,6 +2297,7 @@ class WpsRestApiJobsTest(JobUtils):
         new_job.results = [
             {
                 "id": "file_array",
+                "type": ContentType.APP_RAW_JSON,
                 "value": [
                     {"href": f"{wps_out_url}/{new_job.id}/file1.json", "type": ContentType.APP_JSON},
                     {"href": f"{wps_out_url}/{new_job.id}/file2.json", "type": ContentType.APP_JSON},
@@ -2332,7 +2334,7 @@ class WpsRestApiJobsTest(JobUtils):
         shutil.rmtree(job_out_dir, ignore_errors=True)
 
     @pytest.mark.job
-    @pytest.mark.oap_part4
+    @pytest.mark.oap_part1
     def test_job_result_index_format_negotiation_accept_header(self):
         """
         Test that Accept header is properly used for format negotiation with indexed results.
@@ -2385,7 +2387,7 @@ class WpsRestApiJobsTest(JobUtils):
         shutil.rmtree(job_out_dir, ignore_errors=True)
 
     @pytest.mark.job
-    @pytest.mark.oap_part4
+    @pytest.mark.oap_part1
     def test_job_result_index_mixed_value_and_reference(self):
         """
         Test indexed array containing both literal values and file references.
@@ -2457,6 +2459,50 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json == {"name": "object", "value": "data"}
 
         shutil.rmtree(job_out_dir, ignore_errors=True)
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_json_array_as_single_value(self):
+        """
+        Test behavior when a JSON object contains nested data that looks like output structures.
+
+        This tests the edge case where the JSON output's data happens to have nested structures
+        with fields named 'value' or 'href', but these are just plain JSON data fields, not the
+        special output schema fields.
+
+        .. note::
+            The implementation currently allows indexing into any list value,
+            regardless of whether it represents multiple outputs or a single JSON value containing an array.
+            Ideally, only arrays with ContentType.APP_RAW_JSON type should allow indexing.
+            See: https://pavics-weaver.readthedocs.io/en/latest/processes.html#multiple-outputs
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[
+                {
+                    "id": "json_output",
+                    # The outer "value" is the output schema field (indicates this is by-value, not by-reference)
+                    # The inner fields "value" and "href" are just plain JSON data fields
+                    "value": {
+                        "value": 123,
+                        "href": "https://example.com/data1"
+                    },
+                    "mimeType": ContentType.APP_JSON,
+                },
+            ],
+        )
+
+        path = f"/jobs/{new_job.id}/results/json_output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+        assert resp.json["title"] == "Job Output Not Array"
+        assert "not an array" in resp.json["detail"]
+        assert resp.json["cause"]["type"] == "dict"
 
     @parameterized.expand([Status.ACCEPTED, Status.RUNNING, Status.FAILED, Status.SUCCESSFUL])
     @pytest.mark.oap_part4
