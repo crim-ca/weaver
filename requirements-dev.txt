@@ -8,7 +8,7 @@ autopep8
 # pin bandit to avoid issues in early 1.8.x versions
 # - https://github.com/PyCQA/bandit/issues/1226
 # - https://github.com/PyCQA/bandit/issues/1227
-bandit>=1.8.3
+bandit>=1.9.4
 build
 bump-my-version
 codacy-coverage
@@ -19,7 +19,7 @@ doc8>=2.0.0
 # - https://github.com/PyCQA/docformatter/issues/344
 # - https://github.com/PyCQA/docformatter/issues/345
 docformatter>=1.7.7,!=1.7.8
-flake8>=7
+flake8>=7.3.0
 flynt
 isort>=5
 # FIXME: pin 'marshmallow' dependency of 'safery' to fix compatibility (https://github.com/pyupio/safety/issues/711)
