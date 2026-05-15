@@ -50,6 +50,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import compute_file_digest_multibase, explode_headers, get_path_kvp, now
 from weaver.visibility import Visibility
 from weaver.warning import TimeZoneInfoAlreadySetWarning
+from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import get_job_results_document, get_job_status_schema, get_results
 from weaver.wps_restapi.swagger_definitions import (
@@ -465,7 +466,7 @@ class WpsRestApiJobsTest(JobUtils):
         base_url = self.settings["weaver.url"]
         jobs_url = base_url + sd.jobs_service.path
         limit = 2  # expect 11 jobs to be visible, making 6 pages of 2 each (except last that is 1)
-        last = 5   # zero-based index of last page
+        last = 5  # zero-based index of last page
         last_page = f"page={last}"
         prev_last_page = f"page={last - 1}"
         limit_kvp = f"limit={limit}"
@@ -928,7 +929,7 @@ class WpsRestApiJobsTest(JobUtils):
                             service=self.service_public.name,
                             process=self.process_private.identifier)
         with contextlib.ExitStack() as stack:
-            for patch in mocked_remote_wps([]):    # process invisible (not returned by remote)
+            for patch in mocked_remote_wps([]):  # process invisible (not returned by remote)
                 stack.enter_context(patch)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 404
@@ -1416,7 +1417,7 @@ class WpsRestApiJobsTest(JobUtils):
         """
         # to make sure UUID is applied, use the "same format" (8-4-4-4-12), but with invalid definitions
         base_path = sd.job_service.path.format(job_id="thisisnt-some-real-uuid-allerrordata")
-        for sub_path in ["", "/inputs", "/outputs", "/results", "/logs", "exceptions"]:
+        for sub_path in ["", "/inputs", "/outputs", "/results", "/logs", "/exceptions"]:
             path = f"{base_path}{sub_path}"
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
@@ -1956,19 +1957,19 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{new_job.id}/results/array_output/0"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.json == "first"
+        assert resp.text == "first"
 
         # Test retrieving second element (index 1)
         path = f"/jobs/{new_job.id}/results/array_output/1"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.json == "second"
+        assert resp.text == "second"
 
         # Test retrieving third element (index 2)
         path = f"/jobs/{new_job.id}/results/array_output/2"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.json == "third"
+        assert resp.text == "third"
 
     @pytest.mark.job
     @pytest.mark.oap_part1
@@ -2247,7 +2248,261 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/processes/{self.process_public.identifier}/jobs/{new_job.id}/results/output/1"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
-        assert resp.json == "b"
+        assert resp.text == "b"
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_with_file_references(self):
+        """
+        Test indexed result access with file references (href) in an array.
+        """
+        wps_out_dir = self.settings.get("weaver.wps_output_dir")
+        os.makedirs(wps_out_dir, exist_ok=True)
+
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[
+                {
+                    "id": "file_array",
+                    "type": ContentType.APP_RAW_JSON,
+                    "value": [
+                        {"href": f"{wps_out_dir}/file1.txt", "type": ContentType.TEXT_PLAIN},
+                        {"href": f"{wps_out_dir}/file2.json", "type": ContentType.APP_JSON},
+                    ]
+                },
+            ],
+            outputs={
+                "file_array": {"transmissionMode": ExecuteTransmissionMode.VALUE}
+            }
+        )
+
+        job_out_dir = os.path.join(wps_out_dir, str(new_job.id))
+        os.makedirs(job_out_dir, exist_ok=True)
+
+        file1_path = os.path.join(job_out_dir, "file1.json")
+        with open(file1_path, "w", encoding="utf-8") as f:
+            f.write('{"text": "Hello from file1"}')
+
+        file2_path = os.path.join(job_out_dir, "file2.json")
+        with open(file2_path, "w", encoding="utf-8") as f:
+            f.write('{"message": "Hello from file2"}')
+
+        # Update results with correct paths relative to WPS output
+        wps_out_url = get_wps_output_url(self.settings)
+        new_job.results = [
+            {
+                "id": "file_array",
+                "type": ContentType.APP_RAW_JSON,
+                "value": [
+                    {"href": f"{wps_out_url}/{new_job.id}/file1.json", "type": ContentType.APP_JSON},
+                    {"href": f"{wps_out_url}/{new_job.id}/file2.json", "type": ContentType.APP_JSON},
+                ]
+            },
+        ]
+        self.job_store.update_job(new_job)
+
+        # Test retrieving first file reference with JSON Accept header
+        path = f"/jobs/{new_job.id}/results/file_array/0"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        # When requesting with application/json, returns the file content as JSON
+        assert resp.json == {"text": "Hello from file1"}
+
+        # Test retrieving second file reference with JSON Accept header
+        path = f"/jobs/{new_job.id}/results/file_array/1"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        # JSON file content should be parsed
+        assert resp.json == {"message": "Hello from file2"}
+
+        # Test format conversion: request YAML from JSON file
+        # This tests that the Transform handler is invoked with the Accept header
+        path = f"/jobs/{new_job.id}/results/file_array/1"
+        resp = self.app.get(path, headers={"Accept": ContentType.APP_YAML}, expect_errors=True)
+        # Transform should convert JSON to YAML
+        assert resp.status_code == 200
+        assert ContentType.APP_YAML in resp.content_type
+        assert isinstance(resp.text, str)
+
+        shutil.rmtree(job_out_dir, ignore_errors=True)
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_format_negotiation_accept_header(self):
+        """
+        Test that Accept header is properly used for format negotiation with indexed results.
+        """
+        # Create job with array of file references
+        wps_out_dir = self.settings.get("weaver.wps_output_dir")
+        os.makedirs(wps_out_dir, exist_ok=True)
+
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[],
+            outputs={
+                "json_array": {"transmissionMode": ExecuteTransmissionMode.VALUE}
+            }
+        )
+
+        job_out_dir = os.path.join(wps_out_dir, str(new_job.id))
+        os.makedirs(job_out_dir, exist_ok=True)
+
+        json_file = os.path.join(job_out_dir, "data.json")
+        with open(json_file, "w", encoding="utf-8") as f:
+            f.write('{"status": "success", "value": 42}')
+
+        # Update job results with file reference array using proper WPS output URL
+        wps_out_url = get_wps_output_url(self.settings)
+        new_job.results = [
+            {
+                "id": "json_array",
+                "value": [
+                    {"href": f"{wps_out_url}/{new_job.id}/data.json", "type": ContentType.APP_JSON},
+                    {"href": f"{wps_out_url}/{new_job.id}/data.json", "type": ContentType.APP_JSON},
+                ]
+            },
+        ]
+        self.job_store.update_job(new_job)
+
+        # Test with Accept: application/json - returns the file content as JSON
+        path = f"/jobs/{new_job.id}/results/json_array/0"
+        resp = self.app.get(path, headers={"Accept": ContentType.APP_JSON})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        # The indexed endpoint returns the file content as JSON
+        assert resp.json == {"status": "success", "value": 42}
+
+        shutil.rmtree(job_out_dir, ignore_errors=True)
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_mixed_value_and_reference(self):
+        """
+        Test indexed array containing both literal values and file references.
+        """
+        wps_out_dir = self.settings.get("weaver.wps_output_dir")
+        os.makedirs(wps_out_dir, exist_ok=True)
+
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[],
+            outputs={
+                "mixed_array": {"transmissionMode": ExecuteTransmissionMode.VALUE}
+            }
+        )
+
+        # Create files for references
+        job_out_dir = os.path.join(wps_out_dir, str(new_job.id))
+        os.makedirs(job_out_dir, exist_ok=True)
+
+        # Create a JSON file instead of text file for proper JSON response
+        json_file = os.path.join(job_out_dir, "data.json")
+        with open(json_file, "w", encoding="utf-8") as f:
+            f.write('{"file": "reference"}')
+
+        # Array with mixed literal values and file references
+        wps_out_url = get_wps_output_url(self.settings)
+        new_job.results = [
+            {
+                "id": "mixed_array",
+                "value": [
+                    "literal_string",
+                    {"href": f"{wps_out_url}/{new_job.id}/data.json", "type": ContentType.APP_JSON},
+                    123,
+                    {"name": "object", "value": "data"},
+                ]
+            },
+        ]
+        self.job_store.update_job(new_job)
+
+        # Test literal value (index 0)
+        path = f"/jobs/{new_job.id}/results/mixed_array/0"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.text == "literal_string"
+
+        # Test file reference (index 1) - returns the file content as JSON
+        path = f"/jobs/{new_job.id}/results/mixed_array/1"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        # The indexed endpoint returns the file content as JSON when transmissionMode is VALUE
+        assert resp.json == {"file": "reference"}
+
+        # Test numeric literal (index 2)
+        path = f"/jobs/{new_job.id}/results/mixed_array/2"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.text == "123"
+
+        # Test object literal (index 3)
+        path = f"/jobs/{new_job.id}/results/mixed_array/3"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json == {"name": "object", "value": "data"}
+
+        shutil.rmtree(job_out_dir, ignore_errors=True)
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_json_array_as_single_value(self):
+        """
+        Test behavior when a JSON object contains nested data that looks like output structures.
+
+        This tests the edge case where the JSON output's data happens to have nested structures
+        with fields named 'value' or 'href', but these are just plain JSON data fields, not the
+        special output schema fields.
+
+        .. note::
+            The implementation currently allows indexing into any list value,
+            regardless of whether it represents multiple outputs or a single JSON value containing an array.
+            Ideally, only arrays with ContentType.APP_RAW_JSON type should allow indexing.
+            See: https://pavics-weaver.readthedocs.io/en/latest/processes.html#multiple-outputs
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[
+                {
+                    "id": "json_output",
+                    # The outer "value" is the output schema field (indicates this is by-value, not by-reference)
+                    # The inner fields "value" and "href" are just plain JSON data fields
+                    "value": {
+                        "value": 123,
+                        "href": "https://example.com/data1"
+                    },
+                    "mimeType": ContentType.APP_JSON,
+                },
+            ],
+        )
+
+        path = f"/jobs/{new_job.id}/results/json_output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+        assert resp.json["title"] == "Job Output Not Array"
+        assert "not an array" in resp.json["detail"]
+        assert resp.json["cause"]["type"] == "dict"
 
     @parameterized.expand([Status.ACCEPTED, Status.RUNNING, Status.FAILED, Status.SUCCESSFUL])
     @pytest.mark.oap_part4
