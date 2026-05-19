@@ -131,8 +131,7 @@ ruamel.yaml>=0.19.1
 schema-salad>=8.9.20260417192335,<9
 shapely
 simplejson
-# urllib3 not directly required, pinned by Snyk to avoid CVE-2024-37891
-urllib3>=2.6.3
+urllib3>=2.7.0
 urlmatch
 xmltodict>=1.0.4
 webob
