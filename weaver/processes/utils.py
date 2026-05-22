@@ -1,11 +1,12 @@
 import copy
+import json
 import logging
 import os
 import pathlib
 import warnings
 from copy import deepcopy
 from email import message_from_bytes
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict
 from urllib.parse import parse_qs, urlparse
 
 import colander
@@ -399,7 +400,9 @@ def resolve_deployment_order(cwl_packages):
 
 def _extract_multipart_boundary(content_type):
     # type: (str) -> str
-    """Extract boundary parameter from Content-Type header."""
+    """
+    Extract boundary parameter from Content-Type header.
+    """
     if "boundary=" not in content_type:
         raise HTTPBadRequest(json={
             "title": "Missing multipart boundary",
@@ -412,7 +415,9 @@ def _extract_multipart_boundary(content_type):
 
 def _get_multipart_content(content, request):
     # type: (Union[str, bytes], Optional[AnyRequestType]) -> bytes
-    """Get raw multipart content as bytes."""
+    """
+    Get raw multipart content as bytes.
+    """
     if request is not None and hasattr(request, 'body'):
         return request.body
     if isinstance(content, bytes):
@@ -424,10 +429,11 @@ def _get_multipart_content(content, request):
 
 def _parse_multipart_part(part_content, part_content_type):
     # type: (str, str) -> Optional[JSON]
-    """Parse content from a multipart part."""
+    """
+    Parse content from a multipart part.
+    """
     if 'yaml' in part_content_type or part_content_type in [ContentType.APP_YAML, ContentType.TEXT_YAML]:
         return yaml.safe_load(part_content)
-    import json
     return json.loads(part_content)
 
 
