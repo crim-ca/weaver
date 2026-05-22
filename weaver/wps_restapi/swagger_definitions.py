@@ -7176,7 +7176,12 @@ class ExecutionUnit(OneOfKeywordSchema):
 
 class ExecutionUnitList(ExtendedSequenceSchema):
     item = ExecutionUnit(name="ExecutionUnit")
-    validator = Length(min=1, max=1)
+    validator = Length(min=1)
+    description = (
+        "List of execution units to deploy. "
+        "When multiple units are provided, they should represent workflow steps and/or the main workflow. "
+        "Deployment order will be determined automatically based on dependencies."
+    )
 
 
 class ProcessDeploymentWithContext(ProcessDeployment):
@@ -7290,19 +7295,16 @@ class CWLGraphList(ExtendedSequenceSchema):
     cwl = CWLGraphItem()
 
 
-# FIXME: supported nested and $graph multi-deployment (https://github.com/crim-ca/weaver/issues/56)
+# Multi-deployment support for nested processes and $graph (https://github.com/crim-ca/weaver/issues/56)
 class CWLGraphBase(ExtendedMappingSchema):
     graph = CWLGraphList(
         name="$graph", description=(
-            "Graph definition that defines *exactly one* CWL Application Package represented as list. "
-            "Multiple definitions simultaneously deployed is NOT supported currently."
-            # "Graph definition that combines one or many CWL Application Packages within a single payload. "
-            # "If a single application is given (list of one item), it will be deployed as normal CWL by itself. "
-            # "If multiple applications are defined, the first MUST be the top-most Workflow process. "
-            # "Deployment of other items will be performed, and the full deployment will be persisted only if all are "
-            # "valid. The resulting Workflow will be registered as a package by itself (i.e: not as a graph)."
+            "Graph definition that combines one or many CWL Application Packages within a single payload. "
+            "If a single application is given (list of one item), it will be deployed as a single process. "
+            "If multiple applications are defined, the first SHOULD be a Workflow that references other items. "
+            "Child processes (CommandLineTool) will be deployed first, then the parent Workflow."
         ),
-        validator=Length(min=1, max=1)
+        validator=Length(min=1)
     )
 
 

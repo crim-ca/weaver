@@ -19,6 +19,7 @@ from pyramid.httpexceptions import (
     HTTPForbidden,
     HTTPInternalServerError,
     HTTPNotFound,
+    HTTPNotImplemented,
     HTTPOk,
     HTTPUnprocessableEntity,
     HTTPUnsupportedMediaType
@@ -317,15 +318,82 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
         raise HTTPUnprocessableEntity(detail=msg)
 
 
-# FIXME: supported nested process and $graph multi-deployment (https://github.com/crim-ca/weaver/issues/56)
+# Multi-deployment support for nested processes and $graph (https://github.com/crim-ca/weaver/issues/56)
 #   see also: https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents
 def resolve_cwl_graph(package):
-    # type: (CWL) -> CWL
-    if "$graph" in package and isinstance(package["$graph"], list) and len(package["$graph"]) == 1:
-        # consider package as if provided in non-graph representation
-        # must preserve top level fields (e.g.: 'cwlVersion') and nested graph item
-        package.update(package.pop("$graph")[0])
-    return package
+    # type: (CWL) -> Union[CWL, List[CWL]]
+    """
+    Resolve CWL $graph into deployable packages.
+
+    :returns:
+        - Single CWL dict if no $graph or $graph with 1 item (backward compatible)
+        - List of CWL dicts if $graph contains multiple items
+    """
+    if "$graph" not in package:
+        return package
+
+    graph_items = package.get("$graph", [])
+    if not isinstance(graph_items, list):
+        return package
+
+    if len(graph_items) == 1:
+        # Single item: unpack as before (backward compatible)
+        cwl_base = {k: v for k, v in package.items() if k != "$graph"}
+        cwl_base.update(graph_items[0])
+        return cwl_base
+
+    # Multiple items: return list for multi-deployment
+    # Each item inherits top-level fields (e.g., cwlVersion)
+    cwl_base = {k: v for k, v in package.items() if k != "$graph"}
+    resolved_items = []
+    for item in graph_items:
+        cwl_item = deepcopy(cwl_base)
+        cwl_item.update(item)
+        resolved_items.append(cwl_item)
+
+    return resolved_items
+
+
+def resolve_deployment_order(cwl_packages):
+    # type: (List[CWL]) -> Tuple[List[CWL], Optional[CWL]]
+    """
+    Determine deployment order for multiple CWL packages.
+
+    :param cwl_packages: List of CWL package definitions to order.
+    :returns:
+        Tuple of (dependencies, main_workflow)
+        - dependencies: List of CommandLineTool/ExpressionTool to deploy first
+        - main_workflow: The main Workflow (if any) to deploy last, or None
+    :raises HTTPNotImplemented: If multiple Workflow definitions are provided.
+    """
+    workflows = []
+    tools = []
+
+    for pkg in cwl_packages:
+        cwl_class = pkg.get("class", "")
+        if cwl_class == "Workflow":
+            workflows.append(pkg)
+        elif cwl_class in ["CommandLineTool", "ExpressionTool"]:
+            tools.append(pkg)
+        else:
+            # Unknown class, treat as tool
+            LOGGER.warning("Unknown CWL class '%s', treating as CommandLineTool", cwl_class)
+            tools.append(pkg)
+
+    if len(workflows) > 1:
+        raise HTTPNotImplemented(json={
+            "title": "Multiple Workflow definitions in $graph.",
+            "description": "Only one top-level Workflow is supported per deployment.",
+            "cause": {"workflow_count": len(workflows)},
+            "value": [wf.get("id") for wf in workflows]
+        })
+
+    main_workflow = workflows[0] if workflows else None
+
+    # TODO: Implement topological sort based on workflow step dependencies
+    # For now, deploy tools in order provided
+
+    return tools, main_workflow
 
 
 def parse_process_deploy_content(
@@ -411,6 +479,8 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     headers = getattr(container, "headers", {})  # container is any request (as when called from API Deploy request)
     c_type = ContentType.get(get_header("Content-Type", headers), default=ContentType.APP_OGC_PKG_JSON)
 
+    # c_type multi si c'est format,
+
     # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
     payload = parse_process_deploy_content(
         request=None,
@@ -458,7 +528,12 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         found = isinstance(reference, str)
     elif c_type in (list(ContentType.ANY_CWL) + [ContentType.APP_JSON]) and "cwlVersion" in payload:
         process_info = {"version": payload.pop("version", None)}
+        # Keep original payload with $graph for workflow validation
+        original_payload = deepcopy(payload) if "$graph" in payload else None
         package = resolve_cwl_graph(payload)
+        # Pass original payload alongside resolved packages for workflow reference resolution
+        if isinstance(package, list) and original_payload:
+            package = (package, original_payload)
         found = True
     else:  # ogc-apppkg type, but no explicit check since used by default (backward compat)
         if deployment_profile_name:  # optional hint
@@ -470,20 +545,38 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
             if "unit" not in execution_units and "href" not in execution_units:
                 execution_units = {"unit": execution_units}
             execution_units = [execution_units]
-        if not isinstance(execution_units, list) or not len(execution_units) == 1:
+        if not isinstance(execution_units, list) or len(execution_units) < 1:
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
+
+        # Support multiple execution units for multi-deployment
+        execution_units_to_deploy = []
         for execution_unit in execution_units:
             if not isinstance(execution_unit, dict):
                 raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
-            package = execution_unit.get("unit")
-            reference = execution_unit.get("href")
-            # stop on first package/reference found, simultaneous usage will raise during package retrieval
-            if package:
-                found = isinstance(package, dict) and package
-            elif reference:
-                found = isinstance(reference, str)
-            if found:
-                break
+            unit_package = execution_unit.get("unit")
+            unit_reference = execution_unit.get("href")
+            # Collect all valid packages/references
+            if unit_package:
+                execution_units_to_deploy.append({"package": unit_package, "reference": None})
+            elif unit_reference:
+                execution_units_to_deploy.append({"package": None, "reference": unit_reference})
+
+        if not execution_units_to_deploy:
+            raise HTTPBadRequest("No valid execution units found.")
+
+        # For now, use first execution unit (backward compatible)
+        # Multi-execution unit deployment can be expanded later
+        package = execution_units_to_deploy[0]["package"]
+        reference = execution_units_to_deploy[0]["reference"]
+        found = package or reference
+
+        # Log if multiple units provided (for future expansion)
+        if len(execution_units_to_deploy) > 1:
+            LOGGER.info(
+                "Multiple execution units provided (%d), currently only first unit is deployed. "
+                "Full multi-unit deployment support coming soon.",
+                len(execution_units_to_deploy)
+            )
     if not found:
         params = [
             "process (href)",
@@ -504,8 +597,20 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
             f"Deployment of {ProcessType.BUILTIN} process is not allowed."
         )
 
-    # update and validate process information using WPS process offering, CWL/WPS reference or CWL package definition
     settings = get_settings(container)
+
+    # Handle multi-CWL deployment from $graph
+    original_graph_package = None
+    if isinstance(package, tuple):
+        # package is (list_of_cwls, original_payload_with_graph)
+        package, original_graph_package = package
+    if isinstance(package, list):
+        return _deploy_process_multi_cwl(
+            package, process_info, process_desc, payload_copy, container, overwrite, settings, headers,
+            original_graph_package
+        )
+
+    # update and validate process information using WPS process offering, CWL/WPS reference or CWL package definition
     process_info = _validate_deploy_process_info(process_info, reference, package, settings, headers)
 
     restapi_url = get_wps_restapi_base_url(settings)
@@ -602,6 +707,179 @@ def _save_deploy_process(process, override, container):
             "value": exc.value
         })
     return process_summary
+
+
+def _deploy_process_multi_cwl(
+    cwl_packages,             # type: List[CWL]
+    process_info,             # type: JSON
+    process_desc,             # type: JSON
+    payload_copy,             # type: JSON
+    container,                # type: Union[AnySettingsContainer, AnyRequestType]
+    overwrite,                # type: Union[bool, Process]
+    settings,                 # type: SettingsType
+    headers,                  # type: AnyHeadersContainer
+    original_graph_package,   # type: Optional[CWL]
+):                            # type: (...) -> HTTPException
+    """
+    Deploy multiple CWL packages from a $graph definition.
+
+    :param cwl_packages: List of resolved CWL package definitions.
+    :param process_info: Process information dict.
+    :param process_desc: Process description from payload.
+    :param payload_copy: Original payload copy.
+    :param container: Application container.
+    :param overwrite: Whether to overwrite existing processes.
+    :param settings: Application settings.
+    :param headers: Request headers.
+    :returns: HTTP response with deployment result.
+    """
+    LOGGER.info("Deploying multi-CWL package with %d definitions", len(cwl_packages))
+
+    # Resolve deployment order (tools first, workflow last)
+    tools, main_workflow = resolve_deployment_order(cwl_packages)
+
+    restapi_url = get_wps_restapi_base_url(settings)
+    deployed_processes = []
+
+    # Determine which process will be the main one
+    # If there's a workflow, that's the main; otherwise, use first tool as main
+    main_process_pkg = main_workflow if main_workflow else (tools[0] if tools else None)
+    if not main_process_pkg:
+        raise HTTPBadRequest("No valid CWL definitions found in $graph")
+
+    # Identify main process ID to avoid deploying it as a child
+    main_process_id = main_process_pkg.get("id")
+
+    # Deploy CommandLineTools first (but skip the one that will be the main process)
+    for tool_pkg in tools:
+        tool_id = tool_pkg.get("id")
+
+        # Skip if this tool will be deployed as the main process
+        if tool_id == main_process_id:
+            LOGGER.info("Skipping child deployment of %s (will be deployed as main process)", tool_id)
+            continue
+
+        tool_info = _validate_deploy_process_info(deepcopy(process_info), None, tool_pkg, settings, headers)
+        tool_id = tool_info["identifier"]
+
+        LOGGER.info("Deploying CWL tool: %s", tool_id)
+
+        # Set up tool-specific URLs
+        tool_desc_url = "/".join([restapi_url, "processes", tool_id])
+        tool_exec_url = "/".join([tool_desc_url, "jobs"])
+
+        tool_info["processEndpointWPS1"] = process_desc.get("processEndpointWPS1")
+        tool_info["executeEndpoint"] = tool_exec_url
+        tool_info["payload"] = payload_copy
+        tool_info["jobControlOptions"] = process_desc.get("jobControlOptions", [])
+        tool_info["outputTransmission"] = process_desc.get("outputTransmission", [])
+        tool_info["processDescriptionURL"] = tool_desc_url
+
+        # Remove schema to avoid later deserialization error
+        tool_info.pop("$schema", None)
+        tool_info.pop("$id", None)
+
+        try:
+            tool_process = Process(tool_info)
+            # Deploy tools without overwrite to avoid conflicts
+            tool_summary = _save_deploy_process(tool_process, False, container)
+            deployed_processes.append(tool_summary)
+            LOGGER.info("Successfully deployed CWL tool: %s", tool_id)
+        except HTTPConflict:
+            # Tool already exists, skip but continue
+            LOGGER.info("CWL tool already exists: %s, skipping deployment", tool_id)
+        except Exception as exc:
+            LOGGER.error("Failed to deploy CWL tool %s: %s", tool_id, exc)
+            raise
+
+    # Deploy main process (workflow or first tool if no workflow)
+    # For workflows, keep them in original $graph context for tool reference resolution
+    if main_workflow and original_graph_package:
+        # Create a minimal $graph with just the workflow (for validation)
+        # The workflow can reference tools by ID (without #) as they're already deployed
+        workflow_standalone = deepcopy(main_process_pkg)
+        # Replace #tool-id references with tool-id (deployed process lookup)
+        if "steps" in workflow_standalone:
+            for step_data in workflow_standalone.get("steps", {}).values():
+                if "run" in step_data and isinstance(step_data["run"], str):
+                    # Remove # prefix for deployed process lookup
+                    if step_data["run"].startswith("#"):
+                        step_data["run"] = step_data["run"][1:]
+        validate_pkg = workflow_standalone
+    else:
+        validate_pkg = main_process_pkg
+
+    workflow_info = _validate_deploy_process_info(deepcopy(process_info), None, validate_pkg, settings, headers)
+    workflow_id = workflow_info["identifier"]
+
+    if main_workflow:
+        LOGGER.info("Deploying main CWL workflow: %s", workflow_id)
+    else:
+        LOGGER.info("No workflow found in $graph, deploying first tool as main process: %s", workflow_id)
+
+    # Set up workflow-specific URLs
+    description_url = "/".join([restapi_url, "processes", workflow_id])
+    execute_endpoint = "/".join([description_url, "jobs"])
+
+    workflow_info["processEndpointWPS1"] = process_desc.get("processEndpointWPS1")
+    workflow_info["executeEndpoint"] = execute_endpoint
+    workflow_info["payload"] = payload_copy
+    workflow_info["jobControlOptions"] = process_desc.get("jobControlOptions", [])
+    workflow_info["outputTransmission"] = process_desc.get("outputTransmission", [])
+    workflow_info["processDescriptionURL"] = description_url
+
+    if "links" in workflow_info:
+        workflow_info["additional_links"] = workflow_info.pop("links")
+
+    workflow_info.pop("$schema", None)
+    workflow_info.pop("$id", None)
+
+    try:
+        workflow_process = Process(workflow_info)
+        if isinstance(overwrite, Process):
+            process_summary = _update_deploy_process_version(workflow_process, overwrite, VersionLevel.MAJOR, container)
+        else:
+            process_summary = _save_deploy_process(workflow_process, overwrite, container)
+    except ValueError as exc:
+        LOGGER.error("Failed schema validation of deployed workflow summary:\n%s", exc)
+        raise HTTPBadRequest(detail=str(exc))
+    except HTTPException:
+        raise
+
+    links = workflow_process.links(container)
+    loc_url = next(link["href"] for link in links if link["rel"] == "self")
+    process_summary["links"] = links
+
+    data = {
+        "description": sd.OkPostProcessesResponse.description,
+        "processSummary": process_summary,
+        "deploymentDone": True,
+    }
+
+    # Include information about deployed child processes
+    if deployed_processes:
+        data["deployedProcesses"] = [proc["id"] for proc in deployed_processes]
+
+    headers_out = {
+        "Content-Type": ContentType.APP_JSON,
+        "Content-Location": loc_url,
+        "Location": loc_url,
+    }
+
+    if overwrite and (
+        isinstance(overwrite, bool) or (
+            isinstance(overwrite, Process) and
+            overwrite.version == process_summary.get("version")
+        )
+    ):
+        http_cls = HTTPOk
+    else:
+        http_cls = HTTPCreated
+
+    LOGGER.info("Successfully deployed multi-CWL package: main process %s with %d child processes",
+                workflow_id, len(deployed_processes))
+
+    return http_cls(json=data, headers=headers_out)
 
 
 def _update_deploy_process_version(process, process_overwrite, update_level, container=None):

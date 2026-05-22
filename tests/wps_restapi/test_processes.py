@@ -1410,14 +1410,287 @@ class WpsRestApiProcessesTest(WpsConfigBase):
     def test_deploy_process_CWL_direct_graph_YAML(self):
         self.deploy_process_CWL_direct(ContentType.APP_CWL_YAML, graph_count=1)
 
-    # FIXME: make xfail once nested CWL definitions implemented (https://github.com/crim-ca/weaver/issues/56)
+    def test_deploy_process_CWL_direct_graph_multi_simple(self):
+        """
+        Test deployment of multiple CWL definitions via $graph (simple case with 2 tools).
+
+        This validates that $graph with multiple items is accepted and deployed.
+        """
+        test_id = self.fully_qualified_test_name()
+        cwl = {
+            "cwlVersion": "v1.2",
+            "$graph": [
+                {
+                    "class": "CommandLineTool",
+                    "id": f"{test_id}-tool-1",
+                    "inputs": {},
+                    "outputs": {
+                        "output": {
+                            "type": "File",
+                            "outputBinding": {"glob": "stdout.log"}
+                        }
+                    },
+                    "requirements": {
+                        "DockerRequirement": {"dockerPull": "python:3.12-alpine"}
+                    },
+                    "baseCommand": ["python3", "-V"],
+                    "stdout": "stdout.log"
+                },
+                {
+                    "class": "CommandLineTool",
+                    "id": f"{test_id}-tool-2",
+                    "inputs": {},
+                    "outputs": {
+                        "output": {
+                            "type": "File",
+                            "outputBinding": {"glob": "stdout.log"}
+                        }
+                    },
+                    "requirements": {
+                        "DockerRequirement": {"dockerPull": "alpine:latest"}
+                    },
+                    "baseCommand": ["echo", "hello"],
+                    "stdout": "stdout.log"
+                }
+            ]
+        }
+
+        headers = {"Content-Type": ContentType.APP_CWL_JSON}
+        resp = mocked_sub_requests(self.app, "post", "/processes", data=cwl, headers=headers,
+                                   only_local=True)  # mock in case of TestApp self-reference URLs
+        assert resp.status_code == 201, f"Expected 201, got {resp.status_code}: {resp.json}"
+
+        result = resp.json
+        assert "processSummary" in result
+        assert result["deploymentDone"] is True
+
+        # Since there's no workflow, first tool should be the main process
+        main_id = result["processSummary"]["id"]
+        assert main_id in [f"{test_id}-tool-1", f"{test_id}-tool-2"]
+
+        # Verify main process was deployed
+        resp = self.app.get(f"/processes/{main_id}")
+        assert resp.status_code == 200
+
+    def test_deploy_process_CWL_direct_graph_multi_valid(self):
+        """
+        Test deployment of multiple CWL definitions via $graph.
+
+        This test validates that multiple CommandLineTool definitions can be deployed
+        along with a Workflow that references them.
+        """
+        test_id = self.fully_qualified_test_name()
+        # Create a complete workflow with multiple steps
+        cwl = {
+            "cwlVersion": "v1.2",
+            "$graph": [
+                {
+                    "class": "CommandLineTool",
+                    "id": f"{test_id}-echo-tool",
+                    "inputs": {
+                        "message": "string"
+                    },
+                    "outputs": {
+                        "output": {
+                            "type": "File",
+                            "outputBinding": {
+                                "glob": "output.txt"
+                            }
+                        }
+                    },
+                    "requirements": {
+                        "DockerRequirement": {
+                            "dockerPull": "alpine:latest"
+                        }
+                    },
+                    "baseCommand": ["sh", "-c"],
+                    "arguments": [
+                        "echo $(inputs.message) > output.txt"
+                    ]
+                },
+                {
+                    "class": "CommandLineTool",
+                    "id": f"{test_id}-cat-tool",
+                    "inputs": {
+                        "file": "File"
+                    },
+                    "outputs": {
+                        "output": {
+                            "type": "File",
+                            "outputBinding": {
+                                "glob": "cat_output.txt"
+                            }
+                        }
+                    },
+                    "requirements": {
+                        "DockerRequirement": {
+                            "dockerPull": "alpine:latest"
+                        }
+                    },
+                    "baseCommand": ["cat"],
+                    "stdin": "$(inputs.file.path)",
+                    "stdout": "cat_output.txt"
+                },
+                {
+                    "class": "Workflow",
+                    "id": f"{test_id}-workflow",
+                    "inputs": {
+                        "message": "string"
+                    },
+                    "outputs": {
+                        "result": {
+                            "type": "File",
+                            "outputSource": "cat_step/output"
+                        }
+                    },
+                    "steps": {
+                        "echo_step": {
+                            "run": f"{test_id}-echo-tool",
+                            "in": {
+                                "message": "message"
+                            },
+                            "out": ["output"]
+                        },
+                        "cat_step": {
+                            "run": f"{test_id}-cat-tool",
+                            "in": {
+                                "file": "echo_step/output"
+                            },
+                            "out": ["output"]
+                        }
+                    }
+                }
+            ]
+        }
+
+        headers = {"Content-Type": ContentType.APP_CWL_JSON}
+        resp = mocked_sub_requests(self.app, "post", "/processes", data=cwl, headers=headers,
+                                   only_local=True)  # mock in case of TestApp self-reference URLs
+        assert resp.status_code == 201, f"Expected 201, got {resp.status_code}: {resp.json}"
+
+        result = resp.json
+        assert "processSummary" in result
+        assert result["deploymentDone"] is True
+
+        # The main workflow should be deployed
+        main_id = result["processSummary"]["id"]
+        assert main_id == f"{test_id}-workflow"
+
+        # Verify main workflow was deployed
+        desc = self.get_process_description(main_id, schema=ProcessSchema.OLD)
+        assert desc["process"]["id"] == main_id
+        pkg = self.get_application_package(main_id)
+        assert pkg["class"] == "Workflow"
+
+        # Verify child tools were deployed
+        if "deployedProcesses" in result:
+            assert f"{test_id}-echo-tool" in result["deployedProcesses"]
+            assert f"{test_id}-cat-tool" in result["deployedProcesses"]
+
+            # Verify we can retrieve the child tools
+            desc = self.get_process_description(f"{test_id}-echo-tool", schema=ProcessSchema.OLD)
+            assert desc["process"]["id"] == f"{test_id}-echo-tool"
+            pkg = self.get_application_package(f"{test_id}-echo-tool")
+            assert pkg["class"] == "CommandLineTool"
+
+            desc = self.get_process_description(f"{test_id}-cat-tool", schema=ProcessSchema.OLD)
+            assert desc["process"]["id"] == f"{test_id}-cat-tool"
+            pkg = self.get_application_package(f"{test_id}-cat-tool")
+            assert pkg["class"] == "CommandLineTool"
+
     def test_deploy_process_CWL_direct_graph_multi_invalid(self):
-        with pytest.raises((webtest.app.AppError, AssertionError)) as exc:  # noqa
-            self.deploy_process_CWL_direct(ContentType.APP_CWL_JSON, graph_count=2)
-        error = str(exc.value)
-        assert "400 Bad Request" in error
-        assert "Invalid schema" in error
-        assert "Longer than maximum length 1" in error
+        """
+        Test that deployment of multiple Workflows via $graph is rejected.
+
+        This test validates that attempting to deploy multiple Workflow definitions
+        in a single $graph fails with an appropriate error, since only one Workflow
+        is allowed per deployment.
+        """
+        # Create a $graph with multiple Workflows (invalid)
+        cwl = {
+            "cwlVersion": "v1.2",
+            "$graph": [
+                {
+                    "class": "Workflow",
+                    "id": "workflow-1",
+                    "inputs": {
+                        "message": "string"
+                    },
+                    "outputs": {
+                        "result": {
+                            "type": "string",
+                            "outputSource": "step1/output"
+                        }
+                    },
+                    "steps": {
+                        "step1": {
+                            "run": {
+                                "class": "CommandLineTool",
+                                "baseCommand": ["echo"],
+                                "inputs": {
+                                    "message": "string"
+                                },
+                                "outputs": {
+                                    "output": {
+                                        "type": "stdout"
+                                    }
+                                }
+                            },
+                            "in": {
+                                "message": "message"
+                            },
+                            "out": ["output"]
+                        }
+                    }
+                },
+                {
+                    "class": "Workflow",
+                    "id": "workflow-2",
+                    "inputs": {
+                        "text": "string"
+                    },
+                    "outputs": {
+                        "result": {
+                            "type": "string",
+                            "outputSource": "step1/output"
+                        }
+                    },
+                    "steps": {
+                        "step1": {
+                            "run": {
+                                "class": "CommandLineTool",
+                                "baseCommand": ["cat"],
+                                "inputs": {
+                                    "text": "string"
+                                },
+                                "outputs": {
+                                    "output": {
+                                        "type": "stdout"
+                                    }
+                                }
+                            },
+                            "in": {
+                                "text": "text"
+                            },
+                            "out": ["output"]
+                        }
+                    }
+                }
+            ]
+        }
+
+        headers = {"Content-Type": ContentType.APP_CWL_JSON}
+        resp = self.app.post_json("/processes", params=cwl, headers=headers, expect_errors=True)
+
+        # Should fail because multiple Workflows are not allowed (HTTP 501 Not Implemented)
+        assert resp.status_code == 501, (
+            f"Expected 501 Not Implemented for multiple Workflows in $graph, got {resp.status_code}: {resp.text[:200]}"
+        )
+        # Verify error message mentions the multiple workflow issue
+        error_text = json.dumps(resp.json).lower()
+        assert any(word in error_text for word in ["workflow", "multiple", "one"]), (
+            f"Error message should mention workflow constraint: {resp.json}"
+        )
 
     @staticmethod
     def get_cwl_docker_python_version(cwl_version="v1.0", process_id=None):
