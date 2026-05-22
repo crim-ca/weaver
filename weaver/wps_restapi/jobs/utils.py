@@ -59,8 +59,11 @@ from weaver.processes.convert import any2wps_literal_datatype, convert_output_pa
 from weaver.provenance import ProvenanceFormat
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
+from weaver.transform.const import EXCLUDED_TYPES
+from weaver.transform.handlers import Transform
 from weaver.utils import (
     compute_file_digest_multibase,
+    create_content_id,
     data2str,
     fetch_file,
     get_any_id,
@@ -309,6 +312,7 @@ def get_job_list_links(job_total, filters, grouped, request):
             "href": parent_url, "rel": "up",
             "type": ContentType.APP_JSON, "title": "Parent collection for which listed jobs apply."
         })
+
     return links
 
 
@@ -482,8 +486,9 @@ def make_result_link(
         url = headers["Content-Location"]
         typ = headers["Content-Type"]
         enc = headers.get("Content-Encoding", None)
-        link_header = make_link_header(url, rel=result_id, type=typ, charset=enc)
-        links.append(link_header)
+        link_header_result = make_link_header(url, rel=result_id, type=typ, charset=enc)
+        link_header_output = make_link_header(url, rel="output", type=typ, charset=enc, id=result_id)
+        links.extend([link_header_result, link_header_output])
     return links
 
 
@@ -622,7 +627,7 @@ def get_results(  # pylint: disable=R1260
                 else:
                     output["dataType"] = dtype
 
-            if schema == JobInputsOutputsSchema.OGC_STRICT:
+            if ogc_api and strict:
                 out_fmt = output.pop("format", {})
                 for fmt_key, fmt_val in out_fmt.items():
                     output.setdefault(fmt_key, fmt_val)
@@ -647,6 +652,32 @@ def get_results(  # pylint: disable=R1260
     headers = get_job_results_links(job, references, {}, headers=[], settings=settings)
 
     return outputs, headers
+
+
+def get_job_output_transmission(job, output_id, is_reference):
+    # type: (Job, str, bool) -> Tuple[AnyExecuteTransmissionMode, Optional[JobValueFormat]]
+    """
+    Obtain the requested :term:`Job` output ``transmissionMode`` and ``format``.
+    """
+    outputs = job.outputs or {}
+    outputs = convert_output_params_schema(outputs, JobInputsOutputsSchema.OGC)
+    out = outputs.get(output_id) or {}
+    out_mode = cast("AnyExecuteTransmissionMode", out.get("transmissionMode"))
+    out_fmt = cast("JobValueFormat", out.get("format"))
+
+    # raw/representation can change the output transmission mode if they are not overriding it
+    # document/minimal return is not checked, since it is our default, and will resolve as such anyway
+    if (
+        not out_mode and
+        job.execution_return == ExecuteReturnPreference.REPRESENTATION and
+        job.execution_response == ExecuteResponse.RAW
+    ):
+        return ExecuteTransmissionMode.VALUE, out_fmt
+
+    # because mode can be omitted, resolve their default explicitly
+    if not out_mode:
+        out_mode = ExecuteTransmissionMode.REFERENCE if is_reference else ExecuteTransmissionMode.VALUE
+    return out_mode, out_fmt
 
 
 def get_job_return(
@@ -677,30 +708,43 @@ def get_job_return(
     return job.execution_response, job.execution_return
 
 
-def get_job_output_transmission(job, output_id, is_reference):
-    # type: (Job, str, bool) -> Tuple[AnyExecuteTransmissionMode, Optional[JobValueFormat]]
+def resolve_result_single(
+    job,                # type: Job
+    result,             # type: ExecutionResultObject
+    output_id,          # type: str
+    accept_header,      # type: Optional[str]
+    headers,            # type: AnyHeadersContainer
+    *,                  # force named keyword arguments after
+    settings,           # type: AnySettingsContainer
+):                      # type: (...) -> Union[HTTPOk, HTTPNoContent]
     """
-    Obtain the requested :term:`Job` output ``transmissionMode`` and ``format``.
+    Resolves and returns a single job result with appropriate format negotiation.
+
+    This function consolidates the logic for determining the output format based on priority:
+    1. Accept header from request
+    2. Job output transmission format
+    3. Result media type
+
+    :param job: Job definition to obtain relevant path resolution.
+    :param result: Result to be represented.
+    :param output_id: Identifier of the corresponding result output.
+    :param accept_header: Accept header value from request, if any.
+    :param headers: Additional headers to include in the response.
+    :param settings: Application settings to resolve locations.
+    :return: Response with the single result.
     """
-    outputs = job.outputs or {}
-    outputs = convert_output_params_schema(outputs, JobInputsOutputsSchema.OGC)
-    out = outputs.get(output_id) or {}
-    out_mode = cast("AnyExecuteTransmissionMode", out.get("transmissionMode"))
-    out_fmt = cast("JobValueFormat", out.get("format"))
+    is_reference = bool(get_any_value(result, key=True, file=True))
+    _, output_format = get_job_output_transmission(job, output_id, is_reference)
+    result_media_type = get_field(result, "mime_type", search_variations=True, default=None)
 
-    # raw/representation can change the output transmission mode if they are not overriding it
-    # document/minimal return is not checked, since it is our default, and will resolve as such anyway
-    if (
-        not out_mode and
-        job.execution_return == ExecuteReturnPreference.REPRESENTATION and
-        job.execution_response == ExecuteResponse.RAW
-    ):
-        return ExecuteTransmissionMode.VALUE, out_fmt
+    # Resolve format priority: accept header > job transmission > result media type
+    output_format = accept_header or output_format or result_media_type
 
-    # because mode can be omitted, resolve their default explicitly
-    if not out_mode:
-        out_mode = ExecuteTransmissionMode.REFERENCE if is_reference else ExecuteTransmissionMode.VALUE
-    return out_mode, out_fmt
+    # Normalize format to dictionary for consistency
+    if not isinstance(output_format, dict):
+        output_format = {"mime_type": output_format}
+
+    return get_job_results_single(job, result, output_id, output_format, headers=headers, settings=settings)
 
 
 def get_job_results_response(
@@ -897,13 +941,8 @@ def get_job_results_response(
 
     # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
     res_id = out_vals[0][0]
-    # FIXME: add transform for requested output format (https://github.com/crim-ca/weaver/pull/548)
-    #   req_fmt = guess_target_format(container)   where container=request
-    #   out_fmt (see above)
-    #   out_type = result.get("type")
-    #   out_select = req_fmt or out_fmt or out_type  (resolution order/precedence)
-    out_fmt = None
-    return get_job_results_single(job, out_info, res_id, out_fmt, headers=headers, settings=settings)
+    req_fmt = (request_headers or {}).get("accept")
+    return resolve_result_single(job, out_info, res_id, req_fmt, headers=headers, settings=settings)
 
 
 def get_job_result_by_index(
@@ -911,13 +950,14 @@ def get_job_result_by_index(
     output_id,      # type: str
     index,          # type: int
     *,              # force named keyword arguments after
-    container,      # type: AnySettingsContainer
+    request,        # type: AnyRequestType
 ):                  # type: (...) -> AnyResponseType
     """
     Retrieve a specific indexed value from a job result array.
 
     Given an output that is an array (or multi-value result), this function retrieves
-    a specific element by its zero-based index and returns it as JSON.
+    a specific element by its zero-based index. The output format respects content negotiation
+    via Accept headers and follows the same transmission mode and formatting logic as single outputs.
 
     For Example
         /jobs/{jobId}/results/output_array/0  -> returns first element
@@ -926,14 +966,14 @@ def get_job_result_by_index(
     :param job: Job from which to retrieve the indexed result.
     :param output_id: Identifier of the output containing the array.
     :param index: Zero-based index of the element to retrieve (must be a valid integer).
-    :param container: Container giving access to instance settings.
-    :return: HTTP response with the indexed element as JSON.
+    :param request: Request providing access to instance settings and content negotiation context.
+    :return: HTTP response with the indexed element in the appropriate format (raw data, JSON, reference, etc.).
     :raises HTTPBadRequest: If index is negative or out of range.
     :raises HTTPNotFound: If the output ID is not found in the job results.
     :raises HTTPUnprocessableEntity: If the output is not an array.
     """
-    raise_job_dismissed(job, container)
-    raise_job_bad_status_success(job, container)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_success(job, request)
 
     if index < 0:
         raise HTTPBadRequest(json={
@@ -984,7 +1024,13 @@ def get_job_result_by_index(
 
     indexed_element = output_value[index]
 
-    return HTTPOk(json=indexed_element)
+    if isinstance(indexed_element, dict) and "href" in indexed_element:
+        result = indexed_element
+    else:
+        result = {"value": indexed_element}
+
+    accept = guess_target_format(request, default=None)
+    return resolve_result_single(job, result, output_id, accept, headers={}, settings=request)
 
 
 def generate_or_resolve_result(
@@ -993,7 +1039,7 @@ def generate_or_resolve_result(
     result_id,      # type: str
     output_id,      # type: str
     output_mode,    # type: AnyExecuteTransmissionMode
-    output_format,  # type: Optional[JobValueFormat]  # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    output_format,  # type: Optional[JobValueFormat]
     settings,       # type: SettingsType
 ):                  # type: (...) -> Tuple[HeadersType, Optional[AnyDataStream]]
     """
@@ -1014,7 +1060,7 @@ def generate_or_resolve_result(
     is_val = bool(get_any_value(result, key=True, file=False, data=True))
     is_ref = bool(get_any_value(result, key=True, file=True, data=False))
     val = get_any_value(result)
-    cid = f"{result_id}@{job.id}"
+    cid = create_content_id(result_id, job.id)
     url = None
     loc = None
     res_data = None
@@ -1041,6 +1087,20 @@ def generate_or_resolve_result(
             loc = url  # remote storage, S3, etc.
     else:
         typ = get_field(result, "mime_type", search_variations=True, default=ContentType.TEXT_PLAIN)
+
+    # Handle output_format as either string (Accept header) or dict (format spec)
+    if isinstance(output_format, str):
+        out = clean_media_type_format(output_format, strip_parameters=True)
+    else:
+        out = clean_media_type_format(get_field(output_format, "mime_type", search_variations=True, default=None))
+
+    # Apply transform if type is different from desired output and desired output is different from plain
+    if out and out not in EXCLUDED_TYPES and out != typ:
+        file_transform = Transform(file_path=loc, current_media_type=typ, wanted_media_type=out)
+        typ = out
+        file_transform.get()
+        loc = file_transform.output_path
+        url = map_wps_output_location(loc, settings, exists=True, url=True)
 
     if not url:
         out_dir = get_wps_output_dir(settings)
@@ -1208,7 +1268,16 @@ def get_job_results_single(
 
     ctype = out_headers.get("Content-Type")
     if not ctype:
-        ctype = get_field(result, "mediaType", search_variations=True, default=ContentType.TEXT_PLAIN)
+        ctype = get_field(result, "mediaType", search_variations=True, default=None)
+
+    # If no explicit content-type and data is JSON-serializable, return as JSON
+    if not ctype and isinstance(out_data, (dict, list)):
+        return HTTPOk(json=out_data, headers=headers)
+
+    # Default to text/plain if no content-type specified
+    if not ctype:
+        ctype = ContentType.TEXT_PLAIN
+
     c_enc = cast("AnyContentEncoding", headers.get("Content-Encoding") or "UTF-8")  # type: AnyContentEncoding
     out_data = data2str(out_data)
     out_data = ContentEncoding.encode(out_data, c_enc)
