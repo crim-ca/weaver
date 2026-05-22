@@ -4,6 +4,7 @@ import os
 import pathlib
 import warnings
 from copy import deepcopy
+from email import message_from_bytes
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlparse
 
@@ -396,6 +397,172 @@ def resolve_deployment_order(cwl_packages):
     return tools, main_workflow
 
 
+def _extract_multipart_boundary(content_type):
+    # type: (str) -> str
+    """Extract boundary parameter from Content-Type header."""
+    if "boundary=" not in content_type:
+        raise HTTPBadRequest(json={
+            "title": "Missing multipart boundary",
+            "description": "Content-Type must include boundary parameter for multipart content.",
+            "cause": {"Content-Type": content_type}
+        })
+    boundary_part = content_type.split("boundary=")[1].split(";")[0].strip()
+    return boundary_part.strip('"')
+
+
+def _get_multipart_content(content, request):
+    # type: (Union[str, bytes], Optional[AnyRequestType]) -> bytes
+    """Get raw multipart content as bytes."""
+    if request is not None and hasattr(request, 'body'):
+        return request.body
+    if isinstance(content, bytes):
+        return content
+    if isinstance(content, str):
+        return content.encode('utf-8')
+    raise HTTPBadRequest("Invalid multipart content format")
+
+
+def _parse_multipart_part(part_content, part_content_type):
+    # type: (str, str) -> Optional[JSON]
+    """Parse content from a multipart part."""
+    if 'yaml' in part_content_type or part_content_type in [ContentType.APP_YAML, ContentType.TEXT_YAML]:
+        return yaml.safe_load(part_content)
+    import json
+    return json.loads(part_content)
+
+
+def _classify_multipart_part(part_data, cwl_packages, parts_order, parts_by_cid, content_id, process_description):
+    # type: (JSON, List[CWL], List, Dict, str, Optional[JSON]) -> Optional[JSON]
+    """
+    Classify parsed multipart part as CWL package or process description.
+
+    Returns updated process_description if applicable.
+    """
+    if not isinstance(part_data, dict):
+        return process_description
+
+    if 'class' in part_data and part_data['class'] in ['CommandLineTool', 'Workflow', 'ExpressionTool']:
+        cwl_packages.append(part_data)
+        parts_order.append((part_data, content_id))
+        if content_id:
+            parts_by_cid[content_id] = part_data
+        return process_description
+
+    if 'cwlVersion' in part_data and '$graph' in part_data:
+        cwl_packages.append(part_data)
+        parts_order.append((part_data, content_id))
+        if content_id:
+            parts_by_cid[content_id] = part_data
+        return process_description
+
+    if 'processDescription' in part_data or 'process' in part_data:
+        if process_description is not None:
+            LOGGER.warning("Multiple process descriptions found in multipart, using first one")
+            return process_description
+        return part_data
+
+    if any(k in part_data for k in ['inputs', 'outputs', 'baseCommand', 'steps']):
+        cwl_packages.append(part_data)
+        parts_order.append((part_data, content_id))
+        if content_id:
+            parts_by_cid[content_id] = part_data
+        return process_description
+
+    if process_description is None:
+        return part_data
+    return process_description
+
+
+def parse_multipart_deploy(content, content_type, request=None):
+    # type: (Union[str, bytes], str, Optional[AnyRequestType]) -> Tuple[List[CWL], Optional[JSON]]
+    """
+    Parse multipart/mixed or multipart/related deployment content.
+
+    Extracts CWL packages and optional process description from multipart request.
+
+    :param content: Raw multipart content (string or bytes)
+    :param content_type: Content-Type header value (must include boundary parameter)
+    :param request: Optional request object for extracting body
+    :returns: Tuple of (list of CWL packages, optional process description metadata)
+    :raises HTTPBadRequest: If multipart content is malformed or invalid
+    """
+    boundary = _extract_multipart_boundary(content_type)
+    raw_content = _get_multipart_content(content, request)
+
+    # Parse using email parser
+    content_type_with_boundary = f"{content_type.split(';')[0]}; boundary={boundary}"
+    msg_bytes = b"Content-Type: " + content_type_with_boundary.encode('utf-8') + b"\r\n\r\n" + raw_content
+
+    try:
+        msg = message_from_bytes(msg_bytes)
+    except Exception as exc:
+        raise HTTPBadRequest(json={
+            "title": "Failed to parse multipart content",
+            "description": str(exc),
+            "cause": {"error": exc.__class__.__name__}
+        })
+
+    if not msg.is_multipart():
+        raise HTTPBadRequest("Content is not multipart format")
+
+    # Extract root workflow reference for multipart/related
+    root_workflow_cid = None
+    if "multipart/related" in content_type.lower() and "start=" in content_type:
+        start_part = content_type.split("start=")[1].split(";")[0].strip().strip('"').strip('<>')
+        root_workflow_cid = start_part
+
+    # Process all parts
+    cwl_packages = []
+    process_description = None
+    parts_by_cid = {}
+    parts_order = []
+
+    for part in msg.get_payload():
+        if not hasattr(part, 'get_content_type'):
+            continue
+
+        part_content_type = part.get_content_type()
+        part_content = part.get_payload(decode=True)
+
+        # Handle Content-Transfer-Encoding
+        transfer_encoding = part.get('Content-Transfer-Encoding', '').lower()
+        if transfer_encoding == 'base64' and isinstance(part_content, bytes):
+            import base64
+            part_content = base64.b64decode(part_content)
+
+        if isinstance(part_content, bytes):
+            part_content = part_content.decode('utf-8')
+
+        content_id = part.get('Content-ID', '').strip('<>')
+
+        # Parse and classify content
+        if (part_content_type in ContentType.ANY_CWL or
+                part_content_type in [ContentType.APP_JSON, ContentType.APP_YAML]):
+            try:
+                part_data = _parse_multipart_part(part_content, part_content_type)
+                process_description = _classify_multipart_part(
+                    part_data, cwl_packages, parts_order, parts_by_cid, content_id, process_description
+                )
+            except Exception as exc:
+                LOGGER.warning("Failed to parse part with Content-Type %s: %s", part_content_type, exc)
+                continue
+
+    if not cwl_packages:
+        raise HTTPBadRequest(json={
+            "title": "No CWL packages found in multipart content",
+            "description": "Multipart request must contain at least one CWL package part.",
+            "cause": {"parts_found": len(list(msg.get_payload()))}
+        })
+
+    # Reorder if root workflow specified
+    if root_workflow_cid and root_workflow_cid in parts_by_cid:
+        root_pkg = parts_by_cid[root_workflow_cid]
+        cwl_packages = [pkg for pkg in cwl_packages if pkg is not root_pkg]
+        cwl_packages.append(root_pkg)
+
+    return cwl_packages, process_description
+
+
 def parse_process_deploy_content(
     request=None,                                       # type: Optional[AnyRequestType]
     content=None,                                       # type: Optional[Union[JSON, str]]
@@ -414,6 +581,33 @@ def parse_process_deploy_content(
             "status": HTTPInternalServerError.code,
             "cause": "Request content and content argument are undefined.",
         })
+
+    # Get full Content-Type header (including parameters like boundary) from request if available
+    if request is not None:
+        # Use get_header to get the full header value with parameters, not request.content_type which strips them
+        request_headers = getattr(request, 'headers', {})
+        full_content_type = get_header("Content-Type", request_headers)
+        if full_content_type:
+            content_type = full_content_type
+
+    if content_type and any(mt in content_type.lower() for mt in ["multipart/mixed", "multipart/related"]):
+        LOGGER.info("Detected multipart deployment request")
+        cwl_packages, _ = parse_multipart_deploy(
+            content=content if content is not None else request.body,
+            content_type=content_type,
+            request=request
+        )
+
+        # Return the CWL packages as a list (will be handled by multi-deployment logic)
+        # If there's process description metadata, we could merge it, but for now we focus on CWL
+        # The multi-deployment logic will handle the CWL packages
+        if len(cwl_packages) == 1 and not any('$graph' in pkg for pkg in cwl_packages):
+            # Single CWL package without $graph - return as-is for backward compatibility
+            return cwl_packages[0]
+        else:
+            # Multiple packages or $graph - return as list
+            return cwl_packages
+
     try:
         if request is not None:
             content = request.text
@@ -477,17 +671,30 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     :raises HTTPException: for any invalid process deployment step.
     """
     headers = getattr(container, "headers", {})  # container is any request (as when called from API Deploy request)
-    c_type = ContentType.get(get_header("Content-Type", headers), default=ContentType.APP_OGC_PKG_JSON)
-
-    # c_type multi si c'est format,
+    c_type_full = get_header("Content-Type", headers) or ContentType.APP_OGC_PKG_JSON
+    # Extract base media type (without parameters) for content type checks
+    c_type = c_type_full.split(';')[0].strip() if isinstance(c_type_full, str) else c_type_full
 
     # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
+    # For multipart requests, we need to pass the request object to access the raw body
     payload = parse_process_deploy_content(
-        request=None,
+        request=container if hasattr(container, 'body') else None,
         content=payload,
-        content_type=c_type,
+        content_type=c_type_full,  # Pass full Content-Type with parameters (e.g., boundary)
         content_type_schema=sd.DeployContentType,
     )
+
+    # For multipart/list payload, wrap it so it can flow through normal deployment logic
+    # This will be handled by the existing multi-CWL deployment code later
+    if isinstance(payload, list):
+        LOGGER.info("Detected multi-CWL deployment (multipart or $graph) with %d packages", len(payload))
+        # Wrap list in minimal structure to pass through validation
+        payload = {
+            "cwlVersion": "v1.2",
+            "$graph": payload
+        }
+        c_type = ContentType.APP_CWL_JSON
+
     payload_copy = deepcopy(payload)
     payload = _check_deploy(payload)
     payload.pop("$schema", None)

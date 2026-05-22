@@ -16,7 +16,6 @@ import mock
 import pyramid.testing
 import pytest
 import stopit
-import webtest.app
 import yaml
 from parameterized import parameterized
 from pywps.inout import LiteralInput
@@ -1597,6 +1596,271 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert desc["process"]["id"] == f"{test_id}-cat-tool"
             pkg = self.get_application_package(f"{test_id}-cat-tool")
             assert pkg["class"] == "CommandLineTool"
+
+    def test_deploy_process_CWL_multipart(self):
+        """
+        Test deployment of multiple CWL files via multipart/mixed request.
+
+        This validates that multipart deployment can be used to deploy a workflow
+        with its dependent tools in a single request.
+        """
+        test_id = self.fully_qualified_test_name()
+
+        # Create individual CWL definitions
+        echo_tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": f"{test_id}-echo-tool",
+            "inputs": {
+                "message": "string"
+            },
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {
+                        "glob": "output.txt"
+                    }
+                }
+            },
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "alpine:latest"
+                }
+            },
+            "baseCommand": ["sh", "-c"],
+            "arguments": [
+                "echo $(inputs.message) > output.txt"
+            ]
+        })
+
+        cat_tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": f"{test_id}-cat-tool",
+            "inputs": {
+                "file": "File"
+            },
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {
+                        "glob": "cat_output.txt"
+                    }
+                }
+            },
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "alpine:latest"
+                }
+            },
+            "baseCommand": ["cat"],
+            "stdin": "$(inputs.file.path)",
+            "stdout": "cat_output.txt"
+        })
+
+        workflow_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": f"{test_id}-workflow",
+            "inputs": {
+                "message": "string"
+            },
+            "outputs": {
+                "result": {
+                    "type": "File",
+                    "outputSource": "cat_step/output"
+                }
+            },
+            "steps": {
+                "echo_step": {
+                    "run": f"{test_id}-echo-tool",
+                    "in": {
+                        "message": "message"
+                    },
+                    "out": ["output"]
+                },
+                "cat_step": {
+                    "run": f"{test_id}-cat-tool",
+                    "in": {
+                        "file": "echo_step/output"
+                    },
+                    "out": ["output"]
+                }
+            }
+        })
+
+        # Create multipart content
+        boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        multipart_body = (
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-ID: <echo-tool>\r\n"
+            f"\r\n"
+            f"{echo_tool_cwl}\r\n"
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-ID: <cat-tool>\r\n"
+            f"\r\n"
+            f"{cat_tool_cwl}\r\n"
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-ID: <main-workflow>\r\n"
+            f"\r\n"
+            f"{workflow_cwl}\r\n"
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n"
+        ).encode('utf-8')
+
+        content_type_header = f"multipart/mixed; boundary={boundary}"
+
+        resp = mocked_sub_requests(
+            self.app, "post", "/processes",
+            data=multipart_body,
+            headers={"Content-Type": content_type_header},
+            only_local=True
+        )
+
+        assert resp.status_code == 201, (
+            f"Expected 201, got {resp.status_code}. "
+            f"Content-Type: {resp.content_type}. "
+            f"Body: {resp.text[:500] if hasattr(resp, 'text') else resp.body[:500]}"
+        )
+
+        result = resp.json
+        assert "processSummary" in result
+        assert result["deploymentDone"] is True
+
+        # The main workflow should be deployed
+        main_id = result["processSummary"]["id"]
+        assert main_id == f"{test_id}-workflow"
+
+        # Verify main workflow was deployed
+        desc = self.get_process_description(main_id, schema=ProcessSchema.OLD)
+        assert desc["process"]["id"] == main_id
+        pkg = self.get_application_package(main_id)
+        assert pkg["class"] == "Workflow"
+
+        # Verify child tools were deployed
+        if "deployedProcesses" in result:
+            assert f"{test_id}-echo-tool" in result["deployedProcesses"]
+            assert f"{test_id}-cat-tool" in result["deployedProcesses"]
+
+    def test_deploy_process_CWL_multipart_multiple_workflows_invalid(self):
+        """
+        Test that deployment of multiple Workflows via multipart is rejected.
+
+        This test validates that attempting to deploy multiple Workflow definitions
+        in a single multipart request fails with an appropriate error, since only one
+        Workflow is allowed per deployment.
+        """
+        test_id = "test_multipart_multi_workflow_invalid"
+
+        # Create two workflow definitions
+        workflow1_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": f"{test_id}-workflow-1",
+            "inputs": {
+                "message": "string"
+            },
+            "outputs": {
+                "result": {
+                    "type": "string",
+                    "outputSource": "step1/output"
+                }
+            },
+            "steps": {
+                "step1": {
+                    "run": {
+                        "class": "CommandLineTool",
+                        "baseCommand": ["echo"],
+                        "inputs": {
+                            "message": "string"
+                        },
+                        "outputs": {
+                            "output": {
+                                "type": "stdout"
+                            }
+                        }
+                    },
+                    "in": {
+                        "message": "message"
+                    },
+                    "out": ["output"]
+                }
+            }
+        })
+
+        workflow2_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": f"{test_id}-workflow-2",
+            "inputs": {
+                "text": "string"
+            },
+            "outputs": {
+                "result": {
+                    "type": "string",
+                    "outputSource": "step1/output"
+                }
+            },
+            "steps": {
+                "step1": {
+                    "run": {
+                        "class": "CommandLineTool",
+                        "baseCommand": ["cat"],
+                        "inputs": {
+                            "text": "string"
+                        },
+                        "outputs": {
+                            "output": {
+                                "type": "stdout"
+                            }
+                        }
+                    },
+                    "in": {
+                        "text": "text"
+                    },
+                    "out": ["output"]
+                }
+            }
+        })
+
+        # Create multipart content with two workflows
+        boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        multipart_body = (
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-ID: <workflow-1>\r\n"
+            f"\r\n"
+            f"{workflow1_cwl}\r\n"
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-ID: <workflow-2>\r\n"
+            f"\r\n"
+            f"{workflow2_cwl}\r\n"
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n"
+        ).encode('utf-8')
+
+        content_type_header = f"multipart/mixed; boundary={boundary}"
+
+        resp = mocked_sub_requests(
+            self.app, "post", "/processes",
+            data=multipart_body,
+            headers={"Content-Type": content_type_header},
+            only_local=True
+        )
+
+        # Should fail because multiple Workflows are not allowed (HTTP 501 Not Implemented)
+        assert resp.status_code == 501, (
+            f"Expected 501 Not Implemented for multiple Workflows in multipart, got {resp.status_code}. "
+            f"Content-Type: {resp.content_type}. "
+            f"Body: {resp.text[:500] if hasattr(resp, 'text') else resp.body[:500]}"
+        )
+        error_json = resp.json
+        error_text = json.dumps(error_json).lower()
+        assert any(word in error_text for word in ["workflow", "multiple", "one"]), (
+            f"Error message should mention workflow constraint: {error_json}"
+        )
 
     def test_deploy_process_CWL_direct_graph_multi_invalid(self):
         """
