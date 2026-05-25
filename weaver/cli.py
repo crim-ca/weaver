@@ -2613,8 +2613,12 @@ class WeaverClient(object):
 
         # download links from headers
         LOGGER.debug("%s outputs in results link headers.", "Processing" if len(out_links) else "No")
+        downloaded_links = set()
         for _, link_header in ResponseHeaders(out_links).items():
             link = parse_link_header(link_header)
+            if link["href"] in downloaded_links:
+                continue
+            downloaded_links.add(link["href"])
             rel = link["rel"].rsplit(".", 1)
             output = rel[0]
             is_array = len(rel) > 1 and str.isnumeric(rel[1])
@@ -2761,7 +2765,7 @@ class WeaverClient(object):
         # with this endpoint, outputs IDs are directly at the root of the body
         result_url = f"{job_url}/results"
         LOGGER.info("Retrieving results from [%s]", result_url)
-        headers = headers or {}
+        headers = CaseInsensitiveDict(headers or {})
         headers.update({
             "Accept": ContentType.APP_JSON,
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",  # limit data transfer, prefer href if possible

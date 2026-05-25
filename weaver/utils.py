@@ -85,6 +85,7 @@ if TYPE_CHECKING:
         AnyStr,
         Callable,
         Dict,
+        Generator,
         IO,
         Iterator,
         List,
@@ -148,8 +149,11 @@ if TYPE_CHECKING:
         "max_retries": NotRequired[int],
         "backoff": NotRequired[Number],
         "backoff_factor": NotRequired[Number],
-        "headers": NotRequired[AnyHeadersContainer],
-        "cookies": NotRequired[AnyCookiesContainer],
+        "ssl_verify": NotRequired[bool],
+        "verify": NotRequired[bool],
+        "headers": NotRequired[Optional[AnyHeadersContainer]],
+        "cookies": NotRequired[Optional[AnyCookiesContainer]],
+        "params": NotRequired[Optional[Dict[str, AnyValueType]]],
         "stream": NotRequired[bool],
         "cache": NotRequired[bool],
         "cache_enabled": NotRequired[bool],
@@ -1321,6 +1325,22 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
+def create_content_id(resource_id, context_id):
+    # type: (AnyUUID, AnyUUID) -> str
+    """
+    Generates a unique ``Content-ID`` from provided IDs.
+
+    .. seealso::
+        - Format of ``Content-ID`` header is defined under :rfc:`2392`.
+        - Integration with ``multipart`` :term:`Media-Types` is defined under :rfc:`1521`.
+
+    :param resource_id: Identifier of the resource unique within the context.
+    :param context_id: Identifier that provides a unique reference across contexts.
+    :returns: The ``Content-ID`` representation that can be directly employed as header.
+    """
+    return f"<{resource_id}@{context_id}>"
+
+
 def compute_file_digest_multibase(file_path, hash_algorithm="sha256", multibase_encoding="base64"):
     # type: (str, str, str) -> str
     """
@@ -1473,8 +1493,8 @@ def get_href_headers(
                 if path.startswith("https://s3."):
                     path, s3_region = resolve_s3_from_http(path)
                 s3_params = resolve_s3_http_options(**options["http"], **kwargs)
-                s3_region = s3_region or options["s3"].pop("region_name", None)
-                s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
+                s3_region = cast("RegionName", s3_region or options["s3"].pop("region_name", None))
+                s3_client = boto3.client("s3", region_name=s3_region, **s3_params)
                 s3_bucket, file_key = path[5:].split("/", 1)
                 s3_file = s3_client.head_object(Bucket=s3_bucket, Key=file_key)
                 f_type = content_type or s3_file["ContentType"]
@@ -1507,9 +1527,8 @@ def get_href_headers(
 
     headers = {}
     if content_headers:
-        content_id = content_id.strip("<>") if isinstance(content_id, str) else ""
         if content_id:
-            headers["Content-ID"] = f"<{content_id}>"
+            headers["Content-ID"] = content_id
         if location_headers:
             headers["Content-Location"] = content_location or href
         c_type, c_enc = guess_file_contents(href)
@@ -1550,6 +1569,7 @@ def make_link_header(
     type=None,      # type: Optional[str]  # noqa
     title=None,     # type: Optional[str]
     charset=None,   # type: Optional[str]
+    **kwargs,       # type: Optional[str]
 ):                  # type: (...) -> str
     """
     Creates the HTTP Link (:rfc:`8288`) header value from input parameters or a dictionary representation.
@@ -1562,6 +1582,7 @@ def make_link_header(
         Parameter :paramref:`rel` is optional to allow unpacking with a single parameter,
         but its value is required to form a valid ``Link`` header.
     """
+    params = {}
     if isinstance(href, dict):
         rel = rel or href.get("rel")
         type = type or href.get("type")  # noqa
@@ -1580,6 +1601,9 @@ def make_link_header(
         link += f"; title=\"{title}\""
     if hreflang:
         link += f"; hreflang={hreflang}"
+    if params:
+        for key, val in params.items():
+            link += f"; {key}={val}"
     return link
 
 
@@ -2027,7 +2051,7 @@ def invalidate_region(caching_args):
 
 
 def get_ssl_verify_option(method, url, settings, request_options=None):
-    # type: (str, str, AnySettingsContainer, Optional[RequestOptions]) -> bool
+    # type: (str, str, Optional[AnySettingsContainer], Optional[RequestOptions]) -> bool
     """
     Obtains the SSL verification option considering multiple setting definitions and the provided request context.
 
@@ -2052,7 +2076,7 @@ def get_ssl_verify_option(method, url, settings, request_options=None):
 
 
 def get_no_cache_option(request_headers, **cache_options):
-    # type: (HeadersType, **bool | RequestOptions) -> bool
+    # type: (AnyHeadersContainer, **bool | RequestOptions) -> bool
     """
     Obtains the ``No-Cache`` result from request headers and configured :term:`Request Options`.
 
@@ -2072,7 +2096,7 @@ def get_no_cache_option(request_headers, **cache_options):
 
 
 def get_request_options(method, url, settings):
-    # type: (str, str, AnySettingsContainer) -> RequestOptions
+    # type: (str, str, Optional[AnySettingsContainer]) -> RequestOptions
     """
     Obtains the :term:`Request Options` corresponding to the request from the configuration file.
 
@@ -2260,7 +2284,7 @@ def _patch_cached_request_stream(response, stream=False):
             iter_content = getattr(response, "iter_content")
 
             def cached_iter_content(*_, **__):
-                # type: (*Any, **Any) -> None
+                # type: (*Any, **Any) -> Generator[bytes, None, None]
                 cached_content = b""
                 for chunk in iter_content(*_, **__):
                     cached_content += chunk
@@ -2401,7 +2425,7 @@ def request_extra(method,                           # type: AnyRequestMethod
     # process request
     resp = None
     failures = []
-    no_cache = get_no_cache_option(request_kwargs.get("headers", {}), cache_enabled=cache_enabled, **request_options)
+    no_cache = get_no_cache_option(request_kwargs.get("headers") or {}, cache_enabled=cache_enabled, **request_options)
     # remove leftover options unknown to requests method in case of multiple entries
     # see 'requests.request' detailed signature for applicable args
     known_req_opts = set(inspect.signature(requests.Session.request).parameters)
@@ -2664,7 +2688,7 @@ def resolve_s3_from_http(reference):
     """
     s3 = boto3.client("s3")         # type: S3Client  # created with default, environment, or ~/.aws/config
     s3_url = s3.meta.endpoint_url   # includes the region name, to be used to check if we must switch region
-    s3_region = s3.meta.region_name
+    s3_region = cast("RegionName", s3.meta.region_name)
     try:
         if not reference.startswith(s3_url):
             LOGGER.warning(
@@ -2839,12 +2863,12 @@ class OutputMethod(ExtendedEnum):
     Methodology employed to handle generation of a file or directory output that was fetched.
     """
     # download operations
-    AUTO = "auto"
-    LINK = "link"
-    MOVE = "move"
-    COPY = "copy"
+    AUTO = "auto"  # type: Literal["auto"]
+    LINK = "link"  # type: Literal["link"]
+    MOVE = "move"  # type: Literal["move"]
+    COPY = "copy"  # type: Literal["copy"]
     # metadata operations
-    META = "meta"
+    META = "meta"  # type: Literal["meta"]
 
 
 def fetch_file(file_reference,                      # type: str
@@ -2910,7 +2934,7 @@ def fetch_file(file_reference,                      # type: str
             raise ValueError("Invalid AWS S3 reference. "
                              f"Input region name [{s3_region}] mismatches reference region [{s3_region_ref}].")
         s3_region = s3_region_ref or s3_region
-        s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
+        s3_client = boto3.client("s3", region_name=s3_region, **s3_params)
         s3_client.download_file(s3_bucket, file_key, file_path, Callback=callback)
     elif file_href.startswith("http"):
         # pseudo-http URL referring to S3 bucket, try to redirect to above S3 handling method if applicable
@@ -3157,8 +3181,8 @@ def fetch_files_s3(location,                            # type: str
     configs = get_request_options("GET", location, settings)
     options["http"].update(**configs)
     s3_params = resolve_s3_http_options(**options["http"], **kwargs)
-    s3_region = options["s3"].pop("region_name", None)
-    s3_client = boto3.client("s3", region_name=s3_region, **s3_params)  # type: S3Client
+    s3_region = cast("RegionName", options["s3"].pop("region_name", None))
+    s3_client = boto3.client("s3", region_name=s3_region, **s3_params)
     s3_bucket, dir_key = location[5:].split("/", 1)
     base_url = f"{s3_client.meta.endpoint_url.rstrip('/')}/"
 

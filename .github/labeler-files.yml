@@ -114,6 +114,13 @@ feature/job:
       - 'weaver/wps_restapi/jobs/**/*'
       - 'weaver/wps_restapi/templates/notification_email_example.mako'
 
+feature/provenance:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/provenance.py'
+      - 'weaver/wps_restapi/examples/job_prov*'
+      - 'weaver/wps_restapi/jobs/prov.py'
+
 feature/providers:
   - changed-files:
     - any-glob-to-any-file:
