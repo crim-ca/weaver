@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.12.0:
+
+`6.12.0 <https://github.com/crim-ca/weaver/tree/6.12.0>`_ (2026-05-25)
+====================================================================================================================
+
+Changes:
+--------
 - Add support for various GeoTIFF formats, allowing flexible handling and representation of GeoTIFFs in outputs
   (fixes `#100 <https://github.com/crim-ca/weaver/issues/100>`_).
 - Add support for ``GET /jobs/{jobId}/results/{id}`` and ``GET /jobs/{jobId}/outputs/{id}`` routes to enable direct access to
