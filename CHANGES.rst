@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+<<<<<<< agent-skills
 - Set up `Weaver Agent Skills <./.agents/skills>`_ based on
   the `Agent Skill Specification <https://agentskills.io/specification>`_
   to help AI agents interact with `Weaver` and its API more seamlessly.
@@ -23,6 +24,36 @@ Changes:
 - Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded
   `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification
   following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification.
+=======
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.12.0:
+
+`6.12.0 <https://github.com/crim-ca/weaver/tree/6.12.0>`_ (2026-05-25)
+====================================================================================================================
+
+Changes:
+--------
+- Add support for various GeoTIFF formats, allowing flexible handling and representation of GeoTIFFs in outputs
+  (fixes `#100 <https://github.com/crim-ca/weaver/issues/100>`_).
+- Add support for ``GET /jobs/{jobId}/results/{id}`` and ``GET /jobs/{jobId}/outputs/{id}`` routes to enable direct access to
+  individual `Job` result items by ID. This enhancement includes support alternate representations based on the ``Accept`` header.
+  If an alternate format (e.g., YAML for a JSON source) is requested it will be automatically generated and returned.
+- Return ``Link`` headers with ``rel="alternate"`` containing all possible output formats, allowing retrieval via query parameters
+  (e.g., ``/jobs/{jobId}/outputs/{id}?f=application/x-yaml``) (fixes `#18 <https://github.com/crim-ca/weaver/issues/18>`_).
+- Add ``weaver.formats.OutputFormat.CSV`` format support and extend ``OutputFormat.convert()`` method to handle CSV conversions
+  from JSON data structures.
+- Add ``weaver.transform`` module providing format conversion handlers for `Job` outputs. Output formats are dynamically
+  extended from the original `Process` definition to provide alternate result representations without modifying the deployed
+  `Process` metadata.
+- Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded 
+  `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification 
+  following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification. 
+>>>>>>> master
   Job outputs now include ``digestMultibase`` for local files (resolves `#898 <https://github.com/crim-ca/weaver/issues/898>`_).
 - Add ``/per/core/process-exception-job-gone`` and ``/per/core/job-results-exception-job-gone``
   conformance definitions that allow the HTTP 410 status code for dismissed `Job` and their results.

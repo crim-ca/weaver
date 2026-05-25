@@ -152,7 +152,7 @@ jobs:
         if: ${{ steps.should_skip_test.outputs.skip != 'true' && matrix.test-case != 'test-docker' }}
         # install package and dependencies directly,
         # skip sys/conda setup to use active python
-        run: make install-sys install-pkg install-pip install-raw install-dev install-dev-npm
+        run: SUDO=sudo make install-sys install-pkg install-pip install-raw install-dev install-dev-npm
       - name: Display Packages
         # skip python setup if running with docker or if test should be skipped
         if: ${{ steps.should_skip_test.outputs.skip != 'true' && matrix.test-case != 'test-docker' }}
@@ -210,7 +210,7 @@ jobs:
       # coverage test analysis
       - name: Upload coverage report
         if: ${{ steps.should_skip_test.outputs.skip != 'true' && success() && matrix.test-case == 'test-coverage-only' }}
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2  # v6.0.0
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354  # v6.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./reports/coverage.xml
