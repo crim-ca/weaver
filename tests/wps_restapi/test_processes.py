@@ -1956,6 +1956,181 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             f"Error message should mention workflow constraint: {resp.json}"
         )
 
+    def test_deploy_process_CWL_multipart_related_invalid_root_class(self):
+        """
+        Test that multipart/related with 'start' parameter pointing to non-Workflow is rejected.
+
+        Per RFC 5621 and multipart/related requirements, the root document (identified by 'start')
+        must be a Workflow when deploying CWL processes.
+        """
+        test_id = "test_multipart_related_invalid_root"
+
+        # Create a CommandLineTool (not a Workflow)
+        tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": f"{test_id}-tool",
+            "inputs": {},
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {"glob": "output.txt"}
+                }
+            },
+            "requirements": {
+                "DockerRequirement": {"dockerPull": "alpine:latest"}
+            },
+            "baseCommand": ["echo", "hello"],
+            "stdout": "output.txt"
+        })
+
+        workflow_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": f"{test_id}-workflow",
+            "inputs": {"message": "string"},
+            "outputs": {
+                "result": {"type": "File", "outputSource": "step1/output"}
+            },
+            "steps": {
+                "step1": {
+                    "run": f"{test_id}-tool",
+                    "in": {"message": "message"},
+                    "out": ["output"]
+                }
+            }
+        })
+
+        # Create multipart/related with start= pointing to the tool (invalid)
+        boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        multipart_body = (
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-ID: <tool>\r\n"
+            f"\r\n"
+            f"{tool_cwl}\r\n"
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-ID: <workflow>\r\n"
+            f"\r\n"
+            f"{workflow_cwl}\r\n"
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n"
+        ).encode('utf-8')
+
+        # start= points to the tool, which is NOT a Workflow
+        content_type_header = f"multipart/related; boundary={boundary}; start=\"<tool>\""
+
+        resp = mocked_sub_requests(
+            self.app, "post", "/processes",
+            data=multipart_body,
+            headers={"Content-Type": content_type_header},
+            only_local=True,
+            expect_errors=True
+        )
+
+        # Should fail with 400 because root must be a Workflow
+        assert resp.status_code == 400, (
+            f"Expected 400 Bad Request for non-Workflow root, got {resp.status_code}. "
+            f"Body: {resp.text[:500] if hasattr(resp, 'text') else resp.body[:500]}"
+        )
+        error_json = resp.json
+        error_text = json.dumps(error_json).lower()
+        assert any(word in error_text for word in ["workflow", "root", "class"]), (
+            f"Error message should mention workflow/root/class constraint: {error_json}"
+        )
+
+    def test_deploy_process_CWL_multipart_related_valid_root_workflow(self):
+        """
+        Test that multipart/related with 'start' parameter pointing to a Workflow succeeds.
+
+        This validates that when the root document is correctly identified as a Workflow,
+        the deployment proceeds successfully.
+        """
+        test_id = self.fully_qualified_test_name()
+
+        # Create a CommandLineTool
+        tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": f"{test_id}-tool",
+            "inputs": {"message": "string"},
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {"glob": "output.txt"}
+                }
+            },
+            "requirements": {
+                "DockerRequirement": {"dockerPull": "alpine:latest"}
+            },
+            "baseCommand": ["sh", "-c"],
+            "arguments": ["echo $(inputs.message) > output.txt"]
+        })
+
+        # Create a Workflow
+        workflow_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": f"{test_id}-workflow",
+            "inputs": {"message": "string"},
+            "outputs": {
+                "result": {"type": "File", "outputSource": "step1/output"}
+            },
+            "steps": {
+                "step1": {
+                    "run": f"{test_id}-tool",
+                    "in": {"message": "message"},
+                    "out": ["output"]
+                }
+            }
+        })
+
+        # Create multipart/related with start= pointing to the workflow (valid)
+        boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        multipart_body = (
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-ID: <tool>\r\n"
+            f"\r\n"
+            f"{tool_cwl}\r\n"
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-ID: <workflow>\r\n"
+            f"\r\n"
+            f"{workflow_cwl}\r\n"
+            f"------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n"
+        ).encode('utf-8')
+
+        # start= points to the workflow (correct)
+        content_type_header = f"multipart/related; boundary={boundary}; start=\"<workflow>\""
+
+        resp = mocked_sub_requests(
+            self.app, "post", "/processes",
+            data=multipart_body,
+            headers={"Content-Type": content_type_header},
+            only_local=True
+        )
+
+        # Should succeed
+        assert resp.status_code == 201, (
+            f"Expected 201, got {resp.status_code}. "
+            f"Body: {resp.text[:500] if hasattr(resp, 'text') else resp.body[:500]}"
+        )
+
+        result = resp.json
+        assert "processSummary" in result
+        assert result["deploymentDone"] is True
+
+        # The main workflow should be deployed
+        main_id = result["processSummary"]["id"]
+        assert main_id == f"{test_id}-workflow"
+
+        # Verify main workflow was deployed
+        desc = self.get_process_description(main_id, schema=ProcessSchema.OLD)
+        assert desc["process"]["id"] == main_id
+        pkg = self.get_application_package(main_id)
+        assert pkg["class"] == "Workflow"
+
     @staticmethod
     def get_cwl_docker_python_version(cwl_version="v1.0", process_id=None):
         # type: (Optional[str], Optional[str]) -> CWL

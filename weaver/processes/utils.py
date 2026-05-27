@@ -1,3 +1,4 @@
+import base64
 import copy
 import json
 import logging
@@ -533,7 +534,6 @@ def parse_multipart_deploy(content, content_type, request=None):
         # Handle Content-Transfer-Encoding
         transfer_encoding = part.get('Content-Transfer-Encoding', '').lower()
         if transfer_encoding == 'base64' and isinstance(part_content, bytes):
-            import base64
             part_content = base64.b64decode(part_content)
 
         if isinstance(part_content, bytes):
@@ -560,11 +560,32 @@ def parse_multipart_deploy(content, content_type, request=None):
             "cause": {"parts_found": len(list(msg.get_payload()))}
         })
 
-    # Reorder if root workflow specified
+    # Reorder if root workflow specified and validate it
     if root_workflow_cid and root_workflow_cid in parts_by_cid:
         root_pkg = parts_by_cid[root_workflow_cid]
+        # Validate that the root is actually a Workflow (per RFC 5621 and multipart/related requirements)
+        root_class = root_pkg.get("class", "")
+        if root_class != "Workflow":
+            raise HTTPBadRequest(json={
+                "title": "Invalid root workflow reference",
+                "description": (
+                    f"The 'start' parameter references a CWL with class '{root_class}', "
+                    "but only 'Workflow' is permitted as root document in multipart/related."
+                ),
+                "cause": {"Content-ID": root_workflow_cid, "class": root_class}
+            })
         cwl_packages = [pkg for pkg in cwl_packages if pkg is not root_pkg]
         cwl_packages.append(root_pkg)
+    elif not root_workflow_cid and cwl_packages:
+        # No explicit start parameter: validate first element is a Workflow (RFC 5621 §7 default)
+        first_pkg = cwl_packages[0]
+        first_class = first_pkg.get("class", "")
+        if first_class and first_class != "Workflow":
+            LOGGER.warning(
+                "No 'start' parameter provided in multipart/related. First element has class '%s' "
+                "but 'Workflow' is recommended for root document. Proceeding with deployment.",
+                first_class
+            )
 
     return cwl_packages, process_description
 
@@ -607,11 +628,12 @@ def parse_process_deploy_content(
         # Return the CWL packages as a list (will be handled by multi-deployment logic)
         # If there's process description metadata, we could merge it, but for now we focus on CWL
         # The multi-deployment logic will handle the CWL packages
-        if len(cwl_packages) == 1 and not any('$graph' in pkg for pkg in cwl_packages):
-            # Single CWL package without $graph - return as-is for backward compatibility
+        if len(cwl_packages) == 1:
+            # Single CWL package - return as-is
+            # This avoids double-wrapping if the package already contains a $graph
             return cwl_packages[0]
         else:
-            # Multiple packages or $graph - return as list
+            # Multiple packages - return as list to be wrapped in $graph
             return cwl_packages
 
     try:
