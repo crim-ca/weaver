@@ -529,15 +529,44 @@ def parse_multipart_deploy(content, content_type, request=None):
             continue
 
         part_content_type = part.get_content_type()
-        part_content = part.get_payload(decode=True)
+        content_location = part.get('Content-Location', '').strip()
+        
+        # Check if content should be fetched from Content-Location
+        if content_location:
+            LOGGER.debug("Fetching CWL from Content-Location: %s", content_location)
+            try:
+                # Content-Location can be:
+                # 1. A static CWL file URL (http/https/s3/file)
+                # 2. A Weaver process package endpoint (/processes/{pid}/package)
+                # 3. A WPS process endpoint (/wps?request=DescribeProcess&identifier=...)
+                # 4. An OGC API Processes endpoint
+                
+                _, ext = os.path.splitext(content_location.split('?')[0])  # strip query params
+                if ext.replace('.', '') in PACKAGE_EXTENSIONS:
+                    part_content = load_file(content_location, text=True)
+                else:
+                    # Could be an API endpoint (Weaver, WPS, OGC API)
+                    # Use the process definition resolver that handles all reference types
+                    from weaver.processes.wps_package import _generate_process_with_cwl_from_reference
+                    cwl_pkg, _ = _generate_process_with_cwl_from_reference(content_location)
+                    part_content = json.dumps(cwl_pkg) if isinstance(cwl_pkg, dict) else str(cwl_pkg)
+            except Exception as exc:
+                LOGGER.error("Failed to fetch content from Content-Location %s: %s", content_location, exc)
+                raise HTTPBadRequest(json={
+                    "title": "Failed to fetch Content-Location",
+                    "description": f"Could not retrieve CWL from Content-Location: {content_location}",
+                    "cause": {"error": str(exc), "location": content_location}
+                })
+        else:
+            part_content = part.get_payload(decode=True)
 
-        # Handle Content-Transfer-Encoding
-        transfer_encoding = part.get('Content-Transfer-Encoding', '').lower()
-        if transfer_encoding == 'base64' and isinstance(part_content, bytes):
-            part_content = base64.b64decode(part_content)
+            # Handle Content-Transfer-Encoding
+            transfer_encoding = part.get('Content-Transfer-Encoding', '').lower()
+            if transfer_encoding == 'base64' and isinstance(part_content, bytes):
+                part_content = base64.b64decode(part_content)
 
-        if isinstance(part_content, bytes):
-            part_content = part_content.decode('utf-8')
+            if isinstance(part_content, bytes):
+                part_content = part_content.decode('utf-8')
 
         content_id = part.get('Content-ID', '').strip('<>')
 

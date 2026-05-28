@@ -707,3 +707,154 @@ def test_parse_multipart_deploy_no_cwl_parts():
         parse_multipart_deploy(multipart_body, content_type, request=None)
     assert exc_info.value.json is not None
     assert "No CWL packages found" in exc_info.value.json.get("title", "")
+
+
+def test_parse_multipart_deploy_content_location_static_file(monkeypatch):
+    """
+    Test Content-Location header successfully fetches remote static CWL file.
+    """
+    # CWL to be "fetched" from Content-Location
+    remote_cwl = json.dumps({
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "id": "remote-tool",
+        "inputs": {},
+        "outputs": {"output": {"type": "File"}}
+    })
+
+    # Mock load_file to return the CWL content
+    def mock_load_file(path, text=False):
+        assert path == "https://example.com/tool.cwl"
+        return remote_cwl
+
+    monkeypatch.setattr("weaver.processes.utils.load_file", mock_load_file)
+
+    boundary = "----Boundary123"
+    multipart_body = (
+        f"------Boundary123\r\n"
+        f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+        f"Content-Location: https://example.com/tool.cwl\r\n"
+        f"\r\n"
+        f"------Boundary123--\r\n"
+    ).encode('utf-8')
+
+    content_type = f"multipart/mixed; boundary={boundary}"
+
+    cwl_packages, process_desc = parse_multipart_deploy(
+        multipart_body, content_type, request=None
+    )
+
+    assert len(cwl_packages) == 1
+    assert cwl_packages[0]["id"] == "remote-tool"
+    assert process_desc is None
+
+
+def test_parse_multipart_deploy_content_location_weaver_package(monkeypatch):
+    """
+    Test Content-Location header successfully fetches from Weaver package endpoint.
+    """
+    # Mock CWL package
+    cwl_package = {
+        "cwlVersion": "v1.2",
+        "class": "Workflow",
+        "id": "weaver-workflow",
+        "inputs": {"input": {"type": "string"}},
+        "outputs": {"output": {"type": "File"}},
+        "steps": {}
+    }
+
+    # Mock _generate_process_with_cwl_from_reference
+    def mock_generate_process(reference, process_hint=None):
+        assert "/processes/test-process/package" in reference
+        return (cwl_package, {"identifier": "test-process"})
+
+    monkeypatch.setattr("weaver.processes.wps_package._generate_process_with_cwl_from_reference",
+                       mock_generate_process)
+
+    boundary = "----Boundary123"
+    multipart_body = (
+        f"------Boundary123\r\n"
+        f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+        f"Content-Location: https://weaver.example.com/processes/test-process/package\r\n"
+        f"\r\n"
+        f"------Boundary123--\r\n"
+    ).encode('utf-8')
+
+    content_type = f"multipart/mixed; boundary={boundary}"
+
+    cwl_packages, process_desc = parse_multipart_deploy(
+        multipart_body, content_type, request=None
+    )
+
+    assert len(cwl_packages) == 1
+    assert cwl_packages[0]["id"] == "weaver-workflow"
+    assert process_desc is None
+
+
+def test_parse_multipart_deploy_content_location_wps_endpoint(monkeypatch):
+    """
+    Test Content-Location header successfully fetches from WPS endpoint.
+    """
+    # Mock CWL package generated from WPS DescribeProcess
+    wps_cwl_package = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "id": "wps-process",
+        "inputs": {"input": {"type": "string"}},
+        "outputs": {"output": {"type": "File"}}
+    }
+
+    # Mock _generate_process_with_cwl_from_reference
+    def mock_generate_process(reference, process_hint=None):
+        assert "wps" in reference.lower() or "describeprocess" in reference.lower()
+        return (wps_cwl_package, {"identifier": "wps-process"})
+
+    monkeypatch.setattr("weaver.processes.wps_package._generate_process_with_cwl_from_reference",
+                       mock_generate_process)
+
+    boundary = "----Boundary123"
+    multipart_body = (
+        f"------Boundary123\r\n"
+        f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+        f"Content-Location: https://wps.example.com/wps?service=WPS&request=DescribeProcess&identifier=test\r\n"
+        f"\r\n"
+        f"------Boundary123--\r\n"
+    ).encode('utf-8')
+
+    content_type = f"multipart/mixed; boundary={boundary}"
+
+    cwl_packages, process_desc = parse_multipart_deploy(
+        multipart_body, content_type, request=None
+    )
+
+    assert len(cwl_packages) == 1
+    assert cwl_packages[0]["id"] == "wps-process"
+    assert process_desc is None
+
+
+def test_parse_multipart_deploy_content_location_failure(monkeypatch):
+    """
+    Test Content-Location header raises error when fetch fails.
+    """
+    # Mock load_file to raise an exception
+    def mock_load_file(path, text=False):
+        raise RuntimeError("Failed to fetch file")
+
+    monkeypatch.setattr("weaver.processes.utils.load_file", mock_load_file)
+
+    boundary = "----Boundary123"
+    multipart_body = (
+        f"------Boundary123\r\n"
+        f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+        f"Content-Location: https://example.com/nonexistent.cwl\r\n"
+        f"\r\n"
+        f"------Boundary123--\r\n"
+    ).encode('utf-8')
+
+    content_type = f"multipart/mixed; boundary={boundary}"
+
+    with pytest.raises(HTTPBadRequest) as exc_info:
+        parse_multipart_deploy(multipart_body, content_type, request=None)
+    assert exc_info.value.json is not None
+    assert "Failed to fetch Content-Location" in exc_info.value.json.get("title", "")
+    assert "https://example.com/nonexistent.cwl" in exc_info.value.json.get("cause", {}).get("location", "")
