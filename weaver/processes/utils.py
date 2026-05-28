@@ -530,7 +530,7 @@ def parse_multipart_deploy(content, content_type, request=None):
 
         part_content_type = part.get_content_type()
         content_location = part.get('Content-Location', '').strip()
-        
+
         # Check if content should be fetched from Content-Location
         if content_location:
             LOGGER.debug("Fetching CWL from Content-Location: %s", content_location)
@@ -540,7 +540,7 @@ def parse_multipart_deploy(content, content_type, request=None):
                 # 2. A Weaver process package endpoint (/processes/{pid}/package)
                 # 3. A WPS process endpoint (/wps?request=DescribeProcess&identifier=...)
                 # 4. An OGC API Processes endpoint
-                
+
                 _, ext = os.path.splitext(content_location.split('?')[0])  # strip query params
                 if ext.replace('.', '') in PACKAGE_EXTENSIONS:
                     part_content = load_file(content_location, text=True)

@@ -591,7 +591,7 @@ def test_classify_multipart_part_with_steps():
     parts_order = []
     parts_by_cid = {}
 
-    result = _classify_multipart_part(
+    _classify_multipart_part(
         part_data, cwl_packages, parts_order, parts_by_cid,
         content_id=None, process_description=None
     )
@@ -769,7 +769,7 @@ def test_parse_multipart_deploy_content_location_weaver_package(monkeypatch):
         return (cwl_package, {"identifier": "test-process"})
 
     monkeypatch.setattr("weaver.processes.wps_package._generate_process_with_cwl_from_reference",
-                       mock_generate_process)
+                        mock_generate_process)
 
     boundary = "----Boundary123"
     multipart_body = (
@@ -810,7 +810,7 @@ def test_parse_multipart_deploy_content_location_wps_endpoint(monkeypatch):
         return (wps_cwl_package, {"identifier": "wps-process"})
 
     monkeypatch.setattr("weaver.processes.wps_package._generate_process_with_cwl_from_reference",
-                       mock_generate_process)
+                        mock_generate_process)
 
     boundary = "----Boundary123"
     multipart_body = (
