@@ -1,12 +1,14 @@
-import base64
 import copy
 import json
 import logging
 import os
 import pathlib
+import uuid as uuid_lib
 import warnings
 from copy import deepcopy
 from email import message_from_bytes
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import TYPE_CHECKING, Dict
 from urllib.parse import parse_qs, urlparse
 
@@ -438,6 +440,78 @@ def _parse_multipart_part(part_content, part_content_type):
     return json.loads(part_content)
 
 
+def create_multipart_deploy(cwl_files, process_description=None, boundary=None):
+    # type: (List[Union[str, CWL]], Optional[JSON], Optional[str]) -> Tuple[bytes, str]
+    """
+    Create multipart/related deployment content from a list of CWL files.
+
+    :param cwl_files:
+        List of CWL files. Each item can be:
+        - A file path (string) to a CWL file (will be loaded)
+        - A CWL dictionary (already parsed)
+    :param process_description: Optional process description metadata to include
+    :param boundary: Optional custom boundary string (auto-generated if not provided)
+    :returns: Tuple of (multipart content bytes, full Content-Type header with boundary)
+    """
+    if not cwl_files:
+        raise ValueError("At least one CWL file must be provided")
+
+    if not boundary:
+        boundary = f"----WeaverMultipartBoundary{uuid_lib.uuid4().hex}"
+
+    msg = MIMEMultipart("related", boundary=boundary)
+    main_workflow_cid = None
+    workflow_count = 0
+
+    # Add CWL parts
+    for idx, cwl_item in enumerate(cwl_files):
+        if isinstance(cwl_item, str):
+            cwl_data = load_file(cwl_item)
+        else:
+            cwl_data = cwl_item
+
+        cwl_class = cwl_data.get("class", "")
+        is_workflow = cwl_class == "Workflow"
+
+        if is_workflow:
+            workflow_count += 1
+            if workflow_count == 1:
+                # First workflow becomes the main one
+                main_workflow_cid = f"workflow-{idx}"
+
+        # Create the CWL part
+        cwl_json = json.dumps(cwl_data, indent=2)
+        part = MIMEText(cwl_json, _subtype="json", _charset="utf-8")
+        # Replace the default Content-Type (text/json) with the CWL-specific one
+        part.replace_header("Content-Type", ContentType.APP_CWL_JSON)
+
+        content_id = f"workflow-{idx}" if is_workflow else f"tool-{idx}"
+        part.add_header("Content-ID", f"<{content_id}>")
+
+        cwl_id = cwl_data.get("id", f"cwl-{idx}")
+        part.add_header("Content-Location", cwl_id)
+
+        msg.attach(part)
+
+    # Add process description if provided
+    if process_description:
+        desc_json = json.dumps(process_description, indent=2)
+        desc_part = MIMEText(desc_json, _subtype="json", _charset="utf-8")
+        # Replace the default Content-Type (text/json) with application/json
+        desc_part.replace_header("Content-Type", ContentType.APP_JSON)
+        desc_part.add_header("Content-ID", "<process-description>")
+        msg.attach(desc_part)
+
+    multipart_content = msg.as_bytes()
+
+    # Build the Content-Type header with start parameter if we have a main workflow
+    content_type = f"multipart/related; boundary={boundary}"
+    if main_workflow_cid:
+        content_type += f"; start={main_workflow_cid}"
+
+    return multipart_content, content_type
+
+
 def _classify_multipart_part(part_data, cwl_packages, parts_order, parts_by_cid, content_id, process_description):
     # type: (JSON, List[CWL], List, Dict, str, Optional[JSON]) -> Optional[JSON]
     """
@@ -530,43 +604,51 @@ def parse_multipart_deploy(content, content_type, request=None):
 
         part_content_type = part.get_content_type()
         content_location = part.get('Content-Location', '').strip()
+        part_content = part.get_payload(decode=True)
+
+        if isinstance(part_content, bytes):
+            # Try to decode with the charset specified in the Content-Type, default to utf-8
+            charset = part.get_content_charset() or 'utf-8'
+            try:
+                part_content = part_content.decode(charset)
+            except (UnicodeDecodeError, LookupError):
+                # Fallback to utf-8 with error handling
+                part_content = part_content.decode('utf-8', errors='replace')
 
         # Check if content should be fetched from Content-Location
-        if content_location:
-            LOGGER.debug("Fetching CWL from Content-Location: %s", content_location)
-            try:
-                # Content-Location can be:
-                # 1. A static CWL file URL (http/https/s3/file)
-                # 2. A Weaver process package endpoint (/processes/{pid}/package)
-                # 3. A WPS process endpoint (/wps?request=DescribeProcess&identifier=...)
-                # 4. An OGC API Processes endpoint
+        # Only fetch if part body is empty AND Content-Location looks like a URL
+        if content_location and (not part_content or not part_content.strip()):
+            # Content-Location must be a URL (not just an identifier)
+            if any(content_location.startswith(scheme) for scheme in ["http://", "https://", "file://", "s3://"]):
+                LOGGER.debug("Fetching CWL from Content-Location: %s", content_location)
+                try:
+                    # Content-Location can be:
+                    # 1. A static CWL file URL (http/https/s3/file)
+                    # 2. A Weaver process package endpoint (/processes/{pid}/package)
+                    # 3. A WPS process endpoint (/wps?request=DescribeProcess&identifier=...)
+                    # 4. An OGC API Processes endpoint
 
-                _, ext = os.path.splitext(content_location.split('?')[0])  # strip query params
-                if ext.replace('.', '') in PACKAGE_EXTENSIONS:
-                    part_content = load_file(content_location, text=True)
-                else:
-                    # Could be an API endpoint (Weaver, WPS, OGC API)
-                    # Use the process definition resolver that handles all reference types
-                    from weaver.processes.wps_package import _generate_process_with_cwl_from_reference
-                    cwl_pkg, _ = _generate_process_with_cwl_from_reference(content_location)
-                    part_content = json.dumps(cwl_pkg) if isinstance(cwl_pkg, dict) else str(cwl_pkg)
-            except Exception as exc:
-                LOGGER.error("Failed to fetch content from Content-Location %s: %s", content_location, exc)
-                raise HTTPBadRequest(json={
-                    "title": "Failed to fetch Content-Location",
-                    "description": f"Could not retrieve CWL from Content-Location: {content_location}",
-                    "cause": {"error": str(exc), "location": content_location}
-                })
-        else:
-            part_content = part.get_payload(decode=True)
-
-            # Handle Content-Transfer-Encoding
-            transfer_encoding = part.get('Content-Transfer-Encoding', '').lower()
-            if transfer_encoding == 'base64' and isinstance(part_content, bytes):
-                part_content = base64.b64decode(part_content)
-
-            if isinstance(part_content, bytes):
-                part_content = part_content.decode('utf-8')
+                    _, ext = os.path.splitext(content_location.split('?')[0])  # strip query params
+                    if ext.replace('.', '') in PACKAGE_EXTENSIONS:
+                        part_content = load_file(content_location, text=True)
+                    else:
+                        # Could be an API endpoint (Weaver, WPS, OGC API)
+                        # Use the process definition resolver that handles all reference types
+                        from weaver.processes.wps_package import _generate_process_with_cwl_from_reference
+                        cwl_pkg, _ = _generate_process_with_cwl_from_reference(content_location)
+                        part_content = json.dumps(cwl_pkg) if isinstance(cwl_pkg, dict) else str(cwl_pkg)
+                except Exception as exc:
+                    LOGGER.error("Failed to fetch content from Content-Location %s: %s", content_location, exc)
+                    raise HTTPBadRequest(json={
+                        "title": "Failed to fetch Content-Location",
+                        "description": f"Could not retrieve CWL from Content-Location: {content_location}",
+                        "cause": {"error": str(exc), "location": content_location}
+                    })
+            else:
+                LOGGER.debug(
+                    "Content-Location [%s] is an identifier, not a URL. Using part body content.",
+                    content_location
+                )
 
         content_id = part.get('Content-ID', '').strip('<>')
 
@@ -753,7 +835,17 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         c_type = ContentType.APP_CWL_JSON
 
     payload_copy = deepcopy(payload)
-    payload = _check_deploy(payload)
+
+    # Skip deployment schema validation for pure CWL payloads (CWL has its own validation)
+    is_cwl_only = (
+        c_type in list(ContentType.ANY_CWL) + [ContentType.APP_JSON] and
+        "cwlVersion" in payload and
+        "processDescription" not in payload and
+        "executionUnit" not in payload
+    )
+    if not is_cwl_only:
+        payload = _check_deploy(payload)
+
     payload.pop("$schema", None)
     payload.pop("$id", None)
 

@@ -23,6 +23,7 @@ from weaver.processes.utils import (  # noqa: W0212
     _check_package_file,
     _classify_multipart_part,
     _get_multipart_content,
+    create_multipart_deploy,
     parse_multipart_deploy,
     register_cwl_processes_from_config,
     register_wps_processes_from_config
@@ -858,3 +859,184 @@ def test_parse_multipart_deploy_content_location_failure(monkeypatch):
     assert exc_info.value.json is not None
     assert "Failed to fetch Content-Location" in exc_info.value.json.get("title", "")
     assert "https://example.com/nonexistent.cwl" in exc_info.value.json.get("cause", {}).get("location", "")
+
+
+def test_create_multipart_deploy_single_tool():
+    """
+    Test creating multipart content from a single CommandLineTool.
+    """
+    tool_cwl = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "id": "test-tool",
+        "baseCommand": ["echo"],
+        "inputs": {
+            "message": {"type": "string"}
+        },
+        "outputs": {
+            "output": {"type": "stdout"}
+        }
+    }
+
+    content, content_type = create_multipart_deploy([tool_cwl])
+
+    # Verify content type
+    assert "multipart/related" in content_type
+    assert "boundary=" in content_type
+    assert isinstance(content, bytes)
+
+    # Parse the generated multipart content
+    cwl_packages, _ = parse_multipart_deploy(content, content_type, request=None)
+
+    assert len(cwl_packages) == 1
+    assert cwl_packages[0]["class"] == "CommandLineTool"
+    assert cwl_packages[0]["id"] == "test-tool"
+
+
+def test_create_multipart_deploy_workflow_and_tools():
+    """
+    Test creating multipart content from a workflow and multiple tools.
+    """
+    tool1_cwl = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "id": "tool-1",
+        "baseCommand": ["echo"],
+        "inputs": {"input": {"type": "string"}},
+        "outputs": {"output": {"type": "stdout"}}
+    }
+
+    tool2_cwl = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "id": "tool-2",
+        "baseCommand": ["cat"],
+        "inputs": {"file": {"type": "File"}},
+        "outputs": {"output": {"type": "stdout"}}
+    }
+
+    workflow_cwl = {
+        "cwlVersion": "v1.2",
+        "class": "Workflow",
+        "id": "main-workflow",
+        "inputs": {"input": {"type": "string"}},
+        "outputs": {"result": {"type": "File", "outputSource": "step2/output"}},
+        "steps": {
+            "step1": {"run": "#tool-1", "in": {"input": "input"}, "out": ["output"]},
+            "step2": {"run": "#tool-2", "in": {"file": "step1/output"}, "out": ["output"]}
+        }
+    }
+
+    content, content_type = create_multipart_deploy([tool1_cwl, tool2_cwl, workflow_cwl])
+
+    # Verify content type includes start parameter for main workflow
+    assert "multipart/related" in content_type
+    assert "boundary=" in content_type
+    assert "start=workflow-" in content_type  # Should reference the workflow
+    assert isinstance(content, bytes)
+
+    # Parse the generated multipart content
+    cwl_packages, _ = parse_multipart_deploy(content, content_type, request=None)
+
+    assert len(cwl_packages) == 3
+    # Verify all packages are present
+    ids = [pkg.get("id") for pkg in cwl_packages]
+    assert "tool-1" in ids
+    assert "tool-2" in ids
+    assert "main-workflow" in ids
+
+
+def test_create_multipart_deploy_with_process_description():
+    """
+    Test creating multipart content with an optional process description.
+    """
+    tool_cwl = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "id": "test-tool",
+        "baseCommand": ["echo"],
+        "inputs": {},
+        "outputs": {}
+    }
+
+    process_desc = {
+        "processDescription": {
+            "id": "test-tool",
+            "title": "Test Tool",
+            "description": "A test tool for multipart deployment"
+        }
+    }
+
+    content, content_type = create_multipart_deploy([tool_cwl], process_description=process_desc)
+
+    # Verify content type
+    assert "multipart/related" in content_type
+    assert isinstance(content, bytes)
+
+    # Parse the generated multipart content
+    cwl_packages, parsed_desc = parse_multipart_deploy(content, content_type, request=None)
+
+    assert len(cwl_packages) == 1
+    assert parsed_desc is not None
+    assert parsed_desc.get("processDescription", {}).get("id") == "test-tool"
+
+
+def test_create_multipart_deploy_empty_list():
+    """
+    Test that creating multipart from empty list raises error.
+    """
+    with pytest.raises(ValueError, match="At least one CWL file must be provided"):
+        create_multipart_deploy([])
+
+
+def test_create_multipart_deploy_custom_boundary():
+    """
+    Test creating multipart with a custom boundary.
+    """
+    tool_cwl = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "id": "test-tool",
+        "baseCommand": ["echo"],
+        "inputs": {},
+        "outputs": {}
+    }
+
+    custom_boundary = "CustomBoundary123"
+    content, content_type = create_multipart_deploy([tool_cwl], boundary=custom_boundary)
+
+    # Verify custom boundary is used
+    assert f"boundary={custom_boundary}" in content_type
+    assert custom_boundary.encode() in content
+
+
+def test_create_multipart_deploy_with_file_paths(tmp_path):
+    """
+    Test creating multipart from CWL file paths.
+    """
+    # Create a temporary CWL file
+    tool_cwl = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "id": "file-tool",
+        "baseCommand": ["echo"],
+        "inputs": {},
+        "outputs": {}
+    }
+
+    cwl_file = tmp_path / "tool.cwl"
+    with open(cwl_file, "w", encoding="utf-8") as f:
+        json.dump(tool_cwl, f)
+
+    # Create multipart from file path
+    content, content_type = create_multipart_deploy([str(cwl_file)])
+
+    # Verify content
+    assert isinstance(content, bytes)
+    assert "multipart/related" in content_type
+
+    # Parse and verify
+    cwl_packages, _ = parse_multipart_deploy(content, content_type, request=None)
+
+    assert len(cwl_packages) == 1
+    assert cwl_packages[0]["id"] == "file-tool"
