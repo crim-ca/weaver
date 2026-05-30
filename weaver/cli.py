@@ -9,7 +9,6 @@ import re
 import sys
 import textwrap
 import time
-from mypyc.irbuild.util import TypedDict
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
@@ -75,7 +74,21 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.constants import ConformanceCategory
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Set, Tuple, Type, Union
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        Iterable,
+        List,
+        Literal,
+        Optional,
+        Sequence,
+        Set,
+        Tuple,
+        Type,
+        TypedDict,
+        Union
+    )
     from typing_extensions import TypeAlias
 
     from requests import Response
