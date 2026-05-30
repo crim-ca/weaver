@@ -15,7 +15,6 @@ import warnings
 from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
-import jsonschema
 import pytest
 import requests
 import yaml
@@ -23,7 +22,6 @@ from pyramid.settings import asbool
 from pytest_dependency import depends
 
 from tests.resources import FUNCTIONAL_CODE_SPRINT_SERVERS, load_resource
-from weaver import ogc_definitions as ogc_defs
 from weaver.cli import ValidateAuthHandlerAction, WeaverClient, parse_auth
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPreference
 from weaver.formats import ContentType, OutputFormat
@@ -33,7 +31,6 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER
 )
 from weaver.processes.convert import normalize_ordered_io
-from weaver.status import Status
 from weaver.utils import get_any_id, get_any_value
 
 if TYPE_CHECKING:
@@ -70,15 +67,15 @@ def setup_client():
     # fully-qualified name (eg: 'weaver.cli.BasicAuthHandler', 'requests.auth.HTTPBasicAuth')
     auth_handler_ref = os.getenv("TEST_SERVER_AUTH_HANDLER")
     auth_handler = ValidateAuthHandlerAction.validate(auth_handler_ref)
-    auth = None if not auth_handler else parse_auth(dict(  # type: ignore
-        auth_handler=auth_handler,
-        auth_identity=os.getenv("TEST_SERVER_AUTH_IDENTITY") or os.getenv("TEST_SERVER_AUTH_USERNAME"),
-        auth_password=os.getenv("TEST_SERVER_AUTH_PASSWORD"),
-        auth_url=os.getenv("TEST_SERVER_AUTH_URL"),
-        auth_method=os.getenv("TEST_SERVER_AUTH_method"),
-        auth_headers=os.getenv("TEST_SERVER_AUTH_HEADERS") or {},
-        auth_token=os.getenv("TEST_SERVER_AUTH_TOKEN"),
-    ))
+    auth = None if not auth_handler else parse_auth({
+        "auth_handler": auth_handler,
+        "auth_identity": os.getenv("TEST_SERVER_AUTH_IDENTITY") or os.getenv("TEST_SERVER_AUTH_USERNAME"),
+        "auth_password": os.getenv("TEST_SERVER_AUTH_PASSWORD"),
+        "auth_url": os.getenv("TEST_SERVER_AUTH_URL"),
+        "auth_method": os.getenv("TEST_SERVER_AUTH_method"),
+        "auth_headers": os.getenv("TEST_SERVER_AUTH_HEADERS") or {},
+        "auth_token": os.getenv("TEST_SERVER_AUTH_TOKEN"),
+    })
     request_options = {
         # all must be prefixed by 'request_', options as applicable in 'weaver.utils.request_extra'
         "request_timeout": TEST_SERVER_REQUEST_TIMEOUT,
@@ -107,7 +104,7 @@ def process_execute_body() -> "JSON":
 @pytest.fixture(scope="module", autouse=True)
 def openapi_job_status():
     schema_url = "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml"
-    response = requests.get(schema_url)
+    response = requests.get(schema_url, timeout=TEST_SERVER_REQUEST_TIMEOUT)
     response.raise_for_status()
     schema_yaml = yaml.safe_load(response.text)
     # The relevant definition is the root schema itself
@@ -129,7 +126,7 @@ def depends_or(request, other, scope="module"):
 class ServerOGCAPIProcessesBase:
 
     @classmethod
-    def setup_class(cls, check_server=None):
+    def setup_class(cls):
         cls.client = setup_client()
 
     @cached_property
@@ -153,10 +150,6 @@ class ServerOGCAPIProcessesBase:
 @pytest.mark.oap_part1
 class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
 
-    @classmethod
-    def setup_class(cls, check_server=None):
-        super().setup_class()
-
     def test_landing_page_links(self):
         result = self.client.info()
         assert result.code == 200
@@ -177,10 +170,10 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         depends=["test_conformance_classes_core"],
     )
     def test_service_desc_link_and_oas_validation(self):
-        conf_oasXX = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas"
+        conf_oas_any = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas"
         conf_oas30 = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas30"
         conf_oas31 = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas31"
-        conforms_oas = [uri for uri in self.conforms_to if uri in [conf_oasXX, conf_oas30, conf_oas31]]
+        conforms_oas = [uri for uri in self.conforms_to if uri in [conf_oas_any, conf_oas30, conf_oas31]]
         assert conforms_oas, "Server does not declare conformance to OAS"
 
         result = self.client.info()
@@ -374,7 +367,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
 class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
     @classmethod
-    def setup_class(cls, check_server=None):
+    def setup_class(cls):
         super().setup_class()
         cls.cleanup_processes = set()
 
