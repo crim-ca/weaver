@@ -12,7 +12,6 @@ Changes
 
 Changes:
 --------
-<<<<<<< agent-skills
 - Set up `Weaver Agent Skills <./.agents/skills>`_ based on
   the `Agent Skill Specification <https://agentskills.io/specification>`_
   to help AI agents interact with `Weaver` and its API more seamlessly.
@@ -24,8 +23,6 @@ Changes:
 - Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded
   `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification
   following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification.
-=======
-- No change.
 
 Fixes:
 ------
