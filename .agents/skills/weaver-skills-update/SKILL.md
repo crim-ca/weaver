@@ -405,6 +405,8 @@ When updating skills, verify:
 - [ ] **Author** in frontmatter `metadata.author` preserves the original skill author
 - [ ] **Contributors** include the committer in `metadata.contributors` when the skill is modified by someone else
 - [ ] **Description** is accurate (1-1024 chars)
+- [ ] **Parameters** remain clearly documented with types
+- [ ] **Return values** remain documented and aligned with expected API behavior
 - [ ] **Scripts** that require large set of commands are placed in dedicated `scripts/` and referenced by the skill
 - [ ] **Returns** section has completeness note
 - [ ] **Job IDs** are UUIDs (not simple strings)
@@ -414,6 +416,7 @@ When updating skills, verify:
 - [ ] **Steps** that need code use code blocks only as needed, not for the entire step (avoid embedded comment list)
 - [ ] **Code blocks** have proper syntax highlighting
 - [ ] **Code blocks** do not repeat example keywords making their structure invalid
+- [ ] **Examples** are syntactically valid
 - [ ] **Python examples** use correct method signatures
 - [ ] **CLI examples** use current syntax
 - [ ] **API requests** use curl with `${WEAVER_URL}`
@@ -519,6 +522,8 @@ EOF
 ### Automated Validation
 
 A script is provided to validate YAML frontmatter and cross-references in all skills.
+If any validation or linting command reports issues introduced by the update,
+fix them and rerun the same checks until all are clean.
 
 **Script**: [`scripts/validate-skills.sh`](scripts/validate-skills.sh)
 
@@ -557,6 +562,7 @@ Checking cross-references...
 Employ the `make check-md-only` target.
 Similar command with `make fix-md-only` can be used to automatically formatting issues.
 Remove the `-only` suffix if installation/updates of dependencies are needed.
+Repeat `check-md-only` after each fix until no warnings/errors remain.
 
 ## Best Practices
 

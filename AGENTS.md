@@ -4,13 +4,15 @@ Guide AI agents and development tools toward useful Weaver capabilities.
 
 ## Boundaries
 
-- **Scope**: Use skills in [`.agents/skills/`](.agents/skills/) to support Weaver development, testing, packaging, and API operations.
-- **Out of Scope**: Do not perform unrelated system administration tasks, modify external repositories, or make changes outside this workspace.
-- **Destructive Actions**: Do not delete files, drop databases, undeploy production processes, or overwrite user data unless explicitly requested.
-- **Secrets and Security**: Do not expose credentials, tokens, private keys, or sensitive environment values in logs, outputs, or generated files.
-- **Execution Limits**: Prefer targeted commands and scoped checks; avoid long-running/background operations unless requested and monitored.
-- **Change Control**: Do not apply broad refactors or dependency upgrades unless explicitly requested; keep edits minimal and task-focused.
-- **Validation**: Verify changes with the smallest relevant lint/test command before completion when feasible.
+| Area                 | Constraint                                                                                                              |
+|----------------------|-------------------------------------------------------------------------------------------------------------------------|
+| Scope                | Use skills in [`.agents/skills/`](.agents/skills/) for Weaver development, testing, packaging, and API work.            |
+| Out of Scope         | Do not perform unrelated system administration, modify external repositories, or change files outside this workspace.   |
+| Destructive Actions  | Do not delete files, drop databases, undeploy production processes, or overwrite user data unless explicitly requested. |
+| Secrets and Security | Never expose credentials, tokens, private keys, or sensitive environment values in logs, outputs, or generated files.   |
+| Execution Limits     | Prefer targeted commands and scoped checks; avoid long-running/background operations unless requested and monitored.    |
+| Change Control       | Avoid broad refactors or dependency upgrades unless explicitly requested; keep edits minimal and task-focused.          |
+| Validation           | Verify changes with the smallest relevant lint/test command before completion when feasible.                            |
 
 ## Quick Navigation
 

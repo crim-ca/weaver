@@ -33,7 +33,7 @@ For a complete overview of the Weaver project structure and how Agent Skills int
 ### Quick Reference: Skills to Code Mapping
 
 | Skill Category                        | Code Location         | Interface          |
-|---------------------------------------|-----------------------|--------------------|
+| --------------------------------------- | ----------------------- | -------------------- |
 | **job-**, **process-**, **provider-** | `weaver/cli.py`       | CLI commands       |
 | **API skills**                        | `weaver/wps_restapi/` | REST endpoints     |
 | **process-**                          | `weaver/processes/`   | Process operations |

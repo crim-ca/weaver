@@ -287,13 +287,9 @@ Note that file references are from the root of the repository.
 
 ### 7. Test Documentation
 
-Verify:
-- [ ] All examples are syntactically correct
-- [ ] Parameters are clearly documented
-- [ ] Return values match actual API responses
-- [ ] Links to related skills work
-- [ ] Metadata keywords enable discovery
-- [ ] Lint checks pass for markdown formatting and line length
+Verify the [Validation Checklist](#validation-checklist) to ensure the skill is complete and discoverable.
+If validation reports lint/format issues introduced by the new or modified skill,
+fix them and rerun validation until all checks pass.
 
 ## Validation Checklist
 
@@ -304,13 +300,17 @@ Before considering a skill complete:
 - [ ] All required metadata fields present
 - [ ] Description includes keywords for AI discovery
 - [ ] At least 3 usage examples (CLI, Python, API)
+- [ ] All examples are syntactically correct
+- [ ] All code examples tested
 - [ ] Parameters clearly documented with types
-- [ ] Return values documented
-- [ ] Links to related skills included
+- [ ] Return values documented and match expected API behavior
+- [ ] Links to related skills are valid
+- [ ] Metadata keywords enable discovery
 - [ ] Line length ≤ 120 characters
 - [ ] No escaped underscores (`\_` → `_`)
 - [ ] YAML frontmatter is syntactically valid
-- [ ] All code examples tested
+- [ ] Lint checks pass for Markdown formatting, line length and skill code examples
+- [ ] Any lint issues introduced by this skill were fixed and checks rerun until clean
 
 ## Related Skills
 
