@@ -92,6 +92,7 @@ All skills are organized by category for easy discovery:
 ### Setup Operations
 
 - **[weaver-install](skills/weaver-install/)** - Install and configure Weaver (Docker or from source)
+- **[weaver-ci-validate](skills/weaver-ci-validate/)** - Run code test and lint checks with Makefile targets
 - **[weaver-skill-create](skills/weaver-skill-create/)** - Create new Agent Skills
 - **[weaver-skills-update](skills/weaver-skills-update/)** - Maintain and update skills documentation
 

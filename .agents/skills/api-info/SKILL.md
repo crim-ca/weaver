@@ -6,6 +6,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
+  author: fmigneault
 ---
 
 # Get API Information

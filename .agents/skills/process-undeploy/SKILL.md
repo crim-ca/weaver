@@ -6,6 +6,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires Weaver API access with process management permissions.
 metadata:
+  author: fmigneault
 ---
 
 # Undeploy Process

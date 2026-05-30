@@ -7,6 +7,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires Weaver API access with vault feature enabled.
 metadata:
+  author: fmigneault
 ---
 
 # Upload to Vault

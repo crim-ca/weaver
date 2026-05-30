@@ -7,6 +7,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires Weaver deployment with builtin processes enabled.
 metadata:
+  author: fmigneault
 ---
 
 # Understand Weaver Built-in Processes
@@ -102,7 +103,7 @@ steps:
     in:
       file: config_file
     out: [output]
-  
+
   process_lines:
     run: process-line.cwl
     scatter: line
@@ -180,7 +181,7 @@ steps:
     in:
       file: data_file
     out: [output]
-  
+
   # Process could continue with custom processing
   # Then convert back
   convert:
@@ -203,14 +204,14 @@ steps:
     in:
       input: json_data
     out: [output]
-  
+
   # Use custom process for analysis
   analyze:
     run: custom-analysis.cwl  # Your custom CWL
     in:
       input: to_netcdf/output
     out: [result]
-  
+
   # Use built-in for final conversion
   to_json:
     run: netcdf2jsonarray
@@ -230,12 +231,12 @@ steps:
     run: jsonarray2netcdf
     in: {input: raw_json}
     out: [output]
-  
+
   process:
     run: analysis.cwl
     in: {input: json_to_nc/output}
     out: [result]
-  
+
   nc_to_geotiff:
     run: netcdf2geotiff
     in: {input: process/result}
@@ -251,13 +252,13 @@ steps:
     run: file2string_array
     in: {file: input_file}
     out: [output]
-  
+
   process_each:
     run: process-line.cwl
     scatter: line
     in: {line: split_lines/output}
     out: [processed]
-  
+
   combine:
     run: array2file
     in: {lines: process_each/processed}
@@ -296,7 +297,7 @@ steps:
     run: jsonarray2netcdf
     in: {input: data}
     out: [output]
-  
+
   custom_post_process:
     run: my-custom-tool.cwl
     in: {input: builtin_convert/output}
@@ -315,7 +316,7 @@ steps:
     run: file2string_array  # Built-in
     in: {file: input}
     out: [lines]
-  
+
   main_process:
     run: complex-analysis.cwl  # Custom
     in: {data: preprocess/lines}
@@ -450,7 +451,7 @@ steps:
     in:
       file: input_file
     out: [output]
-  
+
   process:
     run: custom-processor.cwl
     scatter: line
@@ -458,7 +459,7 @@ steps:
       line: split/output
       config: config
     out: [result]
-  
+
   to_netcdf:
     run: jsonarray2netcdf
     in:

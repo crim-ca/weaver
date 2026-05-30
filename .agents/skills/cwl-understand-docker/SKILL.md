@@ -8,6 +8,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires Docker understanding and CWL v1.0+. Docker must be available for local testing.
 metadata:
+  author: fmigneault
 ---
 
 # Understand Docker in CWL
@@ -126,7 +127,7 @@ dockerPull: myorg/myimage@sha256:abc123...
 requirements:
   DockerRequirement:
     dockerPull: myimage:latest
-  
+
   EnvVarRequirement:
     envDef:
       PYTHONUNBUFFERED: "1"
@@ -140,7 +141,7 @@ requirements:
 requirements:
   DockerRequirement:
     dockerPull: myimage:latest
-  
+
   NetworkAccess:
     networkAccess: true  # Allow internet access
 ```
@@ -151,7 +152,7 @@ requirements:
 requirements:
   DockerRequirement:
     dockerPull: myimage:latest
-  
+
   ResourceRequirement:
     coresMin: 2
     coresMax: 4
@@ -232,7 +233,7 @@ outputs:
 requirements:
   DockerRequirement:
     dockerPull: python:3.12-slim
-  
+
   InitialWorkDirRequirement:
     listing:
       - entryname: requirements.txt

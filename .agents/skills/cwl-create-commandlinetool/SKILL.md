@@ -7,6 +7,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires understanding of command-line tools and CWL basics. Supports CWL v1.0, v1.1, v1.2.
 metadata:
+  author: fmigneault
 ---
 
 # Create CWL CommandLineTool
@@ -66,7 +67,7 @@ inputs:
     inputBinding:
       position: 1
       prefix: --input
-  
+
   optional_param:
     type: string?
     default: "default_value"
@@ -163,12 +164,12 @@ inputs:
     type: File
     inputBinding:
       position: 1  # First argument
-  
+
   input2:
     type: File
     inputBinding:
       position: 2  # Second argument
-  
+
   output_name:
     type: string
     inputBinding:
@@ -184,7 +185,7 @@ inputs:
     type: File
     inputBinding:
       prefix: --input
-  
+
   format:
     type: string
     inputBinding:
@@ -300,11 +301,11 @@ requirements:
         entry: |
           #!/usr/bin/env python3
           print("Hello from Python")
-      
+
       - entryname: config.json
         entry: |
           {"setting": "value"}
-      
+
       - $(inputs.input_file)  # Stage input file
 ```
 
@@ -456,20 +457,20 @@ inputs:
     doc: "Input image file"
     inputBinding:
       position: 1
-  
+
   resize:
     type: string?
     doc: "Resize dimensions (e.g., 800x600)"
     inputBinding:
       prefix: -resize
-  
+
   quality:
     type: int?
     default: 90
     doc: "JPEG quality (1-100)"
     inputBinding:
       prefix: -quality
-  
+
   output_format:
     type: string
     default: "jpg"

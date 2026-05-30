@@ -6,6 +6,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires Weaver API access. Job must have succeeded status.
 metadata:
+  author: fmigneault
 ---
 
 # Get Job Results

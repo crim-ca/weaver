@@ -7,6 +7,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires Weaver API access with job management permissions.
 metadata:
+  author: fmigneault
 ---
 
 # Dismiss Job
@@ -49,7 +50,7 @@ result = client.dismiss(job_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 
 if result.success:
     print("Job dismissed successfully")
-    
+
 # Verify status
 status = client.status(job_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 print(f"Job status: {status.body['status']}")  # Should be "dismissed"

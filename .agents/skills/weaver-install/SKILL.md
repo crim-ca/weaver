@@ -7,6 +7,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires Python 3.10+, conda (recommended), Docker (for container deployment), Make.
 metadata:
+  author: fmigneault
 ---
 
 # Install Weaver

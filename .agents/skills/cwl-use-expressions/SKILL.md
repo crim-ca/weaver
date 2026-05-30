@@ -7,6 +7,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires CWL v1.0+ with InlineJavascriptRequirement support.
 metadata:
+  author: fmigneault
 ---
 
 # Use CWL Expressions and JavaScript
@@ -100,16 +101,16 @@ inputs:
 arguments:
   # Use just the filename
   - valueFrom: $(inputs.input_file.basename)
-  
+
   # Use filename without extension
   - valueFrom: $(inputs.input_file.nameroot)
-  
+
   # Get file extension
   - valueFrom: $(inputs.input_file.nameext)
-  
+
   # Get directory
   - valueFrom: $(inputs.input_file.dirname)
-  
+
   # Get file size
   - valueFrom: $(inputs.input_file.size)
 ```
@@ -126,7 +127,7 @@ inputs:
   verbose:
     type: boolean
     default: false
-  
+
   debug:
     type: boolean?
 
@@ -136,7 +137,7 @@ arguments:
       ${
         return inputs.verbose ? "--verbose" : null;
       }
-  
+
   # Add --debug if present and true
   - valueFrom: |
       ${
@@ -189,7 +190,7 @@ arguments:
 inputs:
   threshold:
     type: float?
-  
+
   auto_threshold:
     type: boolean
     default: false
@@ -354,13 +355,13 @@ requirements:
 arguments:
   # Output directory
   - valueFrom: $(runtime.outdir)
-  
+
   # Temp directory
   - valueFrom: $(runtime.tmpdir)
-  
+
   # CPU cores available
   - valueFrom: $(runtime.cores)
-  
+
   # RAM available (MB)
   - valueFrom: $(runtime.ram)
 ```

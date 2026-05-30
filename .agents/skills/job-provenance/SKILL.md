@@ -7,6 +7,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires Weaver API access with provenance feature enabled (weaver.cwl_prov=true).
 metadata:
+  author: fmigneault
 ---
 
 # Get Job Provenance
@@ -62,7 +63,7 @@ prov = client.provenance(job_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 # Access provenance entities
 for entity in prov.body.get("entities", []):
     print(f"Entity: {entity['id']}")
-    
+
 # Get provenance in specific format
 prov_turtle = client.provenance(
     job_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890",

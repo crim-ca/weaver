@@ -7,6 +7,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires understanding of CWL CommandLineTool basics. Supports CWL v1.0, v1.1, v1.2.
 metadata:
+  author: fmigneault
 ---
 
 # Understand CWL Workflows
@@ -62,7 +63,7 @@ steps:
     in:
       input: input_file
     out: [processed]
-  
+
   step2:
     run: analyze.cwl
     in:
@@ -97,7 +98,7 @@ outputs:
   result:
     type: File
     outputSource: final_step/output  # From which step
-  
+
   intermediate:
     type: File
     outputSource: step1/output  # Can expose intermediate results
@@ -113,11 +114,11 @@ steps:
     run:  # Inline tool definition
       class: CommandLineTool
       baseCommand: [echo]
-    
+
     in:  # Map workflow inputs to step inputs
       step_input: workflow_input
       another: some_step/output
-    
+
     out: [output1, output2]  # Step outputs
 ```
 
@@ -142,12 +143,12 @@ steps:
     run: download.cwl
     in: {url: input_url}
     out: [file]
-  
+
   process:
     run: process.cwl
     in: {input: download/file}  # Uses output from download
     out: [result]
-  
+
   upload:
     run: upload.cwl
     in: {file: process/result}  # Uses output from process
@@ -163,12 +164,12 @@ steps:
     run: tool-a.cwl
     in: {input: input_file}
     out: [output_a]
-  
+
   process_b:
     run: tool-b.cwl
     in: {input: input_file}  # Same input, independent processing
     out: [output_b]
-  
+
   # This waits for both to complete
   merge:
     run: merge.cwl
@@ -188,7 +189,7 @@ steps:
     in:
       input_file: input_files  # Array input
     out: [output]  # Array output
-  
+
   combine:
     run: combine.cwl
     in:
@@ -249,17 +250,17 @@ steps:
     run: validate.cwl
     in: {input: raw_data}
     out: [validated]
-  
+
   clean:
     run: clean.cwl
     in: {input: validate/validated}
     out: [cleaned]
-  
+
   transform:
     run: transform.cwl
     in: {input: clean/cleaned}
     out: [transformed]
-  
+
   analyze:
     run: analyze.cwl
     in: {data: transform/transformed, params: parameters}
@@ -276,7 +277,7 @@ steps:
     scatter: item
     in: {item: input_items}
     out: [mapped]
-  
+
   # Reduce: combine results
   reduce:
     run: reducer.cwl
@@ -383,7 +384,7 @@ steps:
       input_file: netcdf_files
       region: region
     out: [subset_file]
-  
+
   compute_stats:
     run: compute-statistics.cwl
     in:

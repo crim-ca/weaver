@@ -7,6 +7,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires Weaver deployment and CWL v1.0+.
 metadata:
+  author: fmigneault
 ---
 
 # Optimize CWL Package Performance
@@ -102,7 +103,7 @@ requirements:
         var sizeMB = inputs.input_file.size / (1024 * 1024);
         return Math.max(2048, Math.ceil(sizeMB * 3));
       }
-    
+
     # Scale cores with number of inputs
     coresMin: |
       ${
@@ -261,12 +262,12 @@ steps:
     run: tool-a.cwl
     in: {input: data}
     out: [output_a]
-  
+
   process_b:  # Runs simultaneously with process_a
     run: tool-b.cwl
     in: {input: data}
     out: [output_b]
-  
+
   combine:  # Waits for both
     run: merge.cwl
     in:
@@ -283,7 +284,7 @@ outputs:
   preprocessed:  # Can be reused
     type: File
     outputSource: preprocess/output
-  
+
   final:
     type: File
     outputSource: analyze/output
@@ -360,7 +361,7 @@ steps:
   download:
     run: download.cwl
     # Check logs to see how long this takes
-  
+
   process:
     run: process.cwl
     # Compare durations
@@ -395,7 +396,7 @@ steps:
     run: preprocess.cwl
     in: {input: raw_data}
     out: [preprocessed]  # Cache this
-  
+
   analyze:
     run: analyze.cwl
     in: {input: expensive_preprocess/preprocessed}

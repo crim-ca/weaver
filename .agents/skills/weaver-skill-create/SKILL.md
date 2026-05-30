@@ -13,7 +13,7 @@ metadata:
     - documentation
     - agent-skills
     - capability-exposure
-  author: CRIM
+  author: fmigneault
 ---
 
 # Create New Agent Skills
@@ -104,7 +104,9 @@ metadata:
   keywords:                         # Search keywords
     - keyword1
     - keyword2
-  author: CRIM                       # Original author
+  author: <original-author>          # Initial/original skill author
+  contributors:                      # Optional list of subsequent modifiers
+    - <contributor-name>
 ---
 ```
 
@@ -119,7 +121,8 @@ metadata:
 | `metadata.category` | string | Yes | Skill category for organization |
 | `metadata.version` | string | Yes | Skill version (semantic versioning) |
 | `metadata.keywords` | array | Yes | Search keywords for discovery |
-| `metadata.author` | string | Yes | Author/maintainer name |
+| `metadata.author` | string | Yes | Original skill author |
+| `metadata.contributors` | array | No | Contributors who modified the skill after creation |
 
 The metadata fields must respect the [Agent Skills Specification](https://agentskills.io/specification).
 
@@ -241,7 +244,9 @@ metadata:
   keywords:
     - keyword1
     - keyword2
-  author: CRIM
+  author: <original-author>
+  contributors:
+    - <contributor-name>
 ---
 
 # Skill Title
@@ -272,7 +277,15 @@ Show what the skill returns:
 - Error response format
 - Example output
 
-### 6. Test Documentation
+### 6. Update Catalogs
+
+After creating a skill, update the following files to include cross-references.
+Note that file references are from the root of the repository.
+
+- **[AGENTS.md](/AGENTS.md)** - Add skill to appropriate category
+- **[.agents/README.md](/.agents/README.md)** - Add skill to appropriate category with description
+
+### 7. Test Documentation
 
 Verify:
 - [ ] All examples are syntactically correct
@@ -280,21 +293,14 @@ Verify:
 - [ ] Return values match actual API responses
 - [ ] Links to related skills work
 - [ ] Metadata keywords enable discovery
-
-### 7. Update Catalogs
-
-After creating a skill, update the following files to include cross-references.
-Note that file references are from the root of the repository.
-
-- **[AGENTS.md](/AGENTS.md)** - Add skill to appropriate category
-- **[.agents/README.md](../)** - Add skill to appropriate category with description
+- [ ] Lint checks pass for markdown formatting and line length
 
 ## Validation Checklist
 
 Before considering a skill complete:
 
 - [ ] Directory name matches skill name (lowercase, hyphens)
-- [ ] SKILL.md has complete frontmatter
+- [ ] `SKILL.md` has complete frontmatter
 - [ ] All required metadata fields present
 - [ ] Description includes keywords for AI discovery
 - [ ] At least 3 usage examples (CLI, Python, API)
@@ -308,6 +314,7 @@ Before considering a skill complete:
 
 ## Related Skills
 
+- [weaver-ci-validate](../weaver-ci-validate/) - Validate code and lint with Makefile targets
 - [weaver-skills-update](../weaver-skills-update/) - Maintain and update skills documentation after creation
 
 ## References

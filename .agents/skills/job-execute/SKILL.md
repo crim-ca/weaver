@@ -7,6 +7,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires Weaver API access. Supports async/sync execution modes.
 metadata:
+  author: fmigneault
 ---
 
 # Execute Process

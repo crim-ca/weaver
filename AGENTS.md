@@ -101,6 +101,7 @@ Complete skill catalog organized by domain:
 ### Setup & Maintenance
 
 - [weaver-install](.agents/skills/weaver-install/)
+- [weaver-ci-validate](.agents/skills/weaver-ci-validate/) - Run test/lint checks with Makefile targets
 - [weaver-skill-create](.agents/skills/weaver-skill-create/) - How to create skills
 - [weaver-skills-update](.agents/skills/weaver-skills-update/)
 

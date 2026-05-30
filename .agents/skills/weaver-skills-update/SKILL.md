@@ -10,7 +10,7 @@ compatibility: Requires Python 3.10+, git, access to weaver repository.
 metadata:
   category: setup-operations
   version: 1.0.0
-  author: CRIM
+  author: fmigneault
 allowed-tools: run_command file_read file_write grep_search
 ---
 
@@ -65,14 +65,14 @@ This skill provides three automation scripts to help maintain Agent Skills:
 
 **See**: [Automated Validation](#automated-validation) section for details
 
-### 3. check-frontmatter.py
+### 3. check_frontmatter.py
 
 **Purpose**: Verify YAML frontmatter uses proper multiline format
 
 **Usage**:
 
 ```bash
-python3 .agents/skills/weaver-skills-update/scripts/check-frontmatter.py
+python3 .agents/skills/weaver-skills-update/scripts/check_frontmatter.py
 ```
 
 **Output**: Ensures all skills use `description: |` format
@@ -349,7 +349,7 @@ git log --since="LAST_UPDATE_DATE" --name-only --pretty=format: | sort -u
 
 # 5. Verify all skills with validation scripts
 .agents/skills/weaver-skills-update/scripts/validate-skills.sh
-python3 .agents/skills/weaver-skills-update/scripts/check-frontmatter.py
+python3 .agents/skills/weaver-skills-update/scripts/check_frontmatter.py
 
 # 6. Update skill count in README (if skills added/removed)
 vim .agents/README.md
@@ -402,6 +402,8 @@ When updating skills, verify:
 - [ ] **YAML frontmatter** is valid
 - [ ] **YAML description** uses multiline format with `description: |` (see YAML Frontmatter Format below)
 - [ ] **Name** matches directory name
+- [ ] **Author** in frontmatter `metadata.author` preserves the original skill author
+- [ ] **Contributors** include the committer in `metadata.contributors` when the skill is modified by someone else
 - [ ] **Description** is accurate (1-1024 chars)
 - [ ] **Scripts** that require large set of commands are placed in dedicated `scripts/` and referenced by the skill
 - [ ] **Returns** section has completeness note
@@ -436,7 +438,9 @@ compatibility: Requirements here
 metadata:
   category: category-name
   version: "1.0.0"
-  author: CRIM
+  author: <original-author>
+  contributors:
+    - <contributor-name>
 allowed-tools: tool1 tool2
 ---
 ```
@@ -446,13 +450,15 @@ allowed-tools: tool1 tool2
 - **Always use `description: |`** for multiline format
 - Indent description content with 2 spaces
 - Keep description lines under 100 characters
+- Preserve `metadata.author` as the original skill author
+- Add/update `metadata.contributors` for anyone modifying the skill
 - Ensure valid YAML syntax (no trailing commas, proper indentation)
 
-**Validation script**: [`scripts/check-frontmatter.py`](scripts/check-frontmatter.py)
+**Validation script**: [`scripts/check_frontmatter.py`](scripts/check_frontmatter.py)
 
 ```bash
 # Check YAML frontmatter format in all skills
-python3 .agents/skills/weaver-skills-update/scripts/check-frontmatter.py
+python3 .agents/skills/weaver-skills-update/scripts/check_frontmatter.py
 ```
 
 ## Version-Specific Updates

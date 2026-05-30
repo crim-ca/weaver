@@ -7,6 +7,7 @@ description: |
 license: Apache-2.0
 compatibility: Requires cwltool for local testing. Works with CWL v1.0, v1.1, v1.2.
 metadata:
+  author: fmigneault
 ---
 
 # Debug CWL Packages
@@ -368,7 +369,7 @@ outputs:
     type: Directory
     outputBinding:
       glob: .  # Capture all files in working directory
-  
+
   final_output:
     type: File
     outputBinding:
@@ -400,7 +401,7 @@ steps:
     run: tool1.cwl
     in: {input: workflow_input}
     out: [output]  # Type: File
-  
+
   step2:
     run: tool2.cwl
     in:
