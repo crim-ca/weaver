@@ -482,3 +482,16 @@ def test_nested_process_input(test_value, expect_result):
     schema = sd.Execute()
     result = schema.deserialize(test_value)
     assert result == expect_result
+
+
+def test_job_inputs_accept_profile_with_angle_brackets():
+    payload = {
+        "inputs": {},
+        "outputs": {},
+        "headers": {
+            "Accept-Profile": f"<{sd.OGC_API_PROC_PROFILE_RESULTS_URI}>",
+        },
+    }
+    result = sd.JobInputsBody().deserialize(payload)
+    assert result["headers"]["Accept-Profile"] == f"<{sd.OGC_API_PROC_PROFILE_RESULTS_URI}>"
+
