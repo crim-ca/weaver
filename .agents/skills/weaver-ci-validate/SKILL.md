@@ -2,7 +2,7 @@
 name: weaver-ci-validate
 description: |
   Run Weaver code test and lint validations through Makefile targets.
-  Prefer `make check*` and `make test*` commands over direct tool calls to stay
+  Prefer `make check*`, `make fix*` and `make test*` commands over direct tool calls to stay
   aligned with project CI behavior and environment setup.
 license: Apache-2.0
 compatibility: Requires Make, Python environment dependencies, and Weaver repository access.
@@ -29,10 +29,12 @@ Guide validation tasks toward `Makefile` targets for consistent local and CI che
 - When investigating lint failures reported by CI.
 - When selecting focused checks to reduce local turnaround time.
 
-## Core Rule
+## Core Rules
 
-Use `make` targets first. Do not call `pytest`, `pylint`, `flake8`, or related tools directly unless a `Makefile`
-target does not exist for the needed scope.
+- Use `make` targets first. Do not call `pytest`, `pylint`, `flake8`, or related tools
+  directly unless a `Makefile` target does not exist for the needed scope.
+- Fix lint issues with `make fix*` targets when available to maintain consistency with CI auto-fix behavior.
+  Only address other issues manually when they cannot be handled through predefined `Makefile` targets.
 
 ## Validation Workflow
 
@@ -64,6 +66,22 @@ make check-md-only
 
 `make check-only` runs all enabled check families through their `-only` variants.
 
+Fix target counterparts for check targets that support automatic remediation:
+
+```shell
+make fix-only
+make fix-imports-only
+make fix-lint-only
+make fix-docf-only
+make fix-fstring-only
+make fix-css-only
+make fix-md-only
+```
+
+`make fix-only` runs all enabled fix families through their `-only` variants.
+
+No automatic `fix-*` targets are defined for remaining `check-*` targets.
+
 ### Test Suites
 
 ```shell
@@ -86,7 +104,7 @@ make test-coverage-only
 
 The marker registry is defined in `setup.cfg` under `[tool:pytest]`.
 
-### Predefined markers
+### Predefined Markers
 
 - `cli`
 - `code_sprint`
@@ -111,7 +129,7 @@ The marker registry is defined in `setup.cfg` under `[tool:pytest]`.
 - `openeo`
 - `wps`
 
-### Predefined make target patterns
+### Predefined Target Patterns
 
 These wrap common marker expressions:
 
@@ -124,7 +142,7 @@ These wrap common marker expressions:
 - `test-no-tb14-only` -> `-m "not testbed14"`
 - `test-code-sprint-only` -> `-m "code_sprint"`
 
-### Flexible marker expressions
+### Flexible Marker Expressions
 
 Use `TEST_XARGS` to append custom pytest expressions while still using `make`:
 
@@ -172,9 +190,5 @@ Use these to discover current targets and any `CHECKS_EXCLUDE` behavior.
 
 ## Related Skills
 
-- [weaver-install](../weaver-install/) - Setup dependencies and local environment.
-- [weaver-skills-update](../weaver-skills-update/) - Maintain skills when Makefile targets evolve.
-
-
-
-
+- [weaver-install](../weaver-install/SKILL.md) - Setup dependencies and local environment.
+- [weaver-skills-update](../weaver-skills-update/SKILL.md) - Maintain skills when Makefile targets evolve.

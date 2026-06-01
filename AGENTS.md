@@ -5,7 +5,7 @@ Guide AI agents and development tools toward useful Weaver capabilities.
 ## Boundaries
 
 | Area                 | Constraint                                                                                                              |
-|----------------------|-------------------------------------------------------------------------------------------------------------------------|
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | Scope                | Use skills in [`.agents/skills/`](.agents/skills/) for Weaver development, testing, packaging, and API work.            |
 | Out of Scope         | Do not perform unrelated system administration, modify external repositories, or change files outside this workspace.   |
 | Destructive Actions  | Do not delete files, drop databases, undeploy production processes, or overwrite user data unless explicitly requested. |
@@ -57,64 +57,67 @@ Complete skill catalog organized by domain:
 
 ### API Information
 
-- [api-conformance](.agents/skills/api-conformance/) - Check OGC standards
-- [api-info](.agents/skills/api-info/) - Get API metadata
-- [api-version](.agents/skills/api-version/) - Get Weaver version
+- [api-conformance](.agents/skills/api-conformance/SKILL.md) - Check OGC standards
+- [api-info](.agents/skills/api-info/SKILL.md) - Get API metadata
+- [api-version](.agents/skills/api-version/SKILL.md) - Get Weaver version
 
 ### CWL Tools
 
-- [cwl-create-commandlinetool](.agents/skills/cwl-create-commandlinetool/)
-- [cwl-debug-package](.agents/skills/cwl-debug-package/)
-- [cwl-optimize-performance](.agents/skills/cwl-optimize-performance/)
-- [cwl-understand-builtin](.agents/skills/cwl-understand-builtin/)
-- [cwl-understand-docker](.agents/skills/cwl-understand-docker/)
-- [cwl-understand-workflow](.agents/skills/cwl-understand-workflow/)
-- [cwl-use-expressions](.agents/skills/cwl-use-expressions/)
-- [cwl-validate-package](.agents/skills/cwl-validate-package/)
+- [cwl-create-commandlinetool](.agents/skills/cwl-create-commandlinetool/SKILL.md)
+- [cwl-debug-package](.agents/skills/cwl-debug-package/SKILL.md)
+- [cwl-optimize-performance](.agents/skills/cwl-optimize-performance/SKILL.md)
+- [cwl-understand-builtin](.agents/skills/cwl-understand-builtin/SKILL.md)
+- [cwl-understand-docker](.agents/skills/cwl-understand-docker/SKILL.md)
+- [cwl-understand-workflow](.agents/skills/cwl-understand-workflow/SKILL.md)
+- [cwl-use-expressions](.agents/skills/cwl-use-expressions/SKILL.md)
+- [cwl-validate-package](.agents/skills/cwl-validate-package/SKILL.md)
 
 ### Job Operations
 
-- [job-dismiss](.agents/skills/job-dismiss/)
-- [job-exceptions](.agents/skills/job-exceptions/)
-- [job-execute](.agents/skills/job-execute/)
-- [job-inputs](.agents/skills/job-inputs/)
-- [job-list](.agents/skills/job-list/)
-- [job-logs](.agents/skills/job-logs/)
-- [job-monitor](.agents/skills/job-monitor/)
-- [job-provenance](.agents/skills/job-provenance/)
-- [job-results](.agents/skills/job-results/)
-- [job-statistics](.agents/skills/job-statistics/)
-- [job-status](.agents/skills/job-status/)
+- [job-dismiss](.agents/skills/job-dismiss/SKILL.md)
+- [job-exceptions](.agents/skills/job-exceptions/SKILL.md)
+- [job-execute](.agents/skills/job-execute/SKILL.md)
+- [job-inputs](.agents/skills/job-inputs/SKILL.md)
+- [job-list](.agents/skills/job-list/SKILL.md)
+- [job-logs](.agents/skills/job-logs/SKILL.md)
+- [job-monitor](.agents/skills/job-monitor/SKILL.md)
+- [job-provenance](.agents/skills/job-provenance/SKILL.md)
+- [job-results](.agents/skills/job-results/SKILL.md)
+- [job-statistics](.agents/skills/job-statistics/SKILL.md)
+- [job-status](.agents/skills/job-status/SKILL.md)
 
 ### Process Management
 
-- [process-deploy](.agents/skills/process-deploy/)
-- [process-describe](.agents/skills/process-describe/)
-- [process-list](.agents/skills/process-list/)
-- [process-package](.agents/skills/process-package/)
-- [process-undeploy](.agents/skills/process-undeploy/)
+- [process-deploy](.agents/skills/process-deploy/SKILL.md)
+- [process-describe](.agents/skills/process-describe/SKILL.md)
+- [process-list](.agents/skills/process-list/SKILL.md)
+- [process-package](.agents/skills/process-package/SKILL.md)
+- [process-undeploy](.agents/skills/process-undeploy/SKILL.md)
 
 ### Provider Management
 
-- [provider-list](.agents/skills/provider-list/)
-- [provider-register](.agents/skills/provider-register/)
-- [provider-unregister](.agents/skills/provider-unregister/)
+- [provider-list](.agents/skills/provider-list/SKILL.md)
+- [provider-register](.agents/skills/provider-register/SKILL.md)
+- [provider-unregister](.agents/skills/provider-unregister/SKILL.md)
 
 ### Setup & Maintenance
 
-- [weaver-install](.agents/skills/weaver-install/)
-- [weaver-ci-validate](.agents/skills/weaver-ci-validate/) - Run test/lint checks with Makefile targets
-- [weaver-skill-create](.agents/skills/weaver-skill-create/) - How to create skills
-- [weaver-skills-update](.agents/skills/weaver-skills-update/)
+- [weaver-install](.agents/skills/weaver-install/SKILL.md) - Install Weaver and its dependencies
+- [weaver-ci-validate](.agents/skills/weaver-ci-validate/SKILL.md) - Run tests, lint checks and fixes with Makefile
+  targets
+- [weaver-skill-create](.agents/skills/weaver-skill-create/SKILL.md) - How to create Agent Skills for Weaver
+  codebase
+- [weaver-skills-update](.agents/skills/weaver-skills-update/SKILL.md) - Update Agent Skills related to Weaver
+  or its codebase
 
 ### Vault
 
-- [vault-upload](.agents/skills/vault-upload/)
+- [vault-upload](.agents/skills/vault-upload/SKILL.md)
 
 ## Learn More
 
 - **Complete Skill Reference**: [.agents/README.md](.agents/README.md)
-- **How to Create Skills**: [weaver-skill-create](.agents/skills/weaver-skill-create/)
+- **How to Create Skills**: [weaver-skill-create](.agents/skills/weaver-skill-create/SKILL.md)
 - **Agent Skills Specification**: <https://agentskills.io/specification>
 - **Weaver Documentation**: <https://pavics-weaver.readthedocs.io/>
 

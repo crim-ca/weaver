@@ -500,7 +500,8 @@ Minimal updates usually needed:
 
 > ⚠️ WARNING ️Unless a Weaver instance is running locally, the following tests will fail. Running an instance can be a
 > timely process. Therefore, consider whether this is actually needed and there are no simpler workarounds. If required,
-> ensure you have a test instance available before running these commands using [weaver-install](../weaver-install/)
+> ensure you have a test instance available before running these commands using
+> [weaver-install](../weaver-install/SKILL.md)
 > skill instructions.
 
 ```bash
@@ -537,8 +538,8 @@ fix them and rerun the same checks until all are clean.
 **What it validates**:
 
 - **YAML frontmatter**: Ensures all skills have valid YAML frontmatter between `---` markers
-- **Cross-references**: Checks that all relative links to other skills (`../skill-name/`)
-  point to existing skill directories
+- **Cross-references**: Checks that all relative links to other skills (`../skill-name/SKILL.md`)
+  point to existing skill directories and their corresponding `SKILL.md` file.
 
 **Example output**:
 
@@ -579,7 +580,7 @@ Repeat `check-md-only` after each fix until no warnings/errors remain.
 
 ## Related Skills
 
-- [weaver-install](../weaver-install/) - Keep installation procedures current
+- [weaver-install](../weaver-install/SKILL.md) - Keep installation procedures current
 - All skills - Any skill may need updates based on code changes
 
 ## Documentation

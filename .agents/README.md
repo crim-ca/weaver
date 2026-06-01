@@ -45,60 +45,59 @@ All skills are organized by category for easy discovery:
 
 ### API Information
 
-- **[api-conformance](skills/api-conformance/)** - Check OGC standards conformance
-- **[api-info](skills/api-info/)** - Get API metadata and endpoints
-- **[api-version](skills/api-version/)** - Get Weaver version information
+- **[api-conformance](skills/api-conformance/SKILL.md)** - Check OGC standards conformance
+- **[api-info](skills/api-info/SKILL.md)** - Get API metadata and endpoints
+- **[api-version](skills/api-version/SKILL.md)** - Get Weaver version information
 
 ### CWL Comprehension
 
-- **[cwl-create-commandlinetool](skills/cwl-create-commandlinetool/)** - Create CWL CommandLineTool packages from
-  scratch
-- **[cwl-debug-package](skills/cwl-debug-package/)** - Debug CWL package deployment and execution issues
-- **[cwl-optimize-performance](skills/cwl-optimize-performance/)** - Optimize CWL performance and resource usage
-- **[cwl-understand-builtin](skills/cwl-understand-builtin/)** - Use Weaver's built-in utility processes
-- **[cwl-understand-docker](skills/cwl-understand-docker/)** - Master Docker requirements in CWL packages
-- **[cwl-understand-workflow](skills/cwl-understand-workflow/)** - Create multi-step CWL workflows
-- **[cwl-use-expressions](skills/cwl-use-expressions/)** - Use JavaScript expressions for dynamic behavior
-- **[cwl-validate-package](skills/cwl-validate-package/)** - Validate CWL syntax before deployment
+- **[cwl-create-commandlinetool](skills/cwl-create-commandlinetool/SKILL.md)** - Create CWL CommandLineTool packages
+- **[cwl-debug-package](skills/cwl-debug-package/SKILL.md)** - Debug CWL package deployment and execution issues
+- **[cwl-optimize-performance](skills/cwl-optimize-performance/SKILL.md)** - Optimize CWL performance and resource usage
+- **[cwl-understand-builtin](skills/cwl-understand-builtin/SKILL.md)** - Use Weaver's built-in utility processes
+- **[cwl-understand-docker](skills/cwl-understand-docker/SKILL.md)** - Master Docker requirements in CWL packages
+- **[cwl-understand-workflow](skills/cwl-understand-workflow/SKILL.md)** - Create multi-step CWL workflows
+- **[cwl-use-expressions](skills/cwl-use-expressions/SKILL.md)** - Use JavaScript expressions for dynamic behavior
+- **[cwl-validate-package](skills/cwl-validate-package/SKILL.md)** - Validate CWL syntax before deployment
 
 ### Job Operations
 
-- **[job-dismiss](skills/job-dismiss/)** - Cancel running or pending jobs
-- **[job-exceptions](skills/job-exceptions/)** - Get detailed error information
-- **[job-execute](skills/job-execute/)** - Run processes with inputs (async/sync)
-- **[job-inputs](skills/job-inputs/)** - Retrieve job input parameters
-- **[job-list](skills/job-list/)** - List jobs with filtering and pagination
-- **[job-logs](skills/job-logs/)** - View execution logs for debugging
-- **[job-monitor](skills/job-monitor/)** - Wait for job completion with polling
-- **[job-provenance](skills/job-provenance/)** - Get W3C PROV lineage metadata
-- **[job-results](skills/job-results/)** - Retrieve output results
-- **[job-statistics](skills/job-statistics/)** - Retrieve resource usage metrics
-- **[job-status](skills/job-status/)** - Check job execution status
+- **[job-dismiss](skills/job-dismiss/SKILL.md)** - Cancel running or pending jobs
+- **[job-exceptions](skills/job-exceptions/SKILL.md)** - Get detailed error information
+- **[job-execute](skills/job-execute/SKILL.md)** - Run processes with inputs (async/sync)
+- **[job-inputs](skills/job-inputs/SKILL.md)** - Retrieve job input parameters
+- **[job-list](skills/job-list/SKILL.md)** - List jobs with filtering and pagination
+- **[job-logs](skills/job-logs/SKILL.md)** - View execution logs for debugging
+- **[job-monitor](skills/job-monitor/SKILL.md)** - Wait for job completion with polling
+- **[job-provenance](skills/job-provenance/SKILL.md)** - Get W3C PROV lineage metadata
+- **[job-results](skills/job-results/SKILL.md)** - Retrieve output results
+- **[job-statistics](skills/job-statistics/SKILL.md)** - Retrieve resource usage metrics
+- **[job-status](skills/job-status/SKILL.md)** - Check job execution status
 
 ### Process Management
 
-- **[process-deploy](skills/process-deploy/)** - Deploy CWL application packages
-- **[process-describe](skills/process-describe/)** - Get process details and capabilities
-- **[process-get-package](skills/process-get-package/)** - Retrieve CWL package definitions
-- **[process-list](skills/process-list/)** - Discover available processes
-- **[process-undeploy](skills/process-undeploy/)** - Remove deployed processes
+- **[process-deploy](skills/process-deploy/SKILL.md)** - Deploy CWL application packages
+- **[process-describe](skills/process-describe/SKILL.md)** - Get process details and capabilities
+- **[process-package](skills/process-package/SKILL.md)** - Retrieve CWL package definitions from a deployed process
+- **[process-list](skills/process-list/SKILL.md)** - Discover available processes
+- **[process-undeploy](skills/process-undeploy/SKILL.md)** - Remove deployed processes
 
 ### Provider Management
 
-- **[provider-list](skills/provider-list/)** - List all registered providers
-- **[provider-register](skills/provider-register/)** - Register remote WPS/OGC services
-- **[provider-unregister](skills/provider-unregister/)** - Remove provider registrations
+- **[provider-list](skills/provider-list/SKILL.md)** - List all registered providers
+- **[provider-register](skills/provider-register/SKILL.md)** - Register remote WPS/OGC services
+- **[provider-unregister](skills/provider-unregister/SKILL.md)** - Remove provider registrations
 
 ### Setup Operations
 
-- **[weaver-install](skills/weaver-install/)** - Install and configure Weaver (Docker or from source)
-- **[weaver-ci-validate](skills/weaver-ci-validate/)** - Run code test and lint checks with Makefile targets
-- **[weaver-skill-create](skills/weaver-skill-create/)** - Create new Agent Skills
-- **[weaver-skills-update](skills/weaver-skills-update/)** - Maintain and update skills documentation
+- **[weaver-install](skills/weaver-install/SKILL.md)** - Install and configure Weaver (Docker or from source)
+- **[weaver-ci-validate](skills/weaver-ci-validate/SKILL.md)** - Run code test and lint checks with Makefile targets
+- **[weaver-skill-create](skills/weaver-skill-create/SKILL.md)** - Create new Agent Skills
+- **[weaver-skills-update](skills/weaver-skills-update/SKILL.md)** - Maintain and update skills documentation
 
 ### Vault Operations
 
-- **[vault-upload](skills/vault-upload/)** - Store sensitive data securely
+- **[vault-upload](skills/vault-upload/SKILL.md)** - Store sensitive data securely
 
 ## Using These Skills
 
