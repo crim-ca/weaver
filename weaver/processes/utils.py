@@ -658,7 +658,8 @@ def parse_multipart_deploy(content, content_type, request=None):
                 process_description = _classify_multipart_part(
                     part_data, cwl_packages, parts_order, parts_by_cid, content_id, process_description
                 )
-            except Exception as exc:
+            except Exception as exc:  # pragma: no cover
+                # Defensive: skip malformed parts that fail JSON/YAML parsing
                 LOGGER.warning("Failed to parse part with Content-Type %s: %s", part_content_type, exc)
                 continue
 
