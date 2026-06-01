@@ -9,7 +9,7 @@ from copy import deepcopy
 from email import message_from_bytes
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlparse
 
 import colander
@@ -82,7 +82,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import Any, List, Optional, Tuple, Union
+    from typing import Any, Dict, List, Optional, Tuple, Union
 
     from docker.client import DockerClient
 

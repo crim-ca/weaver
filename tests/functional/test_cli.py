@@ -454,10 +454,11 @@ class TestWeaverClient(TestWeaverClientBase):
         Test deploying multiple CWL files (workflow with tools) using the CLI.
         """
         # Create tool CWL definitions
+        tool1_id = f"{self.test_process_prefix}tool-1"
         tool1_cwl = {
             "cwlVersion": "v1.2",
             "class": "CommandLineTool",
-            "id": "tool-1",
+            "id": tool1_id,
             "baseCommand": ["echo"],
             "requirements": {
                 "DockerRequirement": {
@@ -469,10 +470,11 @@ class TestWeaverClient(TestWeaverClientBase):
             "stdout": "output.txt"
         }
 
+        tool2_id = f"{self.test_process_prefix}tool-2"
         tool2_cwl = {
             "cwlVersion": "v1.2",
             "class": "CommandLineTool",
-            "id": "tool-2",
+            "id": tool2_id,
             "baseCommand": ["cat"],
             "requirements": {
                 "DockerRequirement": {
@@ -501,12 +503,12 @@ class TestWeaverClient(TestWeaverClientBase):
             },
             "steps": {
                 "step1": {
-                    "run": "tool-1",
+                    "run": tool1_id,
                     "in": {"input": "message"},
                     "out": ["output"]
                 },
                 "step2": {
-                    "run": "tool-2",
+                    "run": tool2_id,
                     "in": {"file": "step1/output"},
                     "out": ["output"]
                 }
