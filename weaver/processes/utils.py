@@ -883,6 +883,16 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         reference = content.get("href")
         found = isinstance(reference, str)
     elif c_type in (list(ContentType.ANY_CWL) + [ContentType.APP_JSON]) and "cwlVersion" in payload:
+        # For direct CWL deployment without $graph, validate that id is present
+        if "$graph" not in payload and "id" not in payload:
+            raise HTTPBadRequest(json={
+                "type": "InvalidParameterValue",
+                "title": "Failed schema validation.",
+                "status": HTTPBadRequest.code,
+                "error": colander.Invalid.__name__,
+                "cause": {"DeployCWL.id": "Missing required field."},
+                "value": repr_json(payload, force_string=False),
+            })
         process_info = {"version": payload.pop("version", None)}
         # Keep original payload with $graph for workflow validation
         original_payload = deepcopy(payload) if "$graph" in payload else None
