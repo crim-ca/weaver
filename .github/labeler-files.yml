@@ -5,11 +5,17 @@
 ## CI
 # all automation-related steps and files
 
+triage/agents:
+  - changed-files:
+    - any-glob-to-any-file:
+      - ".agents/**"
+
 ci/operations:
   - changed-files:
     - any-glob-to-any-file:
       - '.*'  # all '.<>' files
       - '.github/**'
+      - '.agents/**'
       - 'MANIFEST.in'
       - 'hooks/**/*'
       - 'Makefile*'

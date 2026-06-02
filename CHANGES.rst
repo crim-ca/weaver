@@ -14,6 +14,17 @@ Changes:
 --------
 - Add documentation details about `Job` single-output and transform formatting features.
 - Add documentation summary of relevant `Job` endpoints for quicker reference of available operations.
+- Set up `Weaver Agent Skills <./.agents/skills>`_ based on
+  the `Agent Skill Specification <https://agentskills.io/specification>`_
+  to help AI agents interact with `Weaver` and its API more seamlessly.
+
+  - Integrates skills for the `CLI`, the Python ``WeaverClient`` and minimal ``curl`` endpoints for correspond commands.
+  - Integrates skills for common `CWL` design and debugging tasks, with alignment concerns for `Weaver` deployment.
+  - Integrates skills for code management and installation steps, including skills self-validation for extensibility.
+  - See also the configured `Context7 Documentation Updater for Weaver <https://context7.com/crim-ca/weaver>`_.
+- Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded
+  `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification
+  following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification.
 
 Fixes:
 ------
@@ -3287,7 +3298,7 @@ Fixes:
 .. _changes_0.1.3:
 
 `0.1.3 <https://github.com/crim-ca/weaver/tree/0.1.3>`_ (2019-03-07)
-=========================================================================================================================
+====================================================================================================================
 
 - Add useful `Makefile` targets for deployment.
 - Add badges indications in ``README.rst`` for tracking from repo landing page.
@@ -3300,7 +3311,7 @@ Fixes:
 .. _changes_0.1.2:
 
 `0.1.2 <https://github.com/crim-ca/weaver/tree/0.1.2>`_ (2019-03-05)
-=========================================================================================================================
+====================================================================================================================
 
 - Introduce ``WPS1Requirement`` and corresponding ``Wps1Process`` to run a `WPS-1` process under `CWL`.
 - Remove `mongodb` requirement, assume it is running on an external service or docker image.
@@ -3311,7 +3322,7 @@ Fixes:
 .. _changes_0.1.1:
 
 `0.1.1 <https://github.com/crim-ca/weaver/tree/0.1.1>`_ (2019-03-04)
-=========================================================================================================================
+====================================================================================================================
 
 - Modify `Dockerfile` to use lighter ``debian:latest`` instead of ``birdhouse/bird-base:latest``.
 - Modify `Dockerfile` to reduce build time by reusing built image layers (requirements installation mostly).
@@ -3321,7 +3332,7 @@ Fixes:
 .. _changes_0.1.0:
 
 `0.1.0 <https://github.com/crim-ca/weaver/tree/0.1.0>`_ (2019-02-26)
-=========================================================================================================================
+====================================================================================================================
 
 - Initial Release. Based off `Twitcher`_ tag `ogc-0.4.7`.
 
