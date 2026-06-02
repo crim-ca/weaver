@@ -12,6 +12,8 @@ Changes
 
 Changes:
 --------
+- Add documentation details about `Job` single-output and transform formatting features.
+- Add documentation summary of relevant `Job` endpoints for quicker reference of available operations.
 - Set up `Weaver Agent Skills <./.agents/skills>`_ based on
   the `Agent Skill Specification <https://agentskills.io/specification>`_
   to help AI agents interact with `Weaver` and its API more seamlessly.
