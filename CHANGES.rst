@@ -14,10 +14,9 @@ Changes:
 --------
 - Add documentation details about `Job` single-output and transform formatting features.
 - Add documentation summary of relevant `Job` endpoints for quicker reference of available operations.
-- Set up `Weaver Agent Skills <./.agents/skills>`_ based on
+- Set up `Weaver Agent Skills <https://github.com/crim-ca/weaver/agents/skills/>`_ based on
   the `Agent Skill Specification <https://agentskills.io/specification>`_
   to help AI agents interact with `Weaver` and its API more seamlessly.
-
   - Integrates skills for the `CLI`, the Python ``WeaverClient`` and minimal ``curl`` endpoints for correspond commands.
   - Integrates skills for common `CWL` design and debugging tasks, with alignment concerns for `Weaver` deployment.
   - Integrates skills for code management and installation steps, including skills self-validation for extensibility.
