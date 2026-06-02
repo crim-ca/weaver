@@ -1626,7 +1626,7 @@ The following table presents complete execution examples combining various :term
     | .. code-block:: text                                  | Complex execution combining multiple features:        |
     |                                                       |                                                       |
     |    bbox=5.8,47.2,15.1,55.1&                           | - Bounding box with CRS                               |
-    |    bbox[crs]=http://www.opengis.net/def/             | - By-reference input                                  |
+    |    bbox[crs]=http://www.opengis.net/def/              | - By-reference input                                  |
     |      crs/OGC/1.3/CRS84&                               | - Literal threshold                                   |
     |    data[href]=http://example.com/input.nc&            | - Output with format & encoding                       |
     |    data[type]=application/netcdf&                     | - Response format & async preference                  |
@@ -2743,6 +2743,54 @@ if the requested :term:`Job` did refer to those :term:`Provider` and/or :term:`P
 A *local* :term:`Process` would have its :term:`Job` references as ``/processes/{processId}/jobs/{jobID}/...``
 while a :ref:`proc_remote_provider` will use ``/provider/{providerName}/processes/{processId}/jobs/{jobID}/...``.
 
+.. list-table:: Common :term:`Job` detail and metadata endpoints
+    :name: table-job-detail-endpoints
+    :align: center
+    :header-rows: 1
+    :widths: 30,25,45
+
+    * - Endpoint
+      - Documentation
+      - Description
+    * - ``/jobs/{jobID}``
+      - :ref:`proc_op_status`
+      - Obtain latest execution status and monitoring details of a :term:`Job`.
+    * - ``/jobs/{jobID}/outputs``
+      - :ref:`proc_op_job_outputs`
+      - Obtain all outputs under a :term:`JSON` document structure with additional metadata.
+    * - ``/jobs/{jobID}/outputs/{outputID}``
+      - :ref:`proc_op_job_results_single`
+      - Alias to the :term:`OGC API - Processes` compliant ``/jobs/{jobID}/results/{outputID}`` endpoint.
+    * - ``/jobs/{jobID}/results``
+      - :ref:`proc_op_job_results`
+      - Obtain results according to negotiated response and output selection parameters.
+    * - ``/jobs/{jobID}/results/{outputID}``
+      - :ref:`proc_op_job_results_single`
+      - Obtain one selected output from results without retrieving the whole set.
+    * - ``/jobs/{jobID}/results/{outputID}/{index}``
+      - :ref:`proc_op_job_results_single`
+      - Obtain one element from an array-valued output by zero-based index.
+    * - ``/jobs/{jobID}/inputs``
+      - :ref:`proc_op_job_inputs`
+      - Review submitted execution parameters including ``inputs``,
+        *requested* ``outputs`` [#outN]_ and relevant request ``headers``.
+    * - ``/jobs/{jobID}/exceptions``
+      - :ref:`proc_op_job_exceptions`
+      - Inspect reported execution failures.
+    * - ``/jobs/{jobID}/logs``
+      - :ref:`proc_op_job_logs`
+      - Inspect captured runtime logs.
+    * - ``/jobs/{jobID}/prov``
+      - :ref:`proc_op_job_prov`
+      - Retrieve :term:`Provenance` metadata.
+    * - ``/jobs/{jobID}/statistics``
+      - :ref:`proc_op_job_stats`
+      - Retrieve runtime statistics collected from successful executions.
+
+.. note::
+    Corresponding utility operations are provided by the :ref:`cli`.
+
+
 .. _proc_op_job_outputs:
 
 Job Outputs
@@ -2787,8 +2835,8 @@ On the other hand, a :term:`Job` submitted with ``response=raw``, ``Prefer: retu
 combinations of ``Accept`` headers and ``transmissionMode`` parameters, can produce
 many alternative content variations (see :ref:`proc_exec_results`) to respect :term:`OGC` compliance requirements.
 The structure of contents received from :ref:`proc_op_job_results` responses can also surprisingly vary according to
-the number of requested ``outputs``, the submitted request parameters, and the alternative :term:`Media-Type`, schema
-or literal data supported by each respective output.
+the number of requested ``outputs`` [#outN]_, the submitted request parameters, and the alternative :term:`Media-Type`,
+schema or literal data supported by each respective output.
 For this reason, the :ref:`proc_op_job_outputs` endpoint will **always** provide all data and links in the
 response body using the ``minimal`` representation as shown by above :term:`JSON` examples,
 **no matter which request parameters** where originally submitted to execute the :term:`Job`.
@@ -2908,6 +2956,59 @@ If ``transmissionMode: value`` under ``output-file`` in the *requested* ``output
 the data of the file would be directly included inline within the response instead of using ``Content-Location``,
 similarly to the :ref:`Single Output Value <job-results-raw-single-data>` example,
 but with its contents nested within its respective boundaries for the corresponding ``Content-ID``.
+
+.. _proc_op_job_results_single:
+
+Job Single Output Retrieval
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. versionadded:: 6.12.0
+
+When only one output is needed, and following a successful :term:`Job` execution,
+the desired result can be obtained directly without requesting the whole result set, using:
+
+.. code-block:: http
+
+    GET /jobs/{jobID}/results/{outputID} HTTP/1.1
+    Host: weaver.example.com
+
+Equivalent :term:`Process`-scoped and :term:`Provider`-scoped prefixes can be used in the same way, as described
+in :ref:`proc_op_job_detail`. For convenience, the ``../outputs/{outputID}`` endpoint can also be used as an alias
+to the above ``../results/{outputID}`` endpoint.
+
+When the selected ``{outputID}`` corresponds to an array result, a specific element can be obtained with:
+
+.. code-block:: http
+
+    GET /jobs/{jobID}/results/{outputID}/{index} HTTP/1.1
+    Host: weaver.example.com
+
+This indexed route is therefore the same single-output retrieval strategy, but with an additional selector
+applied on the array value for convenience. It can also be employed to convert only a single element of the array
+to another supported :term:`Media-Type`, without triggering conversion for the entire array.
+Submitting a request to the ``{index}`` endpoint for an ``{outputID}`` that does not correspond to an array will
+return an HTTP error response. Using the endpoint without ``{index}`` will return the whole array as a single output,
+or as the output itself it is not an array.
+
+The representation of returned content for single-output retrieval follows similar
+:ref:`Resolution Resolution <proc_exec_results>` and :ref:`Content Negotiation <proc_content_negotiation>` principles
+and parameters to their multi-output counterparts. However, any indication of ``>1`` considerations are not applicable
+in this case, since only one output is requested. Similarly, the semantics of the negotiated formats apply to the
+specifically requested single output directly, rather than to a response containing multiple outputs with
+different formats. Therefore, certain formats might not be applicable to certain cases.
+
+.. warning::
+    Although ``/jobs/{jobID}/results/{outputID}`` and ``/jobs/{jobID}/results/{outputID}/{index}`` can be
+    used to obtain distinct subsets of "outputs", they all refer to the same :term:`Process` ``outputID``.
+    Therefore, the :ref:`proc_content_negotiation` is performed the same way. For example, requesting a
+    GeoTIFF :term:`Media-Type` for an output that supports it would return either the whole array, each item a
+    distinct GeoTIFF, or only the specific one by ``{index}``. It will **NOT** create a "*container*"-like
+    representation of that GeoTIFF (e.g.: by stacking bands).
+
+    That is different from the :ref:`proc_content_negotiation` performed for the ``/jobs/{jobID}/results`` endpoint
+    itself, which MAY perform some sort of packaging of a :ref:`proc_multi_outputs` representation of the whole result
+    set, for example by returning a ZIP representation instead of the default
+    :ref:`JSON Job Results <job-results-document-minimal>` document.
 
 .. _proc_op_job_inputs:
 
@@ -3142,7 +3243,7 @@ Following is a summary of relevant parameters impacting content negotiation.
     * - Parameter
       - Location
       - Description
-      - Allowed Encoding [#noteEncoding]_
+      - Allowed Encoding [#noteParamEncoding]_
       - Example
     * - ``f`` / ``format``
       - Query
@@ -3314,6 +3415,36 @@ clients and servers supporting different :term:`Profile` interoperability. In th
 used to provide a fallback if the :term:`Profile` in ``Prefer`` header cannot not be respected or resolved by the server
 for the given request context. Fulfilling the :term:`Profile` in ``Link`` header is "*more important*" in this fallback
 scenario, but still **NOT** mandatory, contrary to the ``Accept`` and ``Accept-Profile`` headers.
+
+.. _proc_content_negotiation_transforms:
+
+Transformed Output Considerations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. versionadded:: 6.12.0
+
+From a client perspective, output :ref:`content-negotiation` produced directly by an originally deployed :term:`Process`
+definition or through an alternate format :term:`Transform` uses the same mechanisms. All supported :term:`Media-Types`
+by a given :term:`Process` output are described in the same manner. However, the underlying :term:`Process` definition
+composes that set of supported formats by combining the *native* formats declared in the :term:`Process` definition
+(which may come from the declared :ref:`Deployment Metadata <proc_op_deploy>` and/or :term:`Application Package`)
+and any additional transformation formats builtin within `Weaver`.
+
+Additional :term:`Transform` formats can extend those declared formats for simple result retrieval when a compatible
+conversion is available. If a :term:`Process` already defines support of a given :term:`Media-Types` at deployment time,
+this format should be *natively* managed by the :term:`Process` rather than the :term:`Transform` utilities.
+Retrieval methods remain unchanged, including :ref:`proc_op_job_results` for complete result sets and
+:ref:`proc_op_job_results_single` for direct per-output access, with either variant.
+
+The available alternative :term:`Transform` formats are defined in :mod:`weaver.transform`. They are selected on a
+per-output basis based on the applicable output constrains inherited from the original :term:`Process` definition,
+and by cases where compatible :term:`Transform` combinations can be established, if not already provided.
+For example, a :term:`Process` that produces a :term:`JSON` output may automatically support additional transformations
+to corresponding :term:`CSV`, :term:`XML` and :term:`YAML` representations.
+However, it is to be noted that these transformations are performed *literally* and meant to be relatively low-level
+operations, meaning that advanced semantic interpretation and metadata of the formats will often not be considered.
+For advanced transformations including domain-specific interpretation of the data, it is recommended to implement them
+directly with a dedicated and reusable :term:`Process` definition, which can be chained within a :ref:`proc_workflow`.
 
 .. _vault_upload:
 
