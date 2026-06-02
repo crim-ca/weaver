@@ -39,7 +39,7 @@ sys.path.insert(0, os.path.abspath(DOC_DIR_ROOT))
 sys.path.insert(0, os.path.abspath(DOC_PRJ_ROOT))
 
 from weaver import __meta__  # isort:skip # noqa: E402 # pylint: disable=C0413
-from weaver.wps_restapi.api import get_openapi_json  # isort:skip # noqa: E402
+from weaver.wps_restapi.api import get_openapi_json  # isort:skip # noqa: E402 # pylint: disable=C0413
 
 DOC_PKG_ROOT = os.path.join(DOC_PRJ_ROOT, __meta__.__name__)
 
@@ -109,7 +109,7 @@ api_spec_json = get_openapi_json(
 )
 if not os.path.isdir(DOC_BLD_ROOT):
     os.makedirs(DOC_BLD_ROOT)
-with open(api_spec_file, "w") as f:
+with open(api_spec_file, mode="w", encoding="utf-8") as f:
     json.dump(api_spec_json, f, use_decimal=True)
 
 redoc = [{

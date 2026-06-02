@@ -74,7 +74,22 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.constants import ConformanceCategory
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Set, Tuple, Type, Union
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        Iterable,
+        List,
+        Literal,
+        Optional,
+        Sequence,
+        Set,
+        Tuple,
+        Type,
+        TypedDict,
+        Union
+    )
+    from typing_extensions import TypeAlias
 
     from requests import Response
 
@@ -126,6 +141,21 @@ if TYPE_CHECKING:
     PostHelpFormatter = Callable[[str], str]
     ArgumentParserRuleCheck = Callable[[argparse.Namespace], Optional[Union[bool, str]]]
     ArgumentParserRule = Tuple[argparse._ActionsContainer, ArgumentParserRuleCheck, str]  # noqa
+
+    AuthHandlerType: TypeAlias = Type["AuthHandler"]
+    AuthDict = TypedDict(
+        "AuthDict",
+        {
+            "auth_handler": Union[AuthHandlerType, Type[AuthBase], str],
+            "auth_identity": Optional[str],
+            "auth_password": Optional[str],
+            "auth_url": Optional[str],
+            "auth_method": Optional[str],
+            "auth_token": Optional[str],
+            "auth_headers": Optional[HeadersType],
+        },
+        total=True,
+    )
 
 LOGGER = logging.getLogger("weaver.cli")  # do not use '__name__' since it becomes '__main__' from CLI call
 
@@ -2784,7 +2814,7 @@ def add_listing_options(parser, item):
 
 
 def parse_auth(kwargs):
-    # type: (Dict[str, Union[Type[AuthHandler], Type[AuthBase], str, None]]) -> Optional[AuthHandler]
+    # type: (AuthDict) -> Optional[AuthHandler]
     """
     Parses arguments that can define an authentication handler and remove them from dictionary for following calls.
     """
