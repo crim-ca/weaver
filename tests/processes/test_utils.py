@@ -7,7 +7,7 @@ from typing import cast
 import mock
 import pytest
 import yaml
-from pyramid.httpexceptions import HTTPBadRequest
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented
 
 from tests import resources
 from tests.utils import (
@@ -26,7 +26,9 @@ from weaver.processes.utils import (  # noqa: W0212
     create_multipart_deploy,
     parse_multipart_deploy,
     register_cwl_processes_from_config,
-    register_wps_processes_from_config
+    register_wps_processes_from_config,
+    resolve_cwl_graph,
+    resolve_deployment_order
 )
 
 WPS1_URL1 = resources.TEST_REMOTE_SERVER_URL
@@ -1040,3 +1042,293 @@ def test_create_multipart_deploy_with_file_paths(tmp_path):
 
     assert len(cwl_packages) == 1
     assert cwl_packages[0]["id"] == "file-tool"
+
+
+def test_resolve_cwl_graph_no_graph():
+    """
+    Test resolve_cwl_graph returns package as-is when no $graph is present.
+    """
+    package = {
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "id": "simple-tool"
+    }
+    result = resolve_cwl_graph(package)
+    assert result == package
+
+
+def test_resolve_cwl_graph_with_non_list_graph():
+    """
+    Test resolve_cwl_graph returns package as-is when $graph is not a list.
+    """
+    package = {
+        "cwlVersion": "v1.2",
+        "$graph": "not-a-list",  # Invalid but should be returned as-is
+        "id": "test-package"
+    }
+    result = resolve_cwl_graph(package)
+    assert result == package
+
+
+def test_resolve_cwl_graph_single_item():
+    """
+    Test resolve_cwl_graph unpacks single-item $graph.
+    """
+    package = {
+        "cwlVersion": "v1.2",
+        "$graph": [
+            {
+                "class": "CommandLineTool",
+                "id": "single-tool"
+            }
+        ]
+    }
+    result = resolve_cwl_graph(package)
+    assert isinstance(result, dict)
+    assert result["class"] == "CommandLineTool"
+    assert result["id"] == "single-tool"
+    assert result["cwlVersion"] == "v1.2"
+    assert "$graph" not in result
+
+
+def test_resolve_cwl_graph_multiple_items():
+    """
+    Test resolve_cwl_graph returns list for multiple items in $graph.
+    """
+    package = {
+        "cwlVersion": "v1.2",
+        "$graph": [
+            {"class": "CommandLineTool", "id": "tool-1"},
+            {"class": "Workflow", "id": "workflow-1"}
+        ]
+    }
+    result = resolve_cwl_graph(package)
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert result[0]["id"] == "tool-1"
+    assert result[0]["cwlVersion"] == "v1.2"
+    assert result[1]["id"] == "workflow-1"
+    assert result[1]["cwlVersion"] == "v1.2"
+
+
+def test_resolve_deployment_order_single_workflow():
+    """
+    Test resolve_deployment_order with a single workflow.
+    """
+    workflow = {"class": "Workflow", "id": "test-workflow"}
+    tools, main_workflow = resolve_deployment_order([workflow])
+
+    assert tools == []
+    assert main_workflow == workflow
+
+
+def test_resolve_deployment_order_command_line_tool():
+    """
+    Test resolve_deployment_order with CommandLineTool.
+    """
+    tool = {"class": "CommandLineTool", "id": "test-tool"}
+    tools, main_workflow = resolve_deployment_order([tool])
+
+    assert len(tools) == 1
+    assert tools[0] == tool
+    assert main_workflow is None
+
+
+def test_resolve_deployment_order_expression_tool():
+    """
+    Test resolve_deployment_order with ExpressionTool.
+    """
+    expr_tool = {"class": "ExpressionTool", "id": "test-expr"}
+    tools, main_workflow = resolve_deployment_order([expr_tool])
+
+    assert len(tools) == 1
+    assert tools[0] == expr_tool
+    assert main_workflow is None
+
+
+def test_resolve_deployment_order_workflow_and_tools():
+    """
+    Test resolve_deployment_order with workflow and multiple tools.
+    """
+    tool1 = {"class": "CommandLineTool", "id": "tool-1"}
+    tool2 = {"class": "ExpressionTool", "id": "tool-2"}
+    workflow = {"class": "Workflow", "id": "main-workflow"}
+
+    tools, main_workflow = resolve_deployment_order([tool1, tool2, workflow])
+
+    assert len(tools) == 2
+    assert tool1 in tools
+    assert tool2 in tools
+    assert main_workflow == workflow
+
+
+def test_resolve_deployment_order_multiple_workflows_error():
+    """
+    Test resolve_deployment_order raises error for multiple workflows.
+    """
+    workflow1 = {"class": "Workflow", "id": "workflow-1"}
+    workflow2 = {"class": "Workflow", "id": "workflow-2"}
+
+    with pytest.raises(HTTPNotImplemented) as exc_info:
+        resolve_deployment_order([workflow1, workflow2])
+
+    assert exc_info.value.json is not None
+    assert "Multiple Workflow definitions" in exc_info.value.json.get("title", "")
+
+
+def test_resolve_deployment_order_no_packages():
+    """
+    Test resolve_deployment_order with empty list.
+    """
+    tools, main_workflow = resolve_deployment_order([])
+    assert tools == []
+    assert main_workflow is None
+
+
+def test_classify_multipart_part_without_content_id():
+    """
+    Test _classify_multipart_part with no content_id (empty string).
+    """
+    part_data = {
+        "class": "CommandLineTool",
+        "id": "test-tool",
+        "inputs": {},
+        "outputs": {}
+    }
+    cwl_packages = []
+    parts_order = []
+    parts_by_cid = {}
+
+    result = _classify_multipart_part(
+        part_data, cwl_packages, parts_order, parts_by_cid,
+        content_id="", process_description=None  # Empty content_id
+    )
+
+    assert len(cwl_packages) == 1
+    assert cwl_packages[0] == part_data
+    assert len(parts_by_cid) == 0  # Should not be added when content_id is empty
+    assert result is None
+
+
+def test_parse_multipart_deploy_with_bytes_content():
+    """
+    Test parse_multipart_deploy properly decodes bytes content.
+    """
+    tool_cwl = json.dumps({
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "id": "test-tool",
+        "inputs": {},
+        "outputs": {"output": {"type": "File"}}
+    })
+
+    boundary = "----Boundary123"
+    multipart_body = (
+        f"------Boundary123\r\n"
+        f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+        f"\r\n"
+        f"{tool_cwl}\r\n"
+        f"------Boundary123--\r\n"
+    ).encode('utf-8')  # Already bytes
+
+    content_type = f"multipart/mixed; boundary={boundary}"
+
+    cwl_packages, process_desc = parse_multipart_deploy(
+        multipart_body, content_type, request=None
+    )
+
+    assert len(cwl_packages) == 1
+    assert cwl_packages[0]["id"] == "test-tool"
+    assert process_desc is None
+
+
+def test_parse_multipart_deploy_no_start_parameter_non_workflow(caplog):
+    """
+    Test parse_multipart_deploy warning when no start parameter and first element is not a Workflow.
+    """
+    tool_cwl = json.dumps({
+        "cwlVersion": "v1.2",
+        "class": "CommandLineTool",
+        "id": "test-tool",
+        "inputs": {},
+        "outputs": {"output": {"type": "File"}}
+    })
+
+    boundary = "----Boundary123"
+    multipart_body = (
+        f"------Boundary123\r\n"
+        f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+        f"\r\n"
+        f"{tool_cwl}\r\n"
+        f"------Boundary123--\r\n"
+    ).encode('utf-8')
+
+    content_type = f"multipart/related; boundary={boundary}"  # multipart/related without start parameter
+
+    cwl_packages, process_desc = parse_multipart_deploy(
+        multipart_body, content_type, request=None
+    )
+
+    assert len(cwl_packages) == 1
+    assert cwl_packages[0]["id"] == "test-tool"
+    # Check that a warning was logged
+    assert any("No 'start' parameter provided" in record.message for record in caplog.records)
+
+
+def test_create_multipart_deploy_single_workflow():
+    """
+    Test create_multipart_deploy with a single workflow (workflow_count == 1).
+    """
+    workflow_cwl = {
+        "cwlVersion": "v1.2",
+        "class": "Workflow",
+        "id": "test-workflow",
+        "inputs": {"input": {"type": "string"}},
+        "outputs": {"output": {"type": "File"}},
+        "steps": {}
+    }
+
+    content, content_type = create_multipart_deploy([workflow_cwl])
+
+    # Verify content was created
+    assert isinstance(content, bytes)
+    assert "multipart/related" in content_type
+
+    # Verify that the start parameter was added (workflow_count == 1 branch)
+    assert "start=workflow-0" in content_type
+
+    # Parse and verify
+    cwl_packages, _ = parse_multipart_deploy(content, content_type, request=None)
+    assert len(cwl_packages) == 1
+    assert cwl_packages[0]["id"] == "test-workflow"
+
+
+def test_create_multipart_deploy_multiple_workflows():
+    """
+    Test create_multipart_deploy with multiple workflows.
+    """
+    workflow1 = {
+        "cwlVersion": "v1.2",
+        "class": "Workflow",
+        "id": "workflow-1",
+        "inputs": {},
+        "outputs": {},
+        "steps": {}
+    }
+    workflow2 = {
+        "cwlVersion": "v1.2",
+        "class": "Workflow",
+        "id": "workflow-2",
+        "inputs": {},
+        "outputs": {},
+        "steps": {}
+    }
+
+    content, content_type = create_multipart_deploy([workflow1, workflow2])
+
+    # Verify content was created
+    assert isinstance(content, bytes)
+    assert "multipart/related" in content_type
+
+    # First workflow should be the main one
+    assert "start=workflow-0" in content_type
