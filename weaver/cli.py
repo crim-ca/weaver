@@ -728,7 +728,6 @@ class WeaverClient(object):
                     else:
                         raise PackageRegistrationError(f"Invalid CWL item: {cwl_item}")
 
-                    # Validate the CWL
                     if not isinstance(cwl_data, dict) or cwl_data.get("cwlVersion") is None:
                         raise PackageRegistrationError("Invalid CWL structure in multi-CWL deployment.")
 
@@ -744,7 +743,6 @@ class WeaverClient(object):
                 headers["Content-Type"] = content_type
                 return OperationResult(True, process_id or "multi-cwl", multipart_content, headers=headers)
 
-            # Handle single CWL (existing logic)
             if isinstance(cwl, list) and len(cwl) == 1:
                 cwl = cwl[0]  # Unwrap single-item list
 
