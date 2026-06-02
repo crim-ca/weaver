@@ -82,7 +82,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Tuple, Union
+    from typing import Dict, List, Optional, Tuple, Union
 
     from docker.client import DockerClient
 
