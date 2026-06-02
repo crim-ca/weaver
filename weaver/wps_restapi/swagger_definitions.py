@@ -835,8 +835,7 @@ class AcceptLanguageHeader(ExtendedSchemaNode):
 
 class AcceptProfileOneOf(OneOf):
     def __call__(self, node, value):
-        if isinstance(value, str):
-            value = value.strip("<>")
+        value = value.strip("<>")
         return super().__call__(node, value)
 
 
