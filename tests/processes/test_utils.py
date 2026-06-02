@@ -1118,7 +1118,7 @@ def test_resolve_deployment_order_single_workflow():
     workflow = {"class": "Workflow", "id": "test-workflow"}
     tools, main_workflow = resolve_deployment_order([workflow])
 
-    assert tools == []
+    assert not tools
     assert main_workflow == workflow
 
 
@@ -1181,7 +1181,7 @@ def test_resolve_deployment_order_no_packages():
     Test resolve_deployment_order with empty list.
     """
     tools, main_workflow = resolve_deployment_order([])
-    assert tools == []
+    assert not tools
     assert main_workflow is None
 
 
@@ -1265,7 +1265,7 @@ def test_parse_multipart_deploy_no_start_parameter_non_workflow(caplog):
 
     content_type = f"multipart/related; boundary={boundary}"  # multipart/related without start parameter
 
-    cwl_packages, process_desc = parse_multipart_deploy(
+    cwl_packages, _ = parse_multipart_deploy(
         multipart_body, content_type, request=None
     )
 
