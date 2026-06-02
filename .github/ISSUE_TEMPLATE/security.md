@@ -1,10 +1,8 @@
 ---
-
 name: Security and Vulnerability Report
 about: Report a problem regarding security or identified vulnerabilities in code or dependencies.
 labels: triage/security
 assignees: fmigneault
-
 ---
 
 ## Describe the security issue
@@ -13,7 +11,7 @@ assignees: fmigneault
 
 ## How to Reproduce
 
-<!-- 
+<!--
 Steps to reproduce the issue:
 1. '...'
 2. '...'
@@ -30,7 +28,7 @@ Steps to reproduce the issue:
 
 ## Context
 
-<!-- 
+<!--
     If applicable, add screenshots or drag-drop files to help explain the problem.
     Also, please provide any of the following information if relevant.
 
