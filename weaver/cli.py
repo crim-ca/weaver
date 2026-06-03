@@ -1073,9 +1073,12 @@ class WeaverClient(object):
             inserted into the body (i.e.: ``executionUnit``). If provided without additional :paramref:`body`,
             it instead be used as-is for the request body with the corresponding :term:`CWL` :term:`Media-Type`.
             If an embedded ``executionUnit`` containing the :term:`CWL` is desired, provide ``body={}`` explicitly.
-            Can also be a list of :term:`CWL` definitions (dicts, strings, or file paths) for multi-process
-            deployment, which will be combined into a multipart request. When deploying multiple CWL files,
-            the workflow (if present) should be last in the list, and all tools should come before it.
+            Can also be a ``list`` of :term:`CWL` definitions (``dict``, ``str``,
+            or file paths) for multi-:term:`Process` deployment, which will be combined into a ``multipart`` request.
+            When deploying multiple :term:`CWL` files, at least one ``Workflow`` definition is required. The order
+            does not matter as tools are automatically deployed before workflows. The ``Workflow`` will be deployed as the main
+            :term:`Process` with the requested deployment ID, while ``CommandLineTool`` definitions are deployed as
+            supporting processes referenced by the ``Workflow``.
         :param wps:
             URL to an existing :term:`WPS` process (WPS-1/2 or WPS-REST/OGC-API) to represent as
             equivalent :term:`OGC API - Processes` representation. Note that it is up to the server to perform the
@@ -3628,11 +3631,11 @@ def make_parser():
     )
     op_deploy_app_pkg = op_deploy.add_mutually_exclusive_group()
     op_deploy_app_pkg.add_argument(
-        "--cwl", dest="cwl", nargs="+", metavar="CWL_FILE",
+        "--cwl", dest="cwl", action="append", metavar="CWL_FILE",
         help="Application Package of the process defined using Common Workflow Language (CWL) as JSON or YAML "
              "format when provided by file reference. File reference can be a local file or URL location. "
              "Can also be provided as literal string contents formatted as JSON. "
-             "Multiple CWL files can be provided (space-separated) to create a multi-CWL deployment with "
+             "Multiple CWL files can be provided (by repeating --cwl) to create a multi-CWL deployment with "
              "nested workflows and tools. When multiple files are provided, they will be packaged as multipart "
              "content for deployment. "
              "Provided contents will be inserted into an automatically generated request deploy body if none was "

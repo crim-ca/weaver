@@ -1466,9 +1466,9 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     def test_deploy_process_CWL_direct_graph_multi_simple(self):
         """
-        Test deployment of multiple CWL definitions via $graph (simple case with 2 tools).
+        Test deployment of multiple CWL definitions via ``$graph`` (simple case with 2 ``CommandLineTool`` definitions).
 
-        This validates that $graph with multiple items is accepted and deployed.
+        This validates that ``$graph`` with multiple items is accepted and deployed.
         """
         test_id = self.fully_qualified_test_name()
         cwl = {
@@ -1528,10 +1528,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     def test_deploy_process_CWL_direct_graph_multi_valid(self):
         """
-        Test deployment of multiple CWL definitions via $graph.
+        Test deployment of multiple CWL definitions via ``$graph``.
 
-        This test validates that multiple CommandLineTool definitions can be deployed
-        along with a Workflow that references them.
+        This test validates that multiple ``CommandLineTool`` definitions can be deployed
+        along with a ``Workflow`` that references them.
         """
         test_id = self.fully_qualified_test_name()
         # Create a complete workflow with multiple steps
@@ -1654,10 +1654,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     def test_deploy_process_CWL_multipart(self):
         """
-        Test deployment of multiple CWL files via multipart/mixed request.
+        Test deployment of multiple CWL files via ``multipart/mixed`` request.
 
-        This validates that multipart deployment can be used to deploy a workflow
-        with its dependent tools in a single request.
+        This validates that multipart deployment can be used to deploy a ``Workflow``
+        with its dependent ``CommandLineTool`` definitions in a single request.
         """
         test_id = self.fully_qualified_test_name()
 
@@ -1919,10 +1919,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     def test_deploy_process_CWL_direct_graph_multi_invalid(self):
         """
-        Test that deployment of multiple Workflows via $graph is rejected.
+        Test that deployment of multiple ``Workflow`` definitions via ``$graph`` is rejected.
 
-        This test validates that attempting to deploy multiple Workflow definitions
-        in a single $graph fails with an appropriate error, since only one Workflow
+        This test validates that attempting to deploy multiple ``Workflow`` definitions
+        in a single ``$graph`` fails with an appropriate error, since only one ``Workflow``
         is allowed per deployment.
         """
         # Create a $graph with multiple Workflows (invalid)

@@ -323,16 +323,18 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
         raise HTTPUnprocessableEntity(detail=msg)
 
 
-# Multi-deployment support for nested processes and $graph (https://github.com/crim-ca/weaver/issues/56)
-#   see also: https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents
 def resolve_cwl_graph(package):
     # type: (CWL) -> Union[CWL, List[CWL]]
     """
-    Resolve CWL $graph into deployable packages.
+    Resolve :term:`CWL` ``$graph`` into deployable packages.
 
     :returns:
-        - Single CWL dict if no $graph or $graph with 1 item (backward compatible)
-        - List of CWL dicts if $graph contains multiple items
+        - Single :term:`CWL` ``dict`` if no ``$graph`` or ``$graph`` with 1 item (backward compatible)
+        - ``list`` of :term:`CWL` ``dict`` items if ``$graph`` contains multiple items
+
+    .. seealso::
+        - `#56 <https://github.com/crim-ca/weaver/issues/56>`_
+        - `CWL Packed Documents <https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents>`_
     """
     if "$graph" not in package:
         return package
@@ -362,14 +364,14 @@ def resolve_cwl_graph(package):
 def resolve_deployment_order(cwl_packages):
     # type: (List[CWL]) -> Tuple[List[CWL], Optional[CWL]]
     """
-    Determine deployment order for multiple CWL packages.
+    Determine deployment order for multiple :term:`CWL` packages.
 
-    :param cwl_packages: List of CWL package definitions to order.
+    :param cwl_packages: ``list`` of :term:`CWL` package definitions to order.
     :returns:
-        Tuple of (dependencies, main_workflow)
-        - dependencies: List of CommandLineTool/ExpressionTool to deploy first
-        - main_workflow: The main Workflow (if any) to deploy last, or None
-    :raises HTTPNotImplemented: If multiple Workflow definitions are provided.
+        ``tuple`` of (dependencies, main_workflow)
+        - dependencies: ``list`` of ``CommandLineTool``/``ExpressionTool`` to deploy first
+        - main_workflow: The main ``Workflow`` (if any) to deploy last, or ``None``
+    :raises HTTPNotImplemented: If multiple ``Workflow`` definitions are provided.
     """
     workflows = []
     tools = []
@@ -412,7 +414,7 @@ def resolve_deployment_order(cwl_packages):
 def _extract_multipart_boundary(content_type):
     # type: (str) -> str
     """
-    Extract boundary parameter from Content-Type header.
+    Extract ``boundary`` parameter from ``Content-Type`` header.
     """
     if "boundary=" not in content_type:
         raise HTTPBadRequest(json={
@@ -427,7 +429,7 @@ def _extract_multipart_boundary(content_type):
 def _get_multipart_content(content, request):
     # type: (Union[str, bytes], Optional[AnyRequestType]) -> bytes
     """
-    Get raw multipart content as bytes.
+    Get raw multipart content as ``bytes``.
     """
     if request is not None and hasattr(request, 'body'):
         return request.body
@@ -441,7 +443,7 @@ def _get_multipart_content(content, request):
 def _parse_multipart_part(part_content, part_content_type):
     # type: (str, str) -> Optional[JSON]
     """
-    Parse content from a multipart part.
+    Parse content from a multipart part as :term:`JSON` or YAML.
     """
     if 'yaml' in part_content_type.lower():
         return yaml.safe_load(part_content)
@@ -451,15 +453,17 @@ def _parse_multipart_part(part_content, part_content_type):
 def create_multipart_deploy(cwl_files, process_description=None, boundary=None):
     # type: (List[Union[str, CWL]], Optional[JSON], Optional[str]) -> Tuple[bytes, str]
     """
-    Create multipart/related deployment content from a list of CWL files.
+    Create ``multipart/related`` deployment content from a ``list`` of :term:`CWL` files.
 
     :param cwl_files:
-        List of CWL files. Each item can be:
-        - A file path (string) to a CWL file (will be loaded)
-        - A CWL dictionary (already parsed)
-    :param process_description: Optional process description metadata to include
-    :param boundary: Optional custom boundary string (auto-generated if not provided)
-    :returns: Tuple of (multipart content bytes, full Content-Type header with boundary)
+        ``list`` of :term:`CWL` files. Each item can be:
+
+        - A file path (``str``) to a :term:`CWL` file (will be loaded)
+        - A :term:`CWL` ``dict`` (already parsed)
+    :param process_description: Optional :term:`Process` description metadata to include
+    :param boundary: Optional custom ``boundary`` ``str`` (auto-generated if not provided)
+    :returns:
+        ``tuple`` of (multipart content ``bytes``, full ``Content-Type`` header with ``boundary``)
     """
     if not cwl_files:
         raise ValueError("At least one CWL file must be provided")
@@ -564,14 +568,16 @@ def _classify_multipart_part(part_data, cwl_packages, parts_order, parts_by_cid,
 def parse_multipart_deploy(content, content_type, request=None):
     # type: (Union[str, bytes], str, Optional[AnyRequestType]) -> Tuple[List[CWL], Optional[JSON]]
     """
-    Parse multipart/mixed or multipart/related deployment content.
+    Parse ``multipart/mixed`` or ``multipart/related`` deployment content.
 
-    Extracts CWL packages and optional process description from multipart request.
+    Extracts :term:`CWL` packages and optional :term:`Process` description from multipart request.
 
-    :param content: Raw multipart content (string or bytes)
-    :param content_type: Content-Type header value (must include boundary parameter)
+    :param content: Raw multipart content (``str`` or ``bytes``)
+    :param content_type: ``Content-Type`` header value (must include ``boundary`` parameter)
     :param request: Optional request object for extracting body
-    :returns: Tuple of (list of CWL packages, optional process description metadata)
+    :returns:
+        ``tuple`` of (``list`` of :term:`CWL` packages,
+        optional :term:`Process` description metadata)
     :raises HTTPBadRequest: If multipart content is malformed or invalid
     """
     boundary = _extract_multipart_boundary(content_type)
@@ -1098,11 +1104,11 @@ def _deploy_process_multi_cwl(
     original_graph_package,   # type: Optional[CWL]
 ):                            # type: (...) -> HTTPException
     """
-    Deploy multiple CWL packages from a $graph definition.
+    Deploy multiple :term:`CWL` packages from a ``$graph`` definition.
 
-    :param cwl_packages: List of resolved CWL package definitions.
-    :param process_info: Process information dict.
-    :param process_desc: Process description from payload.
+    :param cwl_packages: ``list`` of resolved :term:`CWL` package definitions.
+    :param process_info: :term:`Process` information ``dict``.
+    :param process_desc: :term:`Process` description from payload.
     :param payload_copy: Original payload copy.
     :param container: Application container.
     :param overwrite: Whether to overwrite existing processes.

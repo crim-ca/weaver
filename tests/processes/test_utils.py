@@ -484,7 +484,7 @@ def test_classify_multipart_part_with_cwl_class():
 
 def test_classify_multipart_part_with_graph():
     """
-    Test classification of part with cwlVersion and $graph.
+    Test classification of part with ``cwlVersion`` and ``$graph``.
     """
     part_data = {
         "cwlVersion": "v1.2",
@@ -1046,7 +1046,7 @@ def test_create_multipart_deploy_with_file_paths(tmp_path):
 
 def test_resolve_cwl_graph_no_graph():
     """
-    Test resolve_cwl_graph returns package as-is when no $graph is present.
+    Test ``resolve_cwl_graph`` returns package as-is when no ``$graph`` is present.
     """
     package = {
         "cwlVersion": "v1.2",
@@ -1059,7 +1059,7 @@ def test_resolve_cwl_graph_no_graph():
 
 def test_resolve_cwl_graph_with_non_list_graph():
     """
-    Test resolve_cwl_graph returns package as-is when $graph is not a list.
+    Test ``resolve_cwl_graph`` returns package as-is when ``$graph`` is not a list.
     """
     package = {
         "cwlVersion": "v1.2",
@@ -1072,7 +1072,7 @@ def test_resolve_cwl_graph_with_non_list_graph():
 
 def test_resolve_cwl_graph_single_item():
     """
-    Test resolve_cwl_graph unpacks single-item $graph.
+    Test ``resolve_cwl_graph`` unpacks single-item ``$graph``.
     """
     package = {
         "cwlVersion": "v1.2",
@@ -1093,7 +1093,7 @@ def test_resolve_cwl_graph_single_item():
 
 def test_resolve_cwl_graph_multiple_items():
     """
-    Test resolve_cwl_graph returns list for multiple items in $graph.
+    Test ``resolve_cwl_graph`` returns list for multiple items in ``$graph``.
     """
     package = {
         "cwlVersion": "v1.2",

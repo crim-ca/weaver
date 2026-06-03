@@ -451,7 +451,7 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_deploy_multi_cwl(self):
         """
-        Test deploying multiple CWL files (workflow with tools) using the CLI.
+        Test deploying multiple CWL files (``Workflow`` with ``CommandLineTool`` definitions) using the CLI.
         """
         # Create tool CWL definitions
         tool1_id = f"{self.test_process_prefix}tool-1"
@@ -549,7 +549,7 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_deploy_multi_cwl_tools_only(self):
         """
-        Test deploying multiple CWL tool files using the CLI.
+        Test deploying multiple CWL ``CommandLineTool`` files using the CLI.
         """
         tool1_id = f"{self.test_process_prefix}multi-tool-1"
         tool1_cwl = {
@@ -606,6 +606,106 @@ class TestWeaverClient(TestWeaverClientBase):
         assert result.body["processSummary"]["id"] == tool1_id
         assert "deploymentDone" in result.body
         assert result.body["deploymentDone"] is True
+
+    def test_deploy_multi_cwl_cli(self):
+        """
+        Test deploying multiple CWL files using the CLI with repeated ``--cwl`` arguments.
+        """
+        tool1_id = f"{self.test_process_prefix}multi-cwl-cli-tool-1"
+        tool1_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": tool1_id,
+            "baseCommand": ["echo"],
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "debian:stretch-slim"
+                }
+            },
+            "inputs": {"input": {"type": "string", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "stdout"}},
+            "stdout": "output.txt"
+        }
+
+        tool2_id = f"{self.test_process_prefix}multi-cwl-cli-tool-2"
+        tool2_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": tool2_id,
+            "baseCommand": ["cat"],
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "debian:stretch-slim"
+                }
+            },
+            "inputs": {"file": {"type": "File", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "stdout"}},
+            "stdout": "output.txt"
+        }
+
+        workflow_id = f"{self.test_process_prefix}multi-cwl-cli-workflow"
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": workflow_id,
+            "inputs": {
+                "message": {"type": "string"}
+            },
+            "outputs": {
+                "result": {
+                    "type": "File",
+                    "outputSource": "step2/output"
+                }
+            },
+            "steps": {
+                "step1": {
+                    "run": tool1_id,
+                    "in": {"input": "message"},
+                    "out": ["output"]
+                },
+                "step2": {
+                    "run": tool2_id,
+                    "in": {"file": "step1/output"},
+                    "out": ["output"]
+                }
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tool1_path = os.path.join(tmp_dir, "tool-1.cwl")
+            tool2_path = os.path.join(tmp_dir, "tool-2.cwl")
+            workflow_path = os.path.join(tmp_dir, "workflow.cwl")
+
+            with open(tool1_path, "w", encoding="utf-8") as f:
+                json.dump(tool1_cwl, f)
+            with open(tool2_path, "w", encoding="utf-8") as f:
+                json.dump(tool2_cwl, f)
+            with open(workflow_path, "w", encoding="utf-8") as f:
+                json.dump(workflow_cwl, f)
+
+            # Deploy using multiple --cwl arguments
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    "deploy",
+                    "-u", self.url,
+                    "--cwl", tool1_path,
+                    "--cwl", tool2_path,
+                    "--cwl", workflow_path,
+                    "-D",  # avoid conflict just in case
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+
+        assert any(f"\"id\": \"{workflow_id}\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
+
+        # Verify the workflow was deployed
+        result = mocked_sub_requests(self.app, self.client.describe, workflow_id)
+        assert result.success
+        assert result.body["id"] == workflow_id
 
     def test_undeploy(self):
         # deploy a new process to leave the test one available

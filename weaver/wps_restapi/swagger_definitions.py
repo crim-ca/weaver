@@ -7390,14 +7390,13 @@ class CWLGraphList(ExtendedSequenceSchema):
     cwl = CWLGraphItem()
 
 
-# Multi-deployment support for nested processes and $graph (https://github.com/crim-ca/weaver/issues/56)
 class CWLGraphBase(ExtendedMappingSchema):
     graph = CWLGraphList(
         name="$graph", description=(
             "Graph definition that combines one or many CWL Application Packages within a single payload. "
             "If a single application is given (list of one item), it will be deployed as a single process. "
-            "If multiple applications are defined, the first SHOULD be a Workflow that references other items. "
-            "Child processes (CommandLineTool) will be deployed first, then the parent Workflow."
+            "If multiple applications are defined, at least one must be a Workflow. The order does not matter "
+            "as child processes (CommandLineTool) are automatically deployed first, then the parent Workflow."
         ),
         validator=Length(min=1)
     )
