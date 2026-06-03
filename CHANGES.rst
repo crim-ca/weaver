@@ -20,13 +20,15 @@ Changes:
 - Add support for multiple ``executionUnit`` entries during `Process` deployment when provided with `CWL`-like
   media-types, allowing natural deployment of multi-file `Application Package` definitions.
 - Add support for `CWL` ``$graph`` representation with multiple entries, enabling deployment of workflows with
-  embedded step definitions without manual preprocessing.
+  embedded step definitions without manual preprocessing
+  (resolves `#56 <https://github.com/crim-ca/weaver/issues/56>`_).
 - Add validation during multipart deployment to ensure at least one ``class: Workflow`` is present and properly
   identified as the main workflow from media-type hints or ``Content-ID`` references.
-- Add `CLI` support for deploying multiple `CWL` files using ``--cwl`` arguments to automatically generate
+- Add `CLI` support for deploying multiple `CWL` files by repeating ``--cwl`` arguments to automatically generate
   ``multipart/related`` request payloads, simplifying deployment of workflows with multiple step definitions.
-  The `CLI` accepts a mixture of local `CWL` file paths (as `JSON` or `YAML` with appropriate ``Content-Type``
-  media-type parts) and remote references using ``Content-Location`` headers pointing to external `CWL` files to fetch.
+  The `CLI` accepts a mixture of local `CWL` file paths (as `JSON` or `YAML`) and remote URL references.
+  The server handles ``Content-Type`` media-type detection and ``Content-Location`` header processing for external
+  `CWL` files to fetch during deployment.
 - Add documentation details about `Job` single-output and transform formatting features.
 - Add documentation summary of relevant `Job` endpoints for quicker reference of available operations.
 - Set up `Weaver Agent Skills <https://github.com/crim-ca/weaver/agents/skills/>`_ based on
