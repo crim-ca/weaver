@@ -1179,7 +1179,7 @@ def test_resolve_deployment_order_multiple_workflows_error():
 def test_resolve_deployment_order_tools_only_error():
     """
     Test resolve_deployment_order raises error when only tools are provided (no workflow).
-    
+
     Related to: https://github.com/crim-ca/weaver/issues/171
     """
     tool1 = {"class": "CommandLineTool", "id": "tool-1"}

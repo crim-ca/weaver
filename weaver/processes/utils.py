@@ -389,7 +389,8 @@ def resolve_deployment_order(cwl_packages):
             "value": [wf.get("id") for wf in workflows]
         })
 
-    # FIXME: Temporarily require at least one Workflow in multi-CWL deployments (https://github.com/crim-ca/weaver/issues/171).
+    # FIXME: Temporarily require at least one Workflow in multi-CWL deployments.
+    #        See: https://github.com/crim-ca/weaver/issues/171
     #        If multiple sub-Workflow do not work directly, keep this limit.
     #        Otherwise, allow tool-only deployments and demonstrate multi-workflow deployment.
     if len(workflows) == 0:
