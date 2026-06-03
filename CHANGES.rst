@@ -29,7 +29,7 @@ Fixes:
 ------
 - Update ``cwl-utils>=0.42`` to handle internal ``TypeError`` on ``None`` reference when processing `CWL` definitions
   with JavaScript parser. This is mostly to avoid sporadic ``check-links`` errors when generating documentation details,
-  which is the only place it has been observed so far, not within in actual :term:`Process` runtimes (relates
+  which is the only place it has been observed so far, not within in actual `Process` runtimes (relates
   to `common-workflow-language/cwl-utils#137 <https://github.com/common-workflow-language/cwl-utils/issues/137>`_).
 - Allow ``Accept-Profile`` reporting within `Job Inputs` parameters to contain ``<>`` without failing validation.
 
