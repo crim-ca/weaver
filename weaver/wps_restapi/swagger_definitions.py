@@ -833,19 +833,27 @@ class AcceptLanguageHeader(ExtendedSchemaNode):
     default = AcceptLanguage.EN_CA  # FIXME: oneOf validator for supported languages (?)
 
 
+class AcceptProfileOneOf(OneOf):
+    def __call__(self, node, value):
+        value = value.strip("<>")
+        return super().__call__(node, value)
+
+
 class AcceptProfileHeader(URI):
     name = "Accept-Profile"
     default = None
-    validator = OneOf([
-        OGC_API_PROC_PROFILE_PROC_DESC_URI,
-        OGC_API_PROC_PROFILE_PROC_LIST_URI,
-        OGC_API_PROC_PROFILE_EXECUTE_URI,
-        OGC_API_PROC_PROFILE_RESULTS_URI,
-        OGC_API_PROC_PROFILE_JOB_DESC_URI,
-        OGC_API_PROC_PROFILE_JOB_LIST_URI,
-        OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
-        OPENEO_API_SCHEMA_JOB_STATUS_URI,
-    ])
+    validator = AcceptProfileOneOf(
+        choices=[
+            OGC_API_PROC_PROFILE_PROC_DESC_URI,
+            OGC_API_PROC_PROFILE_PROC_LIST_URI,
+            OGC_API_PROC_PROFILE_EXECUTE_URI,
+            OGC_API_PROC_PROFILE_RESULTS_URI,
+            OGC_API_PROC_PROFILE_JOB_DESC_URI,
+            OGC_API_PROC_PROFILE_JOB_LIST_URI,
+            OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
+            OPENEO_API_SCHEMA_JOB_STATUS_URI,
+        ]
+    )
 
 
 class JsonHeader(ExtendedMappingSchema):
