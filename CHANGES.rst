@@ -28,7 +28,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Allow ``Accept-Profile`` reporting within `Job Inputs` parameters to contain ``<>`` without failing validation.
 
 .. _changes_6.12.0:
 
