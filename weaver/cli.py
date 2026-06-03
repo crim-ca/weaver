@@ -1076,9 +1076,9 @@ class WeaverClient(object):
             Can also be a ``list`` of :term:`CWL` definitions (``dict``, ``str``,
             or file paths) for multi-:term:`Process` deployment, which will be combined into a ``multipart`` request.
             When deploying multiple :term:`CWL` files, at least one ``Workflow`` definition is required. The order
-            does not matter as tools are automatically deployed before workflows. The ``Workflow`` will be deployed as the main
-            :term:`Process` with the requested deployment ID, while ``CommandLineTool`` definitions are deployed as
-            supporting processes referenced by the ``Workflow``.
+            does not matter as tools are automatically deployed before workflows.
+            The ``Workflow`` will be deployed as the main :term:`Process` with the requested deployment ID, while
+            ``CommandLineTool`` definitions are deployed as supporting processes referenced by the ``Workflow``.
         :param wps:
             URL to an existing :term:`WPS` process (WPS-1/2 or WPS-REST/OGC-API) to represent as
             equivalent :term:`OGC API - Processes` representation. Note that it is up to the server to perform the
