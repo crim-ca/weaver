@@ -470,6 +470,9 @@ linkcheck_ignore = [
     "https://pavics.ouranos.ca/weaver/",
     "https://redoak.cs.toronto.edu/weaver/",
     "https://pavics.climatedata.ca/",
+    # ignore agent skills during docs build,
+    # links will be validated by local markdown checks instead
+    r"./\.agents/.*",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md
