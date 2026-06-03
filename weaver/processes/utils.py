@@ -509,7 +509,7 @@ def create_multipart_deploy(cwl_files, process_description=None, boundary=None):
 
 
 def _classify_multipart_part(part_data, cwl_packages, parts_order, parts_by_cid, content_id, process_description):
-    # type: (JSON, List[CWL], List, Dict, str, Optional[JSON]) -> Optional[JSON]
+    # type: (JSON, List[CWL], List, Dict[str, CWL], str, Optional[JSON]) -> Optional[JSON]
     """
     Classify parsed multipart part as CWL package or process description.
 
