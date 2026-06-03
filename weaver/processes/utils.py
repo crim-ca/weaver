@@ -389,7 +389,18 @@ def resolve_deployment_order(cwl_packages):
             "value": [wf.get("id") for wf in workflows]
         })
 
-    main_workflow = workflows[0] if workflows else None
+    # FIXME: Temporarily require at least one Workflow in multi-CWL deployments (https://github.com/crim-ca/weaver/issues/171).
+    #        If multiple sub-Workflow do not work directly, keep this limit.
+    #        Otherwise, allow tool-only deployments and demonstrate multi-workflow deployment.
+    if len(workflows) == 0:
+        raise HTTPBadRequest(json={
+            "title": "No Workflow definition in $graph.",
+            "description": "Multi-CWL deployment requires at least one Workflow definition.",
+            "cause": {"workflow_count": 0, "tool_count": len(tools)},
+            "value": [tool.get("id") for tool in tools]
+        })
+
+    main_workflow = workflows[0]
 
     # TODO: Implement topological sort based on workflow step dependencies
     # For now, deploy tools in order provided

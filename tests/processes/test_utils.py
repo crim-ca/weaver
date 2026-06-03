@@ -1176,13 +1176,33 @@ def test_resolve_deployment_order_multiple_workflows_error():
     assert "Multiple Workflow definitions" in exc_info.value.json.get("title", "")
 
 
+def test_resolve_deployment_order_tools_only_error():
+    """
+    Test resolve_deployment_order raises error when only tools are provided (no workflow).
+    
+    Related to: https://github.com/crim-ca/weaver/issues/171
+    """
+    tool1 = {"class": "CommandLineTool", "id": "tool-1"}
+    tool2 = {"class": "CommandLineTool", "id": "tool-2"}
+
+    with pytest.raises(HTTPBadRequest) as exc_info:
+        resolve_deployment_order([tool1, tool2])
+
+    assert exc_info.value.json is not None
+    assert "No Workflow definition" in exc_info.value.json.get("title", "")
+    assert exc_info.value.json.get("cause", {}).get("workflow_count") == 0
+    assert exc_info.value.json.get("cause", {}).get("tool_count") == 2
+
+
 def test_resolve_deployment_order_no_packages():
     """
-    Test resolve_deployment_order with empty list.
+    Test resolve_deployment_order with empty list raises error.
     """
-    tools, main_workflow = resolve_deployment_order([])
-    assert not tools
-    assert main_workflow is None
+    with pytest.raises(HTTPBadRequest) as exc_info:
+        resolve_deployment_order([])
+
+    assert exc_info.value.json is not None
+    assert "No Workflow definition" in exc_info.value.json.get("title", "")
 
 
 def test_classify_multipart_part_without_content_id():
