@@ -482,3 +482,23 @@ def test_nested_process_input(test_value, expect_result):
     schema = sd.Execute()
     result = schema.deserialize(test_value)
     assert result == expect_result
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {},
+        {"Accept-Profile": ""},
+        {"Accept-Profile": f"{sd.OGC_API_PROC_PROFILE_RESULTS_URI}"},
+        {"Accept-Profile": f"<{sd.OGC_API_PROC_PROFILE_RESULTS_URI}>"},
+    ]
+)
+def test_job_inputs_accept_profile_preserved(headers):
+    payload = {
+        "inputs": {},
+        "outputs": {},
+        "headers": headers,
+    }
+    result = sd.JobInputsBody().deserialize(payload)
+    profile = headers.get("Accept-Profile") or None
+    assert result["headers"]["Accept-Profile"] == profile

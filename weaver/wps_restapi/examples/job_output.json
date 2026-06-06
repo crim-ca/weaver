@@ -1,0 +1,52 @@
+{
+  "outputs": [
+    {
+      "href": "http://schema-example.com/wpsoutputs/14c68477-c3ed-4784-9c0f-a4c9e1344db5/output.txt",
+      "id": "output"
+    }
+  ],
+  "links": [
+    {
+      "type": "application/json",
+      "title": "Job status.",
+      "hreflang": "en-US",
+      "href": "http://schema-example.com/providers/hummingbird/processes/ncdump/jobs/14c68477-c3ed-4784-9c0f-a4c9e1344db5",
+      "rel": "status"
+    },
+    {
+      "type": "application/json",
+      "title": "Job logs.",
+      "hreflang": "en-US",
+      "href": "http://schema-example.com/providers/hummingbird/processes/ncdump/jobs/14c68477-c3ed-4784-9c0f-a4c9e1344db5/logs",
+      "rel": "logs"
+    },
+    {
+      "type": "application/json",
+      "title": "Job inputs.",
+      "hreflang": "en-US",
+      "href": "http://schema-example.com/providers/hummingbird/processes/ncdump/jobs/14c68477-c3ed-4784-9c0f-a4c9e1344db5/inputs",
+      "rel": "inputs"
+    },
+    {
+      "type": "application/json",
+      "title": "Job outputs.",
+      "hreflang": "en-US",
+      "href": "http://schema-example.com/providers/hummingbird/processes/ncdump/jobs/14c68477-c3ed-4784-9c0f-a4c9e1344db5/outputs",
+      "rel": "outputs"
+    },
+    {
+      "type": "application/json",
+      "title": "Job results.",
+      "hreflang": "en-US",
+      "href": "http://schema-example.com/providers/hummingbird/processes/ncdump/jobs/14c68477-c3ed-4784-9c0f-a4c9e1344db5/results",
+      "rel": "results"
+    },
+    {
+      "type": "application/json",
+      "title": "Job outputs.",
+      "hreflang": "en-US",
+      "href": "http://schema-example.com/providers/hummingbird/processes/ncdump/jobs/14c68477-c3ed-4784-9c0f-a4c9e1344db5/outputs",
+      "rel": "self"
+    }
+  ]
+}

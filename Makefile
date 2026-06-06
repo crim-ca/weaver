@@ -1,4 +1,4 @@
-VERSION ?= 6.11.0
+VERSION ?= 6.13.0
 
 # Included custom configs change the value of MAKEFILE_LIST
 # Extract the required reference beforehand so we can use it for help target
@@ -16,6 +16,7 @@ override APP_INI_DEFAULT := $(APP_ROOT)/config/$(APP_NAME).ini.example
 # guess OS (Linux, Darwin,...)
 OS_NAME := $(shell uname -s 2>/dev/null || echo "unknown")
 CPU_ARCH := $(shell uname -m 2>/dev/null || uname -p 2>/dev/null || echo "unknown")
+SUDO ?=
 
 # conda
 CONDA_CMD      ?= __EMPTY__
@@ -228,10 +229,10 @@ conda-env-export:		## export the conda environment
 install: install-all    ## alias for 'install-all' target
 
 .PHONY: install-run
-install-run: conda-install install-sys install-pkg install-raw 	## install requirements and application to run locally
+install-run: conda-install install-sys install-pkg install-raw install-dev ## install requirements and application to run locally
 
 .PHONY: install-all
-install-all: conda-install install-sys install-pkg install-pip install-dev  ## install application with all dependencies
+install-all: conda-install install-sys install-pkg install-pip install-dev ## install application with all dependencies
 
 .PHONY: install-doc
 install-doc: install-pip	## install documentation dependencies
@@ -240,7 +241,7 @@ install-doc: install-pip	## install documentation dependencies
 	@echo "Install with pip complete. Run documentation generation with 'make docs' target."
 
 .PHONY: install-dev
-install-dev: install-pip	## install development and test dependencies
+install-dev: install-pip install-transform 	## install development and test dependencies
 	@echo "Installing development packages with pip..."
 	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-dev.txt"'
 	@echo "Install with pip complete. Test service with 'make test*' variations."
@@ -274,25 +275,38 @@ install-raw:	## install without any requirements or dependencies (suppose everyt
 install-npm:	## install npm package manager and dependencies if they cannot be found
 	@[ -f "$(shell which npm)" ] || ( \
 		echo "Binary package manager npm not found. Attempting to install it."; \
-		apt-get install npm \
+		$(SUDO) apt-get install npm \
 	)
 
 .PHONY: install-npm-stylelint
 install-npm-stylelint: install-npm	## install stylelint dependency for 'check-css' target using npm
-	@[ `npm ls 2>/dev/null | grep stylelint-config-standard | grep -v UNMET | wc -l` = 1 ] || ( \
-		echo "Install required dependencies for CSS checks." && \
-		npm install --save-dev \
-	)
+	@echo "Install required dependencies for CSS checks."
+	@npm install --save-dev
 
 .PHONY: install-npm-remarklint
 install-npm-remarklint: install-npm		## install remark-lint dependency for 'check-md' target using npm
-	@[ `npm ls 2>/dev/null | grep remark-lint | grep -v UNMET | wc -l` = 1 ] || ( \
-		echo "Install required dependencies for Markdown checks." && \
-		npm install --save-dev \
+	@echo "Install required dependencies for Markdown checks."
+	@npm install --save-dev
+
+.PHONY: install-pip-mdformat
+install-pip-mdformat:	## install mdformat dependencies to fix line wrapping
+	@pip install $(cat "$(APP_ROOT)/requirements-dev.txt" | grep mdformat)
+
+.PHONY: install-transform
+install-transform: install-cairo-dependencies       # install-transform dependencies
+	@echo "Installing transformation dependencies..."
+	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-transform.txt" --no-cache-dir'
+	@echo "Install with pip complete."
+
+.PHONY: install-cairo-dependencies
+install-cairo-dependencies:   ## install required dependencies for Transformer
+	@[ -f "$(shell which cairo)" ] || ( \
+		echo "Binary package manager cairo not found. Attempting to install it."; \
+		$(SUDO) apt-get install libpangocairo-1.0-0 \
 	)
 
 .PHONY: install-dev-npm
-install-dev-npm: install-npm install-npm-remarklint install-npm-remarklint	## install all npm development dependencies
+install-dev-npm: install-npm install-npm-stylelint install-npm-remarklint	## install all npm development dependencies
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
@@ -545,7 +559,9 @@ check-lint-only: | mkdir-reports  	## check linting of code style
 	@bash -c '$(CONDA_CMD) \
 		pylint \
 			--rcfile="$(APP_ROOT)/.pylintrc" \
-			"$(APP_ROOT)/weaver" "$(APP_ROOT)/tests" \
+			--reports y \
+			"$(APP_ROOT)/" \
+			$(PYLINT_XARGS) \
 		1> >(tee "$(REPORTS_DIR)/check-lint.txt")'
 
 .PHONY: check-security-only
@@ -631,7 +647,11 @@ check-docstring-only: | mkdir-reports  ## check code docstring style and linting
 	@echo "Running docstring checks..."
 	@-rm -fr "$(REPORTS_DIR)/check-docstring.txt"
 	@bash -c '$(CONDA_CMD) \
-		pydocstyle --explain --config "$(APP_ROOT)/setup.cfg" "$(APP_ROOT)" \
+		pydocstyle \
+			--explain \
+			--config "$(APP_ROOT)/setup.cfg" \
+			--match-dir "^(node_submodules)" \
+			"$(APP_ROOT)" \
 		1> >(tee "$(REPORTS_DIR)/check-docstring.txt")'
 
 .PHONY: check-links-only
@@ -750,20 +770,15 @@ fix-css-only: | mkdir-reports 	## fix CSS linting problems automatically
 .PHONY: fix-css
 fix-css: install-npm-stylelint fix-css-only		## fix CSS linting problems after dependency installation
 
-# must pass 2 search paths because '<dir>/.<subdir>' are somehow not correctly detected with only the top-level <dir>
 .PHONY: fix-md-only
 fix-md-only: | mkdir-reports 	## fix Markdown linting problems automatically
-	@echo "Running Markdown style checks..."
-	@npx --no-install remark \
-		--output --frail \
-		--silently-ignore \
-		--rc-path "$(APP_ROOT)/package.json" \
-		--ignore-path "$(APP_ROOT)/.remarkignore" \
-		"$(APP_ROOT)" "$(APP_ROOT)/.*/" \
-		2>&1 | tee "$(REPORTS_DIR)/fixed-md.txt"
+	@echo "Wrapping long lines with mdformat..."
+	@mdformat "$(APP_ROOT)" 2>&1 | tee "$(REPORTS_DIR)/fixed-md.txt"
+	@echo "Running remark formatter..."
+	@npm run format-markdown 2>&1 | tee -a "$(REPORTS_DIR)/fixed-md.txt"
 
 .PHONY: fix-md
-fix-md: install-npm-remarklint fix-md-only	## fix Markdown linting problems after dependency installation
+fix-md: install-npm-remarklint install-pip-mdformat fix-md-only	## fix Markdown linting problems after dependency installation
 
 ## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 
@@ -1025,8 +1040,8 @@ docker-test: docker-build stop	## execute smoke test of built images (validate t
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) exec $(DOCKER_TEST_EXEC_ARGS) weaver bash /tests/run_tests.sh
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) stop
 
-.PHONY: docker-stat
-docker-stat:  ## query docker-compose images status (from 'docker-test')
+.PHONY: docker-status
+docker-status:  ## query docker-compose images status (from 'docker-test')
 	$(DOCKER_COMPOSE_CMD) $(DOCKER_TEST_COMPOSES) ps
 
 .PHONY: docker-clean
@@ -1126,8 +1141,8 @@ stop-worker: 		## stop worker instance(s) started with celery
 		echo "No worker pidfile ($(WORKER_PIDFILE)) - nothing to stop"; \
 	fi'
 
-.PHONY: stat
-stat: 		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
+.PHONY: status
+status:		## display processes with PID(s) of gunicorn (pserve) instance(s) running the application
 	@bash -c 'if [ -f "$(MANAGER_PIDFILE)" ]; then \
 		pid=$$(cat "$(MANAGER_PIDFILE)" 2>/dev/null || true); \
 		if [ -n "$$pid" ] && kill -0 $$pid 2>/dev/null; then \

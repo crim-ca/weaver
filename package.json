@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "check-markdown": "remark . -f -i .remarkignore",
+    "format-markdown": "remark . -f -i .remarkignore -o"
+  },
   "devDependencies": {
     "remark-cli": "^12.0.0",
     "remark-frontmatter": "^5.0.0",
@@ -6,6 +10,7 @@
     "remark-lint": "^10.0.1",
     "remark-lint-checkbox-content-indent": "^5.0.1",
     "remark-lint-maximum-line-length": "^4.1.1",
+    "remark-preset-lint-consistent": "^6.0.0",
     "remark-preset-lint-markdown-style-guide": "^6.0.1",
     "remark-preset-lint-recommended": "^7.0.1",
     "stylelint": "^17.9.0",
@@ -18,16 +23,17 @@
     "settings": {
       "bullet": "-",
       "fence": "`",
-      "fences": "true",
+      "fences": true,
       "listItemIndent": "mixed",
-      "incrementListMarker": "true",
-      "resourceLink": "true",
-      "rule": "-"
+      "incrementListMarker": true,
+      "resourceLink": true,
+      "rule": "-",
+      "paddedTable": true
     },
     "plugins": [
       "remark-gfm",
       "remark-frontmatter",
-      "remark-preset-lint-markdown-style-guide",
+      "remark-preset-lint-consistent",
       "remark-preset-lint-recommended",
       "remark-lint-list-item-content-indent",
       "remark-lint-checkbox-content-indent",
@@ -46,10 +52,6 @@
       [
         "lint-ordered-list-marker-style",
         "."
-      ],
-      [
-        "lint-ordered-list-marker-value",
-        "ordered"
       ],
       [
         "lint-unordered-list-marker-style",

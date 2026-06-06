@@ -12,9 +12,62 @@ Changes
 
 Changes:
 --------
-- Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded 
-  `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification 
-  following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification. 
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.13.0:
+
+`6.13.0 <https://github.com/crim-ca/weaver/tree/6.13.0>`_ (2026-06-06)
+====================================================================================================================
+
+Changes:
+--------
+- Add documentation details about `Job` single-output and transform formatting features.
+- Add documentation summary of relevant `Job` endpoints for quicker reference of available operations.
+- Set up `Weaver Agent Skills <https://github.com/crim-ca/weaver/agents/skills/>`_ based on
+  the `Agent Skill Specification <https://agentskills.io/specification>`_
+  to help AI agents interact with `Weaver` and its API more seamlessly.
+  - Integrates skills for the `CLI`, the Python ``WeaverClient`` and minimal ``curl`` endpoints for correspond commands.
+  - Integrates skills for common `CWL` design and debugging tasks, with alignment concerns for `Weaver` deployment.
+  - Integrates skills for code management and installation steps, including skills self-validation for extensibility.
+  - See also the configured `Context7 Documentation Updater for Weaver <https://context7.com/crim-ca/weaver>`_.
+- Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded
+  `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification
+  following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification.
+
+Fixes:
+------
+- Update ``cwl-utils>=0.42`` to handle internal ``TypeError`` on ``None`` reference when processing `CWL` definitions
+  with JavaScript parser. This is mostly to avoid sporadic ``check-links`` errors when generating documentation details,
+  which is the only place it has been observed so far, not within in actual `Process` runtimes (relates
+  to `common-workflow-language/cwl-utils#137 <https://github.com/common-workflow-language/cwl-utils/issues/137>`_).
+- Allow ``Accept-Profile`` reporting within `Job Inputs` parameters to contain ``<>`` without failing validation.
+
+.. _changes_6.12.0:
+
+`6.12.0 <https://github.com/crim-ca/weaver/tree/6.12.0>`_ (2026-05-25)
+====================================================================================================================
+
+Changes:
+--------
+- Add support for various GeoTIFF formats, allowing flexible handling and representation of GeoTIFFs in outputs
+  (fixes `#100 <https://github.com/crim-ca/weaver/issues/100>`_).
+- Add support for ``GET /jobs/{jobId}/results/{id}`` and ``GET /jobs/{jobId}/outputs/{id}`` routes to enable direct access to
+  individual `Job` result items by ID. This enhancement includes support alternate representations based on the ``Accept`` header.
+  If an alternate format (e.g., YAML for a JSON source) is requested it will be automatically generated and returned.
+- Return ``Link`` headers with ``rel="alternate"`` containing all possible output formats, allowing retrieval via query parameters
+  (e.g., ``/jobs/{jobId}/outputs/{id}?f=application/x-yaml``) (fixes `#18 <https://github.com/crim-ca/weaver/issues/18>`_).
+- Add ``weaver.formats.OutputFormat.CSV`` format support and extend ``OutputFormat.convert()`` method to handle CSV conversions
+  from JSON data structures.
+- Add ``weaver.transform`` module providing format conversion handlers for `Job` outputs. Output formats are dynamically
+  extended from the original `Process` definition to provide alternate result representations without modifying the deployed
+  `Process` metadata.
+- Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded
+  `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification
+  following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification.
   Job outputs now include ``digestMultibase`` for local files (resolves `#898 <https://github.com/crim-ca/weaver/issues/898>`_).
 - Add ``/per/core/process-exception-job-gone`` and ``/per/core/job-results-exception-job-gone``
   conformance definitions that allow the HTTP 410 status code for dismissed `Job` and their results.
@@ -3261,7 +3314,7 @@ Fixes:
 .. _changes_0.1.3:
 
 `0.1.3 <https://github.com/crim-ca/weaver/tree/0.1.3>`_ (2019-03-07)
-=========================================================================================================================
+====================================================================================================================
 
 - Add useful `Makefile` targets for deployment.
 - Add badges indications in ``README.rst`` for tracking from repo landing page.
@@ -3274,7 +3327,7 @@ Fixes:
 .. _changes_0.1.2:
 
 `0.1.2 <https://github.com/crim-ca/weaver/tree/0.1.2>`_ (2019-03-05)
-=========================================================================================================================
+====================================================================================================================
 
 - Introduce ``WPS1Requirement`` and corresponding ``Wps1Process`` to run a `WPS-1` process under `CWL`.
 - Remove `mongodb` requirement, assume it is running on an external service or docker image.
@@ -3285,7 +3338,7 @@ Fixes:
 .. _changes_0.1.1:
 
 `0.1.1 <https://github.com/crim-ca/weaver/tree/0.1.1>`_ (2019-03-04)
-=========================================================================================================================
+====================================================================================================================
 
 - Modify `Dockerfile` to use lighter ``debian:latest`` instead of ``birdhouse/bird-base:latest``.
 - Modify `Dockerfile` to reduce build time by reusing built image layers (requirements installation mostly).
@@ -3295,7 +3348,7 @@ Fixes:
 .. _changes_0.1.0:
 
 `0.1.0 <https://github.com/crim-ca/weaver/tree/0.1.0>`_ (2019-02-26)
-=========================================================================================================================
+====================================================================================================================
 
 - Initial Release. Based off `Twitcher`_ tag `ogc-0.4.7`.
 

@@ -37,6 +37,9 @@ feature/quotation:
   - '(Estimator|estimator)'
   - '(Estimation|estimation)'
 
+feature/provenance:
+  - '(Provenance|provenance)'
+
 feature/vault:
   - '(Vault|vault)'
 

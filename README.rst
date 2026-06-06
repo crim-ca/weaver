@@ -8,6 +8,7 @@ Weaver
 \| `Installation`_
 \| `Configuration`_
 \| `Documentation`_
+\| `Agent Skills`_
 \| `Extra Details & Sponsors`_
 \|
 
@@ -65,13 +66,13 @@ for each process.
     :alt: Requires Python 3.10+
     :target: https://www.python.org/getit
 
-.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/6.11.0.svg?logo=github
+.. |commits-since| image:: https://img.shields.io/github/commits-since/crim-ca/weaver/6.13.0.svg?logo=github
     :alt: Commits since latest release
-    :target: https://github.com/crim-ca/weaver/compare/6.11.0...master
+    :target: https://github.com/crim-ca/weaver/compare/6.13.0...master
 
-.. |version| image:: https://img.shields.io/badge/latest%20version-6.11.0-blue?logo=github
+.. |version| image:: https://img.shields.io/badge/latest%20version-6.13.0-blue?logo=github
     :alt: Latest Tagged Version
-    :target: https://github.com/crim-ca/weaver/tree/6.11.0
+    :target: https://github.com/crim-ca/weaver/tree/6.13.0
 
 .. |deps| image:: https://img.shields.io/librariesio/github/crim-ca/weaver?logo=librariesdotio&logoColor=white
     :alt: Libraries.io Dependencies Status
@@ -85,9 +86,9 @@ for each process.
     :alt: Github Actions CI Build Status (master branch)
     :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3Amaster
 
-.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=6.11.0&branch=6.11.0&logo=github
+.. |github_tagged| image:: https://img.shields.io/github/actions/workflow/status/crim-ca/weaver/tests.yml?label=6.13.0&branch=6.13.0&logo=github
     :alt: Github Actions CI Build Status (latest tag)
-    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A6.11.0
+    :target: https://github.com/crim-ca/weaver/actions?query=workflow%3ATests+branch%3A6.13.0
 
 .. |readthedocs_build_status| image:: https://img.shields.io/readthedocs/pavics-weaver?logo=readthedocs
     :alt: ReadTheDocs Build Status (master branch)
@@ -99,7 +100,7 @@ for each process.
 
 .. below shield will either indicate the targeted version or 'tag not found'
 .. since docker tags are pushed following manual builds by CI, they are not automatic and no build artifact exists
-.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/6.11.0?label=tag&logo=docker
+.. |docker_build_status| image:: https://img.shields.io/docker/v/pavics/weaver/6.13.0?label=tag&logo=docker
     :alt: Docker Build Status (latest version)
     :target: https://hub.docker.com/r/pavics/weaver/tags
 
@@ -294,12 +295,12 @@ For a prebuilt image, pull as follows:
 
 .. code-block:: shell
 
-    docker pull pavics/weaver:6.11.0
+    docker pull pavics/weaver:6.13.0
 
 For convenience, following tags are also available:
 
-- ``weaver:6.11.0-manager``: `Weaver` image that will run the API for WPS process and job management.
-- ``weaver:6.11.0-worker``: `Weaver` image that will run the process job runner application.
+- ``weaver:6.13.0-manager``: `Weaver` image that will run the API for WPS process and job management.
+- ``weaver:6.13.0-worker``: `Weaver` image that will run the process job runner application.
 
 Following links correspond to existing servers with `Weaver` configured as *EMS* or *ADES* instances respectively.
 
@@ -394,6 +395,34 @@ These are generated from corresponding information provided in `docs`_ source di
 .. _ReadTheDocs: https://pavics-weaver.readthedocs.io
 .. _`OpenAPI Specification`: https://pavics-weaver.readthedocs.io/en/latest/api.html
 .. _docs: ./docs
+
+-------------------------
+Agent Skills
+-------------------------
+
+Weaver provides **Agent Skills** (`.agents/skills/`_) - a standardized format following
+the `Agent Skills Specification`_
+for documenting capabilities that can be discovered and used by AI agents, IDEs, and automated systems.
+See `.agents/README.md`_ for usage instructions and skill creation guidelines.
+
+Each skill is self-contained with:
+
+- **YAML frontmatter** describing metadata (name, description, compatibility)
+- **Markdown documentation** with usage examples
+- **Optional supporting files** (scripts, references, assets)
+
+Each skill documents how to interact with Weaver:
+
+- **REST API** endpoints (e.g., ``POST /processes/{id}/execution``)
+- **CLI commands** (e.g., ``weaver execute -u $WEAVER_URL -p process-id``)
+- **Python client** methods (e.g., ``WeaverClient.execute(process_id="...")``)
+
+See also the configured `Context7 Documentation Updater for Weaver <https://context7.com/crim-ca/weaver>`_
+that can be referenced for contextually-indexed documentation from the source code.
+
+.. _.agents/skills/: ./.agents/skills/
+.. _.agents/README.md: ./.agents/README.md
+.. _Agent Skills Specification: https://agentskills.io/specification
 
 -------------------------
 Extra Details & Sponsors

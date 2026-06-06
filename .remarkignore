@@ -1,13 +1,32 @@
 # To save time scanning
 .idea/
 .vscode/
+.run/
+.tox/
+.git/
+.github/**/*.yaml
+.github/**/*.yml
 *.egg-info/
+build/
+dist/
 downloads/
 env/
-
-# actual items to ignore
+venv/
+__pycache__/
 .pytest_cache/
 node_modules/
 docs/_build/
 docs/build/
 reports/
+archive/
+
+# test resources
+tests/
+
+# temporary/generated files
+celerybeat-schedule.*
+WorkflowTestCase.log
+*.pyc
+*.pyo
+.coverage
+htmlcov/

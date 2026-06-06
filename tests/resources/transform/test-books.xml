@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bookstore>
+    <book id="1">
+        <title>Introduction to XML</title>
+        <author>John Doe</author>
+        <price>29.99</price>
+    </book>
+    <book id="2">
+        <title>Learning Python</title>
+        <author>Jane Smith</author>
+        <price>39.99</price>
+    </book>
+    <book id="3">
+        <title>Data Science Fundamentals</title>
+        <author>Emily Johnson</author>
+        <price>49.99</price>
+    </book>
+</bookstore>

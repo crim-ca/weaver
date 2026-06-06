@@ -6,10 +6,12 @@ import os
 import re
 import socket
 from functools import cache
+from io import StringIO
 from typing import TYPE_CHECKING, cast, overload
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
+import pandas as pd
 import yaml
 from json2xml.json2xml import Json2xml
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk
@@ -53,6 +55,7 @@ if TYPE_CHECKING:
         "TEXT", "text",
         "YML", "yml",
         "YAML", "yaml",
+        "CSV", "csv",
     ]
 
 LOGGER = logging.getLogger(__name__)
@@ -125,11 +128,13 @@ class ContentType(Constants):
     IMAGE_JPEG2000 = "image/jp2"
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
+    IMAGE_SVG_XML = "image/svg+xml"
     MULTIPART_ANY = "multipart/*"
     MULTIPART_FORM = "multipart/form-data"      # data/file upload
     MULTIPART_MIXED = "multipart/mixed"         # content of various types
     MULTIPART_RELATED = "multipart/related"     # content that contain cross-references with Content-ID (CID)
     TEXT_ENRICHED = "text/enriched"
+    TEXT_CSV = "text/csv"
     TEXT_HTML = "text/html"
     TEXT_PLAIN = "text/plain"
     TEXT_RICHTEXT = "text/richtext"
@@ -376,6 +381,10 @@ class OutputFormat(Constants):
     Representation as HTML content formatted as raw string without indentation or newlines.
     """)  # type: Literal["HTML+RAW", "html+raw"]
 
+    CSV = classproperty(fget=lambda self: "csv", doc="""
+    Representation as :term:`CSV` content formatted as string.
+    """)  # type: Literal["CSV", "csv"]
+
     @classmethod
     def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
             format_or_version,      # type: Union[str, AnyOutputFormat, AnyContentType, PropertyDataTypeT]
@@ -421,6 +430,7 @@ class OutputFormat(Constants):
             Unused for other representations.
         :return: Formatted output.
         """
+
         from weaver.utils import bytes2str
 
         fmt = cls.get(to)
@@ -446,6 +456,11 @@ class OutputFormat(Constants):
             if yml.endswith("\n...\n"):  # added when data is single literal or None instead of list/object
                 yml = yml[:-4]
             return yml
+        if fmt == OutputFormat.CSV:
+            df = pd.json_normalize(data) if isinstance(data, dict) else pd.DataFrame(data)
+            csv_buffer = StringIO()
+            df.to_csv(csv_buffer, index=False)
+            return csv_buffer.getvalue()
         return data  # pragma: no cover  # last resort if new output format unhandled
 
 
@@ -468,6 +483,7 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_OCTET_STREAM: ".bin",
     ContentType.APP_FORM: "",
     ContentType.MULTIPART_FORM: "",
+    ContentType.IMAGE_SVG_XML: ".svg",
 }
 _CONTENT_TYPE_FORMAT_OVERRIDES = {
     # align encoding with PyWPS variant

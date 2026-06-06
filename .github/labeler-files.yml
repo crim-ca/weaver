@@ -5,11 +5,17 @@
 ## CI
 # all automation-related steps and files
 
+triage/agents:
+  - changed-files:
+    - any-glob-to-any-file:
+      - ".agents/**"
+
 ci/operations:
   - changed-files:
     - any-glob-to-any-file:
       - '.*'  # all '.<>' files
       - '.github/**'
+      - '.agents/**'
       - 'MANIFEST.in'
       - 'hooks/**/*'
       - 'Makefile*'
@@ -113,6 +119,13 @@ feature/job:
       - 'weaver/sort.py'
       - 'weaver/wps_restapi/jobs/**/*'
       - 'weaver/wps_restapi/templates/notification_email_example.mako'
+
+feature/provenance:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/provenance.py'
+      - 'weaver/wps_restapi/examples/job_prov*'
+      - 'weaver/wps_restapi/jobs/prov.py'
 
 feature/providers:
   - changed-files:
