@@ -4,6 +4,7 @@ Unit test for :mod:`weaver.cli` utilities.
 import argparse
 import base64
 import contextlib
+import copy
 import inspect
 import itertools
 import json
@@ -11,6 +12,7 @@ import os
 import tempfile
 import uuid
 from contextlib import ExitStack
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 import mock
@@ -30,6 +32,11 @@ from weaver.cli import (
 )
 from weaver.exceptions import AuthenticationError
 from weaver.formats import ContentEncoding, ContentType, get_cwl_file_format
+
+if TYPE_CHECKING:
+    from typing import List, Optional, Tuple, Union
+
+    from weaver.typedefs import ExecutionResults
 
 
 @pytest.mark.cli
@@ -1244,7 +1251,7 @@ def test_auth_request_handler_no_url_or_token_init():
         BearerAuthHandler(token=str(uuid.uuid4()))  # OK
         BearerAuthHandler(url="https://example.com")  # OK
     except Exception as exc:
-        pytest.fail(msg=f"Expected no init error from valid combinations. Got [{exc}]")
+        pytest.fail(f"Expected no init error from valid combinations. Got [{exc}]")
 
 
 @pytest.mark.cli
@@ -1486,3 +1493,682 @@ def test_cli_version_non_weaver():
         result = WeaverClient(url="https://fake.domain.com").version()
     assert result.code == 404
     assert "Failed to obtain server version." in result.message
+
+
+@pytest.mark.cli
+def test_cli_replace_with_body():
+    """
+    Test replace operation with full body parameter.
+    """
+    test_body = {"processDescription": {"id": "test-process", "version": "2.0.0"}}
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "2.0.0"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response):
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", body=test_body)
+
+    assert result.success
+    assert result.code == 200
+
+
+@pytest.mark.cli
+def test_cli_replace_with_metadata_kvp():
+    """
+    Test replace operation with metadata as key=value pairs.
+    """
+    metadata_list = ["title=Updated Title", "description=Updated description"]
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "1.0.1"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response):
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", metadata=metadata_list)
+
+    assert result.success
+    assert result.code == 200
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_with_inputs_outputs():
+    """
+    Test replace operation with inputs and outputs.
+    """
+    test_inputs = {"input1": {"title": "Input 1"}}
+    test_outputs = {"output1": {"title": "Output 1"}}
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "1.1.0"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response):
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", inputs=test_inputs, outputs=test_outputs)
+
+    assert result.success
+    assert result.code == 200
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_with_version():
+    """
+    Test replace operation with explicit version.
+    """
+    test_metadata = {"title": "Updated Title"}
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "3.0.0"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response):
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", metadata=test_metadata, version="3.0.0")
+
+    assert result.success
+    assert result.code == 200
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_with_http_method():
+    """
+    Test replace operation with explicit HTTP method selection.
+    """
+    test_metadata = {"title": "Updated"}
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response) as mock_req:
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", metadata=test_metadata, http_method="PATCH")
+
+    assert result.success
+    assert mock_req.call_args[0][0] == "PATCH"
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_no_parameters_error():
+    """
+    Test that replace operation fails when no update parameters are provided.
+    """
+    client = WeaverClient(url="https://fake.domain.com")
+    result = client.replace(process_id="test-process")
+
+    assert not result.success
+    assert "At least one field" in result.message
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_invalid_metadata_kvp():
+    """
+    Test that replace operation handles metadata KVP gracefully.
+
+    Note: parse_kvp treats 'key' without '=' as valid (empty list value),
+    so this just verifies the parsing succeeds but sends an empty array.
+    """
+    metadata_list = ["invalid_format"]  # Missing '=' - becomes key with empty list
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "1.0.1"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response) as mock_req:
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", metadata=metadata_list)
+
+    assert result.success
+    # Verify parse_kvp treated it as key with empty value
+    call_kwargs = mock_req.call_args[1]
+    payload = call_kwargs["json"]
+    assert "invalid_format" in payload
+    assert payload["invalid_format"] == []  # Empty list for key without value
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_with_complex_metadata_field():
+    """
+    Test replace operation with complex metadata field (list of metadata objects).
+    Tests both link format (rel+href) and value format to showcase the distinction.
+    """
+    metadata_updates = {
+        "metadata": [
+            # Link-based metadata (href describes where to find information)
+            {"role": "https://schema.org/author", "rel": "author",
+             "href": "https://orcid.org/0000-0000-0000-0000", "title": "Author ORCID"},
+            # Value-based metadata (actual value/data)
+            {"role": "https://schema.org/name", "value": "John Doe"},
+            {"role": "https://schema.org/codeRepository",
+             "rel": "repository", "href": "https://github.com/org/repo"}
+        ]
+    }
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "1.0.1"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response) as mock_req:
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", metadata=metadata_updates)
+
+    assert result.success
+    # Verify the request payload contains the metadata field
+    call_kwargs = mock_req.call_args[1]
+    assert "json" in call_kwargs
+    payload = call_kwargs["json"]
+    assert "metadata" in payload
+    assert len(payload["metadata"]) == 3
+    # Verify link format entries
+    assert payload["metadata"][0]["role"] == "https://schema.org/author"
+    assert payload["metadata"][0]["rel"] == "author"
+    assert payload["metadata"][0]["href"] == "https://orcid.org/0000-0000-0000-0000"
+    assert payload["metadata"][0]["title"] == "Author ORCID"
+    # Verify value format entry
+    assert payload["metadata"][1]["role"] == "https://schema.org/name"
+    assert payload["metadata"][1]["value"] == "John Doe"
+    # Verify another link
+    assert payload["metadata"][2]["role"] == "https://schema.org/codeRepository"
+    assert payload["metadata"][2]["rel"] == "repository"
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_with_links():
+    """
+    Test replace operation with links field.
+    """
+    metadata_updates = {
+        "links": [
+            {"rel": "service-doc", "href": "https://example.com/docs", "type": "text/html"},
+            {"rel": "license", "href": "https://example.com/license"}
+        ]
+    }
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "1.0.1"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response) as mock_req:
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", metadata=metadata_updates)
+
+    assert result.success
+    call_kwargs = mock_req.call_args[1]
+    payload = call_kwargs["json"]
+    assert "links" in payload
+    assert len(payload["links"]) == 2
+    assert payload["links"][0]["rel"] == "service-doc"
+    assert payload["links"][1]["rel"] == "license"
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_with_keywords():
+    """
+    Test replace operation with keywords field.
+    """
+    metadata_updates = {"keywords": ["climate", "weather", "temperature"]}
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "1.0.1"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response) as mock_req:
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", metadata=metadata_updates)
+
+    assert result.success
+    call_kwargs = mock_req.call_args[1]
+    payload = call_kwargs["json"]
+    assert "keywords" in payload
+    assert payload["keywords"] == ["climate", "weather", "temperature"]
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_with_job_control_options():
+    """
+    Test replace operation with jobControlOptions (MINOR-level change).
+    """
+    metadata_updates = {"jobControlOptions": ["async-execute", "sync-execute"]}
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "1.1.0"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response) as mock_req:
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", metadata=metadata_updates)
+
+    assert result.success
+    call_kwargs = mock_req.call_args[1]
+    payload = call_kwargs["json"]
+    assert "jobControlOptions" in payload
+    assert payload["jobControlOptions"] == ["async-execute", "sync-execute"]
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_with_visibility():
+    """
+    Test replace operation with visibility field (MINOR-level change).
+    """
+    metadata_updates = {"visibility": "public"}
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "1.1.0"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response) as mock_req:
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", metadata=metadata_updates)
+
+    assert result.success
+    call_kwargs = mock_req.call_args[1]
+    payload = call_kwargs["json"]
+    assert "visibility" in payload
+    assert payload["visibility"] == "public"
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_additive_body_and_metadata():
+    """
+    Test that body and metadata parameters are additive (metadata overlays body).
+    """
+    test_body = {"processDescription": {"id": "test-process", "title": "Original Title", "version": "2.0.0"}}
+    metadata_updates = {"title": "Override Title", "keywords": ["new-tag"]}
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "2.0.0"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response) as mock_req:
+        client = WeaverClient(url="https://fake.domain.com")
+        # Mock the body parsing to avoid needing full deployment logic
+        with mock.patch.object(client, "_parse_deploy_body", return_value=OperationResult(True, body=test_body)):
+            with mock.patch.object(client, "_parse_deploy_package", return_value=OperationResult(True, body=test_body)):
+                result = client.replace(process_id="test-process", body=test_body, metadata=metadata_updates)
+
+    assert result.success
+    call_kwargs = mock_req.call_args[1]
+    payload = call_kwargs["json"]
+    # Verify metadata fields override body fields
+    assert payload["title"] == "Override Title"
+    assert payload["keywords"] == ["new-tag"]
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_with_metadata_json_string():
+    """
+    Test replace operation with metadata provided as JSON string.
+    """
+    metadata_json = '{"title": "JSON Title", "description": "JSON Description", "keywords": ["json", "test"]}'
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "1.1.0"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response) as mock_req:
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", metadata=metadata_json)
+
+    assert result.success
+    call_kwargs = mock_req.call_args[1]
+    payload = call_kwargs["json"]
+    assert payload["title"] == "JSON Title"
+    assert payload["description"] == "JSON Description"
+    assert payload["keywords"] == ["json", "test"]
+
+
+@pytest.mark.cli
+def test_cli_replace_with_metadata_file():
+    """
+    Test replace operation with metadata loaded from file.
+    """
+    metadata_dict = {
+        "title": "File Title",
+        "metadata": [
+            {"role": "https://schema.org/license", "rel": "license", "href": "https://example.com/license"}
+        ]
+    }
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "1.0.1"})
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp_file:
+        json.dump(metadata_dict, tmp_file)
+        tmp_file.flush()
+        tmp_path = tmp_file.name
+
+    try:
+        with mock.patch("weaver.cli.request_extra", return_value=mock_response) as mock_req:
+            client = WeaverClient(url="https://fake.domain.com")
+            result = client.replace(process_id="test-process", metadata=tmp_path)
+
+        assert result.success
+        call_kwargs = mock_req.call_args[1]
+        payload = call_kwargs["json"]
+        assert payload["title"] == "File Title"
+        assert "metadata" in payload
+        assert len(payload["metadata"]) == 1
+    finally:
+        os.unlink(tmp_path)
+
+
+@pytest.mark.cli
+@pytest.mark.oap_part2
+def test_cli_replace_multiple_fields_combined():
+    """
+    Test replace operation combining multiple field types.
+    """
+    metadata_updates = {
+        "title": "Combined Title",
+        "keywords": ["tag1", "tag2"],
+        "metadata": [{"role": "https://schema.org/author", "rel": "author",
+                      "href": "https://orcid.org/0000-0000-0000-0000", "title": "Author ORCID"}],
+        "links": [{"rel": "about", "href": "https://example.com/about"}],
+        "visibility": "public"
+    }
+    mock_response = MockedResponse(status_code=200, json_body={"id": "test-process", "version": "1.1.0"})
+
+    with mock.patch("weaver.cli.request_extra", return_value=mock_response) as mock_req:
+        client = WeaverClient(url="https://fake.domain.com")
+        result = client.replace(process_id="test-process", metadata=metadata_updates)
+
+    assert result.success
+    call_kwargs = mock_req.call_args[1]
+    payload = call_kwargs["json"]
+    assert payload["title"] == "Combined Title"
+    assert payload["keywords"] == ["tag1", "tag2"]
+    assert len(payload["metadata"]) == 1
+    assert len(payload["links"]) == 1
+    assert payload["visibility"] == "public"
+
+
+@pytest.mark.cli
+@pytest.mark.parametrize(
+    ["outputs", "output_ids", "expect_success", "expect_result", "expect_error_msg"],
+    [
+        # No filtering - return unchanged
+        (
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output2": [{"href": "http://example.com/data2"}, {"href": "http://example.com/data3"}]
+            },
+            None,
+            True,
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output2": [{"href": "http://example.com/data2"}, {"href": "http://example.com/data3"}]
+            },
+            None
+        ),
+        # Simple ID filtering
+        (
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output2": {"href": "http://example.com/data2"},
+                "output3": {"href": "http://example.com/data3"}
+            },
+            ["output1", "output3"],
+            True,
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output3": {"href": "http://example.com/data3"}
+            },
+            None
+        ),
+        # Array with specific indices (with None placeholders)
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"},
+                    {"href": "http://example.com/data2"},
+                    {"href": "http://example.com/data3"}
+                ]
+            },
+            [("output1", 1), ("output1", 3)],
+            True,
+            {
+                "output1": [
+                    None,
+                    {"href": "http://example.com/data1"},
+                    None,
+                    {"href": "http://example.com/data3"}
+                ]
+            },
+            None
+        ),
+        # Array preserve length with None placeholders
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"},
+                    {"href": "http://example.com/data2"}
+                ]
+            },
+            [("output1", 0), ("output1", 2)],
+            True,
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    None,
+                    {"href": "http://example.com/data2"}
+                ]
+            },
+            None
+        ),
+        # Single value with index 0 (allowed)
+        (
+            {"output1": {"href": "http://example.com/data"}},
+            [("output1", 0)],
+            True,
+            {"output1": {"href": "http://example.com/data"}},
+            None
+        ),
+        # Single value with invalid index (error)
+        (
+            {"output1": {"href": "http://example.com/data"}},
+            [("output1", 1)],
+            False,
+            None,
+            "not an array"
+        ),
+        # Array index out of range (error)
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"}
+                ]
+            },
+            [("output1", 5)],
+            False,
+            None,
+            "out of range"
+        ),
+        # Negative array index (error)
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"}
+                ]
+            },
+            [("output1", -1)],
+            False,
+            None,
+            "out of range"
+        ),
+        # Mixed simple and indexed IDs
+        (
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output2": [
+                    {"href": "http://example.com/data2-0"},
+                    {"href": "http://example.com/data2-1"},
+                    {"href": "http://example.com/data2-2"}
+                ],
+                "output3": {"href": "http://example.com/data3"}
+            },
+            ["output1", ("output2", 1)],
+            True,
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output2": [
+                    None,
+                    {"href": "http://example.com/data2-1"},
+                    None
+                ]
+            },
+            None
+        ),
+        # Multiple indices for same output
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"},
+                    {"href": "http://example.com/data2"},
+                    {"href": "http://example.com/data3"},
+                    {"href": "http://example.com/data4"}
+                ]
+            },
+            [("output1", 0), ("output1", 2), ("output1", 4)],
+            True,
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    None,
+                    {"href": "http://example.com/data2"},
+                    None,
+                    {"href": "http://example.com/data4"}
+                ]
+            },
+            None
+        ),
+        # Non-existent output ID (filtered out)
+        (
+            {
+                "output1": {"href": "http://example.com/data1"},
+                "output2": {"href": "http://example.com/data2"}
+            },
+            ["output1", "output999"],
+            True,
+            {"output1": {"href": "http://example.com/data1"}},
+            None
+        ),
+        # Empty array with index (error)
+        (
+            {"output1": []},
+            [("output1", 0)],
+            False,
+            None,
+            "out of range"
+        ),
+        # Single element array
+        (
+            {"output1": [{"href": "http://example.com/data0"}]},
+            [("output1", 0)],
+            True,
+            {"output1": [{"href": "http://example.com/data0"}]},
+            None
+        ),
+        # Simple values (string literals)
+        (
+            {"out1": "val1", "out2": "val2", "out3": "val3"},
+            ["out1", "out3"],
+            True,
+            {"out1": "val1", "out3": "val3"},
+            None
+        ),
+        # Array with string values
+        (
+            {"out1": ["a", "b", "c"]},
+            [("out1", 0), ("out1", 2)],
+            True,
+            {"out1": ["a", None, "c"]},
+            None
+        ),
+        # Array without index - returns full array, filters other outputs
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"},
+                    {"href": "http://example.com/data2"}
+                ],
+                "output2": {"href": "http://example.com/other"},
+                "output3": ["a", "b", "c"]
+            },
+            ["output1"],
+            True,
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"},
+                    {"href": "http://example.com/data2"}
+                ]
+            },
+            None
+        ),
+        # Single value without index - returns as-is, filters other outputs
+        (
+            {
+                "output1": {"href": "http://example.com/data"},
+                "output2": ["a", "b"],
+                "output3": {"href": "http://example.com/other"}
+            },
+            ["output1"],
+            True,
+            {"output1": {"href": "http://example.com/data"}},
+            None
+        ),
+        # Array with index 0 - returns only that element with None placeholders, filters other outputs
+        (
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    {"href": "http://example.com/data1"},
+                    {"href": "http://example.com/data2"}
+                ],
+                "output2": {"href": "http://example.com/other"},
+                "output3": ["x", "y", "z"]
+            },
+            [("output1", 0)],
+            True,
+            {
+                "output1": [
+                    {"href": "http://example.com/data0"},
+                    None,
+                    None
+                ]
+            },
+            None
+        ),
+        # Mix of array without index and single value without index
+        (
+            {
+                "arr1": ["a", "b", "c"],
+                "single1": "value1",
+                "arr2": [1, 2, 3, 4],
+                "single2": "value2",
+                "arr3": ["x", "y"]
+            },
+            ["arr1", "single1", "arr2"],
+            True,
+            {
+                "arr1": ["a", "b", "c"],
+                "single1": "value1",
+                "arr2": [1, 2, 3, 4]
+            },
+            None
+        ),
+        # Mix of array with index and array without index
+        (
+            {
+                "arr1": ["a", "b", "c"],
+                "arr2": [1, 2, 3, 4],
+                "arr3": ["x", "y", "z"]
+            },
+            ["arr1", ("arr2", 1), ("arr2", 3)],
+            True,
+            {
+                "arr1": ["a", "b", "c"],
+                "arr2": [None, 2, None, 4]
+            },
+            None
+        ),
+    ]
+)
+def test_filter_outputs(
+    outputs,            # type: ExecutionResults
+    output_ids,         # type: Optional[List[Union[str, Tuple[str, int]]]]
+    expect_success,     # type: bool
+    expect_result,      # type: Optional[ExecutionResults]
+    expect_error_msg,   # type: Optional[str]
+):                      # type: (...) -> None
+    outputs_copy = copy.deepcopy(outputs)
+    result = WeaverClient._filter_outputs(outputs_copy, output_ids)
+
+    assert isinstance(result, OperationResult)
+    if expect_success:
+        assert result.success
+        assert result.body == expect_result
+    else:
+        assert not result.success
+        if expect_error_msg:
+            assert expect_error_msg in result.message.lower()
