@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.13.0:
+
+`6.13.0 <https://github.com/crim-ca/weaver/tree/6.13.0>`_ (2026-06-06)
+====================================================================================================================
+
+Changes:
+--------
 - Add documentation details about `Job` single-output and transform formatting features.
 - Add documentation summary of relevant `Job` endpoints for quicker reference of available operations.
 - Set up `Weaver Agent Skills <https://github.com/crim-ca/weaver/agents/skills/>`_ based on
