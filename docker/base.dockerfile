@@ -1,3 +1,30 @@
+FROM node:24-slim AS node-runtime
+
+FROM python:3.13-slim AS py-build
+
+# setup paths
+ENV APP_DIR=/opt/local/src/weaver
+ENV APP_CONFIG_DIR=${APP_DIR}/config
+ENV APP_ENV_DIR=${APP_DIR}/env
+WORKDIR ${APP_DIR}
+
+# obtain source files
+COPY weaver/__init__.py weaver/__meta__.py ${APP_DIR}/weaver/
+COPY requirements* setup.py README.rst CHANGES.rst ${APP_DIR}/
+
+# install package dependencies (build stage)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        netbase \
+        gcc \
+        g++ \
+        git \
+        libpangocairo-1.0-0 \
+    && pip install --no-cache-dir --upgrade -r requirements-sys.txt \
+    && pip install --no-cache-dir -r requirements.txt -r requirements-transform.txt \
+    && pip install --no-cache-dir -e ${APP_DIR} \
+    && rm -rf /var/lib/apt/lists/*
+
 FROM python:3.13-slim
 LABEL description.short="Weaver Base"
 LABEL description.long="Workflow Execution Management Service (EMS); Application, Deployment and Execution Service (ADES)"
@@ -11,33 +38,26 @@ ENV APP_CONFIG_DIR=${APP_DIR}/config
 ENV APP_ENV_DIR=${APP_DIR}/env
 WORKDIR ${APP_DIR}
 
-# obtain source files
-COPY weaver/__init__.py weaver/__meta__.py ${APP_DIR}/weaver/
-COPY requirements* setup.py README.rst CHANGES.rst ${APP_DIR}/
-
-# install runtime/package dependencies
+# install runtime system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         netbase \
-        gcc \
-        g++ \
-        git \
-        nodejs \
         libpangocairo-1.0-0 \
-    && pip install --no-cache-dir --upgrade -r requirements-sys.txt \
-    && pip install --no-cache-dir -r requirements.txt -r requirements-transform.txt \
-    && pip install --no-cache-dir -e ${APP_DIR} \
-    && apt-get remove -y \
-        gcc \
-        g++ \
-        git \
-    && apt-get autoremove -y \
+    && apt-get purge -y --allow-remove-essential \
+        perl-base \
     && rm -rf /var/lib/apt/lists/*
+
+# copy pre-installed python dependencies from build stage
+COPY --from=py-build /usr/local /usr/local
+
+# provide Node.js runtime for inline CWL JavaScript execution
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+RUN ln -s /usr/local/bin/node /usr/local/bin/nodejs || true
 
 # install package
 COPY ./ ${APP_DIR}
 # equivalent of `make install` without conda env and pre-installed packages
-RUN pip install --no-dependencies -e ${APP_DIR}
+RUN pip install --no-dependencies --no-cache-dir ${APP_DIR}
 
 # backward-compatibility mapping for 'importlib.metadata' dist/package name resolution
 # this allows existing 'weaver.ini' to point at 'weaver' rather than 'crim-weaver' for pserve and celery INI

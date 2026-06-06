@@ -3,10 +3,8 @@ FROM ${DOCKER_BASE}
 LABEL description.short="Weaver Worker"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        apt-transport-https \
         curl \
         gnupg \
-        gnupg-agent \
     # NOTE: Only 'worker' image should be using docker, 'manager' is only for API. \
     && install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
@@ -21,11 +19,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     #   Only install CLI package, 'docker-ce' and 'containerd.io' not required as they should be provided by host.
     #   Docker sibling execution is expected. See 'docker/docker-compose.yml.example' for details.
     && apt-get install -y --no-install-recommends docker-ce-cli \
-    && apt-get dist-upgrade -y \
-    && apt-get remove -y \
+    && rm -f /etc/apt/sources.list.d/docker.list \
+    && rm -f /etc/apt/keyrings/docker.gpg \
+    && apt-get purge -y --auto-remove \
+        curl \
         gnupg \
-        gnupg-agent \
-    && apt-get autoremove -y \
+    # harden runtime image by removing package manager tooling after all required installs are complete
+    && apt-get purge -y --allow-remove-essential \
+        apt \
+        libapt-pkg7.0 \
     && rm -rf /var/lib/apt/lists/*
 
 # run app
