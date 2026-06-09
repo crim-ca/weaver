@@ -12,7 +12,23 @@ Changes
 
 Changes:
 --------
-- No change.
+- Rename Dockerfiles from ``docker/Dockerfile-{base,manager,worker}``
+  to ``docker/{base,manager,worker}.dockerfile`` for a consistent naming and file extension scheme.
+- Refactor ``docker/base.dockerfile`` to a multi-stage build keeping build-only tooling out of runtime
+  while preserving Python app execution and Node.js support for `CWL` JavaScript evaluation.
+- Reduce Docker image sizes compared to ``6.12.0`` by about ``19%`` overall:
+  - ``manager`` image from ~1214 MB to ~976 MB.
+  - ``worker`` image from ~1261 MB to ~1023 MB.
+- Harden Docker images by removing unnecessary package-management tooling and bootstrap packages
+  after install steps (e.g.: ``apt``, ``libapt-pkg``, ``perl-base``, ``curl``, ``gnupg``).
+- Harden Docker runtime by removing ``pip`` and ``ensurepip`` after all required install steps,
+  while keeping ``setuptools``/``pkg_resources`` for ``pyramid`` compatibility.
+- Update Python dependency cleanup logic to recursively remove non-empty directories of unnecessary files
+  (e.g.: ``__pycache__``, ``tests``/``test``) to reduce Docker image size.
+- Switch PDF text generation fallback font in ``weaver/transform/handlers.py`` from ``Arial`` to ``Helvetica``
+  to avoid dependency on system-installed fonts in runtime images, since installed fonts are removed.
+- Update Docker smoke-tests to employ ``unittest`` since ``pytest`` is no longer available as runtime
+  installation and execution, due to installation tooling removal. These tests also validate the tooling removal.
 
 Fixes:
 ------

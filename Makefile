@@ -955,7 +955,7 @@ docker-build-base: $(DOCKER_BUILDER_STEP)	## build the base docker image
 	docker build "$(APP_ROOT)" \
 		$(DOCKER_BUILDER_ARGS) \
 		$(DOCKER_BUILD_XARGS) \
-		-f "$(APP_ROOT)/docker/Dockerfile-base" \
+		-f "$(APP_ROOT)/docker/base.dockerfile" \
 		-t "$(DOCKER_REPO):$(APP_VERSION)"
 	@[ "$(DOCKER_TAG_ALIASES)" = "true" ] && ( \
 		( [ "$(APP_VERSION)" = "latest" ] || docker tag "$(DOCKER_REPO):$(APP_VERSION)" "$(DOCKER_REPO):latest" ) && \
@@ -969,7 +969,7 @@ docker-build-manager: $(DOCKER_BUILDER_STEP) docker-build-base		## build the man
 	docker build "$(APP_ROOT)" \
 		$(DOCKER_BUILDER_ARGS) \
 		$(DOCKER_BUILD_XARGS) \
-		-f "$(APP_ROOT)/docker/Dockerfile-manager" \
+		-f "$(APP_ROOT)/docker/manager.dockerfile" \
 		-t "$(DOCKER_REPO):$(APP_VERSION)-manager"
 	@[ "$(DOCKER_TAG_ALIASES)" = "true" ] && ( \
 		$(DOCKER_BUILDER_PULL) "$(DOCKER_REPO):$(APP_VERSION)-manager" && \
@@ -983,7 +983,7 @@ docker-build-worker: $(DOCKER_BUILDER_STEP) docker-build-base		## build the work
 	docker build "$(APP_ROOT)" \
 		$(DOCKER_BUILDER_ARGS) \
 		$(DOCKER_BUILD_XARGS) \
-		-f "$(APP_ROOT)/docker/Dockerfile-worker" \
+		-f "$(APP_ROOT)/docker/worker.dockerfile" \
 		-t "$(DOCKER_REPO):$(APP_VERSION)-worker"
 	@[ "$(DOCKER_TAG_ALIASES)" = "true" ] && ( \
 		$(DOCKER_BUILDER_PULL) "$(DOCKER_REPO):$(APP_VERSION)-worker" ] && \

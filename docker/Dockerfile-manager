@@ -1,5 +1,0 @@
-ARG DOCKER_BASE="weaver:base"
-FROM ${DOCKER_BASE}
-LABEL description.short="Weaver Manager"
-
-CMD pserve "${APP_CONFIG_DIR}/weaver.ini"
