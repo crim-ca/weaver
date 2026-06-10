@@ -1275,7 +1275,7 @@ class TestMultipartDeployment:
         Test resolve_deployment_order with empty list returns empty results.
         """
         tools, main_workflow = resolve_deployment_order([])
-        assert tools == []
+        assert not tools
         assert main_workflow is None
 
     def test_classify_multipart_part_without_content_id(self):
