@@ -429,7 +429,7 @@ class TestMultipartDeployment:
         # Test with invalid type
         (12345, None, None, True),
     ], ids=["bytes", "string", "request_body", "invalid_type"])
-    def test_get_ultipart_content(self, content, request_obj, expected, should_raise):
+    def test_get_multipart_content(self, content, request_obj, expected, should_raise):
         """
         Test _get_multipart_content with various input types.
         """

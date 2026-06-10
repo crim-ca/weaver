@@ -404,7 +404,7 @@ def resolve_deployment_order(cwl_packages):
         main_tool = None
         for tool in tools:
             tool_id = tool.get("id", "")
-            if tool_id == "#main" or tool_id == "main":
+            if tool_id in ("#main", "main"):
                 main_tool = tool
                 break
 
@@ -1118,28 +1118,12 @@ def _deploy_process_multi_cwl(
     """
     LOGGER.info("Deploying multi-CWL package with %d definitions", len(cwl_packages))
 
-    # Resolve deployment order (tools first, workflow last)
-    tools, main_workflow = resolve_deployment_order(cwl_packages)
+    # Resolve deployment order (tools first, main process last)
+    # main_process is either the Workflow or the tool with id "#main"/"main"
+    tools, main_process_pkg = resolve_deployment_order(cwl_packages)
 
     restapi_url = get_wps_restapi_base_url(settings)
     deployed_processes = []
-
-    # Determine which process will be the main one
-    # If there's a workflow, that's the main; otherwise, find the tool with id "#main" or "main"
-    if main_workflow:
-        main_process_pkg = main_workflow
-    else:
-        # Find the tool with id "#main" or "main" (required by resolve_deployment_order validation)
-        main_process_pkg = None
-        for tool in tools:
-            tool_id = tool.get("id", "")
-            if tool_id == "#main" or tool_id == "main":
-                main_process_pkg = tool
-                break
-
-        if not main_process_pkg:
-            # This should not happen if resolve_deployment_order validation passed
-            raise HTTPBadRequest("No valid CWL definitions found in $graph")
 
     # Identify main process ID to avoid deploying it as a child
     main_process_id = main_process_pkg.get("id")
@@ -1186,8 +1170,9 @@ def _deploy_process_multi_cwl(
             LOGGER.error("Failed to deploy CWL tool %s: %s", tool_id, exc)
             raise
 
-    # Deploy main process (workflow or first tool if no workflow)
+    # Deploy main process (workflow or main tool)
     # For workflows, keep them in original $graph context for tool reference resolution
+    main_workflow = main_process_pkg if main_process_pkg and main_process_pkg.get("class") == "Workflow" else None
     if main_workflow and original_graph_package:
         # Create a minimal $graph with just the workflow (for validation)
         # The workflow can reference tools by ID (without #) as they're already deployed
