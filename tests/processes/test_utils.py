@@ -1174,7 +1174,7 @@ class TestMultipartDeployment:
 
     def test_resolve_cwl_graph_multiple_items(self):
         """
-        Test ``resolve_cwl_graph`` returns list for multiple items in ``$graph``.
+        Test ``resolve_cwl_graph`` returns tuple of (list, original) for multiple items in ``$graph``.
         """
         package = {
             "cwlVersion": "v1.2",
@@ -1184,12 +1184,18 @@ class TestMultipartDeployment:
             ]
         }
         result = resolve_cwl_graph(package)
-        assert isinstance(result, list)
+        assert isinstance(result, tuple)
         assert len(result) == 2
-        assert result[0]["id"] == "tool-1"
-        assert result[0]["cwlVersion"] == "v1.2"
-        assert result[1]["id"] == "workflow-1"
-        assert result[1]["cwlVersion"] == "v1.2"
+        resolved_items, original_package = result
+        assert isinstance(resolved_items, list)
+        assert len(resolved_items) == 2
+        assert resolved_items[0]["id"] == "tool-1"
+        assert resolved_items[0]["cwlVersion"] == "v1.2"
+        assert resolved_items[1]["id"] == "workflow-1"
+        assert resolved_items[1]["cwlVersion"] == "v1.2"
+        # Original package should be preserved
+        assert original_package == package
+        assert "$graph" in original_package
 
     def test_resolve_deployment_order_single_workflow(self):
         """

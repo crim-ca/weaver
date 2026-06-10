@@ -324,13 +324,13 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
 
 
 def resolve_cwl_graph(package):
-    # type: (CWL) -> Union[CWL, List[CWL]]
+    # type: (CWL) -> Union[CWL, List[CWL], Tuple[List[CWL], CWL]]
     """
     Resolve :term:`CWL` ``$graph`` into deployable packages.
 
     :returns:
         - Single :term:`CWL` ``dict`` if no ``$graph`` or ``$graph`` with 1 item (backward compatible)
-        - ``list`` of :term:`CWL` ``dict`` items if ``$graph`` contains multiple items
+        - ``tuple`` of (``list`` of :term:`CWL` ``dict`` items, original package with ``$graph``) if multiple items
 
     .. seealso::
         - `#56 <https://github.com/crim-ca/weaver/issues/56>`_
@@ -349,7 +349,7 @@ def resolve_cwl_graph(package):
         cwl_base.update(graph_items[0])
         return cwl_base
 
-    # Multiple items: return list for multi-deployment
+    # Multiple items: return list with original package for workflow reference resolution
     # Each item inherits top-level fields (e.g., cwlVersion)
     cwl_base = {k: v for k, v in package.items() if k != "$graph"}
     resolved_items = []
@@ -358,7 +358,7 @@ def resolve_cwl_graph(package):
         cwl_item.update(item)
         resolved_items.append(cwl_item)
 
-    return resolved_items
+    return resolved_items, package
 
 
 def resolve_deployment_order(cwl_packages):
@@ -399,9 +399,9 @@ def resolve_deployment_order(cwl_packages):
     #        See: https://github.com/crim-ca/weaver/issues/171
     #        If multiple sub-Workflow do not work directly, keep this limit.
     #        Otherwise, allow tool-only deployments and demonstrate multi-workflow deployment.
+    main_tool = None
     if len(cwl_packages) > 1 and len(workflows) == 0:
         # Check if any tool has id "#main" or "main"
-        main_tool = None
         for tool in tools:
             tool_id = tool.get("id", "")
             if tool_id in ("#main", "main"):
@@ -419,7 +419,7 @@ def resolve_deployment_order(cwl_packages):
                 "value": [tool.get("id") for tool in tools]
             })
 
-    main_workflow = workflows[0] if workflows else None
+    main_workflow = workflows[0] if workflows else main_tool
     return tools, main_workflow
 
 
@@ -562,6 +562,100 @@ def _classify_multipart_part(part_data, cwl_packages, parts_order, parts_by_cid,
     return process_description or part_data
 
 
+def _validate_and_reorder_multipart_workflow(cwl_packages, root_workflow_cid, parts_by_cid):
+    # type: (List[CWL], Optional[str], Dict[str, CWL]) -> List[CWL]
+    """
+    Validate and reorder :term:`CWL` packages based on root workflow reference.
+
+    Validates that the root document (specified by ``start`` parameter or first element) is a ``Workflow``
+    as per RFC 5621 requirements for ``multipart/related``.
+
+    :param cwl_packages: ``list`` of :term:`CWL` packages extracted from multipart content
+    :param root_workflow_cid: Content-ID of the root workflow from ``start`` parameter (if provided)
+    :param parts_by_cid: ``dict`` mapping Content-IDs to :term:`CWL` packages
+    :returns: Reordered ``list`` of :term:`CWL` packages with root workflow last
+    :raises HTTPBadRequest: If ``start`` parameter references a non-Workflow :term:`CWL`
+    """
+    if root_workflow_cid and root_workflow_cid in parts_by_cid:
+        root_pkg = parts_by_cid[root_workflow_cid]
+        # Validate that the root is actually a Workflow (per RFC 5621 and multipart/related requirements)
+        root_class = root_pkg.get("class", "")
+        if root_class != "Workflow":
+            raise HTTPBadRequest(json={
+                "title": "Invalid root workflow reference",
+                "description": (
+                    f"The 'start' parameter references a CWL with class '{root_class}', "
+                    "but only 'Workflow' is permitted as root document in multipart/related."
+                ),
+                "cause": {"Content-ID": root_workflow_cid, "class": root_class}
+            })
+        cwl_packages = [pkg for pkg in cwl_packages if pkg is not root_pkg]
+        cwl_packages.append(root_pkg)
+    elif not root_workflow_cid and cwl_packages:
+        # No explicit start parameter: validate first element is a Workflow (RFC 5621 §7 default)
+        first_pkg = cwl_packages[0]
+        first_class = first_pkg.get("class", "")
+        if first_class and first_class != "Workflow":
+            LOGGER.warning(
+                "No 'start' parameter provided in multipart/related. First element has class '%s' "
+                "but 'Workflow' is recommended for root document. Proceeding with deployment.",
+                first_class
+            )
+
+    return cwl_packages
+
+
+def _fetch_multipart_content_location(content_location, part_content):
+    # type: (str, str) -> str
+    """
+    Fetch :term:`CWL` content from Content-Location header if part body is empty.
+
+    Checks if part body is empty and Content-Location is a URL, then fetches the content from that location.
+    Content-Location can be a static :term:`CWL` file URL or an API endpoint (Weaver, WPS, OGC API).
+
+    :param content_location: Content-Location header value (URL or identifier)
+    :param part_content: Current part content (may be empty)
+    :returns: Updated part content (either original or fetched from Content-Location)
+    :raises HTTPBadRequest: If fetching from Content-Location fails
+    """
+    # Only fetch if part body is empty AND Content-Location looks like a URL
+    if not content_location or (part_content and part_content.strip()):
+        return part_content
+
+    # Content-Location must be a URL (not just an identifier)
+    if not any(content_location.startswith(scheme) for scheme in ["http://", "https://", "file://", "s3://"]):
+        LOGGER.debug(
+            "Content-Location [%s] is an identifier, not a URL. Using part body content.",
+            content_location
+        )
+        return part_content
+
+    LOGGER.debug("Fetching CWL from Content-Location: %s", content_location)
+    try:
+        # Content-Location can be:
+        # 1. A static CWL file URL (http/https/s3/file)
+        # 2. A Weaver process package endpoint (/processes/{pid}/package)
+        # 3. A WPS process endpoint (/wps?request=DescribeProcess&identifier=...)
+        # 4. An OGC API Processes endpoint
+
+        _, ext = os.path.splitext(content_location.split('?')[0])  # strip query params
+        if ext.replace('.', '') in PACKAGE_EXTENSIONS:
+            return load_file(content_location, text=True)
+
+        # Could be an API endpoint (Weaver, WPS, OGC API)
+        # Use the process definition resolver that handles all reference types
+        from weaver.processes.wps_package import _generate_process_with_cwl_from_reference
+        cwl_pkg, _ = _generate_process_with_cwl_from_reference(content_location)
+        return json.dumps(cwl_pkg) if isinstance(cwl_pkg, dict) else str(cwl_pkg)
+    except Exception as exc:
+        LOGGER.error("Failed to fetch content from Content-Location %s: %s", content_location, exc)
+        raise HTTPBadRequest(json={
+            "title": "Failed to fetch Content-Location",
+            "description": f"Could not retrieve CWL from Content-Location: {content_location}",
+            "cause": {"error": str(exc), "location": content_location}
+        })
+
+
 def parse_multipart_deploy(content, content_type, request=None):
     # type: (Union[str, bytes], str, Optional[AnyRequestType]) -> Tuple[List[CWL], Optional[JSON]]
     """
@@ -622,40 +716,8 @@ def parse_multipart_deploy(content, content_type, request=None):
                 # Fallback to utf-8 with error handling if charset is invalid/corrupted
                 part_content = part_content.decode('utf-8', errors='replace')
 
-        # Check if content should be fetched from Content-Location
-        # Only fetch if part body is empty AND Content-Location looks like a URL
-        if content_location and (not part_content or not part_content.strip()):
-            # Content-Location must be a URL (not just an identifier)
-            if any(content_location.startswith(scheme) for scheme in ["http://", "https://", "file://", "s3://"]):
-                LOGGER.debug("Fetching CWL from Content-Location: %s", content_location)
-                try:
-                    # Content-Location can be:
-                    # 1. A static CWL file URL (http/https/s3/file)
-                    # 2. A Weaver process package endpoint (/processes/{pid}/package)
-                    # 3. A WPS process endpoint (/wps?request=DescribeProcess&identifier=...)
-                    # 4. An OGC API Processes endpoint
-
-                    _, ext = os.path.splitext(content_location.split('?')[0])  # strip query params
-                    if ext.replace('.', '') in PACKAGE_EXTENSIONS:
-                        part_content = load_file(content_location, text=True)
-                    else:
-                        # Could be an API endpoint (Weaver, WPS, OGC API)
-                        # Use the process definition resolver that handles all reference types
-                        from weaver.processes.wps_package import _generate_process_with_cwl_from_reference
-                        cwl_pkg, _ = _generate_process_with_cwl_from_reference(content_location)
-                        part_content = json.dumps(cwl_pkg) if isinstance(cwl_pkg, dict) else str(cwl_pkg)
-                except Exception as exc:
-                    LOGGER.error("Failed to fetch content from Content-Location %s: %s", content_location, exc)
-                    raise HTTPBadRequest(json={
-                        "title": "Failed to fetch Content-Location",
-                        "description": f"Could not retrieve CWL from Content-Location: {content_location}",
-                        "cause": {"error": str(exc), "location": content_location}
-                    })
-            else:
-                LOGGER.debug(
-                    "Content-Location [%s] is an identifier, not a URL. Using part body content.",
-                    content_location
-                )
+        # Fetch content from Content-Location if part body is empty
+        part_content = _fetch_multipart_content_location(content_location, part_content)
 
         content_id = part.get('Content-ID', '').strip('<>')
 
@@ -679,32 +741,7 @@ def parse_multipart_deploy(content, content_type, request=None):
             "cause": {"parts_found": len(list(msg.get_payload()))}
         })
 
-    # Reorder if root workflow specified and validate it
-    if root_workflow_cid and root_workflow_cid in parts_by_cid:
-        root_pkg = parts_by_cid[root_workflow_cid]
-        # Validate that the root is actually a Workflow (per RFC 5621 and multipart/related requirements)
-        root_class = root_pkg.get("class", "")
-        if root_class != "Workflow":
-            raise HTTPBadRequest(json={
-                "title": "Invalid root workflow reference",
-                "description": (
-                    f"The 'start' parameter references a CWL with class '{root_class}', "
-                    "but only 'Workflow' is permitted as root document in multipart/related."
-                ),
-                "cause": {"Content-ID": root_workflow_cid, "class": root_class}
-            })
-        cwl_packages = [pkg for pkg in cwl_packages if pkg is not root_pkg]
-        cwl_packages.append(root_pkg)
-    elif not root_workflow_cid and cwl_packages:
-        # No explicit start parameter: validate first element is a Workflow (RFC 5621 §7 default)
-        first_pkg = cwl_packages[0]
-        first_class = first_pkg.get("class", "")
-        if first_class and first_class != "Workflow":
-            LOGGER.warning(
-                "No 'start' parameter provided in multipart/related. First element has class '%s' "
-                "but 'Workflow' is recommended for root document. Proceeding with deployment.",
-                first_class
-            )
+    cwl_packages = _validate_and_reorder_multipart_workflow(cwl_packages, root_workflow_cid, parts_by_cid)
 
     return cwl_packages, process_description
 
@@ -746,43 +783,44 @@ def parse_process_deploy_content(
             request=request
         )
 
-        # Return the CWL packages as a list (will be handled by multi-deployment logic)
-        # If there's process description metadata, we could merge it, but for now we focus on CWL
-        # The multi-deployment logic will handle the CWL packages
         if len(cwl_packages) == 1:
-            # Single CWL package - return as-is
+            # Single CWL package - use as-is
             # This avoids double-wrapping if the package already contains a $graph
-            return cwl_packages[0]
+            content = cwl_packages[0]
         else:
             # Multiple packages - return as list to be wrapped in $graph
-            return cwl_packages
+            content = cwl_packages
+        # Content is now parsed, skip to validation
+    else:
+        # Non-multipart content: parse from request or string
+        try:
+            if request is not None:
+                content = request.text
+                content_type = request.content_type
+            if content_type is not None and content_type_schema is not None:
+                content_type = content_type_schema().deserialize(content_type)
+            if isinstance(content, str):
+                content = yaml.safe_load(content)
+            if not isinstance(content, dict):
+                raise TypeError("Not a valid JSON body for process deployment.")
+        except colander.Invalid as exc:
+            raise HTTPUnsupportedMediaType(json={
+                "title": "Unsupported Media Type",
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/unsupported-media-type",
+                "detail": str(exc),
+                "status": HTTPUnsupportedMediaType.code,
+                "cause": {"Content-Type": None if content_type is None else str(content_type)},
+            })
+        except Exception as exc:
+            raise HTTPBadRequest(json={
+                "title": "Bad Request",
+                "type": "BadRequest",
+                "detail": "Unable to parse contents.",
+                "status": HTTPBadRequest.code,
+                "cause": str(exc),
+            })
 
-    try:
-        if request is not None:
-            content = request.text
-            content_type = request.content_type
-        if content_type is not None and content_type_schema is not None:
-            content_type = content_type_schema().deserialize(content_type)
-        if isinstance(content, str):
-            content = yaml.safe_load(content)
-        if not isinstance(content, dict):
-            raise TypeError("Not a valid JSON body for process deployment.")
-    except colander.Invalid as exc:
-        raise HTTPUnsupportedMediaType(json={
-            "title": "Unsupported Media Type",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/unsupported-media-type",
-            "detail": str(exc),
-            "status": HTTPUnsupportedMediaType.code,
-            "cause": {"Content-Type": None if content_type is None else str(content_type)},
-        })
-    except Exception as exc:
-        raise HTTPBadRequest(json={
-            "title": "Bad Request",
-            "type": "BadRequest",
-            "detail": "Unable to parse contents.",
-            "status": HTTPBadRequest.code,
-            "cause": str(exc),
-        })
+    # Validate content schema (applies to both multipart and non-multipart)
     try:
         if content_schema is not None:
             content = content_schema().deserialize(content)
@@ -911,12 +949,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
                 "value": repr_json(payload, force_string=False),
             })
         process_info = {"version": payload.pop("version", None)}
-        # Keep original payload with $graph for workflow validation
-        original_payload = deepcopy(payload) if "$graph" in payload else None
         package = resolve_cwl_graph(payload)
-        # Pass original payload alongside resolved packages for workflow reference resolution
-        if isinstance(package, list) and original_payload:
-            package = (package, original_payload)
         found = True
     else:  # ogc-apppkg type, but no explicit check since used by default (backward compat)
         if deployment_profile_name:  # optional hint
@@ -931,35 +964,49 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         if not isinstance(execution_units, list) or len(execution_units) < 1:
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
 
-        # Support multiple execution units for multi-deployment
-        execution_units_to_deploy = []
-        for execution_unit in execution_units:
+        # Handle multiple execution units similar to $graph multi-CWL deployment
+        if len(execution_units) == 1:
+            # Single execution unit
+            execution_unit = execution_units[0]
             if not isinstance(execution_unit, dict):
                 raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
-            unit_package = execution_unit.get("unit")
-            unit_reference = execution_unit.get("href")
-            # Collect all valid packages/references
-            if unit_package:
-                execution_units_to_deploy.append({"package": unit_package, "reference": None})
-            elif unit_reference:
-                execution_units_to_deploy.append({"package": None, "reference": unit_reference})
+            package = execution_unit.get("unit")
+            reference = execution_unit.get("href")
+            found = package or reference
+        else:
+            # Multiple execution units - must all be CWL packages for multi-deployment
+            # Behaves consistently with $graph: [cwl1, cwl2] deployment
+            packages = []
+            for idx, execution_unit in enumerate(execution_units):
+                if not isinstance(execution_unit, dict):
+                    raise HTTPUnprocessableEntity(f"Invalid parameter 'executionUnit[{idx}]'.")
+                unit_package = execution_unit.get("unit")
+                unit_reference = execution_unit.get("href")
 
-        if not execution_units_to_deploy:
-            raise HTTPBadRequest("No valid execution units found.")
+                if unit_reference:
+                    raise HTTPBadRequest(
+                        "Multiple execution units with 'href' references are not supported. "
+                        "Use 'unit' with CWL package definitions for multi-deployment."
+                    )
 
-        # For now, use first execution unit (backward compatible)
-        # Multi-execution unit deployment can be expanded later
-        package = execution_units_to_deploy[0]["package"]
-        reference = execution_units_to_deploy[0]["reference"]
-        found = package or reference
+                if not unit_package:
+                    raise HTTPBadRequest(f"Execution unit [{idx}] must contain a 'unit' with CWL package.")
 
-        # Log if multiple units provided (for future expansion)
-        if len(execution_units_to_deploy) > 1:
-            LOGGER.info(
-                "Multiple execution units provided (%d), currently only first unit is deployed. "
-                "Full multi-unit deployment support coming soon.",
-                len(execution_units_to_deploy)
-            )
+                # Validate it's a CWL package
+                if not isinstance(unit_package, dict):
+                    raise HTTPBadRequest(f"Execution unit [{idx}] 'unit' must be a CWL package definition.")
+                if "cwlVersion" not in unit_package:
+                    raise HTTPBadRequest(
+                        "Multiple execution units are only supported for CWL packages. "
+                        f"Execution unit [{idx}] must be a valid CWL definition with 'cwlVersion'."
+                    )
+
+                packages.append(unit_package)
+
+            # Return as list to trigger multi-CWL deployment (same as $graph)
+            package = packages
+            reference = None
+            found = True
     if not found:
         params = [
             "process (href)",
@@ -1186,7 +1233,12 @@ def _deploy_process_multi_cwl(
                         step_data["run"] = step_data["run"][1:]
         validate_pkg = workflow_standalone
     else:
-        validate_pkg = main_process_pkg
+        # For tool-only deployments with #main entry point, strip the # prefix
+        # The # is valid in packed CWL but not as a process identifier
+        validate_pkg = deepcopy(main_process_pkg)
+        if validate_pkg and "id" in validate_pkg and isinstance(validate_pkg["id"], str):
+            if validate_pkg["id"].startswith("#"):
+                validate_pkg["id"] = validate_pkg["id"][1:]
 
     workflow_info = _validate_deploy_process_info(deepcopy(process_info), None, validate_pkg, settings, headers)
     workflow_id = workflow_info["identifier"]
