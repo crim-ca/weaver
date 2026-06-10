@@ -929,11 +929,11 @@ class TestMultipartDeployment:
         boundary = "----Boundary123"
         # Create multipart with a valid CWL part and one with encoding issues
         valid_cwl = json.dumps(tool_cwl)
-        
+
         # Create a part with invalid UTF-8 that will trigger decode error handling
         # Use latin-1 encoding with high bytes that aren't valid UTF-8
         invalid_content = "test \xe9\xe0".encode('latin-1')  # Contains bytes invalid in UTF-8
-        
+
         multipart_body = (
             f"------Boundary123\r\n"
             f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
@@ -943,12 +943,12 @@ class TestMultipartDeployment:
             f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
             f"\r\n"
         ).encode('utf-8') + invalid_content + b"\r\n------Boundary123--\r\n"
-        
+
         content_type = f"multipart/mixed; boundary={boundary}"
 
         # Should handle decode error gracefully - valid CWL should be parsed, invalid part skipped
         cwl_packages, _ = parse_multipart_deploy(multipart_body, content_type, request=None)
-        
+
         # Should have successfully parsed the valid CWL package
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "test-tool"
