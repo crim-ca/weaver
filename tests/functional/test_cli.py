@@ -549,7 +549,13 @@ class TestWeaverClient(TestWeaverClientBase):
 
     def test_deploy_multi_cwl_tools_only(self):
         """
-        Test deploying multiple CWL ``CommandLineTool`` files using the CLI.
+        Test deploying multiple CWL ``CommandLineTool`` files without a workflow is rejected.
+
+        According to CWL packed document specification, when there's no workflow
+        and no ``#main`` entry point, deployment must fail.
+
+        .. seealso::
+            https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents
         """
         tool1_id = f"{self.test_process_prefix}multi-tool-1"
         tool1_cwl = {
@@ -592,7 +598,7 @@ class TestWeaverClient(TestWeaverClientBase):
             with open(tool2_path, "w", encoding="utf-8") as f:
                 json.dump(tool2_cwl, f)
 
-            # Deploy using list of CWL files - should deploy the first tool as main
+            # Deploy using list of CWL files - should fail without workflow or #main
             result = mocked_sub_requests(
                 self.app,
                 self.client.deploy,
@@ -600,12 +606,10 @@ class TestWeaverClient(TestWeaverClientBase):
                 cwl=[tool1_path, tool2_path]
             )
 
-        assert result.success
-        assert "processSummary" in result.body
-        # When deploying multiple tools without workflow, first tool becomes main
-        assert result.body["processSummary"]["id"] == tool1_id
-        assert "deploymentDone" in result.body
-        assert result.body["deploymentDone"] is True
+        # Should fail with 400 error for missing entry point
+        assert not result.success
+        assert result.code == 400
+        assert "No entry point in $graph" in result.text or "No Workflow definition" in result.text
 
     def test_deploy_multi_cwl_cli(self):
         """

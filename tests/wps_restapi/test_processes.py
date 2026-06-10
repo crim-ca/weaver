@@ -1466,9 +1466,13 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     def test_deploy_process_CWL_direct_graph_multi_simple(self):
         """
-        Test deployment of multiple CWL definitions via ``$graph`` (simple case with 2 ``CommandLineTool`` definitions).
+        Test deployment of multiple CWL definitions via ``$graph`` without entry point is rejected.
 
-        This validates that ``$graph`` with multiple items is accepted and deployed.
+        According to CWL packed document specification, when there's no top-level process
+        (as with ``$graph``) and no ``#main`` entry point, the runner must return an error.
+
+        .. seealso::
+            https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents
         """
         test_id = self.fully_qualified_test_name()
         cwl = {
@@ -1512,15 +1516,78 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         headers = {"Content-Type": ContentType.APP_CWL_JSON}
         resp = mocked_sub_requests(self.app, "post", "/processes", data=cwl, headers=headers,
                                    only_local=True)  # mock in case of TestApp self-reference URLs
-        assert resp.status_code == 201, f"Expected 201, got {resp.status_code}: {resp.json}"
+        assert resp.status_code == 400, \
+            f"Expected 400 Bad Request for $graph without #main entry point, got {resp.status_code}: {resp.json}"
+
+        result = resp.json
+        assert "title" in result
+        assert "No entry point in $graph" in result["title"]
+        assert "description" in result
+        assert "#main" in result["description"]
+
+    def test_deploy_process_CWL_direct_graph_multi_with_main(self):
+        """
+        Test deployment of multiple CWL definitions via ``$graph`` with ``#main`` entry point.
+
+        According to CWL packed document specification, when there's no top-level process
+        (as with ``$graph``), the runner should choose the process with ``id: "#main"``.
+        This test validates that deployment succeeds when ``#main`` is properly specified.
+
+        .. seealso::
+            https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents
+        """
+        test_id = self.fully_qualified_test_name()
+        cwl = {
+            "cwlVersion": "v1.2",
+            "$graph": [
+                {
+                    "class": "CommandLineTool",
+                    "id": "#main",  # Explicitly mark this as the entry point
+                    "inputs": {},
+                    "outputs": {
+                        "output": {
+                            "type": "File",
+                            "outputBinding": {"glob": "stdout.log"}
+                        }
+                    },
+                    "requirements": {
+                        "DockerRequirement": {"dockerPull": "python:3.12-alpine"}
+                    },
+                    "baseCommand": ["python3", "-V"],
+                    "stdout": "stdout.log"
+                },
+                {
+                    "class": "CommandLineTool",
+                    "id": f"{test_id}-tool-2",
+                    "inputs": {},
+                    "outputs": {
+                        "output": {
+                            "type": "File",
+                            "outputBinding": {"glob": "stdout.log"}
+                        }
+                    },
+                    "requirements": {
+                        "DockerRequirement": {"dockerPull": "alpine:latest"}
+                    },
+                    "baseCommand": ["echo", "hello"],
+                    "stdout": "stdout.log"
+                }
+            ]
+        }
+
+        headers = {"Content-Type": ContentType.APP_CWL_JSON}
+        resp = mocked_sub_requests(self.app, "post", "/processes", data=cwl, headers=headers,
+                                   only_local=True)  # mock in case of TestApp self-reference URLs
+        assert resp.status_code == 201, \
+            f"Expected 201 for $graph with #main entry point, got {resp.status_code}: {resp.json}"
 
         result = resp.json
         assert "processSummary" in result
         assert result["deploymentDone"] is True
 
-        # Since there's no workflow, first tool should be the main process
+        # The main process should be the one with id "#main"
         main_id = result["processSummary"]["id"]
-        assert main_id in [f"{test_id}-tool-1", f"{test_id}-tool-2"]
+        assert "main" in main_id.lower()
 
         # Verify main process was deployed
         resp = self.app.get(f"/processes/{main_id}")
@@ -1636,21 +1703,16 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         pkg = self.get_application_package(main_id)
         assert pkg["class"] == "Workflow"
 
-        # Verify child tools were deployed
-        if "deployedProcesses" in result:
-            assert f"{test_id}-echo-tool" in result["deployedProcesses"]
-            assert f"{test_id}-cat-tool" in result["deployedProcesses"]
+        # Verify child tools were deployed by retrieving them individually
+        desc = self.get_process_description(f"{test_id}-echo-tool", schema=ProcessSchema.OLD)
+        assert desc["process"]["id"] == f"{test_id}-echo-tool"
+        pkg = self.get_application_package(f"{test_id}-echo-tool")
+        assert pkg["class"] == "CommandLineTool"
 
-            # Verify we can retrieve the child tools
-            desc = self.get_process_description(f"{test_id}-echo-tool", schema=ProcessSchema.OLD)
-            assert desc["process"]["id"] == f"{test_id}-echo-tool"
-            pkg = self.get_application_package(f"{test_id}-echo-tool")
-            assert pkg["class"] == "CommandLineTool"
-
-            desc = self.get_process_description(f"{test_id}-cat-tool", schema=ProcessSchema.OLD)
-            assert desc["process"]["id"] == f"{test_id}-cat-tool"
-            pkg = self.get_application_package(f"{test_id}-cat-tool")
-            assert pkg["class"] == "CommandLineTool"
+        desc = self.get_process_description(f"{test_id}-cat-tool", schema=ProcessSchema.OLD)
+        assert desc["process"]["id"] == f"{test_id}-cat-tool"
+        pkg = self.get_application_package(f"{test_id}-cat-tool")
+        assert pkg["class"] == "CommandLineTool"
 
     def test_deploy_process_CWL_multipart(self):
         """
@@ -1794,10 +1856,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         pkg = self.get_application_package(main_id)
         assert pkg["class"] == "Workflow"
 
-        # Verify child tools were deployed
-        if "deployedProcesses" in result:
-            assert f"{test_id}-echo-tool" in result["deployedProcesses"]
-            assert f"{test_id}-cat-tool" in result["deployedProcesses"]
+        # Verify child tools were deployed by retrieving them individually
+        desc = self.get_process_description(f"{test_id}-echo-tool", schema=ProcessSchema.OLD)
+        assert desc["process"]["id"] == f"{test_id}-echo-tool"
+        desc = self.get_process_description(f"{test_id}-cat-tool", schema=ProcessSchema.OLD)
+        assert desc["process"]["id"] == f"{test_id}-cat-tool"
 
     def test_deploy_process_CWL_multipart_multiple_workflows_invalid(self):
         """

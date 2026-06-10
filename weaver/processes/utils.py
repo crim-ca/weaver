@@ -372,6 +372,10 @@ def resolve_deployment_order(cwl_packages):
         - dependencies: ``list`` of ``CommandLineTool``/``ExpressionTool`` to deploy first
         - main_workflow: The main ``Workflow`` (if any) to deploy last, or ``None``
     :raises HTTPNotImplemented: If multiple ``Workflow`` definitions are provided.
+    :raises HTTPBadRequest: If multiple tools without a ``Workflow`` and no ``#main`` entry point.
+
+    .. seealso::
+        - `CWL Packed Documents <https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents>`_
     """
     workflows = []
     tools = []
@@ -396,34 +400,27 @@ def resolve_deployment_order(cwl_packages):
     #        If multiple sub-Workflow do not work directly, keep this limit.
     #        Otherwise, allow tool-only deployments and demonstrate multi-workflow deployment.
     if len(cwl_packages) > 1 and len(workflows) == 0:
-        raise HTTPBadRequest(json={
-            "title": "No Workflow definition in $graph.",
-            "description": "Multi-CWL deployment requires at least one Workflow definition.",
-            "cause": {"workflow_count": 0, "tool_count": len(tools)},
-            "value": [tool.get("id") for tool in tools]
-        })
+        # Check if any tool has id "#main" or "main"
+        main_tool = None
+        for tool in tools:
+            tool_id = tool.get("id", "")
+            if tool_id == "#main" or tool_id == "main":
+                main_tool = tool
+                break
+
+        if not main_tool:
+            raise HTTPBadRequest(json={
+                "title": "No entry point in $graph.",
+                "description": (
+                    "Multi-CWL deployment without a Workflow requires a process with id '#main' "
+                    "as the entry point, according to CWL packed document specification."
+                ),
+                "cause": {"workflow_count": 0, "tool_count": len(tools), "main_found": False},
+                "value": [tool.get("id") for tool in tools]
+            })
 
     main_workflow = workflows[0] if workflows else None
-
-    # TODO: Implement topological sort based on workflow step dependencies
-    # For now, deploy tools in order provided
-
     return tools, main_workflow
-
-
-def _extract_multipart_boundary(content_type):
-    # type: (str) -> str
-    """
-    Extract ``boundary`` parameter from ``Content-Type`` header.
-    """
-    if "boundary=" not in content_type:
-        raise HTTPBadRequest(json={
-            "title": "Missing multipart boundary",
-            "description": "Content-Type must include boundary parameter for multipart content.",
-            "cause": {"Content-Type": content_type}
-        })
-    boundary_part = content_type.split("boundary=")[1].split(";")[0].strip()
-    return boundary_part.strip('"')
 
 
 def _get_multipart_content(content, request):
@@ -534,27 +531,27 @@ def _classify_multipart_part(part_data, cwl_packages, parts_order, parts_by_cid,
     if not isinstance(part_data, dict):
         return process_description
 
-    if 'class' in part_data and part_data['class'] in ['CommandLineTool', 'Workflow', 'ExpressionTool']:
+    if "class" in part_data and part_data["class"] in ["CommandLineTool", "Workflow", "ExpressionTool"]:
         cwl_packages.append(part_data)
         parts_order.append((part_data, content_id))
         if content_id:
             parts_by_cid[content_id] = part_data
         return process_description
 
-    if 'cwlVersion' in part_data and '$graph' in part_data:
+    if "cwlVersion" in part_data and "$graph" in part_data:
         cwl_packages.append(part_data)
         parts_order.append((part_data, content_id))
         if content_id:
             parts_by_cid[content_id] = part_data
         return process_description
 
-    if 'processDescription' in part_data or 'process' in part_data:
+    if "processDescription" in part_data or "process" in part_data:
         if process_description is not None:
             LOGGER.warning("Multiple process descriptions found in multipart, using first one")
             return process_description
         return part_data
 
-    if any(k in part_data for k in ['inputs', 'outputs', 'baseCommand', 'steps']):
+    if any(k in part_data for k in ["inputs", "outputs", "baseCommand", "steps"]):
         cwl_packages.append(part_data)
         parts_order.append((part_data, content_id))
         if content_id:
@@ -580,16 +577,12 @@ def parse_multipart_deploy(content, content_type, request=None):
         optional :term:`Process` description metadata)
     :raises HTTPBadRequest: If multipart content is malformed or invalid
     """
-    boundary = _extract_multipart_boundary(content_type)
     raw_content = _get_multipart_content(content, request)
-
-    # Parse using email parser
-    content_type_with_boundary = f"{content_type.split(';')[0]}; boundary={boundary}"
-    msg_bytes = b"Content-Type: " + content_type_with_boundary.encode('utf-8') + b"\r\n\r\n" + raw_content
+    msg_bytes = b"Content-Type: " + content_type.encode('utf-8') + b"\r\n\r\n" + raw_content
 
     try:
         msg = message_from_bytes(msg_bytes)
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         # Defensive: standard library should handle valid multipart data
         raise HTTPBadRequest(json={
             "title": "Failed to parse multipart content",
@@ -597,7 +590,7 @@ def parse_multipart_deploy(content, content_type, request=None):
             "cause": {"error": exc.__class__.__name__}
         })
 
-    if not msg.is_multipart():  # pragma: no cover
+    if not msg.is_multipart():
         # Defensive: boundary validation should catch this earlier
         raise HTTPBadRequest("Content is not multipart format")
 
@@ -614,11 +607,9 @@ def parse_multipart_deploy(content, content_type, request=None):
     parts_order = []
 
     for part in msg.get_payload():
-        if not hasattr(part, 'get_content_type'):  # pragma: no cover
-            # Defensive: email library should return proper Message objects
-            continue
-
         part_content_type = part.get_content_type()
+        # appeler recursivement parse_process_deploy_content pour chaque part avec le part content
+
         content_location = part.get('Content-Location', '').strip()
         part_content = part.get_payload(decode=True)
 
@@ -627,7 +618,7 @@ def parse_multipart_deploy(content, content_type, request=None):
             charset = part.get_content_charset() or 'utf-8'
             try:
                 part_content = part_content.decode(charset)
-            except (UnicodeDecodeError, LookupError):  # pragma: no cover
+            except (UnicodeDecodeError, LookupError):
                 # Fallback to utf-8 with error handling if charset is invalid/corrupted
                 part_content = part_content.decode('utf-8', errors='replace')
 
@@ -676,7 +667,7 @@ def parse_multipart_deploy(content, content_type, request=None):
                 process_description = _classify_multipart_part(
                     part_data, cwl_packages, parts_order, parts_by_cid, content_id, process_description
                 )
-            except Exception as exc:  # pragma: no cover
+            except Exception as exc:
                 # Defensive: skip malformed parts that fail JSON/YAML parsing
                 LOGGER.warning("Failed to parse part with Content-Type %s: %s", part_content_type, exc)
                 continue
@@ -744,6 +735,8 @@ def parse_process_deploy_content(
         full_content_type = get_header("Content-Type", request_headers)
         if full_content_type:
             content_type = full_content_type
+
+    # extract content id from header
 
     if content_type and any(mt in content_type.lower() for mt in ["multipart/mixed", "multipart/related"]):
         LOGGER.info("Detected multipart deployment request")
@@ -826,10 +819,16 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     :returns: HTTPOk if the process registration was successful.
     :raises HTTPException: for any invalid process deployment step.
     """
+    # TODO move all on top to utils fucntion et call recurisvely
     headers = getattr(container, "headers", {})  # container is any request (as when called from API Deploy request)
     c_type_full = get_header("Content-Type", headers) or ContentType.APP_OGC_PKG_JSON
     # Extract base media type (without parameters) for content type checks
     c_type = c_type_full.split(';')[0].strip() if isinstance(c_type_full, str) else c_type_full
+
+    # weaver@id
+    # cid=     = get_header("Content-ID", headers)
+    # appel la fonction util parse_content_id
+    # payload.setdefault("id",cid)  # if Content-ID provided, use as process id if not set in payload
 
     # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
     # For multipart requests, we need to pass the request object to access the raw body
@@ -850,6 +849,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
             "$graph": payload
         }
         c_type = ContentType.APP_CWL_JSON
+        # loop part et call
 
     payload_copy = deepcopy(payload)
 
@@ -1125,10 +1125,21 @@ def _deploy_process_multi_cwl(
     deployed_processes = []
 
     # Determine which process will be the main one
-    # If there's a workflow, that's the main; otherwise, use first tool as main
-    main_process_pkg = main_workflow if main_workflow else (tools[0] if tools else None)
-    if not main_process_pkg:
-        raise HTTPBadRequest("No valid CWL definitions found in $graph")
+    # If there's a workflow, that's the main; otherwise, find the tool with id "#main" or "main"
+    if main_workflow:
+        main_process_pkg = main_workflow
+    else:
+        # Find the tool with id "#main" or "main" (required by resolve_deployment_order validation)
+        main_process_pkg = None
+        for tool in tools:
+            tool_id = tool.get("id", "")
+            if tool_id == "#main" or tool_id == "main":
+                main_process_pkg = tool
+                break
+
+        if not main_process_pkg:
+            # This should not happen if resolve_deployment_order validation passed
+            raise HTTPBadRequest("No valid CWL definitions found in $graph")
 
     # Identify main process ID to avoid deploying it as a child
     main_process_id = main_process_pkg.get("id")
@@ -1238,10 +1249,6 @@ def _deploy_process_multi_cwl(
         "processSummary": process_summary,
         "deploymentDone": True,
     }
-
-    # Include information about deployed child processes
-    if deployed_processes:
-        data["deployedProcesses"] = [proc["id"] for proc in deployed_processes]
 
     headers_out = {
         "Content-Type": ContentType.APP_JSON,
