@@ -1186,7 +1186,8 @@ class TestMultipartDeployment:
         result = resolve_cwl_graph(package)
         assert isinstance(result, tuple)
         assert len(result) == 2
-        resolved_items, original_package = result
+        resolved_items = result[0]
+        original_package = result[1]
         assert isinstance(resolved_items, list)
         assert len(resolved_items) == 2
         assert resolved_items[0]["id"] == "tool-1"
