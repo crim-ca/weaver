@@ -324,7 +324,7 @@ def _validate_deploy_process_info(process_info, reference, package, settings, he
 
 
 def resolve_cwl_graph(package):
-    # type: (CWL) -> Union[CWL, List[CWL], Tuple[List[CWL], CWL]]
+    # type: (CWL) -> Union[CWL, Tuple[List[CWL], CWL]]
     """
     Resolve :term:`CWL` ``$graph`` into deployable packages.
 
@@ -891,16 +891,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
 
     payload_copy = deepcopy(payload)
 
-    # Skip deployment schema validation for pure CWL payloads (CWL has its own validation)
-    is_cwl_only = (
-        c_type in list(ContentType.ANY_CWL) + [ContentType.APP_JSON] and
-        "cwlVersion" in payload and
-        "processDescription" not in payload and
-        "executionUnit" not in payload
-    )
-    if not is_cwl_only:
-        payload = _check_deploy(payload)
-
+    payload = _check_deploy(payload)
     payload.pop("$schema", None)
     payload.pop("$id", None)
 
@@ -938,16 +929,6 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         reference = content.get("href")
         found = isinstance(reference, str)
     elif c_type in (list(ContentType.ANY_CWL) + [ContentType.APP_JSON]) and "cwlVersion" in payload:
-        # For direct CWL deployment without $graph, validate that id is present
-        if "$graph" not in payload and "id" not in payload:
-            raise HTTPBadRequest(json={
-                "type": "InvalidParameterValue",
-                "title": "Failed schema validation.",
-                "status": HTTPBadRequest.code,
-                "error": colander.Invalid.__name__,
-                "cause": {"DeployCWL.id": "Missing required field."},
-                "value": repr_json(payload, force_string=False),
-            })
         process_info = {"version": payload.pop("version", None)}
         package = resolve_cwl_graph(payload)
         found = True
