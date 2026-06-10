@@ -864,8 +864,6 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     # TODO move all on top to utils fucntion et call recurisvely
     headers = getattr(container, "headers", {})  # container is any request (as when called from API Deploy request)
     c_type_full = get_header("Content-Type", headers) or ContentType.APP_OGC_PKG_JSON
-    # Extract base media type (without parameters) for content type checks
-    c_type = c_type_full.split(';')[0].strip() if isinstance(c_type_full, str) else c_type_full
 
     # Extract process ID from Content-ID header if provided (RFC 2392)
     content_id_header = get_header("Content-ID", headers)
@@ -901,7 +899,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     is_direct_cwl = isinstance(payload, dict) and "cwlVersion" in payload
     if not is_direct_cwl:
         payload = _check_deploy(payload)
-    
+
     # Remove schema fields regardless of deployment type
     payload.pop("$schema", None)
     payload.pop("$id", None)
@@ -926,7 +924,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     reference = None
     package = None
     found = False
-    
+
     # Check for direct CWL first (regardless of content-type) - this handles recursive calls
     if "cwlVersion" in payload:
         process_info = {"version": payload.pop("version", None)}
