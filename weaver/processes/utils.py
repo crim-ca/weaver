@@ -871,23 +871,26 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
 
     # Extract process ID from Content-ID header if provided (RFC 2392)
     content_id_header = get_header("Content-ID", headers)
+    resource_id = None
     if content_id_header:
         try:
             resource_id, _ = parse_content_id(content_id_header)
-            # Set process ID from Content-ID resource part if not already in payload
-            payload.setdefault("id", resource_id)
         except ValueError as exc:
             LOGGER.warning("Invalid Content-ID header format: %s", exc)
-
-    if content_id_header and "id" in payload and payload["id"] != resource_id:
-        raise HTTPBadRequest(json={
-            "title": "Content-ID header mismatch",
-            "description": (
-                f"Content-ID header resource [{resource_id}] does not match payload id [{payload['id']}]. "
-                "Please ensure they match or omit the Content-ID header."
-            ),
-            "cause": {"Content-ID": content_id_header, "payload_id": payload["id"]},
-        })
+        
+        if resource_id:
+            # Check if payload already has an ID that doesn't match
+            if "id" in payload and payload["id"] != resource_id:
+                raise HTTPBadRequest(json={
+                    "title": "Content-ID header mismatch",
+                    "description": (
+                        f"Content-ID header resource [{resource_id}] does not match payload id [{payload['id']}]. "
+                        "Please ensure they match or omit the Content-ID header."
+                    ),
+                    "cause": {"Content-ID": content_id_header, "payload_id": payload["id"]},
+                })
+            # Set process ID from Content-ID resource part if not already in payload
+            payload.setdefault("id", resource_id)
 
     # For multipart/list payload, skip validation and go directly to multi-CWL deployment
     # Each individual CWL package will be validated during recursive deployment
