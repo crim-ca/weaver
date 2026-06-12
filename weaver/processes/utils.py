@@ -402,10 +402,10 @@ def resolve_deployment_order(cwl_packages):
     #        Otherwise, allow tool-only deployments and demonstrate multi-workflow deployment.
     main_tool = None
     if len(cwl_packages) > 1 and len(workflows) == 0:
-        # Check if any tool has id "#main" or "main"
+        # Check if any tool has id "#main"
         for tool in tools:
             tool_id = tool.get("id", "")
-            if tool_id in ("#main", "main"):
+            if tool_id == "#main":
                 main_tool = tool
                 break
 
@@ -522,8 +522,8 @@ def create_multipart_deploy(cwl_files, process_description=None, boundary=None):
     return multipart_content, content_type
 
 
-def _classify_multipart_part(part_data, cwl_packages, parts_order, parts_by_cid, content_id, process_description):
-    # type: (JSON, List[CWL], List, Dict[str, CWL], str, Optional[JSON]) -> Optional[JSON]
+def _classify_multipart_part(part_data, cwl_packages, parts_by_cid, content_id, process_description):
+    # type: (JSON, List[CWL], Dict[str, CWL], str, Optional[JSON]) -> Optional[JSON]
     """
     Classify parsed multipart part as CWL package or process description.
 
@@ -534,14 +534,12 @@ def _classify_multipart_part(part_data, cwl_packages, parts_order, parts_by_cid,
 
     if "class" in part_data and part_data["class"] in ["CommandLineTool", "Workflow", "ExpressionTool"]:
         cwl_packages.append(part_data)
-        parts_order.append((part_data, content_id))
         if content_id:
             parts_by_cid[content_id] = part_data
         return process_description
 
     if "cwlVersion" in part_data and "$graph" in part_data:
         cwl_packages.append(part_data)
-        parts_order.append((part_data, content_id))
         if content_id:
             parts_by_cid[content_id] = part_data
         return process_description
@@ -554,7 +552,6 @@ def _classify_multipart_part(part_data, cwl_packages, parts_order, parts_by_cid,
 
     if any(k in part_data for k in ["inputs", "outputs", "baseCommand", "steps"]):
         cwl_packages.append(part_data)
-        parts_order.append((part_data, content_id))
         if content_id:
             parts_by_cid[content_id] = part_data
         return process_description
@@ -699,7 +696,6 @@ def parse_multipart_deploy(content, content_type, request=None):
     cwl_packages = []
     process_description = None
     parts_by_cid = {}
-    parts_order = []
 
     for part in msg.get_payload():
         part_content_type = part.get_content_type()
@@ -728,7 +724,7 @@ def parse_multipart_deploy(content, content_type, request=None):
             try:
                 part_data = _parse_multipart_part(part_content, part_content_type)
                 process_description = _classify_multipart_part(
-                    part_data, cwl_packages, parts_order, parts_by_cid, content_id, process_description
+                    part_data, cwl_packages, parts_by_cid, content_id, process_description
                 )
             except Exception as exc:
                 # Defensive: skip malformed parts that fail JSON/YAML parsing
@@ -861,20 +857,8 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     :returns: HTTPOk if the process registration was successful.
     :raises HTTPException: for any invalid process deployment step.
     """
-    # TODO move all on top to utils fucntion et call recurisvely
     headers = getattr(container, "headers", {})  # container is any request (as when called from API Deploy request)
     c_type_full = get_header("Content-Type", headers) or ContentType.APP_OGC_PKG_JSON
-
-    # Extract process ID from Content-ID header if provided (RFC 2392)
-    content_id_header = get_header("Content-ID", headers)
-    if content_id_header:
-        try:
-            resource_id, _ = parse_content_id(content_id_header)
-            # Set process ID from Content-ID resource part if not already in payload
-            if isinstance(payload, dict):
-                payload.setdefault("id", resource_id)
-        except ValueError as exc:
-            LOGGER.warning("Invalid Content-ID header format: %s", exc)
 
     # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
     # For multipart requests, we need to pass the request object to access the raw body
@@ -885,6 +869,26 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         content_type_schema=sd.DeployContentType,
     )
 
+    # Extract process ID from Content-ID header if provided (RFC 2392)
+    content_id_header = get_header("Content-ID", headers)
+    if content_id_header:
+        try:
+            resource_id, _ = parse_content_id(content_id_header)
+            # Set process ID from Content-ID resource part if not already in payload
+            payload.setdefault("id", resource_id)
+        except ValueError as exc:
+            LOGGER.warning("Invalid Content-ID header format: %s", exc)
+
+    if content_id_header and "id" in payload and payload["id"] != resource_id:
+        raise HTTPBadRequest(json={
+            "title": "Content-ID header mismatch",
+            "description": (
+                f"Content-ID header resource [{resource_id}] does not match payload id [{payload['id']}]. "
+                "Please ensure they match or omit the Content-ID header."
+            ),
+            "cause": {"Content-ID": content_id_header, "payload_id": payload["id"]},
+        })
+
     # For multipart/list payload, skip validation and go directly to multi-CWL deployment
     # Each individual CWL package will be validated during recursive deployment
     if isinstance(payload, list):
@@ -893,12 +897,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         return _deploy_process_multi_cwl(payload, container, overwrite)
 
     payload_copy = deepcopy(payload)
-
-    # For direct CWL deployment (detected by cwlVersion), skip _check_deploy validation
-    # CWL packages have their own schema validation that will happen later
-    is_direct_cwl = isinstance(payload, dict) and "cwlVersion" in payload
-    if not is_direct_cwl:
-        payload = _check_deploy(payload)
+    payload = _check_deploy(payload)
 
     # Remove schema fields regardless of deployment type
     payload.pop("$schema", None)
@@ -1021,10 +1020,9 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     settings = get_settings(container)
 
     # Handle multi-CWL deployment from $graph
-    original_graph_package = None
     if isinstance(package, tuple):
         # package is (list_of_cwls, original_payload_with_graph)
-        package, original_graph_package = package
+        package, _ = package
     if isinstance(package, list):
         return _deploy_process_multi_cwl(package, container, overwrite)
 

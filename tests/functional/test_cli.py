@@ -466,7 +466,7 @@ class TestWeaverClient(TestWeaverClientBase):
                 }
             },
             "inputs": {"input": {"type": "string", "inputBinding": {"position": 1}}},
-            "outputs": {"output": {"type": "stdout"}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "output.txt"}}},
             "stdout": "output.txt"
         }
 
@@ -482,7 +482,7 @@ class TestWeaverClient(TestWeaverClientBase):
                 }
             },
             "inputs": {"file": {"type": "File", "inputBinding": {"position": 1}}},
-            "outputs": {"output": {"type": "stdout"}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "output.txt"}}},
             "stdout": "output.txt"
         }
 
@@ -569,7 +569,7 @@ class TestWeaverClient(TestWeaverClientBase):
                 }
             },
             "inputs": {"input": {"type": "string", "inputBinding": {"position": 1}}},
-            "outputs": {"output": {"type": "stdout"}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "output.txt"}}},
             "stdout": "output.txt"
         }
 
@@ -585,7 +585,7 @@ class TestWeaverClient(TestWeaverClientBase):
                 }
             },
             "inputs": {"file": {"type": "File", "inputBinding": {"position": 1}}},
-            "outputs": {"output": {"type": "stdout"}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "output.txt"}}},
             "stdout": "output.txt"
         }
 
@@ -627,7 +627,7 @@ class TestWeaverClient(TestWeaverClientBase):
                 }
             },
             "inputs": {"input": {"type": "string", "inputBinding": {"position": 1}}},
-            "outputs": {"output": {"type": "stdout"}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "output.txt"}}},
             "stdout": "output.txt"
         }
 
@@ -643,7 +643,7 @@ class TestWeaverClient(TestWeaverClientBase):
                 }
             },
             "inputs": {"file": {"type": "File", "inputBinding": {"position": 1}}},
-            "outputs": {"output": {"type": "stdout"}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "output.txt"}}},
             "stdout": "output.txt"
         }
 

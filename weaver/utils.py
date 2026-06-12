@@ -1326,7 +1326,7 @@ def get_file_header_datetime(dt):
 
 
 def parse_content_id(content_id):
-    # type: (str) -> Tuple[str, str]
+    # type: (str) -> Tuple[AnyUUID, AnyUUID]
     """
     Parses a ``Content-ID`` header value into its resource and context identifiers.
 

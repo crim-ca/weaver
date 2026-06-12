@@ -459,11 +459,10 @@ class TestMultipartDeployment:
             "outputs": {}
         }
         cwl_packages = []
-        parts_order = []
         parts_by_cid = {}
 
         result = _classify_multipart_part(
-            part_data, cwl_packages, parts_order, parts_by_cid,
+            part_data, cwl_packages, parts_by_cid,
             content_id="tool-1", process_description=None
         )
 
@@ -482,11 +481,10 @@ class TestMultipartDeployment:
             ]
         }
         cwl_packages = []
-        parts_order = []
         parts_by_cid = {}
 
         result = _classify_multipart_part(
-            part_data, cwl_packages, parts_order, parts_by_cid,
+            part_data, cwl_packages, parts_by_cid,
             content_id="graph-1", process_description=None
         )
 
@@ -505,11 +503,10 @@ class TestMultipartDeployment:
             }
         }
         cwl_packages = []
-        parts_order = []
         parts_by_cid = {}
 
         result = _classify_multipart_part(
-            part_data, cwl_packages, parts_order, parts_by_cid,
+            part_data, cwl_packages, parts_by_cid,
             content_id=None, process_description=None
         )
 
@@ -524,19 +521,18 @@ class TestMultipartDeployment:
         second_desc = {"processDescription": {"id": "second"}}
 
         cwl_packages = []
-        parts_order = []
         parts_by_cid = {}
 
         # First one is accepted
         result1 = _classify_multipart_part(
-            first_desc, cwl_packages, parts_order, parts_by_cid,
+            first_desc, cwl_packages, parts_by_cid,
             content_id=None, process_description=None
         )
         assert result1 == first_desc
 
         # Second one should trigger warning and be ignored
         result2 = _classify_multipart_part(
-            second_desc, cwl_packages, parts_order, parts_by_cid,
+            second_desc, cwl_packages, parts_by_cid,
             content_id=None, process_description=first_desc
         )
         assert result2 == first_desc  # Still returns the first one
@@ -553,11 +549,10 @@ class TestMultipartDeployment:
             "baseCommand": ["echo", "hello"]
         }
         cwl_packages = []
-        parts_order = []
         parts_by_cid = {}
 
         result = _classify_multipart_part(
-            part_data, cwl_packages, parts_order, parts_by_cid,
+            part_data, cwl_packages, parts_by_cid,
             content_id="implicit-1", process_description=None
         )
 
@@ -576,11 +571,10 @@ class TestMultipartDeployment:
             }
         }
         cwl_packages = []
-        parts_order = []
         parts_by_cid = {}
 
         _classify_multipart_part(
-            part_data, cwl_packages, parts_order, parts_by_cid,
+            part_data, cwl_packages, parts_by_cid,
             content_id=None, process_description=None
         )
 
@@ -597,12 +591,11 @@ class TestMultipartDeployment:
             "custom_field": "value"
         }
         cwl_packages = []
-        parts_order = []
         parts_by_cid = {}
 
         # No process description yet, so this becomes the process description
         result = _classify_multipart_part(
-            part_data, cwl_packages, parts_order, parts_by_cid,
+            part_data, cwl_packages, parts_by_cid,
             content_id=None, process_description=None
         )
 
@@ -615,11 +608,10 @@ class TestMultipartDeployment:
         """
         part_data = "just a string"
         cwl_packages = []
-        parts_order = []
         parts_by_cid = {}
 
         result = _classify_multipart_part(
-            part_data, cwl_packages, parts_order, parts_by_cid,
+            part_data, cwl_packages, parts_by_cid,
             content_id=None, process_description=None
         )
 
@@ -1296,11 +1288,10 @@ class TestMultipartDeployment:
             "outputs": {}
         }
         cwl_packages = []
-        parts_order = []
         parts_by_cid = {}
 
         result = _classify_multipart_part(
-            part_data, cwl_packages, parts_order, parts_by_cid,
+            part_data, cwl_packages, parts_by_cid,
             content_id="", process_description=None  # Empty content_id
         )
 
