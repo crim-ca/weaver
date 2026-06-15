@@ -925,6 +925,7 @@ class TestWeaverClient(TestWeaverClientBase):
             assert result.success
             assert "undefined" not in result.message
 
+    @pytest.mark.job
     def test_jobs_search_multi_status(self):
         self.job_store.clear_jobs()
         proc = self.test_process["Echo"]
@@ -2105,6 +2106,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         )
         assert any(bad_input_value in line for line in lines)
 
+    @pytest.mark.job
     def test_jobs(self):
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -2122,6 +2124,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("total" in line for line in lines)
         assert any("limit" in line for line in lines)
 
+    @pytest.mark.job
     def test_jobs_no_links_limit_status_filters(self):
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -2148,6 +2151,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert "total" in body and isinstance(body["total"], int)  # ignore actual variable amount
         assert "links" not in body
 
+    @pytest.mark.job
     def test_jobs_no_links_nested_detail(self):
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -2172,6 +2176,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert all("links" not in job for job in body["jobs"])
         assert "links" not in body
 
+    @pytest.mark.job
     def test_jobs_filter_status_multi(self):
         self.job_store.clear_jobs()
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
@@ -2211,6 +2216,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert len(jobs_accept) == 1 and jobs_accept[0]["jobID"] == str(job_a.uuid)
         assert len(jobs_success) == 1 and jobs_success[0]["jobID"] == str(job_s.uuid)
 
+    @pytest.mark.job
     def test_jobs_filter_tags(self):
         self.job_store.clear_jobs()
         job1 = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
@@ -2258,6 +2264,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert isinstance(body["jobs"], list)
             self.assert_equal_with_jobs_diffs(body["jobs"], expect_jobs, test_tags, jobs=jobs)
 
+    @pytest.mark.job
     @mocked_remote_server_requests_wps1([
         "https://random.com",
         resources.load_resource(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML).replace(
@@ -2322,6 +2329,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert len(body["jobs"]) == 1
         assert body["jobs"] == [str(job2.uuid)]
 
+    @pytest.mark.job
     def test_output_format_json_pretty(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         for format_option in [[], ["-F", OutputFormat.JSON_STR]]:
@@ -2341,6 +2349,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert lines[-1].endswith("}")
             assert any("jobID" in line for line in lines)
 
+    @pytest.mark.job
     def test_output_format_json_pretty_and_headers(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         lines = mocked_sub_requests(
@@ -2367,6 +2376,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert result[-1].endswith("}")
         assert any("jobID" in line for line in result)
 
+    @pytest.mark.job
     def test_output_format_json_raw(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         for format_option in [["-F", OutputFormat.JSON], ["-F", OutputFormat.JSON_RAW]]:
@@ -2386,6 +2396,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert lines[0].endswith("}")
             assert "jobID" in lines[0]
 
+    @pytest.mark.job
     def test_output_format_yaml_pretty(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         lines = mocked_sub_requests(
@@ -2408,6 +2419,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         else:
             raise AssertionError("JobID not found for validation.")
 
+    @pytest.mark.job
     def test_output_format_xml_pretty(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         lines = mocked_sub_requests(
@@ -2428,6 +2440,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert lines[-1].endswith("</result>")
         assert any("jobID" in line for line in lines)
 
+    @pytest.mark.job
     def test_output_format_xml_pretty_and_headers(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         lines = mocked_sub_requests(
@@ -2455,6 +2468,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert result[-1].endswith("</result>")
         assert any("jobID" in line for line in result)
 
+    @pytest.mark.job
     def test_output_format_xml_raw(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         lines = mocked_sub_requests(
@@ -2473,6 +2487,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert lines[0].startswith("<?xml")
         assert lines[0].endswith("</result>")
 
+    @pytest.mark.job
     def test_job_logs(self):
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
         job.save_log(message="test start", progress=0, status=Status.ACCEPTED)
@@ -2499,6 +2514,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert f"100% {Status.SUCCESSFUL}" in lines[3]
         assert lines[4] == "]"
 
+    @pytest.mark.job
     def test_job_exceptions(self):
         xml_error = resources.load_example("wps_access_forbidden_response.xml", xml=True)
         wps_error = WPSException(xml_error.xpath(".//ows:Exception", namespaces={"ows": DEFAULT_OWS_NAMESPACE})[0])
@@ -2529,6 +2545,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             {"Code": "AccessForbidden", "Locator": "service", "Text": "Access to service is forbidden."}
         ]
 
+    @pytest.mark.job
     def test_job_statistics(self):
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
         job.statistics = resources.load_example("job_statistics.json")
@@ -2553,6 +2570,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         body = json.loads(text)
         assert body == job.statistics
 
+    @pytest.mark.job
     @parameterized.expand([
         ("results", Status.FAILED, "JobResultsFailed", True),
         ("statistics", Status.FAILED, "NoJobStatistics", True),

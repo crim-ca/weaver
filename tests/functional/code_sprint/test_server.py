@@ -288,6 +288,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             for out_id in process_outputs
         )
 
+    @pytest.mark.job
     @pytest.mark.skipif(
         TEST_SERVER_OAP_PROC_EXEC_ASYNC_UNSUPPORTED,
         reason="Asynchronous process execution not supported by the test server.",

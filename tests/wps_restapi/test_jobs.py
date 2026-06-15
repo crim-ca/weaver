@@ -67,6 +67,7 @@ if TYPE_CHECKING:
     from weaver.visibility import AnyVisibility
 
 
+@pytest.mark.job
 class WpsRestApiJobsTest(JobUtils):
     settings = {}
     config = None
