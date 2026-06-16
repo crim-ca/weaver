@@ -681,7 +681,7 @@ def _extract_multipart_start_parameter(content_type):
     :param content_type: Full Content-Type header value
     :returns: Content-ID from ``start`` parameter, or ``None`` if not present
     """
-    if "multipart/related" in content_type.lower() and "start=" in content_type:
+    if ContentType.MULTIPART_RELATED in content_type.lower() and "start=" in content_type:
         start_part = content_type.split("start=")[1].split(";")[0].strip().strip('"').strip('<>')
         return start_part
     return None
