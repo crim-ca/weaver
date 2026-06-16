@@ -22,7 +22,11 @@ from weaver.processes.constants import CWL_NAMESPACE_WEAVER_ID, CWL_REQUIREMENT_
 from weaver.processes.utils import (  # noqa: W0212
     _check_package_file,
     _classify_multipart_part,
+    _extract_multipart_start_parameter,
     _get_multipart_content,
+    _interpret_multipart_part,
+    _organize_deploy_parts,
+    _parse_multipart_message,
     create_multipart_deploy,
     parse_multipart_deploy,
     register_cwl_processes_from_config,
@@ -1015,7 +1019,7 @@ class TestMultipartDeployment:
         # Verify content type includes start parameter for main workflow
         assert "multipart/related" in content_type
         assert "boundary=" in content_type
-        assert "start=workflow-" in content_type  # Should reference the workflow
+        assert "start=main-workflow" in content_type  # Should reference the workflow
         assert isinstance(content, bytes)
 
         # Parse the generated multipart content
@@ -1331,6 +1335,216 @@ class TestMultipartDeployment:
         assert cwl_packages[0]["id"] == "test-tool"
         assert process_desc is None
 
+    def test_parse_multipart_message_valid(self):
+        """
+        Test _parse_multipart_message with valid multipart content.
+        """
+        tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool"
+        })
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"\r\n"
+            f"{tool_cwl}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        msg = _parse_multipart_message(multipart_body, content_type, request=None)
+
+        assert msg.is_multipart()
+        assert len(msg.get_payload()) == 1
+
+    def test_parse_multipart_message_invalid_format(self):
+        """
+        Test _parse_multipart_message raises error for non-multipart format.
+        """
+        content_type = "multipart/mixed; boundary=----Boundary123"
+        non_multipart_content = b"Content-Type: text/plain\r\n\r\nPlain text"
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            _parse_multipart_message(non_multipart_content, content_type, request=None)
+
+        assert "multipart" in str(exc_info.value).lower()
+
+    def test_parse_multipart_message_parse_failure(self):
+        """
+        Test _parse_multipart_message handles email parsing exceptions.
+        """
+        # Mock message_from_bytes to raise an exception
+        with mock.patch("weaver.processes.utils.message_from_bytes") as mock_parse:
+            mock_parse.side_effect = ValueError("Invalid email format")
+
+            content_type = "multipart/mixed; boundary=----Boundary"
+            content = b"some content"
+
+            # Should raise HTTPBadRequest with parsing error
+            with pytest.raises(HTTPBadRequest) as exc_info:
+                _parse_multipart_message(content, content_type, request=None)
+
+            assert exc_info.value.json is not None
+            assert "Failed to parse multipart content" in exc_info.value.json.get("title", "")
+
+    def test_extract_multipart_start_parameter_with_start(self):
+        """
+        Test _extract_multipart_start_parameter extracts start parameter correctly.
+        """
+        content_type = "multipart/related; boundary=----Boundary; start=workflow-main"
+        result = _extract_multipart_start_parameter(content_type)
+        assert result == "workflow-main"
+
+    def test_extract_multipart_start_parameter_with_quotes(self):
+        """
+        Test _extract_multipart_start_parameter handles quoted start parameter.
+        """
+        content_type = 'multipart/related; boundary=----Boundary; start="workflow-main"'
+        result = _extract_multipart_start_parameter(content_type)
+        assert result == "workflow-main"
+
+    def test_extract_multipart_start_parameter_with_angle_brackets(self):
+        """
+        Test _extract_multipart_start_parameter handles angle bracket notation.
+        """
+        content_type = "multipart/related; boundary=----Boundary; start=<workflow-main>"
+        result = _extract_multipart_start_parameter(content_type)
+        assert result == "workflow-main"
+
+    def test_extract_multipart_start_parameter_no_start(self):
+        """
+        Test _extract_multipart_start_parameter returns None when no start parameter.
+        """
+        content_type = "multipart/mixed; boundary=----Boundary"
+        result = _extract_multipart_start_parameter(content_type)
+        assert result is None
+
+    def test_extract_multipart_start_parameter_not_related(self):
+        """
+        Test _extract_multipart_start_parameter returns None for non-related types.
+        """
+        content_type = "multipart/mixed; boundary=----Boundary; start=something"
+        result = _extract_multipart_start_parameter(content_type)
+        assert result is None
+
+    def test_interpret_multipart_part_cwl_json(self):
+        """
+        Test _interpret_multipart_part successfully interprets CWL JSON part.
+        """
+        from email.mime.text import MIMEText
+
+        tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool"
+        })
+
+        part = MIMEText(tool_cwl, _subtype="json", _charset="utf-8")
+        part.replace_header("Content-Type", ContentType.APP_CWL_JSON)
+        part.add_header("Content-ID", "<tool-1>")
+        part.add_header("Content-Location", "test-tool.cwl")
+
+        result = _interpret_multipart_part(part)
+
+        assert result is not None
+        assert len(result) == 4
+        content_type, content_id, content_location, part_data = result
+        assert content_type == ContentType.APP_CWL_JSON
+        assert content_id == "tool-1"
+        assert content_location == "test-tool.cwl"
+        assert part_data["id"] == "test-tool"
+
+    def test_interpret_multipart_part_invalid_json(self):
+        """
+        Test _interpret_multipart_part returns None for malformed JSON.
+        """
+        from email.mime.text import MIMEText
+
+        invalid_json = "{ not valid json"
+        part = MIMEText(invalid_json, _subtype="json", _charset="utf-8")
+        part.replace_header("Content-Type", ContentType.APP_JSON)
+
+        result = _interpret_multipart_part(part)
+
+        assert result is None
+
+    def test_interpret_multipart_part_unsupported_content_type(self):
+        """
+        Test _interpret_multipart_part returns None for unsupported content types.
+        """
+        from email.mime.text import MIMEText
+
+        part = MIMEText("plain text", _subtype="plain", _charset="utf-8")
+
+        result = _interpret_multipart_part(part)
+
+        assert result is None
+
+    def test_organize_deploy_parts_valid(self):
+        """
+        Test _organize_deploy_parts successfully organizes CWL packages.
+        """
+        interpreted_parts = [
+            (ContentType.APP_CWL_JSON, "tool-1", "", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "id": "tool-1"
+            }),
+            (ContentType.APP_CWL_JSON, "workflow-1", "", {
+                "cwlVersion": "v1.2",
+                "class": "Workflow",
+                "id": "workflow-1"
+            })
+        ]
+
+        cwl_packages, process_desc = _organize_deploy_parts(interpreted_parts, root_workflow_cid="workflow-1")
+
+        assert len(cwl_packages) == 2
+        assert process_desc is None
+        # Workflow should be last due to root_workflow_cid
+        assert cwl_packages[-1]["class"] == "Workflow"
+
+    def test_organize_deploy_parts_no_cwl_error(self):
+        """
+        Test _organize_deploy_parts raises error when no CWL packages found.
+        """
+        interpreted_parts = [
+            (ContentType.APP_JSON, "", "", {"some": "data"})
+        ]
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            _organize_deploy_parts(interpreted_parts, root_workflow_cid=None)
+
+        assert "No CWL packages found" in exc_info.value.json.get("title", "")
+
+    def test_organize_deploy_parts_with_process_description(self):
+        """
+        Test _organize_deploy_parts correctly identifies process description.
+        """
+        interpreted_parts = [
+            (ContentType.APP_CWL_JSON, "tool-1", "", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "id": "tool-1"
+            }),
+            (ContentType.APP_JSON, "", "", {
+                "processDescription": {
+                    "id": "tool-1",
+                    "title": "Test Tool"
+                }
+            })
+        ]
+
+        cwl_packages, process_desc = _organize_deploy_parts(interpreted_parts, root_workflow_cid=None)
+
+        assert len(cwl_packages) == 1
+        assert process_desc is not None
+        assert process_desc["processDescription"]["title"] == "Test Tool"
+
     def test_parse_multipart_deploy_no_start_parameter_non_workflow(self, caplog):
         """
         Test parse_multipart_deploy warning when no start parameter and first element is not a Workflow.
@@ -1383,7 +1597,7 @@ class TestMultipartDeployment:
         assert "multipart/related" in content_type
 
         # Verify that the start parameter was added (workflow_count == 1 branch)
-        assert "start=workflow-0" in content_type
+        assert "start=test-workflow" in content_type
 
         # Parse and verify
         cwl_packages, _ = parse_multipart_deploy(content, content_type, request=None)
@@ -1418,4 +1632,4 @@ class TestMultipartDeployment:
         assert "multipart/related" in content_type
 
         # First workflow should be the main one
-        assert "start=workflow-0" in content_type
+        assert "start=workflow-1" in content_type
