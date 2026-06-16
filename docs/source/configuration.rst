@@ -950,6 +950,6 @@ Starting the Application
 
 The following examples provided more details:
 
-- use ``gunicorn/pserve`` to start the Web :term:`API` (example `Dockerfile-manager`_)
-- use ``celery`` to start :term:`Job` Workers (example `Dockerfile-worker`_)
+- use ``gunicorn/pserve`` to start the Web :term:`API` (example `manager.dockerfile`_)
+- use ``celery`` to start :term:`Job` Workers (example `worker.dockerfile`_)
 - see `docker-compose.yml.example`_ for a complete stack including database dependencies

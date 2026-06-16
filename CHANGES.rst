@@ -29,6 +29,35 @@ Changes:
   The `CLI` accepts a mixture of local `CWL` file paths (as `JSON` or `YAML`) and remote URL references.
   The server handles ``Content-Type`` media-type detection and ``Content-Location`` header processing for external
   `CWL` files to fetch during deployment.
+- Rename Dockerfiles from ``docker/Dockerfile-{base,manager,worker}``
+  to ``docker/{base,manager,worker}.dockerfile`` for a consistent naming and file extension scheme.
+- Refactor ``docker/base.dockerfile`` to a multi-stage build keeping build-only tooling out of runtime
+  while preserving Python app execution and Node.js support for `CWL` JavaScript evaluation.
+- Reduce Docker image sizes compared to ``6.12.0`` by about ``19%`` overall:
+  - ``manager`` image from ~1214 MB to ~976 MB.
+  - ``worker`` image from ~1261 MB to ~1023 MB.
+- Harden Docker images by removing unnecessary package-management tooling and bootstrap packages
+  after install steps (e.g.: ``apt``, ``libapt-pkg``, ``perl-base``, ``curl``, ``gnupg``).
+- Harden Docker runtime by removing ``pip`` and ``ensurepip`` after all required install steps,
+  while keeping ``setuptools``/``pkg_resources`` for ``pyramid`` compatibility.
+- Update Python dependency cleanup logic to recursively remove non-empty directories of unnecessary files
+  (e.g.: ``__pycache__``, ``tests``/``test``) to reduce Docker image size.
+- Switch PDF text generation fallback font in ``weaver/transform/handlers.py`` from ``Arial`` to ``Helvetica``
+  to avoid dependency on system-installed fonts in runtime images, since installed fonts are removed.
+- Update Docker smoke-tests to employ ``unittest`` since ``pytest`` is no longer available as runtime
+  installation and execution, due to installation tooling removal. These tests also validate the tooling removal.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.13.0:
+
+`6.13.0 <https://github.com/crim-ca/weaver/tree/6.13.0>`_ (2026-06-06)
+====================================================================================================================
+
+Changes:
+--------
 - Add documentation details about `Job` single-output and transform formatting features.
 - Add documentation summary of relevant `Job` endpoints for quicker reference of available operations.
 - Set up `Weaver Agent Skills <https://github.com/crim-ca/weaver/agents/skills/>`_ based on
@@ -44,6 +73,10 @@ Changes:
 
 Fixes:
 ------
+- Update ``cwl-utils>=0.42`` to handle internal ``TypeError`` on ``None`` reference when processing `CWL` definitions
+  with JavaScript parser. This is mostly to avoid sporadic ``check-links`` errors when generating documentation details,
+  which is the only place it has been observed so far, not within in actual `Process` runtimes (relates
+  to `common-workflow-language/cwl-utils#137 <https://github.com/common-workflow-language/cwl-utils/issues/137>`_).
 - Allow ``Accept-Profile`` reporting within `Job Inputs` parameters to contain ``<>`` without failing validation.
 
 .. _changes_6.12.0:
