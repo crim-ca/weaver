@@ -87,6 +87,7 @@ if TYPE_CHECKING:
     from docker.client import DockerClient
 
     from weaver.typedefs import (
+        URL,
         AnyHeadersContainer,
         AnyRegistryContainer,
         AnyRequestType,
@@ -101,8 +102,7 @@ if TYPE_CHECKING:
         ProcessDeployment,
         PyramidRequest,
         SettingsType,
-        TypedDict,
-        URL
+        TypedDict
     )
     from weaver.utils import LoggerHandler
 
