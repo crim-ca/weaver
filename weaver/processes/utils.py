@@ -56,7 +56,6 @@ from weaver.processes.constants import PACKAGE_EXTENSIONS
 from weaver.processes.convert import get_field, normalize_ordered_io, set_field
 from weaver.processes.types import ProcessType
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
-from weaver.typedefs import URL
 from weaver.utils import (
     VersionFormat,
     VersionLevel,
@@ -102,7 +101,8 @@ if TYPE_CHECKING:
         ProcessDeployment,
         PyramidRequest,
         SettingsType,
-        TypedDict
+        TypedDict,
+        URL
     )
     from weaver.utils import LoggerHandler
 
