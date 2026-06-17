@@ -56,6 +56,7 @@ from weaver.processes.constants import PACKAGE_EXTENSIONS
 from weaver.processes.convert import get_field, normalize_ordered_io, set_field
 from weaver.processes.types import ProcessType
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
+from weaver.typedefs import URL
 from weaver.utils import (
     VersionFormat,
     VersionLevel,
@@ -435,8 +436,8 @@ def _get_multipart_content(content, request):
         raise HTTPBadRequest(f"Invalid multipart content format: {exc}")
 
 
-def create_multipart_deploy(cwl_files, process_description=None, boundary=None):
-    # type: (List[Union[str, CWL]], Optional[JSON], Optional[str]) -> Tuple[bytes, str]
+def create_multipart_deploy(cwl_files, url, process_description=None, boundary=None):
+    # type: (List[Union[str, CWL]], URL, Optional[JSON], Optional[str]) -> Tuple[bytes, str]
     """
     Create ``multipart/related`` deployment content from a ``list`` of :term:`CWL` files.
 
@@ -445,6 +446,7 @@ def create_multipart_deploy(cwl_files, process_description=None, boundary=None):
 
         - A file path (``str``) to a :term:`CWL` file (will be loaded)
         - A :term:`CWL` ``dict`` (already parsed)
+    :param url: Domain or hostname for Content-ID header generation
     :param process_description: Optional :term:`Process` description metadata to include
     :param boundary: Optional custom ``boundary`` ``str`` (auto-generated if not provided)
     :returns:
@@ -486,7 +488,7 @@ def create_multipart_deploy(cwl_files, process_description=None, boundary=None):
         # Replace the default Content-Type (text/json) with the CWL-specific one
         part.replace_header("Content-Type", ContentType.APP_CWL_JSON)
 
-        part.add_header("Content-ID", f"<{cwl_id}>")
+        part.add_header("Content-ID", f"<{cwl_id}@{url}>")
         part.add_header("Content-Location", cwl_id)
 
         msg.attach(part)
@@ -909,18 +911,27 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
             LOGGER.warning("Invalid Content-ID header format: %s", exc)
 
         if resource_id:
-            # Check if payload already has an ID that doesn't match
-            if "id" in payload and payload["id"] != resource_id:
+            # Extract process ID from payload - check multiple possible locations
+            payload_id = payload.get("id")  # Direct CWL or top-level
+            if not payload_id and "processDescription" in payload:
+                process_desc = payload.get("processDescription", {})
+                # OLD schema: processDescription.process.id
+                if "process" in process_desc and isinstance(process_desc["process"], dict):
+                    payload_id = process_desc["process"].get("id")
+                # OGC schema: processDescription.id
+                elif "id" in process_desc:
+                    payload_id = process_desc.get("id")
+
+            # Validate Content-ID matches payload ID
+            if payload_id and payload_id != resource_id:
                 raise HTTPBadRequest(json={
                     "title": "Content-ID header mismatch",
                     "description": (
-                        f"Content-ID header resource [{resource_id}] does not match payload id [{payload['id']}]. "
+                        f"Content-ID header resource [{resource_id}] does not match payload id [{payload_id}]. "
                         "Please ensure they match or omit the Content-ID header."
                     ),
-                    "cause": {"Content-ID": content_id_header, "payload_id": payload["id"]},
+                    "cause": {"Content-ID": content_id_header, "payload_id": payload_id},
                 })
-            # Set process ID from Content-ID resource part if not already in payload
-            payload.setdefault("id", resource_id)
 
     # For multipart/list payload, skip validation and go directly to multi-CWL deployment
     # Each individual CWL package will be validated during recursive deployment

@@ -869,9 +869,9 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         process_data = self.get_process_deploy_template(process_name)
         package_mock = mocked_process_package()
 
-        # Add Content-ID header with different ID than payload
-        headers = copy.deepcopy(self.json_headers)
-        headers["Content-ID"] = "<different-process-id>"
+        # Add Content-ID header with different ID than payload (RFC 2392 format)
+        headers = dict(self.json_headers)
+        headers["Content-ID"] = "<different-process-id@example.com>"
 
         with contextlib.ExitStack() as stack:
             for pkg in package_mock:
@@ -1554,46 +1554,79 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
         According to CWL packed document specification, when there's no top-level process
         (as with ``$graph``), the runner should choose the process with ``id: "#main"``.
-        This test validates that deployment succeeds when ``#main`` is properly specified.
+        With multiple items in $graph, #main must be a Workflow that uses the other tools.
 
         .. seealso::
             https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents
         """
-        test_id = self.fully_qualified_test_name()
         cwl = {
             "cwlVersion": "v1.2",
             "$graph": [
                 {
                     "class": "CommandLineTool",
-                    "id": "#main",  # Explicitly mark this as the entry point
-                    "inputs": {},
+                    "id": "#echo-tool",
+                    "inputs": {
+                        "message": "string"
+                    },
                     "outputs": {
                         "output": {
                             "type": "File",
-                            "outputBinding": {"glob": "stdout.log"}
-                        }
-                    },
-                    "requirements": {
-                        "DockerRequirement": {"dockerPull": "python:3.12-alpine"}
-                    },
-                    "baseCommand": ["python3", "-V"],
-                    "stdout": "stdout.log"
-                },
-                {
-                    "class": "CommandLineTool",
-                    "id": f"{test_id}-tool-2",
-                    "inputs": {},
-                    "outputs": {
-                        "output": {
-                            "type": "File",
-                            "outputBinding": {"glob": "stdout.log"}
+                            "outputBinding": {"glob": "output.txt"}
                         }
                     },
                     "requirements": {
                         "DockerRequirement": {"dockerPull": "alpine:latest"}
                     },
-                    "baseCommand": ["echo", "hello"],
-                    "stdout": "stdout.log"
+                    "baseCommand": ["sh", "-c"],
+                    "arguments": ["echo $(inputs.message) > output.txt"]
+                },
+                {
+                    "class": "CommandLineTool",
+                    "id": "#cat-tool",
+                    "inputs": {
+                        "file": "File"
+                    },
+                    "outputs": {
+                        "output": {
+                            "type": "File",
+                            "outputBinding": {"glob": "cat_output.txt"}
+                        }
+                    },
+                    "requirements": {
+                        "DockerRequirement": {"dockerPull": "alpine:latest"}
+                    },
+                    "baseCommand": ["cat"],
+                    "stdin": "$(inputs.file.path)",
+                    "stdout": "cat_output.txt"
+                },
+                {
+                    "class": "Workflow",
+                    "id": "#main",  # Main entry point must be a Workflow when multiple items in $graph
+                    "inputs": {
+                        "message": "string"
+                    },
+                    "outputs": {
+                        "result": {
+                            "type": "File",
+                            "outputSource": "cat_step/output"
+                        }
+                    },
+                    "steps": {
+                        "echo_step": {
+                            "run": "echo-tool",
+                            "in": {
+                                "message": "message"
+                            },
+                            "out": ["output"]
+                        },
+                        "cat_step": {
+                            "run": "cat-tool",
+                            "in": {
+                                "file": "echo_step/output"
+                            },
+                            "out": ["output"]
+                        }
+                    }
                 }
             ]
         }
@@ -1608,13 +1641,22 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "processSummary" in result
         assert result["deploymentDone"] is True
 
-        # The main process should be the one with id "#main"
+        # The main process should be the one with id "#main" (stripped to "main")
         main_id = result["processSummary"]["id"]
-        assert "main" in main_id.lower()
+        assert main_id == "main"
 
-        # Verify main process was deployed
-        resp = self.app.get(f"/processes/{main_id}")
-        assert resp.status_code == 200
+        # Verify main workflow was deployed
+        desc = self.get_process_description(main_id, schema=ProcessSchema.OLD)
+        assert desc["process"]["id"] == main_id
+        pkg = self.get_application_package(main_id)
+        assert pkg["class"] == "Workflow"
+
+        # Verify child tools were deployed
+        desc = self.get_process_description("echo-tool", schema=ProcessSchema.OLD)
+        assert desc["process"]["id"] == "echo-tool"
+
+        desc = self.get_process_description("cat-tool", schema=ProcessSchema.OLD)
+        assert desc["process"]["id"] == "cat-tool"
 
     def test_deploy_process_CWL_direct_graph_multi_valid(self):
         """

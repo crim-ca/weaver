@@ -6459,6 +6459,25 @@ class CWLIdentifier(ProcessIdentifier):
     )
 
 
+class CWLGraphEntryPoint(ExtendedSchemaNode):
+    schema_type = String
+    description = "CWL $graph entry point identifier with # prefix (e.g., '#main')."
+    example = "#main"
+    pattern = r"^#[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*$"
+
+
+class CWLGraphIdentifier(AnyOfKeywordSchema):
+    """
+    Identifier for a CWL item within a $graph.
+    Can be a #-prefixed entry point, a UUID, or a standard process ID.
+    """
+    _any_of = [
+        CWLGraphEntryPoint(),
+        UUID(),
+        SLUG(),
+    ]
+
+
 class CWLIntentURL(URL):
     description = (
         "Identifier URL to a concept for the type of computational operation accomplished by this Process "
@@ -7383,7 +7402,7 @@ class DeployContextDefinition(NotKeywordSchema, DeployParameters):
 
 
 class CWLGraphItem(CWLApp):  # no 'cwlVersion', only one at the top
-    id = CWLIdentifier()  # required in this case
+    id = CWLGraphIdentifier()  # required in this case
 
 
 class CWLGraphList(ExtendedSequenceSchema):

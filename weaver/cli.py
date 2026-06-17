@@ -701,6 +701,7 @@ class WeaverClient(object):
 
     def _parse_deploy_package(
         self,
+        url,            # type: Optional[URL]
         body,           # type: JSON
         cwl,            # type: Optional[Union[CWL, str, List[Union[CWL, str]]]]
         wps,            # type: Optional[str]
@@ -735,6 +736,7 @@ class WeaverClient(object):
 
                 multipart_content, content_type = create_multipart_deploy(
                     cwl_files=cwl_packages,
+                    url=url,
                     process_description=body if body else None
                 )
 
@@ -1111,7 +1113,7 @@ class WeaverClient(object):
         settings = copy.deepcopy(self._settings)
         settings["weaver.wps_restapi_url"] = base
         data = result.body
-        result = self._parse_deploy_package(data, cwl, wps, process_id, req_headers, settings)
+        result = self._parse_deploy_package(base, data, cwl, wps, process_id, req_headers, settings)
         if not result.success:
             return result
         p_id = result.message

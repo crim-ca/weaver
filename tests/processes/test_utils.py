@@ -966,7 +966,7 @@ class TestMultipartDeployment:
             }
         }
 
-        content, content_type = create_multipart_deploy([tool_cwl])
+        content, content_type = create_multipart_deploy([tool_cwl], "localhost")
 
         # Verify content type
         assert "multipart/related" in content_type
@@ -1014,7 +1014,7 @@ class TestMultipartDeployment:
             }
         }
 
-        content, content_type = create_multipart_deploy([tool1_cwl, tool2_cwl, workflow_cwl])
+        content, content_type = create_multipart_deploy([tool1_cwl, tool2_cwl, workflow_cwl], "localhost")
 
         # Verify content type includes start parameter for main workflow
         assert "multipart/related" in content_type
@@ -1053,7 +1053,7 @@ class TestMultipartDeployment:
             }
         }
 
-        content, content_type = create_multipart_deploy([tool_cwl], process_description=process_desc)
+        content, content_type = create_multipart_deploy([tool_cwl], "localhost", process_description=process_desc)
 
         # Verify content type
         assert "multipart/related" in content_type
@@ -1071,7 +1071,7 @@ class TestMultipartDeployment:
         Test that creating multipart from empty list raises error.
         """
         with pytest.raises(ValueError, match="At least one CWL file must be provided"):
-            create_multipart_deploy([])
+            create_multipart_deploy([], "localhost")
 
     def test_create_multipart_deploy_custom_boundary(self):
         """
@@ -1087,7 +1087,7 @@ class TestMultipartDeployment:
         }
 
         custom_boundary = "CustomBoundary123"
-        content, content_type = create_multipart_deploy([tool_cwl], boundary=custom_boundary)
+        content, content_type = create_multipart_deploy([tool_cwl], "localhost", boundary=custom_boundary)
 
         # Verify custom boundary is used
         assert f"boundary={custom_boundary}" in content_type
@@ -1112,7 +1112,7 @@ class TestMultipartDeployment:
             json.dump(tool_cwl, f)
 
         # Create multipart from file path
-        content, content_type = create_multipart_deploy([str(cwl_file)])
+        content, content_type = create_multipart_deploy([str(cwl_file)], "localhost")
 
         # Verify content
         assert isinstance(content, bytes)
@@ -1590,7 +1590,7 @@ class TestMultipartDeployment:
             "steps": {}
         }
 
-        content, content_type = create_multipart_deploy([workflow_cwl])
+        content, content_type = create_multipart_deploy([workflow_cwl], "localhost")
 
         # Verify content was created
         assert isinstance(content, bytes)
@@ -1625,7 +1625,7 @@ class TestMultipartDeployment:
             "steps": {}
         }
 
-        content, content_type = create_multipart_deploy([workflow1, workflow2])
+        content, content_type = create_multipart_deploy([workflow1, workflow2], "localhost")
 
         # Verify content was created
         assert isinstance(content, bytes)
