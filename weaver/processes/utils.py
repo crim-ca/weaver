@@ -910,7 +910,14 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         try:
             resource_id, _ = parse_content_id(content_id_header)
         except ValueError as exc:
-            LOGGER.warning("Invalid Content-ID header format: %s", exc)
+            raise HTTPBadRequest(json={
+                "title": "Invalid Content-ID header format",
+                "description": (
+                    f"Content-ID header does not conform to RFC 2392 format: {exc}. "
+                    "Expected format: '<resource-id@context>'"
+                ),
+                "cause": {"Content-ID": content_id_header, "error": str(exc)},
+            })
 
         if resource_id:
             # Extract process ID from payload - check multiple possible locations
@@ -926,7 +933,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
 
             # Validate Content-ID matches payload ID
             if payload_id and payload_id != resource_id:
-                raise HTTPBadRequest(json={
+                raise HTTPUnprocessableEntity(json={
                     "title": "Content-ID header mismatch",
                     "description": (
                         f"Content-ID header resource [{resource_id}] does not match payload id [{payload_id}]. "

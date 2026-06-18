@@ -1058,7 +1058,7 @@ class WeaverClient(object):
 
         The referenced :term:`Application Package` must be one of:
         - :term:`CWL` body, local file or URL in :term:`JSON` or :term:`YAML` format
-        - List of :term:`CWL` bodies/files for multi-process deployment (workflow with tools or multiple tools)
+        - List of :term:`CWL` bodies/files for multi-process deployment (workflow with tools)
         - :term:`WPS` process URL with :term:`XML` response
         - :term:`WPS-REST` process URL with :term:`JSON` response
         - :term:`OGC API - Processes` process URL with :term:`JSON` response
@@ -1094,6 +1094,9 @@ class WeaverClient(object):
             does not matter as tools are automatically deployed before workflows.
             The ``Workflow`` will be deployed as the main :term:`Process` with the requested deployment ID, while
             ``CommandLineTool`` definitions are deployed as supporting processes referenced by the ``Workflow``.
+            When using :term:`CWL` packed documents with ``$graph`` containing multiple items, the ``#main`` ID
+            designation should be used to specify the entry point. If multiple ``Workflow`` definitions exist
+            in a packed document, the one with ``id: "#main"`` will be deployed as the main :term:`Process`.
         :param wps:
             URL to an existing :term:`WPS` process (WPS-1/2 or WPS-REST/OGC-API) to represent as
             equivalent :term:`OGC API - Processes` representation. Note that it is up to the server to perform the

@@ -878,11 +878,34 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 stack.enter_context(pkg)
             path = "/processes"
             resp = self.app.post_json(path, params=process_data, headers=headers, expect_errors=True)
-            assert resp.status_code == 400
+            assert resp.status_code == 422
             assert resp.content_type == ContentType.APP_JSON
             assert "Content-ID header mismatch" in resp.json["title"]
             assert "different-process-id" in resp.json["cause"]["Content-ID"]
             assert process_name == resp.json["cause"]["payload_id"]
+
+    def test_deploy_process_content_id_header_invalid_format(self):
+        """
+        Test that deployment fails when Content-ID header has invalid RFC 2392 format.
+        """
+        process_name = self.fully_qualified_test_name()
+        process_data = self.get_process_deploy_template(process_name)
+        package_mock = mocked_process_package()
+
+        # Add Content-ID header with invalid format (missing required angle brackets and @)
+        headers = dict(self.json_headers)
+        headers["Content-ID"] = "invalid-format-no-brackets"
+
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
+            path = "/processes"
+            resp = self.app.post_json(path, params=process_data, headers=headers, expect_errors=True)
+            assert resp.status_code == 400
+            assert resp.content_type == ContentType.APP_JSON
+            assert "Invalid Content-ID header format" in resp.json["title"]
+            assert "RFC 2392" in resp.json["description"]
+            assert "invalid-format-no-brackets" in resp.json["cause"]["Content-ID"]
 
     def test_deploy_process_missing_or_invalid_components(self):
         process_name = self.fully_qualified_test_name()
