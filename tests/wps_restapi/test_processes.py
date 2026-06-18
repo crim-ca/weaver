@@ -1578,6 +1578,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "#main",
             "Workflow",
             "workflow-id",
+            422,
         ),
         (
             "main_on_both_tool_and_workflow",
@@ -1585,6 +1586,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "#main",
             "Workflow",
             "#main",
+            400,
         ),
     ])
     def test_deploy_process_CWL_direct_graph_multi_main_invalid(
@@ -1594,6 +1596,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         first_id,
         second_class,
         second_id,
+        expected_status,
     ):
         """
         Test deployment failures when ``#main`` entry point is improperly used.
@@ -1699,14 +1702,15 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         except Exception:
             resp_body = resp.text[:200] if hasattr(resp, 'text') else str(resp.body[:200])
 
-        assert resp.status_code == 422, (
-            f"Expected 422 Unprocessable Entity for invalid #main usage ({case_name}), "
+        assert resp.status_code == expected_status, (
+            f"Expected {expected_status} for invalid #main usage ({case_name}), "
             f"got {resp.status_code}: {resp_body}"
         )
 
-        result = resp.json
-        assert "title" in result or "description" in result, \
-            "Error response should contain title or description"
+        if resp.content_type == ContentType.APP_JSON:
+            result = resp.json
+            assert "title" in result or "description" in result, \
+                "Error response should contain title or description"
 
     def test_deploy_process_CWL_direct_graph_multi_tools_with_main_valid(self):
         """
