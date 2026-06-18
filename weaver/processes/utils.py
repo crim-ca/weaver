@@ -998,49 +998,15 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
             execution_units = [execution_units]
         if not isinstance(execution_units, list) or len(execution_units) < 1:
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
-
-        # Handle multiple execution units similar to $graph multi-CWL deployment
-        if len(execution_units) == 1:
-            # Single execution unit
-            execution_unit = execution_units[0]
-            if not isinstance(execution_unit, dict):
-                raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
-            package = execution_unit.get("unit")
-            reference = execution_unit.get("href")
-            found = package or reference
-        else:
-            # Multiple execution units - must all be CWL packages for multi-deployment
-            # Behaves consistently with $graph: [cwl1, cwl2] deployment
-            packages = []
-            for idx, execution_unit in enumerate(execution_units):
-                if not isinstance(execution_unit, dict):
-                    raise HTTPUnprocessableEntity(f"Invalid parameter 'executionUnit[{idx}]'.")
-                unit_package = execution_unit.get("unit")
-                unit_reference = execution_unit.get("href")
-
-                if unit_reference:
-                    raise HTTPBadRequest(
-                        "Multiple execution units with 'href' references are not supported. "
-                        "Use 'unit' with CWL package definitions for multi-deployment."
-                    )
-
-                if not unit_package:
-                    raise HTTPBadRequest(f"Execution unit [{idx}] must contain a 'unit' with CWL package.")
-
-                # Validate it's a CWL package
-                if not isinstance(unit_package, dict):
-                    raise HTTPBadRequest(f"Execution unit [{idx}] 'unit' must be a CWL package definition.")
-                if "cwlVersion" not in unit_package:
-                    raise HTTPBadRequest(
-                        "Multiple execution units are only supported for CWL packages. "
-                        f"Execution unit [{idx}] must be a valid CWL definition with 'cwlVersion'."
-                    )
-
-                packages.append(unit_package)
-
-            package = packages
-            reference = None
-            found = True
+        if len(execution_units) > 1:
+            # FIXME: Multi-execution unit deployment is not yet supported
+            raise HTTPNotImplemented("Multiple execution units are not supported.")
+        execution_unit = execution_units[0]
+        if not isinstance(execution_unit, dict):
+            raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
+        package = execution_unit.get("unit")
+        reference = execution_unit.get("href")
+        found = package or reference
     if not found:
         params = [
             "process (href)",

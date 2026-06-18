@@ -17,8 +17,6 @@ Changes:
   along with optional `Process` description metadata (relates to `#56 <https://github.com/crim-ca/weaver/issues/56>`_,
   resolves `#717 <https://github.com/crim-ca/weaver/issues/717>`_,
   resolves `#874 <https://github.com/crim-ca/weaver/issues/874>`_).
-- Add support for multiple ``executionUnit`` entries during `Process` deployment when provided with `CWL`-like
-  media-types, allowing natural deployment of multi-file `Application Package` definitions.
 - Add support for `CWL` ``$graph`` representation with multiple entries, enabling deployment of workflows with
   embedded step definitions without manual preprocessing
   (resolves `#56 <https://github.com/crim-ca/weaver/issues/56>`_).
