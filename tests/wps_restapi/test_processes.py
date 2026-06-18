@@ -1548,6 +1548,204 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "description" in result
         assert "#main" in result["description"]
 
+    @parameterized.expand([
+        (
+            "main_on_tool_with_workflow_different_id",
+            "CommandLineTool",
+            "#main",
+            "Workflow",
+            "workflow-id",
+        ),
+        (
+            "main_on_both_tool_and_workflow",
+            "CommandLineTool",
+            "#main",
+            "Workflow",
+            "#main",
+        ),
+    ])
+    def test_deploy_process_CWL_direct_graph_multi_main_invalid(
+        self,
+        case_name,
+        first_class,
+        first_id,
+        second_class,
+        second_id,
+    ):
+        """
+        Test deployment failures when ``#main`` entry point is improperly used.
+
+        When multiple items are in ``$graph``, the ``#main`` entry point must be:
+        - A Workflow (if a Workflow is present with multiple items)
+        - Unique (only one ``#main`` allowed)
+
+        This test covers error cases:
+        1. ``#main`` on a CommandLineTool while Workflow has different ID (Workflow must have #main)
+        2. ``#main`` on both CommandLineTool and Workflow (duplicate #main)
+        """
+        # Build $graph with provided classes and IDs
+        graph = []
+
+        # First item
+        if first_class == "CommandLineTool":
+            graph.append({
+                "class": "CommandLineTool",
+                "id": first_id,
+                "inputs": {},
+                "outputs": {
+                    "output": {
+                        "type": "File",
+                        "outputBinding": {"glob": "stdout.log"}
+                    }
+                },
+                "requirements": {
+                    "DockerRequirement": {"dockerPull": "alpine:latest"}
+                },
+                "baseCommand": ["echo", "first"],
+                "stdout": "stdout.log"
+            })
+        else:  # Workflow
+            graph.append({
+                "class": "Workflow",
+                "id": first_id,
+                "inputs": {"message": "string"},
+                "outputs": {
+                    "result": {
+                        "type": "File",
+                        "outputSource": "tool_step/output"
+                    }
+                },
+                "steps": {
+                    "tool_step": {
+                        "run": "other-tool",
+                        "in": {"message": "message"},
+                        "out": ["output"]
+                    }
+                }
+            })
+
+        # Second item
+        if second_class == "CommandLineTool":
+            graph.append({
+                "class": "CommandLineTool",
+                "id": second_id,
+                "inputs": {},
+                "outputs": {
+                    "output": {
+                        "type": "File",
+                        "outputBinding": {"glob": "stdout.log"}
+                    }
+                },
+                "requirements": {
+                    "DockerRequirement": {"dockerPull": "alpine:latest"}
+                },
+                "baseCommand": ["echo", "second"],
+                "stdout": "stdout.log"
+            })
+        else:  # Workflow
+            graph.append({
+                "class": "Workflow",
+                "id": second_id,
+                "inputs": {"message": "string"},
+                "outputs": {
+                    "result": {
+                        "type": "File",
+                        "outputSource": "tool_step/output"
+                    }
+                },
+                "steps": {
+                    "tool_step": {
+                        "run": "#main" if first_id == "#main" else "other-tool",
+                        "in": {"message": "message"},
+                        "out": ["output"]
+                    }
+                }
+            })
+
+        cwl = {
+            "cwlVersion": "v1.2",
+            "$graph": graph
+        }
+
+        headers = {"Content-Type": ContentType.APP_CWL_JSON}
+        resp = mocked_sub_requests(self.app, "post", "/processes", data=cwl, headers=headers,
+                                   only_local=True, expect_errors=True)
+
+        try:
+            resp_body = resp.json if resp.content_type == ContentType.APP_JSON else resp.text[:200]
+        except Exception:
+            resp_body = resp.text[:200] if hasattr(resp, 'text') else str(resp.body[:200])
+
+        assert resp.status_code == 400, \
+            f"Expected 400 Bad Request for invalid #main usage ({case_name}), got {resp.status_code}: {resp_body}"
+
+        result = resp.json
+        assert "title" in result or "description" in result, \
+            "Error response should contain title or description"
+
+    def test_deploy_process_CWL_direct_graph_multi_tools_with_main_valid(self):
+        """
+        Test deployment of multiple CommandLineTools with ``#main`` entry point (no Workflow).
+
+        This is a valid case: when there's no Workflow, a CommandLineTool with ``id: "#main"``
+        can serve as the entry point.
+
+        .. seealso::
+            https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents
+        """
+        test_id = self.fully_qualified_test_name()
+        cwl = {
+            "cwlVersion": "v1.2",
+            "$graph": [
+                {
+                    "class": "CommandLineTool",
+                    "id": "#main",
+                    "inputs": {},
+                    "outputs": {
+                        "output": {
+                            "type": "File",
+                            "outputBinding": {"glob": "stdout.log"}
+                        }
+                    },
+                    "requirements": {
+                        "DockerRequirement": {"dockerPull": "python:3.12-alpine"}
+                    },
+                    "baseCommand": ["python3", "-V"],
+                    "stdout": "stdout.log"
+                },
+                {
+                    "class": "CommandLineTool",
+                    "id": f"{test_id}-tool-2",
+                    "inputs": {},
+                    "outputs": {
+                        "output": {
+                            "type": "File",
+                            "outputBinding": {"glob": "stdout.log"}
+                        }
+                    },
+                    "requirements": {
+                        "DockerRequirement": {"dockerPull": "alpine:latest"}
+                    },
+                    "baseCommand": ["echo", "hello"],
+                    "stdout": "stdout.log"
+                }
+            ]
+        }
+
+        headers = {"Content-Type": ContentType.APP_CWL_JSON}
+        resp = mocked_sub_requests(self.app, "post", "/processes", data=cwl, headers=headers,
+                                   only_local=True)
+        assert resp.status_code == 201, \
+            f"Expected 201 Created for valid multi-tool $graph with #main, got {resp.status_code}: {resp.json}"
+
+        result = resp.json
+        assert "processSummary" in result
+        assert result["deploymentDone"] is True
+
+        # The main process should be the one with id "#main" (stripped to "main")
+        main_id = result["processSummary"]["id"]
+        assert main_id == "main"
+
     def test_deploy_process_CWL_direct_graph_multi_with_main(self):
         """
         Test deployment of multiple CWL definitions via ``$graph`` with ``#main`` entry point.

@@ -334,7 +334,7 @@ def resolve_cwl_graph(package):
         - ``tuple`` of (``list`` of :term:`CWL` ``dict`` items, original package with ``$graph``) if multiple items
 
     .. seealso::
-        - `#56 <https://github.com/crim-ca/weaver/issues/56>`_
+        - `crim-ca/weaver#56 <https://github.com/crim-ca/weaver/issues/56>`_
         - `CWL Packed Documents <https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents>`_
     """
     if "$graph" not in package:
@@ -396,29 +396,33 @@ def resolve_deployment_order(cwl_packages):
             "value": [wf.get("id") for wf in workflows]
         })
 
-    # FIXME: Temporarily require at least one Workflow in multi-CWL deployments.
-    #        See: https://github.com/crim-ca/weaver/issues/171
-    #        If multiple sub-Workflow do not work directly, keep this limit.
-    #        Otherwise, allow tool-only deployments and demonstrate multi-workflow deployment.
+    # See: https://github.com/crim-ca/weaver/issues/171
+    # If multiple sub-Workflow do not work directly, keep this limit.
+    # Otherwise, allow tool-only deployments and demonstrate multi-workflow deployment.
     main_tool = None
-    if len(cwl_packages) > 1 and len(workflows) == 0:
-        # Check if any tool has id "#main"
-        for tool in tools:
-            tool_id = tool.get("id", "")
-            if tool_id == "#main":
-                main_tool = tool
-                break
+    if len(cwl_packages) > 1:
+        # When multiple packages exist, check for proper entry point designation
+        # Note: #main is only strictly required in packed $graph documents per CWL spec.
+        # For separate file deployments, a Workflow is implicitly the main entry point.
 
-        if not main_tool:
+        # Check for duplicate #main if explicitly used
+        main_items = [pkg for pkg in cwl_packages if pkg.get("id") == "#main"]
+        if len(main_items) > 1:
             raise HTTPBadRequest(json={
-                "title": "No entry point in $graph.",
+                "title": "Duplicate #main entry point in $graph.",
                 "description": (
-                    "Multi-CWL deployment without a Workflow requires a process with id '#main' "
-                    "as the entry point, according to CWL packed document specification."
+                    "Only one item in $graph can have id '#main' as the entry point."
                 ),
-                "cause": {"workflow_count": 0, "tool_count": len(tools), "main_found": False},
-                "value": [tool.get("id") for tool in tools]
+                "cause": {"main_count": len(main_items)},
+                "value": [item.get("class") for item in main_items]
             })
+
+        # If Workflow exists, it's the main entry point (regardless of #main designation)
+        if len(workflows) > 0:
+            main_tool = None
+        elif len(tools) > 0:
+            # No Workflow: use the tool with #main if present, otherwise use first tool
+            main_tool = next((t for t in tools if t.get("id") == "#main"), tools[0])
 
     main_workflow = workflows[0] if workflows else main_tool
     return tools, main_workflow
@@ -768,9 +772,7 @@ def parse_multipart_deploy(content, content_type, request=None):
     :param content: Raw multipart content (``str`` or ``bytes``)
     :param content_type: ``Content-Type`` header value (must include ``boundary`` parameter)
     :param request: Optional request object for extracting body
-    :returns:
-        ``tuple`` of (``list`` of :term:`CWL` packages,
-        optional :term:`Process` description metadata)
+    :returns: ``tuple`` of (``list`` of :term:`CWL` packages, optional :term:`Process` description metadata)
     :raises HTTPBadRequest: If multipart content is malformed or invalid
     """
     msg = _parse_multipart_message(content, content_type, request)

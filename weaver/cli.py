@@ -699,6 +699,37 @@ class WeaverClient(object):
             headers["Content-Type"] = ContentType.APP_CWL_JSON
         return body, headers
 
+    @staticmethod
+    def _parse_cwl_items(cwl):
+        # type: (List[Union[CWL, str]]) -> List[CWL]
+        """
+        Parse and load CWL items from various formats.
+
+        :param cwl: List of CWL items (dict, JSON string, or file path/URL).
+        :returns: List of parsed CWL package dictionaries.
+        :raises PackageRegistrationError: If any CWL item is invalid.
+        """
+        cwl_packages = []
+        for cwl_item in cwl:
+            if isinstance(cwl_item, str) and not cwl_item.startswith("{"):
+                # File reference or URL
+                cwl_data = load_file(cwl_item)
+            elif isinstance(cwl_item, str) and cwl_item.startswith("{") and cwl_item.endswith("}"):
+                # Literal JSON string
+                cwl_data = yaml.safe_load(cwl_item)
+            elif isinstance(cwl_item, dict):
+                # Already parsed CWL
+                cwl_data = cwl_item
+            else:
+                raise PackageRegistrationError(f"Invalid CWL item: {cwl_item}")
+
+            if not isinstance(cwl_data, dict) or cwl_data.get("cwlVersion") is None:
+                raise PackageRegistrationError("Invalid CWL structure in multi-CWL deployment.")
+
+            cwl_packages.append(cwl_data)
+
+        return cwl_packages
+
     def _parse_deploy_package(
         self,
         url,            # type: Optional[URL]
@@ -714,25 +745,7 @@ class WeaverClient(object):
             if isinstance(cwl, list) and len(cwl) > 1:
                 LOGGER.debug("Processing multi-CWL deployment with %d files", len(cwl))
 
-                # Load and parse each CWL file
-                cwl_packages = []
-                for cwl_item in cwl:
-                    if isinstance(cwl_item, str) and not cwl_item.startswith("{"):
-                        # File reference or URL
-                        cwl_data = load_file(cwl_item)
-                    elif isinstance(cwl_item, str) and cwl_item.startswith("{") and cwl_item.endswith("}"):
-                        # Literal JSON string
-                        cwl_data = yaml.safe_load(cwl_item)
-                    elif isinstance(cwl_item, dict):
-                        # Already parsed CWL
-                        cwl_data = cwl_item
-                    else:
-                        raise PackageRegistrationError(f"Invalid CWL item: {cwl_item}")
-
-                    if not isinstance(cwl_data, dict) or cwl_data.get("cwlVersion") is None:
-                        raise PackageRegistrationError("Invalid CWL structure in multi-CWL deployment.")
-
-                    cwl_packages.append(cwl_data)
+                cwl_packages = self._parse_cwl_items(cwl)
 
                 multipart_content, content_type = create_multipart_deploy(
                     cwl_files=cwl_packages,

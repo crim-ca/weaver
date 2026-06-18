@@ -1057,7 +1057,11 @@ class TestMultipartDeployment:
 
         # Verify content type
         assert "multipart/related" in content_type
+        assert "boundary=" in content_type
         assert isinstance(content, bytes)
+        # Extract boundary and verify it's in the raw content
+        boundary = content_type.split("boundary=")[1].split(";")[0].strip()
+        assert boundary.encode() in content
 
         # Parse the generated multipart content
         cwl_packages, parsed_desc = parse_multipart_deploy(content, content_type, request=None)
@@ -1117,6 +1121,10 @@ class TestMultipartDeployment:
         # Verify content
         assert isinstance(content, bytes)
         assert "multipart/related" in content_type
+        assert "boundary=" in content_type
+        # Extract boundary and verify it's in the raw content
+        boundary = content_type.split("boundary=")[1].split(";")[0].strip()
+        assert boundary.encode() in content
 
         # Parse and verify
         cwl_packages, _ = parse_multipart_deploy(content, content_type, request=None)
@@ -1124,27 +1132,14 @@ class TestMultipartDeployment:
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "file-tool"
 
-    def test_resolve_cwl_graph_no_graph(self):
+    @pytest.mark.parametrize("package", [
+        {"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "simple-tool"},
+        {"cwlVersion": "v1.2", "$graph": "not-a-list", "id": "test-package"},
+    ], ids=["no_graph", "non_list_graph"])
+    def test_resolve_cwl_graph_returns_as_is(self, package):
         """
-        Test ``resolve_cwl_graph`` returns package as-is when no ``$graph`` is present.
+        Test ``resolve_cwl_graph`` returns package as-is for invalid or missing $graph.
         """
-        package = {
-            "cwlVersion": "v1.2",
-            "class": "CommandLineTool",
-            "id": "simple-tool"
-        }
-        result = resolve_cwl_graph(package)
-        assert result == package
-
-    def test_resolve_cwl_graph_with_non_list_graph(self):
-        """
-        Test ``resolve_cwl_graph`` returns package as-is when ``$graph`` is not a list.
-        """
-        package = {
-            "cwlVersion": "v1.2",
-            "$graph": "not-a-list",  # Invalid but should be returned as-is
-            "id": "test-package"
-        }
         result = resolve_cwl_graph(package)
         assert result == package
 
@@ -1194,37 +1189,24 @@ class TestMultipartDeployment:
         assert original_package == package
         assert "$graph" in original_package
 
-    def test_resolve_deployment_order_single_workflow(self):
+    @pytest.mark.parametrize("packages,expected_tool_count,expected_workflow", [
+        ([{"class": "Workflow", "id": "test-workflow"}], 0, "workflow"),
+        ([{"class": "CommandLineTool", "id": "test-tool"}], 1, None),
+        ([{"class": "ExpressionTool", "id": "test-expr"}], 1, None),
+    ], ids=["single_workflow", "command_line_tool", "expression_tool"])
+    def test_resolve_deployment_order_simple(self, packages, expected_tool_count, expected_workflow):
         """
-        Test resolve_deployment_order with a single workflow.
+        Test resolve_deployment_order with single package types.
         """
-        workflow = {"class": "Workflow", "id": "test-workflow"}
-        tools, main_workflow = resolve_deployment_order([workflow])
+        tools, main_workflow = resolve_deployment_order(packages)
 
-        assert not tools
-        assert main_workflow == workflow
-
-    def test_resolve_deployment_order_command_line_tool(self):
-        """
-        Test resolve_deployment_order with CommandLineTool.
-        """
-        tool = {"class": "CommandLineTool", "id": "test-tool"}
-        tools, main_workflow = resolve_deployment_order([tool])
-
-        assert len(tools) == 1
-        assert tools[0] == tool
-        assert main_workflow is None
-
-    def test_resolve_deployment_order_expression_tool(self):
-        """
-        Test resolve_deployment_order with ExpressionTool.
-        """
-        expr_tool = {"class": "ExpressionTool", "id": "test-expr"}
-        tools, main_workflow = resolve_deployment_order([expr_tool])
-
-        assert len(tools) == 1
-        assert tools[0] == expr_tool
-        assert main_workflow is None
+        assert len(tools) == expected_tool_count
+        if expected_tool_count > 0:
+            assert tools[0] == packages[0]
+        if expected_workflow == "workflow":
+            assert main_workflow == packages[0]
+        else:
+            assert main_workflow is None
 
     def test_resolve_deployment_order_workflow_and_tools(self):
         """
@@ -1254,24 +1236,23 @@ class TestMultipartDeployment:
         assert exc_info.value.json is not None
         assert "Multiple Workflow definitions" in exc_info.value.json.get("title", "")
 
-    def test_resolve_deployment_order_tools_only_error(self):
+    def test_resolve_deployment_order_tools_only(self):
         """
-        Test resolve_deployment_order raises error when only tools are provided (no workflow).
+        Test resolve_deployment_order with only tools (no workflow).
 
-        According to CWL packed document specification, multiple tools without a workflow
-        require a #main entry point.
+        When multiple tools are provided without a Workflow, the first tool
+        is used as the main entry point.
         """
         tool1 = {"class": "CommandLineTool", "id": "tool-1"}
         tool2 = {"class": "CommandLineTool", "id": "tool-2"}
 
-        with pytest.raises(HTTPBadRequest) as exc_info:
-            resolve_deployment_order([tool1, tool2])
+        tools, main_workflow = resolve_deployment_order([tool1, tool2])
 
-        assert exc_info.value.json is not None
-        assert "No entry point in $graph" in exc_info.value.json.get("title", "")
-        assert exc_info.value.json.get("cause", {}).get("workflow_count") == 0
-        assert exc_info.value.json.get("cause", {}).get("tool_count") == 2
-        assert exc_info.value.json.get("cause", {}).get("main_found") is False
+        assert len(tools) == 2
+        assert tool1 in tools
+        assert tool2 in tools
+        # First tool should be returned as main when no workflow exists
+        assert main_workflow == tool1
 
     def test_resolve_deployment_order_no_packages(self):
         """
@@ -1391,98 +1372,50 @@ class TestMultipartDeployment:
             assert exc_info.value.json is not None
             assert "Failed to parse multipart content" in exc_info.value.json.get("title", "")
 
-    def test_extract_multipart_start_parameter_with_start(self):
+    @pytest.mark.parametrize("content_type,expected", [
+        ("multipart/related; boundary=----Boundary; start=workflow-main", "workflow-main"),
+        ('multipart/related; boundary=----Boundary; start="workflow-main"', "workflow-main"),
+        ("multipart/related; boundary=----Boundary; start=<workflow-main>", "workflow-main"),
+        ("multipart/mixed; boundary=----Boundary", None),
+        ("multipart/mixed; boundary=----Boundary; start=something", None),
+    ], ids=["with_start", "with_quotes", "with_angle_brackets", "no_start", "not_related"])
+    def test_extract_multipart_start_parameter(self, content_type, expected):
         """
-        Test _extract_multipart_start_parameter extracts start parameter correctly.
+        Test _extract_multipart_start_parameter handles various Content-Type header formats.
         """
-        content_type = "multipart/related; boundary=----Boundary; start=workflow-main"
         result = _extract_multipart_start_parameter(content_type)
-        assert result == "workflow-main"
+        assert result == expected
 
-    def test_extract_multipart_start_parameter_with_quotes(self):
+    @pytest.mark.parametrize("content,content_type,should_parse", [
+        (json.dumps({"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "test-tool"}),
+         ContentType.APP_CWL_JSON, True),
+        ("{ not valid json", ContentType.APP_JSON, False),
+        ("plain text", "text/plain", False),
+    ], ids=["cwl_json", "invalid_json", "unsupported_content_type"])
+    def test_interpret_multipart_part(self, content, content_type, should_parse):
         """
-        Test _extract_multipart_start_parameter handles quoted start parameter.
-        """
-        content_type = 'multipart/related; boundary=----Boundary; start="workflow-main"'
-        result = _extract_multipart_start_parameter(content_type)
-        assert result == "workflow-main"
-
-    def test_extract_multipart_start_parameter_with_angle_brackets(self):
-        """
-        Test _extract_multipart_start_parameter handles angle bracket notation.
-        """
-        content_type = "multipart/related; boundary=----Boundary; start=<workflow-main>"
-        result = _extract_multipart_start_parameter(content_type)
-        assert result == "workflow-main"
-
-    def test_extract_multipart_start_parameter_no_start(self):
-        """
-        Test _extract_multipart_start_parameter returns None when no start parameter.
-        """
-        content_type = "multipart/mixed; boundary=----Boundary"
-        result = _extract_multipart_start_parameter(content_type)
-        assert result is None
-
-    def test_extract_multipart_start_parameter_not_related(self):
-        """
-        Test _extract_multipart_start_parameter returns None for non-related types.
-        """
-        content_type = "multipart/mixed; boundary=----Boundary; start=something"
-        result = _extract_multipart_start_parameter(content_type)
-        assert result is None
-
-    def test_interpret_multipart_part_cwl_json(self):
-        """
-        Test _interpret_multipart_part successfully interprets CWL JSON part.
+        Test _interpret_multipart_part with various content types and validity.
         """
         from email.mime.text import MIMEText
 
-        tool_cwl = json.dumps({
-            "cwlVersion": "v1.2",
-            "class": "CommandLineTool",
-            "id": "test-tool"
-        })
-
-        part = MIMEText(tool_cwl, _subtype="json", _charset="utf-8")
-        part.replace_header("Content-Type", ContentType.APP_CWL_JSON)
-        part.add_header("Content-ID", "<tool-1>")
-        part.add_header("Content-Location", "test-tool.cwl")
+        part = MIMEText(content, _subtype="json" if "json" in content_type else "plain", _charset="utf-8")
+        part.replace_header("Content-Type", content_type)
+        if should_parse:
+            part.add_header("Content-ID", "<tool-1>")
+            part.add_header("Content-Location", "test-tool.cwl")
 
         result = _interpret_multipart_part(part)
 
-        assert result is not None
-        assert len(result) == 4
-        content_type, content_id, content_location, part_data = result
-        assert content_type == ContentType.APP_CWL_JSON
-        assert content_id == "tool-1"
-        assert content_location == "test-tool.cwl"
-        assert part_data["id"] == "test-tool"
-
-    def test_interpret_multipart_part_invalid_json(self):
-        """
-        Test _interpret_multipart_part returns None for malformed JSON.
-        """
-        from email.mime.text import MIMEText
-
-        invalid_json = "{ not valid json"
-        part = MIMEText(invalid_json, _subtype="json", _charset="utf-8")
-        part.replace_header("Content-Type", ContentType.APP_JSON)
-
-        result = _interpret_multipart_part(part)
-
-        assert result is None
-
-    def test_interpret_multipart_part_unsupported_content_type(self):
-        """
-        Test _interpret_multipart_part returns None for unsupported content types.
-        """
-        from email.mime.text import MIMEText
-
-        part = MIMEText("plain text", _subtype="plain", _charset="utf-8")
-
-        result = _interpret_multipart_part(part)
-
-        assert result is None
+        if should_parse:
+            assert result is not None
+            assert len(result) == 4
+            result_content_type, content_id, content_location, part_data = result
+            assert result_content_type == content_type
+            assert content_id == "tool-1"
+            assert content_location == "test-tool.cwl"
+            assert part_data["id"] == "test-tool"
+        else:
+            assert result is None
 
     def test_organize_deploy_parts_valid(self):
         """
@@ -1595,6 +1528,10 @@ class TestMultipartDeployment:
         # Verify content was created
         assert isinstance(content, bytes)
         assert "multipart/related" in content_type
+        assert "boundary=" in content_type
+        # Extract boundary and verify it's in the raw content
+        boundary = content_type.split("boundary=")[1].split(";")[0].strip()
+        assert boundary.encode() in content
 
         # Verify that the start parameter was added (workflow_count == 1 branch)
         assert "start=test-workflow" in content_type
@@ -1630,6 +1567,10 @@ class TestMultipartDeployment:
         # Verify content was created
         assert isinstance(content, bytes)
         assert "multipart/related" in content_type
+        assert "boundary=" in content_type
+        # Extract boundary and verify it's in the raw content
+        boundary = content_type.split("boundary=")[1].split(";")[0].strip()
+        assert boundary.encode() in content
 
         # First workflow should be the main one
         assert "start=workflow-1" in content_type
