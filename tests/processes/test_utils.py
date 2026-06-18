@@ -1236,23 +1236,24 @@ class TestMultipartDeployment:
         assert exc_info.value.json is not None
         assert "Multiple Workflow definitions" in exc_info.value.json.get("title", "")
 
-    def test_resolve_deployment_order_tools_only(self):
+    def test_resolve_deployment_order_tools_only_error(self):
         """
-        Test resolve_deployment_order with only tools (no workflow).
+        Test resolve_deployment_order raises error when only tools are provided (no workflow).
 
-        When multiple tools are provided without a Workflow, the first tool
-        is used as the main entry point.
+        According to CWL packed document specification, multiple tools without a workflow
+        require a #main entry point.
         """
         tool1 = {"class": "CommandLineTool", "id": "tool-1"}
         tool2 = {"class": "CommandLineTool", "id": "tool-2"}
 
-        tools, main_workflow = resolve_deployment_order([tool1, tool2])
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            resolve_deployment_order([tool1, tool2])
 
-        assert len(tools) == 2
-        assert tool1 in tools
-        assert tool2 in tools
-        # First tool should be returned as main when no workflow exists
-        assert main_workflow == tool1
+        assert exc_info.value.json is not None
+        assert "No entry point in $graph" in exc_info.value.json.get("title", "")
+        assert exc_info.value.json.get("cause", {}).get("workflow_count") == 0
+        assert exc_info.value.json.get("cause", {}).get("tool_count") == 2
+        assert exc_info.value.json.get("cause", {}).get("main_found") is False
 
     def test_resolve_deployment_order_no_packages(self):
         """

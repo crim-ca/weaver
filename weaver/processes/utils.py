@@ -401,10 +401,6 @@ def resolve_deployment_order(cwl_packages):
     # Otherwise, allow tool-only deployments and demonstrate multi-workflow deployment.
     main_tool = None
     if len(cwl_packages) > 1:
-        # When multiple packages exist, check for proper entry point designation
-        # Note: #main is only strictly required in packed $graph documents per CWL spec.
-        # For separate file deployments, a Workflow is implicitly the main entry point.
-
         # Check for duplicate #main if explicitly used
         main_items = [pkg for pkg in cwl_packages if pkg.get("id") == "#main"]
         if len(main_items) > 1:
@@ -420,9 +416,22 @@ def resolve_deployment_order(cwl_packages):
         # If Workflow exists, it's the main entry point (regardless of #main designation)
         if len(workflows) > 0:
             main_tool = None
-        elif len(tools) > 0:
-            # No Workflow: use the tool with #main if present, otherwise use first tool
-            main_tool = next((t for t in tools if t.get("id") == "#main"), tools[0])
+        elif len(tools) > 1:
+            # Multiple tools without Workflow: require #main designation
+            main_tool = next((t for t in tools if t.get("id") == "#main"), None)
+            if not main_tool:
+                raise HTTPBadRequest(json={
+                    "title": "No entry point in $graph.",
+                    "description": (
+                        "Multi-CWL deployment without a Workflow requires a process with id '#main' "
+                        "as the entry point, according to CWL packed document specification."
+                    ),
+                    "cause": {"workflow_count": 0, "tool_count": len(tools), "main_found": False},
+                    "value": [tool.get("id") for tool in tools]
+                })
+        elif len(tools) == 1:
+            # Single tool: it's implicitly the main entry point
+            main_tool = tools[0]
 
     main_workflow = workflows[0] if workflows else main_tool
     return tools, main_workflow

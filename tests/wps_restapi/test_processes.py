@@ -1699,8 +1699,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         except Exception:
             resp_body = resp.text[:200] if hasattr(resp, 'text') else str(resp.body[:200])
 
-        assert resp.status_code == 400, \
-            f"Expected 400 Bad Request for invalid #main usage ({case_name}), got {resp.status_code}: {resp_body}"
+        assert resp.status_code == 422, (
+            f"Expected 422 Unprocessable Entity for invalid #main usage ({case_name}), "
+            f"got {resp.status_code}: {resp_body}"
+        )
 
         result = resp.json
         assert "title" in result or "description" in result, \
