@@ -477,6 +477,9 @@ class TestMultipartDeployment:
     def test_classify_multipart_part_with_graph(self):
         """
         Test classification of part with ``cwlVersion`` and ``$graph``.
+        
+        This ensures that $graph CWL packages are properly stored in parts_by_cid
+        when a content_id is provided.
         """
         part_data = {
             "cwlVersion": "v1.2",
@@ -495,6 +498,9 @@ class TestMultipartDeployment:
         assert len(cwl_packages) == 1
         assert cwl_packages[0] == part_data
         assert result is None
+        # Verify content_id was stored in parts_by_cid
+        assert "graph-1" in parts_by_cid
+        assert parts_by_cid["graph-1"] == part_data
 
     def test_classify_multipart_part_with_process_description(self):
         """
@@ -1372,19 +1378,19 @@ class TestMultipartDeployment:
         """
         Test resolve_deployment_order with single tool among multiple packages.
 
-        This tests the case where multiple packages are provided but only one
-        is a valid tool (others have no/invalid class), triggering the implicit
-        main entry point assignment.
+        This tests the case where only one valid tool is provided,
+        which should be implicitly treated as the main entry point.
         """
+        # Provide two packages: one tool and one without a valid class
         tool = {"class": "CommandLineTool", "id": "only-tool"}
-        invalid_pkg = {"id": "no-class-field"}  # No class field, will be ignored
+        invalid_pkg = {"someField": "value"}  # No class field
 
         tools, main_workflow = resolve_deployment_order([tool, invalid_pkg])
 
+        # Single tool is returned in tools list AND as the main_workflow
         assert len(tools) == 1
         assert tools[0] == tool
-        # Single tool among multiple packages becomes the implicit main entry point
-        assert main_workflow == tool
+        assert main_workflow == tool  # Single tool becomes the implicit main entry point
 
     def test_classify_multipart_part_without_content_id(self):
         """

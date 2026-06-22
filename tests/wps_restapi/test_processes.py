@@ -959,6 +959,79 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert "different-id" in resp.json["cause"]["Content-ID"]
             assert process_name == resp.json["cause"]["payload_id"]
 
+    def test_deploy_process_multiple_execution_units_not_supported(self):
+        """
+        Test that deployment with multiple execution units raises HTTPNotImplemented.
+
+        """
+        process_name = self.fully_qualified_test_name()
+        process_data = {
+            "processDescription": {
+                "process": {"id": process_name}
+            },
+            "executionUnit": [
+                {"href": "http://example.com/tool1.cwl"},
+                {"href": "http://example.com/tool2.cwl"}  # Multiple units not supported
+            ]
+        }
+        package_mock = mocked_process_package()
+
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
+            path = "/processes"
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == 501
+            assert resp.content_type == ContentType.APP_JSON
+            assert "Multiple execution units are not supported" in resp.json.get("description", "")
+
+    def test_deploy_process_execution_unit_not_dict(self):
+        """
+        Test that deployment fails when execution_unit[0] is not a dict.
+        """
+        process_name = self.fully_qualified_test_name()
+        process_data = {
+            "processDescription": {
+                "process": {"id": process_name}
+            },
+            "executionUnit": ["not-a-dict"]  # First element is string, not dict
+        }
+        package_mock = mocked_process_package()
+
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
+            path = "/processes"
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == 400  # HTTPBadRequest from schema validation
+            assert resp.content_type == ContentType.APP_JSON
+
+    def test_deploy_process_no_package_reference_found(self):
+        """
+        Test that deployment fails when no valid package/reference is provided.
+        
+        Covers the validation: if not found: raise HTTPBadRequest with missing parameters list
+        """
+        process_name = self.fully_qualified_test_name()
+        process_data = {
+            "processDescription": {
+                "process": {"id": process_name}
+            },
+            "executionUnit": [
+                {}  # Empty dict - no 'unit' or 'href'
+            ]
+        }
+        package_mock = mocked_process_package()
+
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
+            path = "/processes"
+            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == 400  # HTTPBadRequest
+            assert resp.content_type == ContentType.APP_JSON
+            assert "Missing one of required parameters" in resp.json.get("description", "")
+
     def test_deploy_process_missing_or_invalid_components(self):
         process_name = self.fully_qualified_test_name()
         process_data = self.get_process_deploy_template(process_name)
