@@ -531,6 +531,8 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-response",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-response-body",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/replace-unsupported-content-type",
+        f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/resources-endpoint",
+        f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/resource-endpoint",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/static/indicator",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/undeploy/delete-op",
         f"{ogcapi_proc_part2}/req/deploy-replace-undeploy/undeploy/response",
