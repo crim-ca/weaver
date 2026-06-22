@@ -807,16 +807,18 @@ class TestMultipartDeployment:
 
     def test_parse_multipart_deploy_content_location_identifier_not_url(self):
         """
-        Test Content-Location header with identifier (not URL) uses part body content.
+        Test Content-Location with identifier (not URL) and empty body returns empty content.
 
-        This tests the uncovered return path in _fetch_multipart_content_location
-        where Content-Location is just an identifier (not starting with http://, https://, etc.)
-        and the function returns the original part_content.
+        This tests the specific return path in _fetch_multipart_content_location where:
+        1. Part body is empty
+        2. Content-Location is just an identifier (not starting with http://, https://, etc.)
+        3. Function returns the empty part_content instead of trying to fetch
         """
+        # Create a valid CWL tool to include alongside the empty part
         tool_cwl = {
             "cwlVersion": "v1.2",
             "class": "CommandLineTool",
-            "id": "test-tool",
+            "id": "valid-tool",
             "inputs": {},
             "outputs": {"output": {"type": "File"}}
         }
@@ -824,25 +826,32 @@ class TestMultipartDeployment:
 
         boundary = "----Boundary123"
         multipart_body = (
+            # First part: valid CWL with content
             f"------Boundary123\r\n"
             f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
-            f"Content-ID: <test-tool@example.com>\r\n"
-            # Content-Location is just an identifier, not a URL
-            f"Content-Location: test-tool\r\n"
+            f"Content-ID: <valid-tool@example.com>\r\n"
             f"\r\n"
             f"{tool_json}\r\n"
+            # Second part: empty body with identifier Content-Location (not a URL)
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-ID: <empty-part@example.com>\r\n"
+            f"Content-Location: just-an-identifier\r\n"
+            f"\r\n"
+            f"\r\n"  # Empty body
             f"------Boundary123--\r\n"
         ).encode('utf-8')
 
         content_type = f"multipart/mixed; boundary={boundary}"
 
+        # Should parse successfully, skipping the empty part with identifier Content-Location
         cwl_packages, process_desc = parse_multipart_deploy(
             multipart_body, content_type, request=None
         )
 
-        # Should successfully parse using part body content (not trying to fetch from Content-Location)
+        # Only the valid CWL should be parsed (empty part is skipped)
         assert len(cwl_packages) == 1
-        assert cwl_packages[0]["id"] == "test-tool"
+        assert cwl_packages[0]["id"] == "valid-tool"
         assert process_desc is None
 
     def test_parse_multipart_deploy_content_location_failure(self, monkeypatch):
@@ -944,6 +953,43 @@ class TestMultipartDeployment:
         # Should have parsed the valid CWL, skipped the malformed JSON
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "test-tool"
+
+    def test_parse_multipart_deploy_bytes_decoding(self):
+        """
+        Test that multipart parts with bytes content are properly decoded to strings.
+
+        This tests the code path in _interpret_multipart_part where part_content is bytes
+        and needs to be decoded using the part's charset.
+        """
+        tool_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}}
+        }
+        tool_json = json.dumps(tool_cwl)
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}; charset=utf-8\r\n"
+            f"Content-ID: <test-tool@example.com>\r\n"
+            f"\r\n"
+            f"{tool_json}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        cwl_packages, process_desc = parse_multipart_deploy(
+            multipart_body, content_type, request=None
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "test-tool"
+        assert cwl_packages[0]["class"] == "CommandLineTool"
+        assert process_desc is None
 
     def test_parse_multipart_deploy_unicode_decode_error(self):
         """

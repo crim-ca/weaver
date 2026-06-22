@@ -907,6 +907,58 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert "RFC 2392" in resp.json["description"]
             assert "invalid-format-no-brackets" in resp.json["cause"]["Content-ID"]
 
+    def test_deploy_process_content_id_header_ogc_schema_match(self):
+        """
+        Test Content-ID header validation with OGC schema (processDescription.id).
+
+        This tests the uncovered path where process ID is extracted from
+        processDescription.id (OGC schema) rather than processDescription.process.id (old schema).
+        """
+        process_name = self.fully_qualified_test_name()
+        # Use OGC schema format with processDescription.id directly
+        process_data = self.get_process_deploy_template(process_name, schema=ProcessSchema.OGC)
+        package_mock = mocked_process_package()
+
+        # Add Content-ID header matching the process ID
+        headers = dict(self.json_headers)
+        headers["Content-ID"] = f"<{process_name}@example.com>"
+
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
+            path = "/processes"
+            resp = self.app.post_json(path, params=process_data, headers=headers)
+            # Should succeed because Content-ID matches processDescription.id
+            assert resp.status_code == 201
+            assert resp.content_type == ContentType.APP_JSON
+
+    def test_deploy_process_content_id_header_ogc_schema_mismatch(self):
+        """
+        Test Content-ID header mismatch with OGC schema (processDescription.id).
+
+        This tests the error path where Content-ID doesn't match processDescription.id,
+        covering the validation logic for OGC schema format (not old schema with processDescription.process.id).
+        """
+        process_name = self.fully_qualified_test_name()
+        # Use OGC schema format with processDescription.id directly
+        process_data = self.get_process_deploy_template(process_name, schema=ProcessSchema.OGC)
+        package_mock = mocked_process_package()
+
+        # Add Content-ID header NOT matching the process ID
+        headers = dict(self.json_headers)
+        headers["Content-ID"] = "<different-id@example.com>"
+
+        with contextlib.ExitStack() as stack:
+            for pkg in package_mock:
+                stack.enter_context(pkg)
+            path = "/processes"
+            resp = self.app.post_json(path, params=process_data, headers=headers, expect_errors=True)
+            assert resp.status_code == 422
+            assert resp.content_type == ContentType.APP_JSON
+            assert "Content-ID header mismatch" in resp.json["title"]
+            assert "different-id" in resp.json["cause"]["Content-ID"]
+            assert process_name == resp.json["cause"]["payload_id"]
+
     def test_deploy_process_missing_or_invalid_components(self):
         process_name = self.fully_qualified_test_name()
         process_data = self.get_process_deploy_template(process_name)
