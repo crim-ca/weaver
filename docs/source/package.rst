@@ -428,6 +428,110 @@ Below are examples of the corresponding :term:`CWL` requirements employed for ea
     - :ref:`proc_ogc_api`
     - :ref:`proc_esgf_cwt`
 
+.. _app_pkg_multipart:
+
+CWL Multipart Content
+------------------------
+
+When deploying multiple related :term:`CWL` definitions (e.g., a :term:`Workflow` with its dependent tools),
+`Weaver` supports ``multipart/related`` content format as defined in |ogc-api-proc-part2|_.
+This allows packaging multiple :term:`CWL` documents in a single HTTP request using standard MIME multipart encoding.
+
+Each part in the multipart body must specify:
+
+- ``Content-Type``: The media type of the part (e.g., ``application/cwl+json``)
+- ``Content-ID``: A unique identifier for the part in RFC 2392 format (``<id@domain>``)
+- ``Content-Location`` (optional): The identifier or URL of the :term:`CWL` resource
+
+The multipart content structure follows RFC 2387 conventions:
+
+- The ``Content-Type`` header must specify ``multipart/related`` with a ``boundary`` parameter
+- An optional ``start`` parameter can indicate the root :term:`CWL` document (typically the main :term:`Workflow`)
+- If no ``start`` parameter is provided, the first part is considered the root document
+
+Example multipart request structure:
+
+.. code-block:: http
+
+    POST /processes HTTP/1.1
+    Host: weaver.example.com
+    Content-Type: multipart/related; boundary="boundary123"; start="<main-workflow@weaver.example.com>"
+
+    --boundary123
+    Content-Type: application/cwl+json
+    Content-ID: <echo-tool@weaver.example.com>
+    Content-Location: echo-tool
+
+    {
+      "cwlVersion": "v1.2",
+      "class": "CommandLineTool",
+      "id": "echo-tool",
+      "baseCommand": ["echo"],
+      "inputs": {
+        "message": "string"
+      },
+      "outputs": {
+        "output": {
+          "type": "stdout"
+        }
+      },
+      "requirements": {
+        "DockerRequirement": {
+          "dockerPull": "alpine:latest"
+        }
+      },
+      "stdout": "output.txt"
+    }
+
+    --boundary123
+    Content-Type: application/cwl+json
+    Content-ID: <main-workflow@weaver.example.com>
+    Content-Location: main-workflow
+
+    {
+      "cwlVersion": "v1.2",
+      "class": "Workflow",
+      "id": "main-workflow",
+      "inputs": {
+        "input_message": "string"
+      },
+      "outputs": {
+        "result": {
+          "type": "File",
+          "outputSource": "echo_step/output"
+        }
+      },
+      "steps": {
+        "echo_step": {
+          "run": "echo-tool",
+          "in": {
+            "message": "input_message"
+          },
+          "out": ["output"]
+        }
+      }
+    }
+
+    --boundary123--
+
+Key considerations:
+
+- Each :term:`CWL` part must have a valid ``id`` field for internal reference resolution
+- Step references in workflows should match the ``id`` (or ``Content-Location``) of the dependent tools
+- The root document (specified by ``start`` or first part) should typically be a :term:`Workflow`
+- All dependent tools are automatically deployed before the main workflow
+
+.. warning::
+
+    Multi-CWL deployment is **not atomic**. If any :term:`CWL` package fails validation or deployment,
+    previously deployed tools remain in the database without rollback. Retrying the deployment will
+    skip already-deployed tools to allow recovery, but manual cleanup may be required after failures.
+
+.. seealso::
+    - :ref:`app_pkg_workflow` for more details on :term:`Workflow` definitions
+    - :ref:`proc_ogc_api_multi_cwl` for deployment request examples
+    - |ogc-api-proc-part2|_ specification (Clause 9: CWL Multipart Content)
+
 .. _app_pkg_workflow:
 
 CWL Workflow

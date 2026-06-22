@@ -507,6 +507,8 @@ def get_conformance(category, settings):
         # f"{ogcapi_proc_part2}/req/cwl/deploy-exception-workflow-not-found",
         f"{ogcapi_proc_part2}/req/cwl/package-response-body",
         f"{ogcapi_proc_part2}/req/cwl/replace-body",
+        f"{ogcapi_proc_part2}/rec/deploy-replace-undeploy/deploy-body-cwl-multipart",
+        f"{ogcapi_proc_part2}/rec/deploy-replace-undeploy/replace-body-cwl-multipart",
         f"{ogcapi_proc_part2}/per/deploy-replace-undeploy/additional-status-codes",
         f"{ogcapi_proc_part2}/per/deploy-replace-undeploy/replace-body",
         f"{ogcapi_proc_part2}/per/deploy-replace-undeploy/replace-response-insert",

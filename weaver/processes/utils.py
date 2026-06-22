@@ -388,6 +388,10 @@ def resolve_deployment_order(cwl_packages):
         elif cwl_class in ["CommandLineTool", "ExpressionTool"]:
             tools.append(pkg)
 
+    # FIXME: Temporarily require at least one Workflow in multi-CWL deployments.
+    # See: https://github.com/crim-ca/weaver/issues/171
+    # If multiple sub-Workflow do not work directly, keep this limit.
+    # Otherwise, allow tool-only deployments and demonstrate multi-workflow deployment.
     if len(workflows) > 1:
         raise HTTPNotImplemented(json={
             "title": "Multiple Workflow definitions in $graph.",
@@ -396,9 +400,6 @@ def resolve_deployment_order(cwl_packages):
             "value": [wf.get("id") for wf in workflows]
         })
 
-    # See: https://github.com/crim-ca/weaver/issues/171
-    # If multiple sub-Workflow do not work directly, keep this limit.
-    # Otherwise, allow tool-only deployments and demonstrate multi-workflow deployment.
     main_tool = None
     if len(cwl_packages) > 1:
         # Check for duplicate #main if explicitly used
@@ -953,9 +954,10 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
 
     # For multipart/list payload, skip validation and go directly to multi-CWL deployment
     # Each individual CWL package will be validated during recursive deployment
+    # WARNING: Multi-CWL deployment is NOT atomic. If deployment fails midway, previously deployed
+    # tools remain in the database without rollback. Retry attempts will skip already-deployed tools.
     if isinstance(payload, list):
         LOGGER.info("Detected multi-CWL deployment (multipart) with %d packages", len(payload))
-        # Multi-CWL deployment path - skip _check_deploy since individual packages will be validated recursively
         return _deploy_process_multi_cwl(payload, container, overwrite)
 
     payload_copy = deepcopy(payload)
@@ -986,8 +988,12 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     package = None
     found = False
 
-    # Check for direct CWL first (regardless of content-type) - this handles recursive calls
+    # Detect direct CWL format (vs OGC deployment wrapper with processDescription/executionUnit).
+    # Recursion is safe: resolve_cwl_graph() unpacks $graph items before recursive calls.
     if "cwlVersion" in payload:
+        # Extract and remove Weaver-specific 'version' field before CWL processing.
+        # The 'version' field is a Weaver extension for process versioning and is not part of the CWL standard.
+        # Leaving it in would cause CWL schema validation errors downstream.
         process_info = {"version": payload.pop("version", None)}
         package = resolve_cwl_graph(payload)
         found = True
@@ -1164,9 +1170,18 @@ def _deploy_process_multi_cwl(
     Rather than duplicating deployment logic, this function orchestrates the deployment order and recursively
     calls :func:`deploy_process_from_payload` for each package to reuse all validation, URL setup, and storage logic.
 
+    .. warning::
+        This deployment is **NOT atomic**. If any CWL package fails during deployment:
+
+        - Previously deployed tools remain in the database (no rollback)
+        - Retry attempts will skip already-deployed tools (``HTTPConflict`` is caught and ignored)
+        - Child tools are always deployed with ``overwrite=False``, even if the main process uses ``overwrite=True``
+
+        This means partial deployments can leave orphaned processes that must be manually cleaned up.
+
     :param cwl_packages: ``list`` of resolved :term:`CWL` package definitions.
     :param container: Application container.
-    :param overwrite: Whether to overwrite existing processes.
+    :param overwrite: Whether to overwrite existing processes. Note: only applies to main process, not child tools.
     :returns: HTTP response with deployment result from the main process.
     """
     LOGGER.info("Deploying multi-CWL package with %d definitions", len(cwl_packages))
@@ -1195,14 +1210,19 @@ def _deploy_process_multi_cwl(
             tool_pkg_deploy["id"] = tool_id[1:]
 
         # Pass CWL package directly - it will be detected as CWL content by cwlVersion field
+        # NOTE: Child tools are always deployed with overwrite=False to preserve existing dependencies.
+        # This means retrying a failed multi-CWL deployment will skip already-deployed tools.
         try:
             response = deploy_process_from_payload(tool_pkg_deploy, container, overwrite=False)
             deployed_processes.append(response.json["processSummary"])
             LOGGER.info("Successfully deployed CWL tool: %s", tool_id)
         except HTTPConflict:
-            # Tool already exists, skip but continue
+            # Tool already exists from a previous (possibly failed) deployment attempt.
+            # Continue deployment to allow retry scenarios without requiring manual cleanup.
             LOGGER.info("CWL tool already exists: %s, skipping deployment", tool_id)
         except Exception as exc:
+            # Any other error (validation, permission, etc.) stops the entire deployment.
+            # WARNING: Previously deployed tools from this attempt are NOT rolled back.
             LOGGER.error("Failed to deploy CWL tool %s: %s", tool_id, exc)
             raise
 

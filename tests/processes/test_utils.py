@@ -805,6 +805,46 @@ class TestMultipartDeployment:
         assert cwl_packages[0]["id"] == "wps-process"
         assert process_desc is None
 
+    def test_parse_multipart_deploy_content_location_identifier_not_url(self):
+        """
+        Test Content-Location header with identifier (not URL) uses part body content.
+
+        This tests the uncovered return path in _fetch_multipart_content_location
+        where Content-Location is just an identifier (not starting with http://, https://, etc.)
+        and the function returns the original part_content.
+        """
+        tool_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}}
+        }
+        tool_json = json.dumps(tool_cwl)
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-ID: <test-tool@example.com>\r\n"
+            # Content-Location is just an identifier, not a URL
+            f"Content-Location: test-tool\r\n"
+            f"\r\n"
+            f"{tool_json}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        cwl_packages, process_desc = parse_multipart_deploy(
+            multipart_body, content_type, request=None
+        )
+
+        # Should successfully parse using part body content (not trying to fetch from Content-Location)
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "test-tool"
+        assert process_desc is None
+
     def test_parse_multipart_deploy_content_location_failure(self, monkeypatch):
         """
         Test Content-Location header raises error when fetch fails.
@@ -1077,6 +1117,25 @@ class TestMultipartDeployment:
         with pytest.raises(ValueError, match="At least one CWL file must be provided"):
             create_multipart_deploy([], "localhost")
 
+    def test_create_multipart_deploy_missing_id_field(self):
+        """
+        Test that creating multipart with CWL missing 'id' field raises ValueError.
+
+        This tests the uncovered ValueError raise in create_multipart_deploy
+        when a CWL package is missing the required 'id' field.
+        """
+        tool_without_id = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            # Missing 'id' field
+            "baseCommand": ["echo"],
+            "inputs": {},
+            "outputs": {}
+        }
+
+        with pytest.raises(ValueError, match="missing required 'id' field"):
+            create_multipart_deploy([tool_without_id], "localhost")
+
     def test_create_multipart_deploy_custom_boundary(self):
         """
         Test creating multipart with a custom boundary.
@@ -1262,6 +1321,24 @@ class TestMultipartDeployment:
         tools, main_workflow = resolve_deployment_order([])
         assert not tools
         assert main_workflow is None
+
+    def test_resolve_deployment_order_single_tool_among_multiple_packages(self):
+        """
+        Test resolve_deployment_order with single tool among multiple packages.
+
+        This tests the case where multiple packages are provided but only one
+        is a valid tool (others have no/invalid class), triggering the implicit
+        main entry point assignment.
+        """
+        tool = {"class": "CommandLineTool", "id": "only-tool"}
+        invalid_pkg = {"id": "no-class-field"}  # No class field, will be ignored
+
+        tools, main_workflow = resolve_deployment_order([tool, invalid_pkg])
+
+        assert len(tools) == 1
+        assert tools[0] == tool
+        # Single tool among multiple packages becomes the implicit main entry point
+        assert main_workflow == tool
 
     def test_classify_multipart_part_without_content_id(self):
         """
