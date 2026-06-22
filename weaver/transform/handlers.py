@@ -175,7 +175,7 @@ def any_to_pdf(i: str, out: str) -> None:
     if image is None:
         # If input is not an image, treat it as text
         new_pdf.add_page()
-        new_pdf.set_font("Arial", size=12)
+        new_pdf.set_font("Helvetica", size=12)  # default one available, no fonts installed
         new_pdf.multi_cell(0, 10, txt=get_content(i), align="L")
     else:
         if is_tiff(i):

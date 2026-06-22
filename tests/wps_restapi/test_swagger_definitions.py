@@ -484,6 +484,7 @@ def test_nested_process_input(test_value, expect_result):
     assert result == expect_result
 
 
+@pytest.mark.job
 @pytest.mark.parametrize(
     "headers",
     [
