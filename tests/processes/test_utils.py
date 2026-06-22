@@ -477,7 +477,7 @@ class TestMultipartDeployment:
     def test_classify_multipart_part_with_graph(self):
         """
         Test classification of part with ``cwlVersion`` and ``$graph``.
-        
+
         This ensures that $graph CWL packages are properly stored in parts_by_cid
         when a content_id is provided.
         """
