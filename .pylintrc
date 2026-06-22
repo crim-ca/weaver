@@ -148,6 +148,8 @@ disable=C0111,missing-docstring,
 
 per-file-ignores =
     .agents/skills/*/scripts/*:C0103,
+    setup.py:C0103,
+    docs/examples/*.py:C0103,
     tests/*:R1729
 
 # Enable the message, report, category or checker with the given id(s). You can
