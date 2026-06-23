@@ -68,7 +68,7 @@ def parse(source, parser=XML_PARSER):
 owslib_wps_etree.fromstring = fromstring
 
 
-HTML = lxml_etree.HTML
+HTML = lxml_etree.HTML  # pylint: disable=C0103
 
 
 def _lxml_tree_parser_maker(**parser_kwargs):
