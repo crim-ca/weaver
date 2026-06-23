@@ -1009,17 +1009,20 @@ class WpsRestApiProcessesTest(WpsConfigBase):
     def test_deploy_process_no_package_reference_found(self):
         """
         Test that deployment fails when no valid package/reference is provided.
-
-        Covers the validation: if not found: raise HTTPBadRequest with missing parameters list
         """
         process_name = self.fully_qualified_test_name()
+        # Use owsContext without href to pass schema validation but still trigger the "not found" check
         process_data = {
             "processDescription": {
-                "process": {"id": process_name}
-            },
-            "executionUnit": [
-                {}  # Empty dict - no 'unit' or 'href'
-            ]
+                "process": {
+                    "id": process_name,
+                    "owsContext": {
+                        "offering": {
+                            "content": {}  # Valid structure but missing 'href'
+                        }
+                    }
+                }
+            }
         }
         package_mock = mocked_process_package()
 
