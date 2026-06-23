@@ -1739,7 +1739,7 @@ def dismiss_job_task(job, container):
         except OSError as exc:
             LOGGER.warning("Job [%s] dismiss operation: Failed to delete [%s] due to [%s]", job.id, job_out_xml, exc)
 
-    LOGGER.debug("Job [%s] dismiss operation: Updating job status.")
+    LOGGER.debug("Job [%s] dismiss operation: Updating job status.", job.id)
     store = get_db(container).get_store(StoreJobs)
     job.status_message = f"Job {Status.DISMISSED}."
     job.status = map_status(Status.DISMISSED)

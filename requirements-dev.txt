@@ -45,7 +45,7 @@ pytest-server-fixtures
 #pytest-rerunfailures
 pytest-retry
 pydocstyle
-pylint>=3,<4
+pylint>=4.0.5,<5
 pylint-per-file-ignores
 responses
 safety
