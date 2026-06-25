@@ -18,6 +18,7 @@ import pytest
 import stopit
 import yaml
 from parameterized import parameterized
+from pyramid.httpexceptions import HTTPUnprocessableEntity
 from pywps.inout import LiteralInput
 
 from tests import resources
@@ -67,6 +68,7 @@ from weaver.processes.constants import (
     ProcessSchema
 )
 from weaver.processes.types import ProcessType
+from weaver.processes.utils import deploy_process_from_payload
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import Status
 from weaver.utils import explode_headers, fully_qualified_name, get_path_kvp, load_file, ows_context_href, repr_json
@@ -985,27 +987,6 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert resp.content_type == ContentType.APP_JSON
             assert "Multiple execution units are not supported" in resp.json.get("description", "")
 
-    def test_deploy_process_execution_unit_not_dict(self):
-        """
-        Test that deployment fails when execution_unit[0] is not a dict.
-        """
-        process_name = self.fully_qualified_test_name()
-        process_data = {
-            "processDescription": {
-                "process": {"id": process_name}
-            },
-            "executionUnit": ["not-a-dict"]  # First element is string, not dict
-        }
-        package_mock = mocked_process_package()
-
-        with contextlib.ExitStack() as stack:
-            for pkg in package_mock:
-                stack.enter_context(pkg)
-            path = "/processes"
-            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
-            assert resp.status_code == 400  # HTTPBadRequest from schema validation
-            assert resp.content_type == ContentType.APP_JSON
-
     def test_deploy_process_no_package_reference_found(self):
         """
         Test that deployment fails when no valid package/reference is provided.
@@ -1065,6 +1046,28 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 msg = "Failed with test variation '{}' with value '{}' using data:\n{}"
                 assert resp.status_code in [400, 422], msg.format(i, resp.status_code, json.dumps(data, indent=2))
                 assert resp.content_type == ContentType.APP_JSON, msg.format(i, resp.content_type, "")
+
+    @parameterized.expand([
+        ("not_a_list", "not-a-list"),
+        ("empty_list", []),
+        ("element_not_dict", ["not-a-dict"]),
+    ])
+    def test_deploy_process_execution_unit_runtime_validation(self, name, invalid_execution_unit):
+        """
+        Test runtime validation of executionUnit that bypasses schema validation.
+
+        This tests the defensive checks in deploy_process_from_payload that protect
+        against invalid data from internal calls (e.g., workflow deployment, file loading).
+        """
+        process_name = self.fully_qualified_test_name()
+        invalid_payload = {
+            "processDescription": {"process": {"id": process_name}},
+            "executionUnit": invalid_execution_unit
+        }
+        with mock.patch("weaver.processes.utils._check_deploy", return_value=invalid_payload):
+            with pytest.raises(HTTPUnprocessableEntity) as exc_info:
+                deploy_process_from_payload(invalid_payload, self.app.app.registry.settings, overwrite=False)
+            assert "Invalid parameter 'executionUnit'" in str(exc_info.value)
 
     def test_deploy_process_default_endpoint_wps1(self):
         """

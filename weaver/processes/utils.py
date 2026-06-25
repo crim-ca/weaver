@@ -1020,14 +1020,13 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
             if "unit" not in execution_units and "href" not in execution_units:
                 execution_units = {"unit": execution_units}
             execution_units = [execution_units]
-        if not isinstance(execution_units, list) or len(execution_units) < 1:
+        if (not isinstance(execution_units, list) or len(execution_units) < 1 or
+                not isinstance(execution_units[0], dict)):
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
         if len(execution_units) > 1:
             # FIXME: Multi-execution unit deployment is not yet supported
             raise HTTPNotImplemented("Multiple execution units are not supported.")
         execution_unit = execution_units[0]
-        if not isinstance(execution_unit, dict):
-            raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
         package = execution_unit.get("unit")
         reference = execution_unit.get("href")
         found = package or reference
