@@ -9,7 +9,7 @@ from email import message_from_bytes
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import TYPE_CHECKING
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 
 import colander
 import docker
@@ -418,18 +418,18 @@ def resolve_deployment_order(cwl_packages):
         if len(workflows) > 0:
             main_tool = None
         elif len(tools) > 1:
-            # Multiple tools without Workflow: require #main designation
-            main_tool = next((t for t in tools if t.get("id") == "#main"), None)
-            if not main_tool:
-                raise HTTPBadRequest(json={
-                    "title": "No entry point in $graph.",
-                    "description": (
-                        "Multi-CWL deployment without a Workflow requires a process with id '#main' "
-                        "as the entry point, according to CWL packed document specification."
-                    ),
-                    "cause": {"workflow_count": 0, "tool_count": len(tools), "main_found": False},
-                    "value": [tool.get("id") for tool in tools]
-                })
+            # Multiple tools without Workflow: NOT ALLOWED (even with #main)
+            main_tool_found = next((t for t in tools if t.get("id") == "#main"), None)
+            raise HTTPBadRequest(json={
+                "title": "No entry point in $graph.",
+                "description": (
+                    "Multi-CWL deployment with multiple tools requires a Workflow as the entry point, "
+                    "according to CWL packed document specification. Multiple CommandLineTools or "
+                    "ExpressionTools without a Workflow are not supported, even with #main designation."
+                ),
+                "cause": {"workflow_count": 0, "tool_count": len(tools), "main_found": bool(main_tool_found)},
+                "value": [tool.get("id") for tool in tools]
+            })
         elif len(tools) == 1:
             # Single tool: it's implicitly the main entry point
             main_tool = tools[0]
@@ -609,32 +609,52 @@ def _validate_and_reorder_multipart_workflow(cwl_packages, root_workflow_cid, pa
     return cwl_packages
 
 
-def _fetch_multipart_content_location(content_location, part_content):
-    # type: (str, str) -> str
+def _fetch_multipart_content_location(content_location, part_content, request=None):
+    # type: (str, str, Optional[AnyRequestType]) -> str
     """
     Fetch :term:`CWL` content from Content-Location header if part body is empty.
 
     Checks if part body is empty and Content-Location is a URL, then fetches the content from that location.
     Content-Location can be a static :term:`CWL` file URL or an API endpoint (Weaver, WPS, OGC API).
+    Relative URLs are resolved against the base API URL.
 
-    :param content_location: Content-Location header value (URL or identifier)
+    :param content_location: Content-Location header value (absolute or relative URL)
     :param part_content: Current part content (may be empty)
+    :param request: Optional request object for resolving relative URLs
     :returns: Updated part content (either original or fetched from Content-Location)
     :raises HTTPBadRequest: If fetching from Content-Location fails
     """
-    # Only fetch if part body is empty AND Content-Location looks like a URL
+    # Only fetch if part body is empty AND Content-Location is provided
     if not content_location or (part_content and part_content.strip()):
         return part_content
 
-    # Content-Location must be a URL (not just an identifier)
+    # Resolve relative URLs using base API URL
+    absolute_url = content_location
     if not any(content_location.startswith(scheme) for scheme in ["http://", "https://", "file://", "s3://"]):
-        LOGGER.debug(
-            "Content-Location [%s] is an identifier, not a URL. Using part body content.",
-            content_location
-        )
-        return part_content
+        # Relative URL - resolve against base API URL
+        if request:
+            base_url = get_wps_restapi_base_url(request)
+            absolute_url = urljoin(f"{base_url}/", content_location)
+            LOGGER.debug(
+                "Resolving relative Content-Location [%s] to absolute URL [%s]",
+                content_location, absolute_url
+            )
+        else:
+            # No request context to resolve relative URL
+            LOGGER.error(
+                "Content-Location [%s] is relative but no request context available to resolve it.",
+                content_location
+            )
+            raise HTTPBadRequest(json={
+                "title": "Invalid Content-Location",
+                "description": (
+                    f"Content-Location [{content_location}] is a relative URL but cannot be resolved "
+                    f"without request context."
+                ),
+                "cause": {"location": content_location}
+            })
 
-    LOGGER.debug("Fetching CWL from Content-Location: %s", content_location)
+    LOGGER.debug("Fetching CWL from Content-Location: %s", absolute_url)
     try:
         # Content-Location can be:
         # 1. A static CWL file URL (http/https/s3/file)
@@ -642,21 +662,21 @@ def _fetch_multipart_content_location(content_location, part_content):
         # 3. A WPS process endpoint (/wps?request=DescribeProcess&identifier=...)
         # 4. An OGC API Processes endpoint
 
-        _, ext = os.path.splitext(content_location.split('?')[0])  # strip query params
+        _, ext = os.path.splitext(absolute_url.split('?')[0])  # strip query params
         if ext.replace('.', '') in PACKAGE_EXTENSIONS:
-            return load_file(content_location, text=True)
+            return load_file(absolute_url, text=True)
 
         # Could be an API endpoint (Weaver, WPS, OGC API)
         # Use the process definition resolver that handles all reference types
         from weaver.processes.wps_package import _generate_process_with_cwl_from_reference
-        cwl_pkg, _ = _generate_process_with_cwl_from_reference(content_location)
+        cwl_pkg, _ = _generate_process_with_cwl_from_reference(absolute_url)
         return json.dumps(cwl_pkg) if isinstance(cwl_pkg, dict) else str(cwl_pkg)
     except Exception as exc:
-        LOGGER.error("Failed to fetch content from Content-Location %s: %s", content_location, exc)
+        LOGGER.error("Failed to fetch content from Content-Location %s: %s", absolute_url, exc)
         raise HTTPBadRequest(json={
             "title": "Failed to fetch Content-Location",
-            "description": f"Could not retrieve CWL from Content-Location: {content_location}",
-            "cause": {"error": str(exc), "location": content_location}
+            "description": f"Could not retrieve CWL from Content-Location: {absolute_url}",
+            "cause": {"error": str(exc), "location": absolute_url}
         })
 
 
@@ -703,12 +723,13 @@ def _extract_multipart_start_parameter(content_type):
     return None
 
 
-def _interpret_multipart_part(part):
-    # type: (Any) -> Optional[Tuple[str, str, str, JSON]]
+def _interpret_multipart_part(part, request=None):
+    # type: (Any, Optional[AnyRequestType]) -> Optional[Tuple[str, str, str, JSON]]
     """
     Interpret a single multipart part: decode, fetch content if needed, and parse.
 
     :param part: Single part from multipart message
+    :param request: Optional request object for resolving relative Content-Location URLs
     :returns:
         ``tuple`` of (content_type, content_id, content_location, parsed_data) or ``None`` if part cannot be parsed
     """
@@ -726,7 +747,7 @@ def _interpret_multipart_part(part):
             part_content = part_content.decode('utf-8', errors='replace')
 
     # Fetch from Content-Location if part body is empty
-    part_content = _fetch_multipart_content_location(content_location, part_content)
+    part_content = _fetch_multipart_content_location(content_location, part_content, request)
 
     # Parse JSON/YAML if applicable
     if (part_content_type in ContentType.ANY_CWL or
@@ -790,7 +811,7 @@ def parse_multipart_deploy(content, content_type, request=None):
     interpreted_parts = []
 
     for part in msg.get_payload():
-        interpreted = _interpret_multipart_part(part)
+        interpreted = _interpret_multipart_part(part, request)
         if interpreted:
             interpreted_parts.append(interpreted)
 

@@ -811,53 +811,136 @@ class TestMultipartDeployment:
         assert cwl_packages[0]["id"] == "wps-process"
         assert process_desc is None
 
-    def test_parse_multipart_deploy_content_location_identifier_not_url(self):
+    def test_parse_multipart_deploy_content_location_relative_url(self, monkeypatch):
         """
-        Test Content-Location with identifier (not URL) and empty body returns empty content.
+        Test Content-Location with relative URL is resolved using base API URL.
 
-        This tests the specific return path in _fetch_multipart_content_location where:
-        1. Part body is empty
-        2. Content-Location is just an identifier (not starting with http://, https://, etc.)
-        3. Function returns the empty part_content instead of trying to fetch
+        This tests that relative URLs like 'processes/test-process/package' are properly
+        resolved against the base API URL using urljoin and get_wps_restapi_base_url.
         """
-        # Create a valid CWL tool to include alongside the empty part
-        tool_cwl = {
+        # Mock CWL package to be "fetched" from relative URL
+        relative_cwl = {
             "cwlVersion": "v1.2",
             "class": "CommandLineTool",
-            "id": "valid-tool",
+            "id": "relative-tool",
             "inputs": {},
             "outputs": {"output": {"type": "File"}}
         }
-        tool_json = json.dumps(tool_cwl)
+
+        def mock_get_base_url(request):
+            return "https://weaver.example.com/api"
+
+        def mock_generate_process(reference, process_hint=None):
+            # Should receive the resolved absolute URL
+            assert reference == "https://weaver.example.com/api/processes/test-process/package"
+            return (relative_cwl, {"identifier": "test-process"})
+
+        monkeypatch.setattr("weaver.processes.utils.get_wps_restapi_base_url", mock_get_base_url)
+        monkeypatch.setattr("weaver.processes.wps_package._generate_process_with_cwl_from_reference",
+                            mock_generate_process)
+
+        # Create a mock request object
+        class MockRequest:
+            def __init__(self):
+                self.headers = {}
 
         boundary = "----Boundary123"
         multipart_body = (
-            # First part: valid CWL with content
             f"------Boundary123\r\n"
             f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
-            f"Content-ID: <valid-tool@example.com>\r\n"
+            f"Content-Location: processes/test-process/package\r\n"  # Relative URL
             f"\r\n"
-            f"{tool_json}\r\n"
-            # Second part: empty body with identifier Content-Location (not a URL)
-            f"------Boundary123\r\n"
-            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
-            f"Content-ID: <empty-part@example.com>\r\n"
-            f"Content-Location: just-an-identifier\r\n"
-            f"\r\n"
-            f"\r\n"  # Empty body
             f"------Boundary123--\r\n"
         ).encode('utf-8')
 
         content_type = f"multipart/mixed; boundary={boundary}"
 
-        # Should parse successfully, skipping the empty part with identifier Content-Location
+        # Should parse successfully with relative URL resolved
         cwl_packages, process_desc = parse_multipart_deploy(
-            multipart_body, content_type, request=None
+            multipart_body, content_type, request=MockRequest()
         )
 
-        # Only the valid CWL should be parsed (empty part is skipped)
         assert len(cwl_packages) == 1
-        assert cwl_packages[0]["id"] == "valid-tool"
+        assert cwl_packages[0]["id"] == "relative-tool"
+        assert process_desc is None
+
+    def test_parse_multipart_deploy_content_location_relative_url_no_request(self):
+        """
+        Test Content-Location with relative URL but no request context raises error.
+
+        This tests that when a relative URL is provided but no request context is available
+        to resolve it, an HTTPBadRequest error is raised.
+        """
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Location: processes/test-process/package\r\n"  # Relative URL
+            f"\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        # Should raise HTTPBadRequest because relative URL cannot be resolved without request
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            parse_multipart_deploy(multipart_body, content_type, request=None)
+
+        assert exc_info.value.json is not None
+        assert "Invalid Content-Location" in exc_info.value.json.get("title", "")
+        assert "relative" in exc_info.value.json.get("description", "").lower()
+        assert "processes/test-process/package" in exc_info.value.json.get("cause", {}).get("location", "")
+
+    def test_parse_multipart_deploy_content_location_relative_url_static_file(self, monkeypatch):
+        """
+        Test Content-Location with relative URL resolving to a static CWL file.
+
+        This tests that relative URLs with file extensions (e.g., 'files/tool.cwl') are properly
+        resolved and fetched as static files using load_file.
+        """
+        # Mock CWL content to be "fetched" from relative URL
+        static_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "static-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}}
+        })
+
+        def mock_get_base_url(request):
+            return "https://weaver.example.com/api"
+
+        def mock_load_file(path, text=False):
+            # Should receive the resolved absolute URL
+            assert path == "https://weaver.example.com/api/files/tool.cwl"
+            assert text is True
+            return static_cwl
+
+        monkeypatch.setattr("weaver.processes.utils.get_wps_restapi_base_url", mock_get_base_url)
+        monkeypatch.setattr("weaver.processes.utils.load_file", mock_load_file)
+
+        class MockRequest:
+            def __init__(self):
+                self.headers = {}
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Location: files/tool.cwl\r\n"  # Relative URL with file extension
+            f"\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        # Should parse successfully with relative URL resolved to static file
+        cwl_packages, process_desc = parse_multipart_deploy(
+            multipart_body, content_type, request=MockRequest()
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "static-tool"
         assert process_desc is None
 
     def test_parse_multipart_deploy_content_location_failure(self, monkeypatch):
@@ -1352,7 +1435,7 @@ class TestMultipartDeployment:
         Test resolve_deployment_order raises error when only tools are provided (no workflow).
 
         According to CWL packed document specification, multiple tools without a workflow
-        require a #main entry point.
+        are not supported, even with #main designation.
         """
         tool1 = {"class": "CommandLineTool", "id": "tool-1"}
         tool2 = {"class": "CommandLineTool", "id": "tool-2"}
@@ -1365,6 +1448,25 @@ class TestMultipartDeployment:
         assert exc_info.value.json.get("cause", {}).get("workflow_count") == 0
         assert exc_info.value.json.get("cause", {}).get("tool_count") == 2
         assert exc_info.value.json.get("cause", {}).get("main_found") is False
+
+    def test_resolve_deployment_order_tools_with_main_error(self):
+        """
+        Test resolve_deployment_order raises error when multiple tools with #main but no workflow.
+
+        Multiple CommandLineTools or ExpressionTools are not supported without a Workflow,
+        even if one has id '#main'.
+        """
+        tool1 = {"class": "CommandLineTool", "id": "#main"}
+        tool2 = {"class": "CommandLineTool", "id": "tool-2"}
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            resolve_deployment_order([tool1, tool2])
+
+        assert exc_info.value.json is not None
+        assert "No entry point in $graph" in exc_info.value.json.get("title", "")
+        assert exc_info.value.json.get("cause", {}).get("workflow_count") == 0
+        assert exc_info.value.json.get("cause", {}).get("tool_count") == 2
+        assert exc_info.value.json.get("cause", {}).get("main_found") is True
 
     def test_resolve_deployment_order_no_packages(self):
         """

@@ -1843,12 +1843,12 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert "title" in result or "description" in result, \
                 "Error response should contain title or description"
 
-    def test_deploy_process_CWL_direct_graph_multi_tools_with_main_valid(self):
+    def test_deploy_process_CWL_direct_graph_multi_tools_with_main_invalid(self):
         """
-        Test deployment of multiple CommandLineTools with ``#main`` entry point (no Workflow).
+        Test deployment of multiple CommandLineTools with ``#main`` entry point (no Workflow) is rejected.
 
-        This is a valid case: when there's no Workflow, a CommandLineTool with ``id: "#main"``
-        can serve as the entry point.
+        Multiple CommandLineTools or ExpressionTools in ``$graph`` without a Workflow are NOT allowed,
+        even if one has ``id: "#main"``. A Workflow is required as the entry point for multi-tool deployments.
 
         .. seealso::
             https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents
@@ -1894,17 +1894,19 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
         headers = {"Content-Type": ContentType.APP_CWL_JSON}
         resp = mocked_sub_requests(self.app, "post", "/processes", data=cwl, headers=headers,
-                                   only_local=True)
-        assert resp.status_code == 201, \
-            f"Expected 201 Created for valid multi-tool $graph with #main, got {resp.status_code}: {resp.json}"
+                                   only_local=True, expect_errors=True)
+        assert resp.status_code == 400, \
+            f"Expected 400 Bad Request for multi-tool $graph without Workflow, got {resp.status_code}: {resp.json}"
 
         result = resp.json
-        assert "processSummary" in result
-        assert result["deploymentDone"] is True
-
-        # The main process should be the one with id "#main" (stripped to "main")
-        main_id = result["processSummary"]["id"]
-        assert main_id == "main"
+        assert "title" in result
+        assert "No entry point in $graph" in result["title"]
+        assert "description" in result
+        assert "Workflow" in result["description"]
+        assert "cause" in result
+        assert result["cause"]["workflow_count"] == 0
+        assert result["cause"]["tool_count"] == 2
+        assert result["cause"]["main_found"] is True
 
     def test_deploy_process_CWL_direct_graph_multi_with_main(self):
         """
