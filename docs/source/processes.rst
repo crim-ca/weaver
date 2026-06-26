@@ -268,27 +268,25 @@ When deploying a :term:`Workflow` with multiple dependent :term:`CWL` tools, `We
 the ``multipart/related`` content format as defined in |ogc-api-proc-part2|_.
 This allows packaging multiple :term:`CWL` documents in a single HTTP request using standard MIME multipart encoding.
 
-Alternatively, the `Weaver` CLI provides the ``weaver deploy`` command which can accept multiple :term:`CWL` file
-paths and automatically deploy them in the correct order.
+The key advantage of this approach is that users can develop and test their :term:`Workflow` locally using
+separate :term:`CWL` files, then deploy them as-is to `Weaver` without manual modifications. In contrast,
+`CWL Packed Documents`_ (using ``$graph``) or nested tool definitions require manual consolidation and
+restructuring of multiple files into a single document before deployment.
 
-Example using the CLI:
+.. _CWL Packed Documents: https://www.commonwl.org/v1.2/Workflow.html#Packed_documents
 
-.. code-block:: bash
+.. note::
 
-    weaver deploy \
-      -u https://weaver.example.com \
-      echo-tool.cwl \
-      cat-tool.cwl \
-      main-workflow.cwl
+    Users do not need to manually construct the ``multipart/related`` request format. The :ref:`cli` and
+    :ref:`Python client <client_commands>` automatically handle multipart encoding and boundary generation
+    when multiple :term:`CWL` files are provided, making the deployment process seamless.
 
-The CLI will automatically:
+`Weaver` also supports `CWL Packed Documents`_ via ``$graph`` arrays if needed. Both the multipart approach
+and ``$graph`` approach ultimately resolve to equivalent internal representations, so users can choose
+whichever method best fits their workflow development process.
 
-1. Analyze dependencies between :term:`CWL` definitions
-2. Deploy all :term:`CommandLineTool` and :term:`ExpressionTool` definitions first
-3. Deploy the main :term:`Workflow` last, once all dependencies are available
-4. Skip tools that already exist (allowing deployment retries after failures)
-
-The order in which files are provided to the CLI does not matter - dependencies are resolved automatically.
+.. seealso::
+    For automated multi-CWL deployment using the CLI, refer to :ref:`cli_example_deploy`.
 
 .. note::
 
@@ -473,7 +471,7 @@ The request body requires mainly two components:
     the ``multipart/related`` :term:`Media-Type` can be used in the ``Content-Type`` header to package
     all :term:`CWL` documents in a single request. Each part should specify its own content type
     (``application/cwl+json`` or ``application/cwl+yaml``) and unique ``Content-ID``.
-    See :ref:`app_pkg_multipart` for detailed multipart structure and examples.
+    See :ref:`proc_ogc_api_multi_cwl` and :ref:`app_pkg_multipart` for detailed multipart structure and examples.
 
 .. seealso::
     Section :ref:`cwl-wps-mapping` provides further details about notable considerations that

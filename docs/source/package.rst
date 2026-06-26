@@ -434,20 +434,174 @@ CWL Multipart Content
 ------------------------
 
 When deploying multiple related :term:`CWL` definitions (e.g., a :term:`Workflow` with its dependent tools),
-`Weaver` supports ``multipart/related`` content format as defined in |ogc-api-proc-part2|_.
+`Weaver` supports ``multipart/related`` content format (:rfc:`2387`) as defined in |ogc-api-proc-part2|_.
 This allows packaging multiple :term:`CWL` documents in a single HTTP request using standard MIME multipart encoding.
+
+Alternatively, the :ref:`cli` provides the :ref:`cli_example_deploy` command which can accept multiple :term:`CWL` file
+paths and automatically handles multipart encoding and deployment order resolution.
+
+Multipart Workflow Definition
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Each part in the multipart body must specify:
 
-- ``Content-Type``: The media type of the part (e.g., ``application/cwl+json``)
-- ``Content-ID``: A unique identifier for the part in RFC 2392 format (``<id@domain>``)
+- ``Content-Type``: The media type of the part (e.g., ``application/cwl+json``) (:rfc:`2045#section-5`)
+- ``Content-ID``: A unique identifier for the part (:rfc:`2392`) in the format ``<id@domain>``
 - ``Content-Location`` (optional): The identifier or URL of the :term:`CWL` resource
 
-The multipart content structure follows RFC 2387 conventions:
+The multipart content structure follows :rfc:`2387` conventions, with the ``Content-Type`` header
+specifying ``multipart/related`` with a ``boundary`` parameter.
 
-- The ``Content-Type`` header must specify ``multipart/related`` with a ``boundary`` parameter
-- An optional ``start`` parameter can indicate the root :term:`CWL` document (typically the main :term:`Workflow`)
-- If no ``start`` parameter is provided, the first part is considered the root document
+Identifier Resolution and Reference Mapping
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The following table describes how various identifiers are resolved and used for :term:`CWL` part identification,
+process deployment, and workflow step references:
+
+.. table:: Multipart CWL Identifier Resolution
+    :name: table-multipart-cwl-identifiers
+    :align: center
+    :widths: 20 25 55
+
+    +----------------------+---------------------------+---------------------------------------------------------------+
+    | Field                | Location                  | Purpose and Behavior                                          |
+    +======================+===========================+===============================================================+
+    | ``Content-ID``       | MIME header               | - **Required** unique identifier for the part                 |
+    |                      |                           | - Format: ``<id@domain>`` (:rfc:`2392`)                       |
+    |                      |                           | - Used by ``start`` parameter to reference the main document  |
+    |                      |                           | - Can be referenced by workflow steps if no                   |
+    |                      |                           |   ``Content-Location`` is provided                            |
+    +----------------------+---------------------------+---------------------------------------------------------------+
+    | ``Content-Location`` | MIME header               | **When provided as identifier** (e.g., ``echo-tool``):        |
+    |                      | (optional)                |                                                               |
+    |                      |                           | - Used as the process ID for deployment                       |
+    |                      |                           | - Preferred reference for workflow step ``run`` fields        |
+    |                      |                           | - Takes precedence over ``id`` in CWL body for process ID     |
+    |                      |                           |                                                               |
+    |                      |                           | **When provided as URL** (e.g., ``http://...`` or            |
+    |                      |                           | ``file://...``):                                              |
+    |                      |                           |                                                               |
+    |                      |                           | - Acts as external reference to fetch :term:`CWL` content     |
+    |                      |                           | - Part body should be empty or omitted                        |
+    |                      |                           | - Process ID derived from fetched content's ``id`` field      |
+    +----------------------+---------------------------+---------------------------------------------------------------+
+    | ``id``               | :term:`CWL` body          | - **Required** in each :term:`CWL` document                   |
+    |                      |                           | - Used as process ID if ``Content-Location`` not provided     |
+    |                      |                           | - Special value ``#main`` marks the root document             |
+    |                      |                           |   (see :ref:`Main Tool Selection <main-tool-selection>`)      |
+    |                      |                           | - Must be unique across all :term:`CWL` parts                 |
+    +----------------------+---------------------------+---------------------------------------------------------------+
+    | ``run``              | Workflow step             | References a dependent tool using one of:                     |
+    |                      | (:term:`CWL` body)        |                                                               |
+    |                      |                           | - ``Content-Location`` identifier (preferred)                 |
+    |                      |                           | - ``id`` from the tool's :term:`CWL` body                     |
+    |                      |                           | - ``Content-ID`` (if neither above provided)                  |
+    +----------------------+---------------------------+---------------------------------------------------------------+
+
+**Example Combinations:**
+
+.. code-block:: http
+    :caption: Part with identifier Content-Location
+
+    Content-Type: application/cwl+json
+    Content-ID: <tool-1@weaver.example.com>
+    Content-Location: echo-tool
+
+    {
+      "cwlVersion": "v1.2",
+      "class": "CommandLineTool",
+      "id": "echo-tool",  # matches Content-Location
+      ...
+    }
+
+In this case, the process will be deployed as ``echo-tool`` (from ``Content-Location``), and workflow steps
+should reference it as ``run: echo-tool``.
+
+.. code-block:: http
+    :caption: Part with URL Content-Location (external reference)
+
+    Content-Type: application/cwl+json
+    Content-ID: <tool-2@weaver.example.com>
+    Content-Location: https://example.com/tools/cat-tool.cwl
+
+    # Body is empty - content fetched from URL
+
+When ``Content-Location`` is a URL, the :term:`CWL` content is fetched from that location,
+and the process ID is derived from the ``id`` field in the fetched document.
+
+.. code-block:: http
+    :caption: Part without Content-Location
+
+    Content-Type: application/cwl+json
+    Content-ID: <tool-3@weaver.example.com>
+
+    {
+      "cwlVersion": "v1.2",
+      "class": "CommandLineTool",
+      "id": "grep-tool",
+      ...
+    }
+
+Without ``Content-Location``, the process ID comes from the ``id`` field (``grep-tool``), and workflow steps
+can reference it using ``run: grep-tool`` or ``run: <tool-3@weaver.example.com>`` (using ``Content-ID``).
+
+.. note::
+    All dependent tools are automatically deployed before the main workflow to ensure proper resolution
+    of workflow step references.
+
+.. warning::
+
+    Multi-CWL deployment is **not atomic**. If any :term:`CWL` package fails validation or deployment,
+    previously deployed tools remain in the database without rollback. Retrying the deployment will
+    skip already-deployed tools to allow recovery, but manual cleanup may be required after failures.
+
+.. warning::
+
+    When deploying multiple :term:`CWL` tools, it is **strongly recommended** to use consistent and unique
+    prefixes for all process IDs (via ``id`` field or ``Content-Location``) to avoid conflicts with existing
+    processes. If a process with a matching ID already exists in the database, `Weaver` will resolve and use
+    that existing process instead of deploying the one provided in the multipart request. This can lead to
+    unexpected behavior if the existing process has different inputs, outputs, or implementation details than
+    the one intended for the workflow.
+
+    For example, use prefixed IDs like ``myworkflow-echo-tool``, ``myworkflow-cat-tool``, etc., rather than
+    generic names like ``echo-tool`` or ``cat-tool`` that might conflict with other deployed processes.
+
+.. _main-tool-selection:
+
+Main Tool Selection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The root :term:`CWL` document to be deployed as the main :term:`Process` is determined by the following priority:
+
+1. The ``start`` parameter in the ``Content-Type`` header, which references a ``Content-ID``
+2. The `#main identifier <https://www.commonwl.org/v1.2/Workflow.html#Generic_execution_process>`_ specified by
+   ``Content-ID`` or the ``id`` field within the :term:`CWL` body of the corresponding part
+3. If neither of the above are provided, the first :term:`CWL` part in the multipart body is considered the root
+   (non-CWL parts such as :term:`Process` metadata are ignored when determining the first :term:`CWL` document)
+
+The root document should typically be a :term:`Workflow` when deploying multiple related :term:`CWL` definitions.
+
+When multiple ``CommandLineTool`` or ``ExpressionTool`` definitions are provided without a ``Workflow``,
+the deployment will be rejected, even if one of the tools has ``id: "#main"``. According to the :term:`CWL`
+packed document specification, multiple tools require a ``Workflow`` as the entry point to establish their
+execution relationship.
+
+Additional Metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The multipart request can optionally include a :term:`Process` description part to provide additional metadata
+that supplements the :term:`CWL` definitions. This part should:
+
+- Use ``Content-Type: application/json`` or ``application/ogcapppkg+json``
+- Contain :term:`OGC API - Processes` compliant process metadata (title, description, keywords, etc.)
+- Be referenced by a ``Content-ID`` that matches the main :term:`CWL` document's process identifier
+
+When provided, this metadata will be merged with information derived from the :term:`CWL` definitions,
+following the same :ref:`merging strategy <cwl-wps-mapping>` applied for single-document deployments.
+
+Example Multipart Request
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Example multipart request structure:
 
@@ -514,23 +668,10 @@ Example multipart request structure:
 
     --boundary123--
 
-Key considerations:
-
-- Each :term:`CWL` part must have a valid ``id`` field for internal reference resolution
-- Step references in workflows should match the ``id`` (or ``Content-Location``) of the dependent tools
-- The root document (specified by ``start`` or first part) should typically be a :term:`Workflow`
-- All dependent tools are automatically deployed before the main workflow
-
-.. warning::
-
-    Multi-CWL deployment is **not atomic**. If any :term:`CWL` package fails validation or deployment,
-    previously deployed tools remain in the database without rollback. Retrying the deployment will
-    skip already-deployed tools to allow recovery, but manual cleanup may be required after failures.
-
 .. seealso::
     - :ref:`app_pkg_workflow` for more details on :term:`Workflow` definitions
     - :ref:`proc_ogc_api_multi_cwl` for deployment request examples
-    - |ogc-api-proc-part2|_ specification (Clause 9: CWL Multipart Content)
+    - |ogc-api-proc-part2|_ CWL Multipart Content conformance class
 
 .. _app_pkg_workflow:
 

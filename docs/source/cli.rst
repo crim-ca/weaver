@@ -215,6 +215,35 @@ Sample Output:
     :language: json
 
 
+Multi-CWL Deployment Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When deploying a :term:`Workflow` with multiple dependent :term:`CWL` tools, the ``weaver deploy`` command
+can accept multiple :term:`CWL` file paths and automatically deploy them in the correct order.
+
+.. code-block:: bash
+    :caption: Command Line
+
+    weaver deploy \
+      -u https://weaver.example.com \
+      echo-tool.cwl \
+      cat-tool.cwl \
+      main-workflow.cwl
+
+The CLI will automatically:
+
+1. Analyze dependencies between :term:`CWL` definitions
+2. Deploy all :term:`CommandLineTool` and :term:`ExpressionTool` definitions first
+3. Deploy the main :term:`Workflow` last, once all dependencies are available
+4. Skip tools that already exist (allowing deployment retries after failures)
+
+The order in which files are provided to the CLI does not matter - dependencies are resolved automatically.
+
+.. seealso::
+    - :ref:`app_pkg_workflow` for details on :term:`Workflow` definitions
+    - :ref:`proc_ogc_api_multi_cwl` for HTTP API multipart deployment requests
+
+
 .. _cli_undeploy:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
