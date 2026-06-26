@@ -463,40 +463,38 @@ process deployment, and workflow step references:
     :align: center
     :widths: 20 25 55
 
-    +----------------------+---------------------------+---------------------------------------------------------------+
-    | Field                | Location                  | Purpose and Behavior                                          |
-    +======================+===========================+===============================================================+
-    | ``Content-ID``       | MIME header               | - **Required** unique identifier for the part                 |
-    |                      |                           | - Format: ``<id@domain>`` (:rfc:`2392`)                       |
-    |                      |                           | - Used by ``start`` parameter to reference the main document  |
-    |                      |                           | - Can be referenced by workflow steps if no                   |
-    |                      |                           |   ``Content-Location`` is provided                            |
-    +----------------------+---------------------------+---------------------------------------------------------------+
-    | ``Content-Location`` | MIME header               | **When provided as identifier** (e.g., ``echo-tool``):        |
-    |                      | (optional)                |                                                               |
-    |                      |                           | - Used as the process ID for deployment                       |
-    |                      |                           | - Preferred reference for workflow step ``run`` fields        |
-    |                      |                           | - Takes precedence over ``id`` in CWL body for process ID     |
-    |                      |                           |                                                               |
-    |                      |                           | **When provided as URL** (e.g., ``http://...`` or            |
-    |                      |                           | ``file://...``):                                              |
-    |                      |                           |                                                               |
-    |                      |                           | - Acts as external reference to fetch :term:`CWL` content     |
-    |                      |                           | - Part body should be empty or omitted                        |
-    |                      |                           | - Process ID derived from fetched content's ``id`` field      |
-    +----------------------+---------------------------+---------------------------------------------------------------+
-    | ``id``               | :term:`CWL` body          | - **Required** in each :term:`CWL` document                   |
-    |                      |                           | - Used as process ID if ``Content-Location`` not provided     |
-    |                      |                           | - Special value ``#main`` marks the root document             |
-    |                      |                           |   (see :ref:`Main Tool Selection <main-tool-selection>`)      |
-    |                      |                           | - Must be unique across all :term:`CWL` parts                 |
-    +----------------------+---------------------------+---------------------------------------------------------------+
-    | ``run``              | Workflow step             | References a dependent tool using one of:                     |
-    |                      | (:term:`CWL` body)        |                                                               |
-    |                      |                           | - ``Content-Location`` identifier (preferred)                 |
-    |                      |                           | - ``id`` from the tool's :term:`CWL` body                     |
-    |                      |                           | - ``Content-ID`` (if neither above provided)                  |
-    +----------------------+---------------------------+---------------------------------------------------------------+
+    +----------------------+---------------------------+--------------------------------------------------------------+
+    | Field                | Location                  | Purpose and Behavior                                         |
+    +======================+===========================+==============================================================+
+    | ``Content-ID``       | MIME header               | - **Required** unique identifier for the part                |
+    |                      |                           | - Format: ``<id@domain>`` (:rfc:`2392`)                      |
+    |                      |                           | - Used by ``start`` parameter to reference the main document |
+    |                      |                           | - Can be referenced if no ``Content-Location`` is provided   |
+    +----------------------+---------------------------+--------------------------------------------------------------+
+    | ``Content-Location`` | MIME header (optional)    | **When identifier (e.g., ``echo-tool``):**                   |
+    |                      |                           |                                                              |
+    |                      |                           | - Used as process ID                                         |
+    |                      |                           | - Preferred for ``run`` references                           |
+    |                      |                           | - Overrides ``id`` in :term:`CWL`                            |
+    |                      |                           |                                                              |
+    |                      |                           | **When URL (e.g., ``http://...``):**                         |
+    |                      |                           |                                                              |
+    |                      |                           | - External reference to fetch :term:`CWL`                    |
+    |                      |                           | - Body should be empty                                       |
+    |                      |                           | - ID derived from fetched content                            |
+    +----------------------+---------------------------+--------------------------------------------------------------+
+    | ``id``               | :term:`CWL` body          | - **Required** in each :term:`CWL` document                  |
+    |                      |                           | - Used if no ``Content-Location``                            |
+    |                      |                           | - ``#main`` marks root document                              |
+    |                      |                           |   (see :ref:`Main Tool Selection <main-tool-selection>`)     |
+    |                      |                           | - Must be unique across parts                                |
+    +----------------------+---------------------------+--------------------------------------------------------------+
+    | ``run``              | Workflow step             | References a tool using:                                     |
+    |                      | (:term:`CWL` body)        |                                                              |
+    |                      |                           | - ``Content-Location`` (preferred)                           |
+    |                      |                           | - ``id``                                                     |
+    |                      |                           | - ``Content-ID``                                             |
+    +----------------------+---------------------------+--------------------------------------------------------------+
 
 **Example Combinations:**
 
