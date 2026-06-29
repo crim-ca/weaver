@@ -20,6 +20,11 @@ Changes:
 - Add support for `CWL` ``$graph`` representation with multiple entries, enabling deployment of workflows with
   embedded step definitions without manual preprocessing
   (resolves `#56 <https://github.com/crim-ca/weaver/issues/56>`_).
+- Add support for multiple ``executionUnit`` `CWL` entries in deployment payloads. Multiple execution units can now
+  be deployed in a single request using either inline ``unit`` objects or ``href`` URL references, allowing
+  deployment of workflows with multiple step definitions without requiring multipart encoding. This approach only
+  accepts CWL-like media-types to avoid ambiguities with other deployment formats
+  (e.g.: ``application/json`` or ``application/ogcapppkg+json``).
 - Add validation during multipart deployment to ensure at least one ``class: Workflow`` is present and properly
   identified as the main workflow from media-type hints or ``Content-ID`` references.
 - Add `CLI` support for deploying multiple `CWL` files by repeating ``--cwl`` arguments to automatically generate

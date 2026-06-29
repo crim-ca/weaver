@@ -473,6 +473,14 @@ The request body requires mainly two components:
     (``application/cwl+json`` or ``application/cwl+yaml``) and unique ``Content-ID``.
     See :ref:`proc_ogc_api_multi_cwl` and :ref:`app_pkg_multipart` for detailed multipart structure and examples.
 
+.. note::
+    Multiple :term:`CWL` packages can also be deployed using an array of ``executionUnit`` entries, where each
+    entry contains either an inline ``unit`` object or an ``href`` reference to an external :term:`CWL` document.
+    This approach resolves the multi-:term:`CWL` references in an equivalent fashion to the ``multipart/related``
+    content case described above, but allows deployment through standard :term:`JSON` request bodies without
+    requiring multipart encoding. Only :term:`CWL`-like :term:`Media-Types` are accepted to avoid ambiguities
+    with other deployment formats (e.g.: ``application/json`` or ``application/ogcapppkg+json``).
+
 .. seealso::
     Section :ref:`cwl-wps-mapping` provides further details about notable considerations that
     could require additional fields in ``processDescription`` for an adequate :term:`Process` definition.

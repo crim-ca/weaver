@@ -1044,13 +1044,38 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         if (not isinstance(execution_units, list) or len(execution_units) < 1 or
                 not isinstance(execution_units[0], dict)):
             raise HTTPUnprocessableEntity("Invalid parameter 'executionUnit'.")
-        if len(execution_units) > 1:
-            # FIXME: Multi-execution unit deployment is not yet supported
-            raise HTTPNotImplemented("Multiple execution units are not supported.")
-        execution_unit = execution_units[0]
-        package = execution_unit.get("unit")
-        reference = execution_unit.get("href")
-        found = package or reference
+
+        if len(execution_units) == 1:
+            execution_unit = execution_units[0]
+            package = execution_unit.get("unit")
+            reference = execution_unit.get("href")
+            found = package or reference
+        else:
+            # Multiple execution units: extract all packages (inline or fetch from references)
+            # Schema validation (OneOfKeywordSchema) ensures each unit has exactly one of 'unit' or 'href'
+            packages = []
+            for idx, execution_unit in enumerate(execution_units):
+                unit_package = execution_unit.get("unit")
+                unit_reference = execution_unit.get("href")
+
+                if unit_package:
+                    packages.append(unit_package)
+                elif unit_reference:
+                    try:
+                        # To avoid circular dependencies
+                        from weaver.processes.wps_package import _generate_process_with_cwl_from_reference
+                        cwl_pkg, _ = _generate_process_with_cwl_from_reference(unit_reference)
+                        packages.append(cwl_pkg)
+                    except Exception as exc:
+                        raise HTTPBadRequest(json={
+                            "title": "Failed to fetch execution unit reference",
+                            "description": f"Could not retrieve CWL from href at index {idx}: {unit_reference}",
+                            "cause": {"error": str(exc), "href": unit_reference, "index": idx}
+                        })
+
+            package = packages
+            reference = None
+            found = True
     if not found:
         params = [
             "process (href)",

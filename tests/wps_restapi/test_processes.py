@@ -961,31 +961,427 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             assert "different-id" in resp.json["cause"]["Content-ID"]
             assert process_name == resp.json["cause"]["payload_id"]
 
-    def test_deploy_process_multiple_execution_units_not_supported(self):
+    def test_deploy_process_multiple_execution_units(self):
         """
-        Test that deployment with multiple execution units raises HTTPNotImplemented.
+        Test that deployment with multiple execution units (inline CWL) works correctly.
 
+        This validates that executionUnit array format can deploy multiple CWL packages
+        in a single request, similar to multipart deployment.
         """
-        process_name = self.fully_qualified_test_name()
+        test_id = self.fully_qualified_test_name()
+
+        # Create inline CWL definitions for tools and workflow
         process_data = {
             "processDescription": {
-                "process": {"id": process_name}
+                "process": {"id": f"{test_id}-workflow"}
             },
             "executionUnit": [
-                {"href": "http://example.com/tool1.cwl"},
-                {"href": "http://example.com/tool2.cwl"}  # Multiple units not supported
+                {
+                    "unit": {
+                        "cwlVersion": "v1.2",
+                        "class": "CommandLineTool",
+                        "id": f"{test_id}-echo-tool",
+                        "inputs": {"message": "string"},
+                        "outputs": {
+                            "output": {
+                                "type": "File",
+                                "outputBinding": {"glob": "output.txt"}
+                            }
+                        },
+                        "requirements": {
+                            "DockerRequirement": {"dockerPull": "alpine:latest"}
+                        },
+                        "baseCommand": ["sh", "-c"],
+                        "arguments": ["echo $(inputs.message) > output.txt"]
+                    }
+                },
+                {
+                    "unit": {
+                        "cwlVersion": "v1.2",
+                        "class": "Workflow",
+                        "id": f"{test_id}-workflow",
+                        "inputs": {"message": "string"},
+                        "outputs": {
+                            "result": {
+                                "type": "File",
+                                "outputSource": "echo_step/output"
+                            }
+                        },
+                        "steps": {
+                            "echo_step": {
+                                "run": f"{test_id}-echo-tool",
+                                "in": {"message": "message"},
+                                "out": ["output"]
+                            }
+                        }
+                    }
+                }
             ]
         }
-        package_mock = mocked_process_package()
+
+        resp = mocked_sub_requests(
+            self.app, "post", "/processes",
+            data=process_data,
+            headers=self.json_headers,
+            only_local=True
+        )
+
+        assert resp.status_code == 201, (
+            f"Expected 201 Created, got {resp.status_code}. "
+            f"Body: {resp.json if resp.content_type == ContentType.APP_JSON else resp.text[:500]}"
+        )
+
+        result = resp.json
+        assert "processSummary" in result
+        assert result["deploymentDone"] is True
+
+        main_id = result["processSummary"]["id"]
+        assert main_id == f"{test_id}-workflow"
+
+        desc = self.get_process_description(main_id, schema=ProcessSchema.OLD)
+        assert desc["process"]["id"] == main_id
+        pkg = self.get_application_package(main_id)
+        assert pkg["class"] == "Workflow"
+
+        desc = self.get_process_description(f"{test_id}-echo-tool", schema=ProcessSchema.OLD)
+        assert desc["process"]["id"] == f"{test_id}-echo-tool"
+
+    def test_deploy_process_multiple_execution_units_with_href(self):
+        """
+        Test deployment with multiple execution units using href references.
+
+        This validates the code path that fetches CWL packages from remote URLs
+        and deploys them together, covering the branch added in utils.py ~line 1075.
+        """
+        test_id = self.fully_qualified_test_name()
+
+        # Create CWL tool definition
+        cwl_tool = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": f"{test_id}-echo-tool",
+            "inputs": {"message": "string"},
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {"glob": "output.txt"}
+                }
+            },
+            "requirements": {
+                "DockerRequirement": {"dockerPull": "alpine:latest"}
+            },
+            "baseCommand": ["sh", "-c"],
+            "arguments": ["echo $(inputs.message) > output.txt"]
+        }
+
+        # Create CWL workflow definition
+        cwl_workflow = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": f"{test_id}-workflow",
+            "inputs": {"message": "string"},
+            "outputs": {
+                "result": {
+                    "type": "File",
+                    "outputSource": "echo_step/output"
+                }
+            },
+            "steps": {
+                "echo_step": {
+                    "run": f"{test_id}-echo-tool",
+                    "in": {"message": "message"},
+                    "out": ["output"]
+                }
+            }
+        }
 
         with contextlib.ExitStack() as stack:
-            for pkg in package_mock:
-                stack.enter_context(pkg)
-            path = "/processes"
-            resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
-            assert resp.status_code == 501
-            assert resp.content_type == ContentType.APP_JSON
-            assert "Multiple execution units are not supported" in resp.json.get("description", "")
+            stack.enter_context(mocked_wps_output(self.settings))
+            out_dir = self.settings["weaver.wps_output_dir"]
+            out_url = self.settings["weaver.wps_output_url"]
+            assert out_url.startswith("http"), "test requires HTTP reference"
+
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
+
+            tool_file = os.path.join(tmp_dir, "tool.cwl")
+            tool_href = tool_file.replace(out_dir, out_url, 1)
+            with open(tool_file, mode="w", encoding="utf-8") as f:
+                json.dump(cwl_tool, f)
+
+            workflow_file = os.path.join(tmp_dir, "workflow.cwl")
+            workflow_href = workflow_file.replace(out_dir, out_url, 1)
+            with open(workflow_file, mode="w", encoding="utf-8") as f:
+                json.dump(cwl_workflow, f)
+
+            # Deploy using href references
+            process_data = {
+                "processDescription": {
+                    "process": {"id": f"{test_id}-workflow"}
+                },
+                "executionUnit": [
+                    {"href": tool_href},
+                    {"href": workflow_href}
+                ]
+            }
+
+            resp = mocked_sub_requests(
+                self.app, "post", "/processes",
+                data=process_data,
+                headers=self.json_headers,
+                only_local=True
+            )
+
+            assert resp.status_code == 201, (
+                f"Expected 201 Created, got {resp.status_code}. "
+                f"Body: {resp.json if resp.content_type == ContentType.APP_JSON else resp.text[:500]}"
+            )
+
+            result = resp.json
+            assert "processSummary" in result
+            assert result["deploymentDone"] is True
+
+            main_id = result["processSummary"]["id"]
+            assert main_id == f"{test_id}-workflow"
+
+            desc = self.get_process_description(main_id, schema=ProcessSchema.OLD)
+            assert desc["process"]["id"] == main_id
+            pkg = self.get_application_package(main_id)
+            assert pkg["class"] == "Workflow"
+
+            desc = self.get_process_description(f"{test_id}-echo-tool", schema=ProcessSchema.OLD)
+            assert desc["process"]["id"] == f"{test_id}-echo-tool"
+
+    def test_deploy_process_multiple_execution_units_mixed_inline_and_href(self):
+        """
+        Test deployment with mixed inline and href execution units.
+
+        This ensures the code handles a combination of inline CWL packages
+        and remote href references in the same executionUnit array.
+        """
+        test_id = self.fully_qualified_test_name()
+
+        # Inline CWL tool definition
+        inline_tool = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": f"{test_id}-inline-tool",
+            "inputs": {"text": "string"},
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {"glob": "inline.txt"}
+                }
+            },
+            "requirements": {
+                "DockerRequirement": {"dockerPull": "alpine:latest"}
+            },
+            "baseCommand": ["sh", "-c"],
+            "arguments": ["echo $(inputs.text) > inline.txt"]
+        }
+
+        # CWL workflow referencing both tools
+        cwl_workflow = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": f"{test_id}-workflow",
+            "inputs": {"message": "string"},
+            "outputs": {
+                "result": {
+                    "type": "File",
+                    "outputSource": "inline_step/output"
+                }
+            },
+            "steps": {
+                "inline_step": {
+                    "run": f"{test_id}-inline-tool",
+                    "in": {"text": "message"},
+                    "out": ["output"]
+                }
+            }
+        }
+
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            out_dir = self.settings["weaver.wps_output_dir"]
+            out_url = self.settings["weaver.wps_output_url"]
+            assert out_url.startswith("http"), "test requires HTTP reference"
+
+            # Create temporary file for workflow
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
+            workflow_file = os.path.join(tmp_dir, "workflow.cwl")
+            workflow_href = workflow_file.replace(out_dir, out_url, 1)
+            with open(workflow_file, mode="w", encoding="utf-8") as f:
+                json.dump(cwl_workflow, f)
+
+            # Deploy with mixed inline unit and href reference
+            process_data = {
+                "processDescription": {
+                    "process": {"id": f"{test_id}-workflow"}
+                },
+                "executionUnit": [
+                    {"unit": inline_tool},  # Inline
+                    {"href": workflow_href}  # Remote reference
+                ]
+            }
+
+            resp = mocked_sub_requests(
+                self.app, "post", "/processes",
+                data=process_data,
+                headers=self.json_headers,
+                only_local=True
+            )
+
+            assert resp.status_code == 201, (
+                f"Expected 201 Created, got {resp.status_code}. "
+                f"Body: {resp.json if resp.content_type == ContentType.APP_JSON else resp.text[:500]}"
+            )
+
+            result = resp.json
+            assert "processSummary" in result
+            assert result["deploymentDone"] is True
+
+            # Verify both processes were deployed
+            main_id = result["processSummary"]["id"]
+            assert main_id == f"{test_id}-workflow"
+
+            desc = self.get_process_description(f"{test_id}-inline-tool", schema=ProcessSchema.OLD)
+            assert desc["process"]["id"] == f"{test_id}-inline-tool"
+
+            desc = self.get_process_description(main_id, schema=ProcessSchema.OLD)
+            assert desc["process"]["id"] == main_id
+
+    def test_deploy_process_multiple_execution_units_href_fetch_error(self):
+        """
+        Test error handling when one of the href execution units fails to fetch.
+
+        This validates the error handling in the code branch at utils.py ~line 1075
+        when a remote CWL reference cannot be retrieved.
+        """
+        test_id = self.fully_qualified_test_name()
+
+        cwl_tool = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": f"{test_id}-tool",
+            "inputs": {"message": "string"},
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {"glob": "output.txt"}
+                }
+            },
+            "requirements": {
+                "DockerRequirement": {"dockerPull": "alpine:latest"}
+            },
+            "baseCommand": ["echo"]
+        }
+
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            out_dir = self.settings["weaver.wps_output_dir"]
+            out_url = self.settings["weaver.wps_output_url"]
+            assert out_url.startswith("http"), "test requires HTTP reference"
+
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
+            tool_file = os.path.join(tmp_dir, "tool.cwl")
+            tool_href = tool_file.replace(out_dir, out_url, 1)
+            with open(tool_file, mode="w", encoding="utf-8") as f:
+                json.dump(cwl_tool, f)
+
+            # Use invalid href that will fail to fetch
+            invalid_href = f"{out_url}/nonexistent/invalid.cwl"
+
+            process_data = {
+                "processDescription": {
+                    "process": {"id": f"{test_id}-workflow"}
+                },
+                "executionUnit": [
+                    {"href": tool_href},
+                    {"href": invalid_href}
+                ]
+            }
+
+            resp = mocked_sub_requests(
+                self.app, "post", "/processes",
+                data=process_data,
+                headers=self.json_headers,
+                only_local=True
+            )
+
+            assert resp.status_code == 400, (
+                f"Expected 400 Bad Request for invalid href, got {resp.status_code}"
+            )
+
+            result = resp.json
+            assert "title" in result
+            assert "Failed to fetch execution unit reference" in result["title"]
+            assert "cause" in result
+            assert result["cause"]["href"] == invalid_href
+            assert result["cause"]["index"] == 1
+
+    def test_deploy_process_single_execution_unit_href(self):
+        """
+        Test deployment with a single execution unit using href reference.
+
+        This ensures single href execution units work correctly (not just multiple).
+        """
+        test_id = self.fully_qualified_test_name()
+
+        cwl_tool = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": test_id,
+            "inputs": {"message": "string"},
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {"glob": "output.txt"}
+                }
+            },
+            "requirements": {
+                "DockerRequirement": {"dockerPull": "alpine:latest"}
+            },
+            "baseCommand": ["sh", "-c"],
+            "arguments": ["echo $(inputs.message) > output.txt"]
+        }
+
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mocked_wps_output(self.settings))
+            out_dir = self.settings["weaver.wps_output_dir"]
+            out_url = self.settings["weaver.wps_output_url"]
+            assert out_url.startswith("http"), "test requires HTTP reference"
+
+            tmp_dir = stack.enter_context(tempfile.TemporaryDirectory(dir=out_dir))
+            tool_file = os.path.join(tmp_dir, "tool.cwl")
+            tool_href = tool_file.replace(out_dir, out_url, 1)
+            with open(tool_file, mode="w", encoding="utf-8") as f:
+                json.dump(cwl_tool, f)
+
+            process_data = {
+                "processDescription": {
+                    "process": {"id": test_id}
+                },
+                "executionUnit": [
+                    {"href": tool_href}
+                ]
+            }
+
+            resp = mocked_sub_requests(
+                self.app, "post", "/processes",
+                data=process_data,
+                headers=self.json_headers,
+                only_local=True
+            )
+
+            assert resp.status_code == 201, (
+                f"Expected 201 Created, got {resp.status_code}. "
+                f"Body: {resp.json if resp.content_type == ContentType.APP_JSON else resp.text[:500]}"
+            )
+
+            result = resp.json
+            assert "processSummary" in result
+            assert result["deploymentDone"] is True
+            assert result["processSummary"]["id"] == test_id
 
     def test_deploy_process_no_package_reference_found(self):
         """
