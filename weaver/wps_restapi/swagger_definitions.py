@@ -9182,12 +9182,24 @@ get_result_redirect_responses = {
     "308": RedirectResultResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
 }
 get_job_results_responses = {
-    "200": OkGetJobResultsResponse(description="success", examples={
-        "JobResults": {
-            "summary": "Obtained job results.",
-            "value": EXAMPLES["job_results.json"],
+    "200": OkGetJobResultsResponse(
+        description=(
+            "Retrieval of results from a successfully completed job."
+            "\n\n"
+            "For bacward compatibility, nested `format` content details are provided. "
+            "However, implementations should rely on directly provided `mediaType`, `encoding`, etc."
+        ),
+        examples={
+            "JobResultsByReference": {
+                "summary": "Obtained job results by reference.",
+                "value": EXAMPLES["job_results_by_reference.json"],
+            },
+            "JobResultsByValue": {
+                "summary": "Obtained job results by value.",
+                "value": EXAMPLES["job_results_by_value.json"],
+            }
         }
-    }),
+    ),
     "204": NoContentJobResultsResponse(description="success"),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
