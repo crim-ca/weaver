@@ -259,6 +259,41 @@ Where the referenced file hosted at ``"https://remote-file-server.com/my-package
     "<...>": "<...>"
 
 
+.. _proc_ogc_api_multi_cwl:
+
+Package as Multiple CWL Documents
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When deploying a :term:`Workflow` with multiple dependent :term:`CWL` tools, `Weaver` supports
+the ``multipart/related`` content format as defined in |ogc-api-proc-part2|_.
+This allows packaging multiple :term:`CWL` documents in a single HTTP request using standard MIME multipart encoding.
+
+The key advantage of this approach is that users can develop and test their :term:`Workflow` locally using
+separate :term:`CWL` files, then deploy them as-is to `Weaver` without manual modifications. In contrast,
+`CWL Packed Documents`_ (using ``$graph``) or nested tool definitions require manual consolidation and
+restructuring of multiple files into a single document before deployment.
+
+.. _CWL Packed Documents: https://www.commonwl.org/v1.2/Workflow.html#Packed_documents
+
+.. note::
+
+    Users do not need to manually construct the ``multipart/related`` request format. The :ref:`CLI <cli>` and
+    :ref:`Python client <client_commands>` automatically handle multipart encoding and boundary generation
+    when multiple :term:`CWL` files are provided, making the deployment process seamless.
+
+`Weaver` also supports `CWL Packed Documents`_ via ``$graph`` arrays if needed. Both the multipart approach
+and ``$graph`` approach ultimately resolve to equivalent internal representations, so users can choose
+whichever method best fits their workflow development process.
+
+.. seealso::
+    For automated multi-CWL deployment using the CLI, refer to :ref:`cli_example_deploy`.
+
+.. note::
+
+    For HTTP API requests, use ``multipart/related`` content format to package multiple :term:`CWL` documents
+    in a single request body. See :ref:`app_pkg_multipart` for detailed examples and structure.
+
+
 .. _proc_esgf_cwt:
 
 ESGF-CWT
@@ -430,6 +465,21 @@ The request body requires mainly two components:
     If the :term:`Process` can be directly represented and converted from the :term:`CWL`, it
     can be directly deployed (i.e.: provided as is rather than embedding it in ``executionUnit``) when combined with
     the appropriate ``application/cwl+json`` or ``application/cwl+yaml`` :term:`Media-Type` in ``Content-Type`` header.
+
+.. note::
+    For deploying multiple related :term:`CWL` packages (e.g., a :term:`Workflow` with dependent tools),
+    the ``multipart/related`` :term:`Media-Type` can be used in the ``Content-Type`` header to package
+    all :term:`CWL` documents in a single request. Each part should specify its own content type
+    (``application/cwl+json`` or ``application/cwl+yaml``) and unique ``Content-ID``.
+    See :ref:`proc_ogc_api_multi_cwl` and :ref:`app_pkg_multipart` for detailed multipart structure and examples.
+
+.. note::
+    Multiple :term:`CWL` packages can also be deployed using an array of ``executionUnit`` entries, where each
+    entry contains either an inline ``unit`` object or an ``href`` reference to an external :term:`CWL` document.
+    This approach resolves the multi-:term:`CWL` references in an equivalent fashion to the ``multipart/related``
+    content case described above, but allows deployment through standard :term:`JSON` request bodies without
+    requiring multipart encoding. Only :term:`CWL`-like :term:`Media-Types` are accepted to avoid ambiguities
+    with other deployment formats (e.g.: ``application/json`` or ``application/ogcapppkg+json``).
 
 .. seealso::
     Section :ref:`cwl-wps-mapping` provides further details about notable considerations that

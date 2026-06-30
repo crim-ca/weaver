@@ -12,6 +12,26 @@ Changes
 
 Changes:
 --------
+- Add support for multipart `Process` deployment using ``multipart/related`` or ``multipart/mixed`` content types,
+  allowing simultaneous upload of multiple `CWL` files (e.g.: ``class: Workflow`` and ``class: CommandLineTool``)
+  along with optional `Process` description metadata (relates to `#56 <https://github.com/crim-ca/weaver/issues/56>`_,
+  resolves `#717 <https://github.com/crim-ca/weaver/issues/717>`_,
+  resolves `#874 <https://github.com/crim-ca/weaver/issues/874>`_).
+- Add support for `CWL` ``$graph`` representation with multiple entries, enabling deployment of workflows with
+  embedded step definitions without manual preprocessing
+  (resolves `#56 <https://github.com/crim-ca/weaver/issues/56>`_).
+- Add support for multiple ``executionUnit`` `CWL` entries in deployment payloads. Multiple execution units can now
+  be deployed in a single request using either inline ``unit`` objects or ``href`` URL references, allowing
+  deployment of workflows with multiple step definitions without requiring multipart encoding. This approach only
+  accepts CWL-like media-types to avoid ambiguities with other deployment formats
+  (e.g.: ``application/json`` or ``application/ogcapppkg+json``).
+- Add validation during multipart deployment to ensure at least one ``class: Workflow`` is present and properly
+  identified as the main workflow from media-type hints or ``Content-ID`` references.
+- Add `CLI` support for deploying multiple `CWL` files by repeating ``--cwl`` arguments to automatically generate
+  ``multipart/related`` request payloads, simplifying deployment of workflows with multiple step definitions.
+  The `CLI` accepts a mixture of local `CWL` file paths (as `JSON` or `YAML`) and remote URL references.
+  The server handles ``Content-Type`` media-type detection and ``Content-Location`` header processing for external
+  `CWL` files to fetch during deployment.
 - Rename Dockerfiles from ``docker/Dockerfile-{base,manager,worker}``
   to ``docker/{base,manager,worker}.dockerfile`` for a consistent naming and file extension scheme.
 - Refactor ``docker/base.dockerfile`` to a multi-stage build keeping build-only tooling out of runtime

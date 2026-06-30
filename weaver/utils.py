@@ -1325,6 +1325,23 @@ def get_file_header_datetime(dt):
     return dt_str
 
 
+def parse_content_id(content_id):
+    # type: (str) -> Tuple[AnyUUID, AnyUUID]
+    """
+    Parses a ``Content-ID`` header value into its resource and context identifiers.
+
+    .. seealso::
+        - Format of ``Content-ID`` header is defined under :rfc:`2392`.
+        - Integration with ``multipart`` :term:`Media-Types` is defined under :rfc:`1521`.
+
+    """
+    if not content_id.startswith("<") or not content_id.endswith(">") or "@" not in content_id:
+        raise ValueError(f"Invalid Content-ID format: [{content_id}]")
+    content_id = content_id[1:-1]  # Remove angle brackets
+    resource_id, context_id = content_id.split("@", 1)
+    return resource_id, context_id
+
+
 def create_content_id(resource_id, context_id):
     # type: (AnyUUID, AnyUUID) -> str
     """
