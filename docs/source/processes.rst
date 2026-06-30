@@ -277,7 +277,7 @@ restructuring of multiple files into a single document before deployment.
 
 .. note::
 
-    Users do not need to manually construct the ``multipart/related`` request format. The :ref:`cli` and
+    Users do not need to manually construct the ``multipart/related`` request format. The :ref:`CLI <cli>` and
     :ref:`Python client <client_commands>` automatically handle multipart encoding and boundary generation
     when multiple :term:`CWL` files are provided, making the deployment process seamless.
 

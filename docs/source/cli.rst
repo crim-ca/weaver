@@ -230,10 +230,17 @@ can accept multiple :term:`CWL` file paths and automatically deploy them in the 
       cat-tool.cwl \
       main-workflow.cwl
 
+.. code-block:: python
+    :caption: Python
+
+    client.deploy(
+        cwl=["echo-tool.cwl", "cat-tool.cwl", "main-workflow.cwl"]
+    )
+
 The CLI will automatically:
 
 1. Analyze dependencies between :term:`CWL` definitions
-2. Deploy all :term:`CommandLineTool` and :term:`ExpressionTool` definitions first
+2. Deploy all ``CommandLineTool`` and ``ExpressionTool`` definitions first
 3. Deploy the main :term:`Workflow` last, once all dependencies are available
 4. Skip tools that already exist (allowing deployment retries after failures)
 

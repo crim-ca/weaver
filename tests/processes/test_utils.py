@@ -1390,7 +1390,7 @@ class TestMultipartDeployment:
     ], ids=["single_workflow", "command_line_tool", "expression_tool"])
     def test_resolve_deployment_order_simple(self, packages, expected_tool_count, expected_workflow):
         """
-        Test resolve_deployment_order with single package types.
+        Test :func:`weaver.processes.utils.resolve_deployment_order` with single package types.
         """
         tools, main_workflow = resolve_deployment_order(packages)
 
@@ -1404,7 +1404,7 @@ class TestMultipartDeployment:
 
     def test_resolve_deployment_order_workflow_and_tools(self):
         """
-        Test resolve_deployment_order with workflow and multiple tools.
+        Test :func:`weaver.processes.utils.resolve_deployment_order` with workflow and multiple tools.
         """
         tool1 = {"class": "CommandLineTool", "id": "tool-1"}
         tool2 = {"class": "ExpressionTool", "id": "tool-2"}
@@ -1419,7 +1419,7 @@ class TestMultipartDeployment:
 
     def test_resolve_deployment_order_multiple_workflows_error(self):
         """
-        Test resolve_deployment_order raises error for multiple workflows.
+        Test :func:`weaver.processes.utils.resolve_deployment_order` raises error for multiple workflows.
         """
         workflow1 = {"class": "Workflow", "id": "workflow-1"}
         workflow2 = {"class": "Workflow", "id": "workflow-2"}
@@ -1432,10 +1432,11 @@ class TestMultipartDeployment:
 
     def test_resolve_deployment_order_tools_only_error(self):
         """
-        Test resolve_deployment_order raises error when only tools are provided (no workflow).
+        Test :func:`weaver.processes.utils.resolve_deployment_order` raises error
+        when only tools are provided (no workflow).
 
         According to CWL packed document specification, multiple tools without a workflow
-        are not supported, even with #main designation.
+        are not supported, even with ``#main`` designation.
         """
         tool1 = {"class": "CommandLineTool", "id": "tool-1"}
         tool2 = {"class": "CommandLineTool", "id": "tool-2"}
@@ -1451,10 +1452,11 @@ class TestMultipartDeployment:
 
     def test_resolve_deployment_order_tools_with_main_error(self):
         """
-        Test resolve_deployment_order raises error when multiple tools with #main but no workflow.
+        Test :func:`weaver.processes.utils.resolve_deployment_order` raises error
+        when multiple tools with ``#main`` but no workflow.
 
         Multiple CommandLineTools or ExpressionTools are not supported without a Workflow,
-        even if one has id '#main'.
+        even if one has id ``#main``.
         """
         tool1 = {"class": "CommandLineTool", "id": "#main"}
         tool2 = {"class": "CommandLineTool", "id": "tool-2"}
@@ -1470,7 +1472,7 @@ class TestMultipartDeployment:
 
     def test_resolve_deployment_order_no_packages(self):
         """
-        Test resolve_deployment_order with empty list returns empty results.
+        Test :func:`weaver.processes.utils.resolve_deployment_order` with empty list returns empty results.
         """
         tools, main_workflow = resolve_deployment_order([])
         assert not tools
@@ -1478,7 +1480,7 @@ class TestMultipartDeployment:
 
     def test_resolve_deployment_order_single_tool_among_multiple_packages(self):
         """
-        Test resolve_deployment_order with single tool among multiple packages.
+        Test :func:`weaver.processes.utils.resolve_deployment_order` with single tool among multiple packages.
 
         This tests the case where only one valid tool is provided,
         which should be implicitly treated as the main entry point.

@@ -438,6 +438,43 @@ def resolve_deployment_order(cwl_packages):
     return tools, main_workflow
 
 
+def resolve_multi_execution_units(execution_units):
+    # type: (List[JSON]) -> List[CWL]
+    """
+    Extract all :term:`CWL` packages from multiple execution units.
+
+    Each execution unit can contain either an inline package (``unit``) or a reference (``href``)
+    to fetch the package from a remote location.
+
+    :param execution_units:
+        ``list`` of execution unit definitions.
+        Each unit must have exactly one of ``unit`` or ``href`` (enforced by schema validation).
+    :returns: ``list`` of resolved :term:`CWL` package definitions.
+    :raises HTTPBadRequest: If unable to fetch a remote execution unit reference.
+    """
+    packages = []
+    for idx, execution_unit in enumerate(execution_units):
+        unit_package = execution_unit.get("unit")
+        unit_reference = execution_unit.get("href")
+
+        if unit_package:
+            packages.append(unit_package)
+        elif unit_reference:
+            try:
+                # To avoid circular dependencies
+                from weaver.processes.wps_package import _generate_process_with_cwl_from_reference
+                cwl_pkg, _ = _generate_process_with_cwl_from_reference(unit_reference)
+                packages.append(cwl_pkg)
+            except Exception as exc:
+                raise HTTPBadRequest(json={
+                    "title": "Failed to fetch execution unit reference",
+                    "description": f"Could not retrieve CWL from href at index {idx}: {unit_reference}",
+                    "cause": {"error": str(exc), "href": unit_reference, "index": idx}
+                })
+
+    return packages
+
+
 def _get_multipart_content(content, request):
     # type: (Union[str, bytes], Optional[AnyRequestType]) -> bytes
     """
@@ -460,7 +497,7 @@ def create_multipart_deploy(cwl_files, url, process_description=None, boundary=N
 
         - A file path (``str``) to a :term:`CWL` file (will be loaded)
         - A :term:`CWL` ``dict`` (already parsed)
-    :param url: Domain or hostname for Content-ID header generation
+    :param url: Domain or hostname for ``Content-ID`` header generation
     :param process_description: Optional :term:`Process` description metadata to include
     :param boundary: Optional custom ``boundary`` ``str`` (auto-generated if not provided)
     :returns:
@@ -612,17 +649,17 @@ def _validate_and_reorder_multipart_workflow(cwl_packages, root_workflow_cid, pa
 def _fetch_multipart_content_location(content_location, part_content, request=None):
     # type: (str, str, Optional[AnyRequestType]) -> str
     """
-    Fetch :term:`CWL` content from Content-Location header if part body is empty.
+    Fetch :term:`CWL` content from ``Content-Location`` header if part body is empty.
 
-    Checks if part body is empty and Content-Location is a URL, then fetches the content from that location.
-    Content-Location can be a static :term:`CWL` file URL or an API endpoint (Weaver, WPS, OGC API).
+    Checks if part body is empty and ``Content-Location`` is a URL, then fetches the content from that location.
+    ``Content-Location`` can be a static :term:`CWL` file URL or an API endpoint (Weaver, WPS, OGC API).
     Relative URLs are resolved against the base API URL.
 
-    :param content_location: Content-Location header value (absolute or relative URL)
+    :param content_location: ``Content-Location`` header value (absolute or relative URL)
     :param part_content: Current part content (may be empty)
     :param request: Optional request object for resolving relative URLs
-    :returns: Updated part content (either original or fetched from Content-Location)
-    :raises HTTPBadRequest: If fetching from Content-Location fails
+    :returns: Updated part content (either original or fetched from ``Content-Location``)
+    :raises HTTPBadRequest: If fetching from ``Content-Location`` fails
     """
     # Only fetch if part body is empty AND Content-Location is provided
     if not content_location or (part_content and part_content.strip()):
@@ -675,8 +712,8 @@ def _fetch_multipart_content_location(content_location, part_content, request=No
         LOGGER.error("Failed to fetch content from Content-Location %s: %s", absolute_url, exc)
         raise HTTPBadRequest(json={
             "title": "Failed to fetch Content-Location",
-            "description": f"Could not retrieve CWL from Content-Location: {absolute_url}",
-            "cause": {"error": str(exc), "location": absolute_url}
+            "description": f"Could not retrieve CWL from Content-Location: {content_location}",
+            "cause": {"error": str(exc), "Content-Location": content_location, "location": absolute_url}
         })
 
 
@@ -712,10 +749,10 @@ def _parse_multipart_message(content, content_type, request=None):
 def _extract_multipart_start_parameter(content_type):
     # type: (str) -> Optional[str]
     """
-    Extract the ``start`` parameter from a ``multipart/related`` Content-Type header.
+    Extract the ``start`` parameter from a ``multipart/related`` ``Content-Type`` header.
 
-    :param content_type: Full Content-Type header value
-    :returns: Content-ID from ``start`` parameter, or ``None`` if not present
+    :param content_type: Full ``Content-Type`` header value
+    :returns: ``Content-ID`` from ``start`` parameter, or ``None`` if not present
     """
     if ContentType.MULTIPART_RELATED in content_type.lower() and "start=" in content_type:
         start_part = content_type.split("start=")[1].split(";")[0].strip().strip('"').strip('<>')
@@ -729,7 +766,7 @@ def _interpret_multipart_part(part, request=None):
     Interpret a single multipart part: decode, fetch content if needed, and parse.
 
     :param part: Single part from multipart message
-    :param request: Optional request object for resolving relative Content-Location URLs
+    :param request: Optional request object for resolving relative ``Content-Location`` URLs
     :returns:
         ``tuple`` of (content_type, content_id, content_location, parsed_data) or ``None`` if part cannot be parsed
     """
@@ -1052,28 +1089,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
             found = package or reference
         else:
             # Multiple execution units: extract all packages (inline or fetch from references)
-            # Schema validation (OneOfKeywordSchema) ensures each unit has exactly one of 'unit' or 'href'
-            packages = []
-            for idx, execution_unit in enumerate(execution_units):
-                unit_package = execution_unit.get("unit")
-                unit_reference = execution_unit.get("href")
-
-                if unit_package:
-                    packages.append(unit_package)
-                elif unit_reference:
-                    try:
-                        # To avoid circular dependencies
-                        from weaver.processes.wps_package import _generate_process_with_cwl_from_reference
-                        cwl_pkg, _ = _generate_process_with_cwl_from_reference(unit_reference)
-                        packages.append(cwl_pkg)
-                    except Exception as exc:
-                        raise HTTPBadRequest(json={
-                            "title": "Failed to fetch execution unit reference",
-                            "description": f"Could not retrieve CWL from href at index {idx}: {unit_reference}",
-                            "cause": {"error": str(exc), "href": unit_reference, "index": idx}
-                        })
-
-            package = packages
+            package = resolve_multi_execution_units(execution_units)
             reference = None
             found = True
     if not found:
