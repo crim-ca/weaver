@@ -447,7 +447,7 @@ Each part in the multipart body must specify:
 
 - ``Content-Type``: The media type of the part (e.g., ``application/cwl+json``) (:rfc:`2045#section-5`)
 - A unique identifier resolved from one or more of:
-  
+
   - ``Content-ID``: Part identifier in the format ``<id@domain>`` (:rfc:`2392`)
   - ``Content-Location``: Process identifier or URL to fetch the :term:`CWL` resource
   - ``id`` field within the :term:`CWL` body
@@ -584,7 +584,8 @@ Main Tool Selection
 
 The root :term:`CWL` document to be deployed as the main :term:`Process` is determined by the following priority:
 
-1. The ``start`` parameter in the ``Content-Type`` header, which references a :ref:`resolved identifier <table-multipart-cwl-identifiers>` from multipart definitions
+1. The ``start`` parameter in the ``Content-Type`` header, which references a
+   :ref:`resolved identifier <table-multipart-cwl-identifiers>` from multipart definitions
 2. The |cwl-main-id|_ identifier specified by ``Content-ID`` or the ``id`` field within the :term:`CWL` body
    of the corresponding part
 3. If neither of the above are provided, the first :term:`CWL` part in the multipart body is considered the root
@@ -605,7 +606,7 @@ Additional Metadata
 
 .. warning::
     **Process description metadata in multipart requests is not yet implemented.**
-    
+
     While the multipart format supports including :term:`Process` description parts alongside :term:`CWL` documents,
     this feature is not currently implemented. Any process description parts included in multipart requests
     will be parsed but discarded during deployment.
