@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+- Adjusted OpenAPI `Job` result examples with by-value/href responses.
 - Adjust OpenAPI ``Accept-Profile`` to report profiles applicable to specific endpoints rather than generic entries.
 - Update OGC profile, exception and link relation URIs to ``https://`` as per corresponding standard updates.
 - Rename Dockerfiles from ``docker/Dockerfile-{base,manager,worker}``
