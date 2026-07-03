@@ -698,7 +698,7 @@ def get_response_profile(request=None, request_headers=None):
         - ``Accept-Profile`` header directly providing the profile :term:`URI`.
         - ``Accept`` :term:`Media-Type` with a ``profile`` parameter.
         - ``Prefer`` header including a ``profile`` parameter.
-        - ``Link`` header including a ``profile`` parameter.
+        - ``Link`` header including a link relation named ``profile``.
 
     .. seealso::
         - `Content Negotiation by Profile - Existing Standards <https://www.w3.org/TR/dx-prof-conneg/#related-http>`_
@@ -726,13 +726,13 @@ def get_response_profile(request=None, request_headers=None):
 
     content_profile = get_header("Accept-Profile", headers)
     if content_profile:
-        return content_profile.strip("<>").strip() or None
+        return content_profile.strip("<>").strip("\"").strip() or None
 
     for header_name in ["Accept", "Prefer", "Link"]:
-        content_accept = get_header(header_name, headers) or ""
-        content_media_type = content_accept.split(",")[0]
+        content_value = get_header(header_name, headers) or ""
+        content_value = content_value.split(",", 1)[0]
         content_params = parse_kvp(
-            content_media_type,
+            content_value,
             key_value_sep="=",
             pair_sep=";",
             nested_pair_sep=None,
@@ -740,9 +740,16 @@ def get_response_profile(request=None, request_headers=None):
             unescape_quotes=True,
             strip_spaces=True,
         )
-        content_profile = content_params.get("profile")
+        if header_name == "Link":
+            rel = content_params.get("rel")
+            if not rel or rel[0].lower() != "profile":
+                continue
+            content_profile = content_value.split(";", 1)[0]
+        else:
+            content_profile = content_params.get("profile")
+            content_profile = content_profile[0] if content_profile else ""
         if content_profile:
-            return content_profile[0].strip("<>").strip() or None
+            return content_profile.strip("<>").strip("\"").strip() or None
 
 
 def get_request_args(request):

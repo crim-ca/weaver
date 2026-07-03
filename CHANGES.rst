@@ -18,7 +18,7 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix invalid parsing of ``Link: <{URI}>; rel="profile"`` headers to extract the profile URI.
 
 .. _changes_6.15.0:
 

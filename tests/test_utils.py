@@ -2542,6 +2542,8 @@ def test_explode_headers(test_headers, expect_headers, expect_get_all):
         (MockRequest("?profile=param", headers={"Profile": "header"}), {}, "param"),
         (MockRequest("?profile=param", headers={"Accept-Profile": "header"}), {}, "param"),
         (MockRequest("?random=param", headers={"Accept-Profile": "header"}), {}, "header"),
+        (MockRequest("/test", headers={"Link": "<https://example.com>; rel=profile"}), {}, "https://example.com"),
+        (MockRequest("/test", headers={"Link": "<https://example.com>; rel=\"profile\""}), {}, "https://example.com"),
         (MockRequest("/test", headers={"Accept-Profile": "header"}), {"Accept-Profile": "x-header"}, "x-header"),
         (MockRequest("/test", headers={"Random": "other"}), {"Accept-Profile": "x-header"}, "x-header"),
         (MockRequest("/test", headers={}), {"Accept-Profile": "x-header"}, "x-header"),
