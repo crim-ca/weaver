@@ -510,6 +510,7 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part2}/per/deploy-replace-undeploy/additional-status-codes",
         f"{ogcapi_proc_part2}/per/deploy-replace-undeploy/replace-body",
         f"{ogcapi_proc_part2}/per/deploy-replace-undeploy/replace-response-insert",
+        f"{ogcapi_proc_part2}/per/cwl/multipart-cwl-body",
         f"{ogcapi_proc_part2}/rec/deploy-replace-undeploy/deploy-body-ogcapppkg",
         f"{ogcapi_proc_part2}/rec/deploy-replace-undeploy/package-response-cwl",
         f"{ogcapi_proc_part2}/rec/deploy-replace-undeploy/package-response-ogcapppkg",

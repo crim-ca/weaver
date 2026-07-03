@@ -7,6 +7,7 @@ from typing import cast
 import mock
 import pytest
 import yaml
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented
 
 from tests import resources
 from tests.utils import (
@@ -16,9 +17,23 @@ from tests.utils import (
     setup_mongodb_servicestore
 )
 from weaver.exceptions import PackageRegistrationError
+from weaver.formats import ContentType
 from weaver.processes.constants import CWL_NAMESPACE_WEAVER_ID, CWL_REQUIREMENT_APP_WPS1, CWL_RequirementWeaverWPS1Type
-from weaver.processes.utils import _check_package_file  # noqa: W0212
-from weaver.processes.utils import register_cwl_processes_from_config, register_wps_processes_from_config
+from weaver.processes.utils import (  # noqa: W0212
+    _check_package_file,
+    _classify_multipart_part,
+    _extract_multipart_start_parameter,
+    _get_multipart_content,
+    _interpret_multipart_part,
+    _organize_deploy_parts,
+    _parse_multipart_message,
+    create_multipart_deploy,
+    parse_multipart_deploy,
+    register_cwl_processes_from_config,
+    register_wps_processes_from_config,
+    resolve_cwl_graph,
+    resolve_deployment_order
+)
 
 WPS1_URL1 = resources.TEST_REMOTE_SERVER_URL
 WPS1_URL2 = "http://yet-another-server.com"
@@ -397,3 +412,1399 @@ def test_register_cwl_processes_from_config_error_handling():
                 assert mock_deploy.call_count == 0, "Deploy should not be reached due to failed CWL pre-validation."
                 assert mock_load.call_count == 1
                 assert result is None  # not returned
+
+
+@pytest.mark.multipart
+class TestMultipartDeployment:
+    """
+    Test multipart deployment parsing functions.
+
+    These tests directly test the internal multipart parsing functions to cover
+    branches that are difficult to reach through integration tests.
+    """
+
+    @pytest.mark.parametrize("content,request_obj,expected,should_raise", [
+        # Test with bytes input
+        (b"test content", None, b"test content", False),
+        # Test with string input
+        ("test content", None, b"test content", False),
+        # Test with request body (request will be mocked in test)
+        (None, "mock_request", b"request body content", False),
+        # Test with invalid type
+        (12345, None, None, True),
+    ], ids=["bytes", "string", "request_body", "invalid_type"])
+    def test_get_multipart_content(self, content, request_obj, expected, should_raise):
+        """
+        Test _get_multipart_content with various input types.
+        """
+        # Handle mock request case
+        if request_obj == "mock_request":
+            class MockRequest:
+                body = b"request body content"
+            request_obj = MockRequest()
+
+        if should_raise:
+            with pytest.raises(HTTPBadRequest) as exc_info:
+                _get_multipart_content(content, request=request_obj)
+            assert "Invalid multipart content format" in str(exc_info.value)
+        else:
+            result = _get_multipart_content(content, request=request_obj)
+            assert result == expected
+            assert isinstance(result, bytes)
+
+    def test_classify_multipart_part_with_cwl_class(self):
+        """
+        Test classification of part with explicit CWL class.
+        """
+        part_data = {
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {}
+        }
+        cwl_packages = []
+        parts_by_cid = {}
+
+        result = _classify_multipart_part(
+            part_data, cwl_packages, parts_by_cid,
+            content_id="tool-1", process_description=None
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0] == part_data
+        assert result is None  # No process description returned
+
+    def test_classify_multipart_part_with_graph(self):
+        """
+        Test classification of part with ``cwlVersion`` and ``$graph``.
+
+        This ensures that $graph CWL packages are properly stored in parts_by_cid
+        when a content_id is provided.
+        """
+        part_data = {
+            "cwlVersion": "v1.2",
+            "$graph": [
+                {"class": "CommandLineTool", "id": "tool-1"}
+            ]
+        }
+        cwl_packages = []
+        parts_by_cid = {}
+
+        result = _classify_multipart_part(
+            part_data, cwl_packages, parts_by_cid,
+            content_id="graph-1", process_description=None
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0] == part_data
+        assert result is None
+        # Verify content_id was stored in parts_by_cid
+        assert "graph-1" in parts_by_cid
+        assert parts_by_cid["graph-1"] == part_data
+
+    def test_classify_multipart_part_with_process_description(self):
+        """
+        Test classification of part with processDescription.
+        """
+        part_data = {
+            "processDescription": {
+                "id": "test-process",
+                "title": "Test Process"
+            }
+        }
+        cwl_packages = []
+        parts_by_cid = {}
+
+        result = _classify_multipart_part(
+            part_data, cwl_packages, parts_by_cid,
+            content_id=None, process_description=None
+        )
+
+        assert len(cwl_packages) == 0  # Not added to CWL packages
+        assert result == part_data  # Returned as process description
+
+    def test_classify_multipart_part_multiple_process_descriptions(self, caplog):
+        """
+        Test warning when multiple process descriptions are found.
+        """
+        first_desc = {"processDescription": {"id": "first"}}
+        second_desc = {"processDescription": {"id": "second"}}
+
+        cwl_packages = []
+        parts_by_cid = {}
+
+        # First one is accepted
+        result1 = _classify_multipart_part(
+            first_desc, cwl_packages, parts_by_cid,
+            content_id=None, process_description=None
+        )
+        assert result1 == first_desc
+
+        # Second one should trigger warning and be ignored
+        result2 = _classify_multipart_part(
+            second_desc, cwl_packages, parts_by_cid,
+            content_id=None, process_description=first_desc
+        )
+        assert result2 == first_desc  # Still returns the first one
+        assert "Multiple process descriptions found" in caplog.text
+
+    def test_classify_multipart_part_with_implicit_cwl(self):
+        """
+        Test classification of part with implicit CWL characteristics (inputs/outputs/baseCommand).
+        """
+        part_data = {
+            "id": "implicit-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}},
+            "baseCommand": ["echo", "hello"]
+        }
+        cwl_packages = []
+        parts_by_cid = {}
+
+        result = _classify_multipart_part(
+            part_data, cwl_packages, parts_by_cid,
+            content_id="implicit-1", process_description=None
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0] == part_data
+        assert result is None
+
+    def test_classify_multipart_part_with_steps(self):
+        """
+        Test classification with 'steps' field (workflow-like).
+        """
+        part_data = {
+            "id": "workflow",
+            "steps": {
+                "step1": {"run": "tool1"}
+            }
+        }
+        cwl_packages = []
+        parts_by_cid = {}
+
+        _classify_multipart_part(
+            part_data, cwl_packages, parts_by_cid,
+            content_id=None, process_description=None
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0] == part_data
+
+    def test_classify_multipart_part_generic_fallback(self):
+        """
+        Test fallback classification for generic JSON.
+        """
+        part_data = {
+            "id": "test-id",
+            "title": "Some title",
+            "custom_field": "value"
+        }
+        cwl_packages = []
+        parts_by_cid = {}
+
+        # No process description yet, so this becomes the process description
+        result = _classify_multipart_part(
+            part_data, cwl_packages, parts_by_cid,
+            content_id=None, process_description=None
+        )
+
+        assert len(cwl_packages) == 0
+        assert result == part_data  # Returned as process description
+
+    def test_classify_multipart_part_non_dict(self):
+        """
+        Test classification of non-dict data (should be ignored).
+        """
+        part_data = "just a string"
+        cwl_packages = []
+        parts_by_cid = {}
+
+        result = _classify_multipart_part(
+            part_data, cwl_packages, parts_by_cid,
+            content_id=None, process_description=None
+        )
+
+        assert len(cwl_packages) == 0
+        assert result is None
+
+    def test_parse_multipart_deploy_simple(self):
+        """
+        Test parsing a simple multipart deployment.
+        """
+        tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}}
+        })
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"\r\n"
+            f"{tool_cwl}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        cwl_packages, process_desc = parse_multipart_deploy(
+            multipart_body, content_type, request=None
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "test-tool"
+        assert process_desc is None
+
+    def test_parse_multipart_deploy_missing_boundary(self):
+        """
+        Test that missing boundary in Content-Type raises error.
+        """
+        content = b"some content"
+        content_type = "multipart/mixed"  # No boundary parameter
+
+        with pytest.raises(Exception):  # Can be HTTPBadRequest or email parsing error
+            parse_multipart_deploy(content, content_type, request=None)
+
+    def test_parse_multipart_deploy_no_cwl_parts(self):
+        """
+        Test that multipart with no CWL parts raises error.
+        """
+        generic_json = json.dumps({"some": "data"})
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_JSON}\r\n"
+            f"\r\n"
+            f"{generic_json}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            parse_multipart_deploy(multipart_body, content_type, request=None)
+        assert exc_info.value.json is not None
+        assert "No CWL packages found" in exc_info.value.json.get("title", "")
+
+    def test_parse_multipart_deploy_content_location_static_file(self, monkeypatch):
+        """
+        Test Content-Location header successfully fetches remote static CWL file.
+        """
+        # CWL to be "fetched" from Content-Location
+        remote_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "remote-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}}
+        })
+
+        # Mock load_file to return the CWL content
+        def mock_load_file(path, text=False):
+            assert path == "https://example.com/tool.cwl"
+            return remote_cwl
+
+        monkeypatch.setattr("weaver.processes.utils.load_file", mock_load_file)
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Location: https://example.com/tool.cwl\r\n"
+            f"\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        cwl_packages, process_desc = parse_multipart_deploy(
+            multipart_body, content_type, request=None
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "remote-tool"
+        assert process_desc is None
+
+    def test_parse_multipart_deploy_content_location_weaver_package(self, monkeypatch):
+        """
+        Test Content-Location header successfully fetches from Weaver package endpoint.
+        """
+        # Mock CWL package
+        cwl_package = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "weaver-workflow",
+            "inputs": {"input": {"type": "string"}},
+            "outputs": {"output": {"type": "File"}},
+            "steps": {}
+        }
+
+        # Mock _generate_process_with_cwl_from_reference
+        def mock_generate_process(reference, process_hint=None):
+            assert "/processes/test-process/package" in reference
+            return (cwl_package, {"identifier": "test-process"})
+
+        monkeypatch.setattr("weaver.processes.wps_package._generate_process_with_cwl_from_reference",
+                            mock_generate_process)
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Location: https://weaver.example.com/processes/test-process/package\r\n"
+            f"\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        cwl_packages, process_desc = parse_multipart_deploy(
+            multipart_body, content_type, request=None
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "weaver-workflow"
+        assert process_desc is None
+
+    def test_parse_multipart_deploy_content_location_wps_endpoint(self, monkeypatch):
+        """
+        Test Content-Location header successfully fetches from WPS endpoint.
+        """
+        # Mock CWL package generated from WPS DescribeProcess
+        wps_cwl_package = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "wps-process",
+            "inputs": {"input": {"type": "string"}},
+            "outputs": {"output": {"type": "File"}}
+        }
+
+        # Mock _generate_process_with_cwl_from_reference
+        def mock_generate_process(reference, process_hint=None):
+            assert "wps" in reference.lower() or "describeprocess" in reference.lower()
+            return (wps_cwl_package, {"identifier": "wps-process"})
+
+        monkeypatch.setattr("weaver.processes.wps_package._generate_process_with_cwl_from_reference",
+                            mock_generate_process)
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Location: https://wps.example.com/wps?service=WPS&request=DescribeProcess&identifier=test\r\n"
+            f"\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        cwl_packages, process_desc = parse_multipart_deploy(
+            multipart_body, content_type, request=None
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "wps-process"
+        assert process_desc is None
+
+    def test_parse_multipart_deploy_content_location_relative_url(self, monkeypatch):
+        """
+        Test Content-Location with relative URL is resolved using base API URL.
+
+        This tests that relative URLs like 'processes/test-process/package' are properly
+        resolved against the base API URL using urljoin and get_wps_restapi_base_url.
+        """
+        # Mock CWL package to be "fetched" from relative URL
+        relative_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "relative-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}}
+        }
+
+        def mock_get_base_url(request):
+            return "https://weaver.example.com/api"
+
+        def mock_generate_process(reference, process_hint=None):
+            # Should receive the resolved absolute URL
+            assert reference == "https://weaver.example.com/api/processes/test-process/package"
+            return (relative_cwl, {"identifier": "test-process"})
+
+        monkeypatch.setattr("weaver.processes.utils.get_wps_restapi_base_url", mock_get_base_url)
+        monkeypatch.setattr("weaver.processes.wps_package._generate_process_with_cwl_from_reference",
+                            mock_generate_process)
+
+        # Create a mock request object
+        class MockRequest:
+            def __init__(self):
+                self.headers = {}
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Location: processes/test-process/package\r\n"  # Relative URL
+            f"\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        # Should parse successfully with relative URL resolved
+        cwl_packages, process_desc = parse_multipart_deploy(
+            multipart_body, content_type, request=MockRequest()
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "relative-tool"
+        assert process_desc is None
+
+    def test_parse_multipart_deploy_content_location_relative_url_no_request(self):
+        """
+        Test Content-Location with relative URL but no request context raises error.
+
+        This tests that when a relative URL is provided but no request context is available
+        to resolve it, an HTTPBadRequest error is raised.
+        """
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Location: processes/test-process/package\r\n"  # Relative URL
+            f"\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        # Should raise HTTPBadRequest because relative URL cannot be resolved without request
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            parse_multipart_deploy(multipart_body, content_type, request=None)
+
+        assert exc_info.value.json is not None
+        assert "Invalid Content-Location" in exc_info.value.json.get("title", "")
+        assert "relative" in exc_info.value.json.get("description", "").lower()
+        assert "processes/test-process/package" in exc_info.value.json.get("cause", {}).get("location", "")
+
+    def test_parse_multipart_deploy_content_location_relative_url_static_file(self, monkeypatch):
+        """
+        Test Content-Location with relative URL resolving to a static CWL file.
+
+        This tests that relative URLs with file extensions (e.g., 'files/tool.cwl') are properly
+        resolved and fetched as static files using load_file.
+        """
+        # Mock CWL content to be "fetched" from relative URL
+        static_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "static-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}}
+        })
+
+        def mock_get_base_url(request):
+            return "https://weaver.example.com/api"
+
+        def mock_load_file(path, text=False):
+            # Should receive the resolved absolute URL
+            assert path == "https://weaver.example.com/api/files/tool.cwl"
+            assert text is True
+            return static_cwl
+
+        monkeypatch.setattr("weaver.processes.utils.get_wps_restapi_base_url", mock_get_base_url)
+        monkeypatch.setattr("weaver.processes.utils.load_file", mock_load_file)
+
+        class MockRequest:
+            def __init__(self):
+                self.headers = {}
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Location: files/tool.cwl\r\n"  # Relative URL with file extension
+            f"\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        # Should parse successfully with relative URL resolved to static file
+        cwl_packages, process_desc = parse_multipart_deploy(
+            multipart_body, content_type, request=MockRequest()
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "static-tool"
+        assert process_desc is None
+
+    def test_parse_multipart_deploy_content_location_failure(self, monkeypatch):
+        """
+        Test Content-Location header raises error when fetch fails.
+        """
+        # Mock load_file to raise an exception
+        def mock_load_file(path, text=False):
+            raise RuntimeError("Failed to fetch file")
+
+        monkeypatch.setattr("weaver.processes.utils.load_file", mock_load_file)
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Location: https://example.com/nonexistent.cwl\r\n"
+            f"\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            parse_multipart_deploy(multipart_body, content_type, request=None)
+        assert exc_info.value.json is not None
+        assert "Failed to fetch Content-Location" in exc_info.value.json.get("title", "")
+        assert "https://example.com/nonexistent.cwl" in exc_info.value.json.get("cause", {}).get("location", "")
+
+    def test_parse_multipart_deploy_malformed_multipart_content(self):
+        """
+        Test that malformed multipart content that can't be parsed raises HTTPBadRequest.
+        """
+        # Create malformed multipart data with invalid structure
+        # Missing proper MIME boundary markers and structure
+        content_type = "multipart/mixed; boundary=----Boundary123"
+        malformed_content = b"This is not valid multipart content\r\nIt lacks proper structure"
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            parse_multipart_deploy(malformed_content, content_type, request=None)
+        error_str = str(exc_info.value)
+        assert "multipart" in error_str.lower() or "parse" in error_str.lower()
+
+    def test_parse_multipart_deploy_non_multipart_format(self):
+        """
+        Test that content parsed successfully but not in multipart format raises error.
+        """
+        # Create content that parses but isn't actually multipart
+        # Using a simple email message without multipart structure
+        content_type = "multipart/mixed; boundary=----Boundary123"
+        # This creates a message that parses but has no multipart payload
+        non_multipart_content = (
+            b"Content-Type: text/plain\r\n"
+            b"\r\n"
+            b"This is just plain text, not multipart\r\n"
+        )
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            parse_multipart_deploy(non_multipart_content, content_type, request=None)
+        # Should raise "Content is not multipart format"
+        assert "multipart" in str(exc_info.value).lower()
+
+    def test_parse_multipart_deploy_malformed_json_in_part(self):
+        """
+        Test that malformed JSON/YAML in a part is gracefully skipped (logged as warning).
+
+        This tests the exception handling around _parse_multipart_part that catches
+        malformed JSON/YAML and skips the part with a warning.
+        """
+        # Create multipart with one valid CWL and one malformed JSON part
+        tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}}
+        })
+
+        malformed_json = "{ this is not valid json at all"
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"\r\n"
+            f"{tool_cwl}\r\n"
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_JSON}\r\n"
+            f"\r\n"
+            f"{malformed_json}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        # Should still succeed because malformed part is skipped
+        cwl_packages, _ = parse_multipart_deploy(multipart_body, content_type, request=None)
+
+        # Should have parsed the valid CWL, skipped the malformed JSON
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "test-tool"
+
+    def test_parse_multipart_deploy_bytes_decoding(self):
+        """
+        Test that multipart parts with bytes content are properly decoded to strings.
+
+        This tests the code path in _interpret_multipart_part where part_content is bytes
+        and needs to be decoded using the part's charset.
+        """
+        tool_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}}
+        }
+        tool_json = json.dumps(tool_cwl)
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}; charset=utf-8\r\n"
+            f"Content-ID: <test-tool@example.com>\r\n"
+            f"\r\n"
+            f"{tool_json}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        cwl_packages, process_desc = parse_multipart_deploy(
+            multipart_body, content_type, request=None
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "test-tool"
+        assert cwl_packages[0]["class"] == "CommandLineTool"
+        assert process_desc is None
+
+    def test_parse_multipart_deploy_unicode_decode_error(self):
+        """
+        Test that parts with invalid charset are handled with fallback decoding.
+
+        Tests the UnicodeDecodeError handling that falls back to utf-8 with error replacement.
+        This test verifies that the error recovery path is exercised even if the part
+        is ultimately skipped due to malformed content.
+        """
+        # Create a tool CWL for reference
+        tool_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}}
+        }
+
+        boundary = "----Boundary123"
+        # Create multipart with a valid CWL part and one with encoding issues
+        valid_cwl = json.dumps(tool_cwl)
+
+        # Create a part with invalid UTF-8 that will trigger decode error handling
+        # Use latin-1 encoding with high bytes that aren't valid UTF-8
+        invalid_content = "test \xe9\xe0".encode('latin-1')  # Contains bytes invalid in UTF-8
+
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"\r\n"
+            f"{valid_cwl}\r\n"
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"\r\n"
+        ).encode('utf-8') + invalid_content + b"\r\n------Boundary123--\r\n"
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        # Should handle decode error gracefully - valid CWL should be parsed, invalid part skipped
+        cwl_packages, _ = parse_multipart_deploy(multipart_body, content_type, request=None)
+
+        # Should have successfully parsed the valid CWL package
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "test-tool"
+
+    def test_create_multipart_deploy_single_tool(self):
+        """
+        Test creating multipart content from a single CommandLineTool.
+        """
+        tool_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "baseCommand": ["echo"],
+            "inputs": {
+                "message": {"type": "string"}
+            },
+            "outputs": {
+                "output": {"type": "stdout"}
+            }
+        }
+
+        content, content_type = create_multipart_deploy([tool_cwl], "localhost")
+
+        # Verify content type
+        assert "multipart/related" in content_type
+        assert "boundary=" in content_type
+        assert isinstance(content, bytes)
+
+        # Parse the generated multipart content
+        cwl_packages, _ = parse_multipart_deploy(content, content_type, request=None)
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["class"] == "CommandLineTool"
+        assert cwl_packages[0]["id"] == "test-tool"
+
+    def test_create_multipart_deploy_workflow_and_tools(self):
+        """
+        Test creating multipart content from a workflow and multiple tools.
+        """
+        tool1_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "tool-1",
+            "baseCommand": ["echo"],
+            "inputs": {"input": {"type": "string"}},
+            "outputs": {"output": {"type": "stdout"}}
+        }
+
+        tool2_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "tool-2",
+            "baseCommand": ["cat"],
+            "inputs": {"file": {"type": "File"}},
+            "outputs": {"output": {"type": "stdout"}}
+        }
+
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "main-workflow",
+            "inputs": {"input": {"type": "string"}},
+            "outputs": {"result": {"type": "File", "outputSource": "step2/output"}},
+            "steps": {
+                "step1": {"run": "#tool-1", "in": {"input": "input"}, "out": ["output"]},
+                "step2": {"run": "#tool-2", "in": {"file": "step1/output"}, "out": ["output"]}
+            }
+        }
+
+        content, content_type = create_multipart_deploy([tool1_cwl, tool2_cwl, workflow_cwl], "localhost")
+
+        # Verify content type includes start parameter for main workflow
+        assert "multipart/related" in content_type
+        assert "boundary=" in content_type
+        assert "start=main-workflow" in content_type  # Should reference the workflow
+        assert isinstance(content, bytes)
+
+        # Parse the generated multipart content
+        cwl_packages, _ = parse_multipart_deploy(content, content_type, request=None)
+
+        assert len(cwl_packages) == 3
+        # Verify all packages are present
+        ids = [pkg.get("id") for pkg in cwl_packages]
+        assert "tool-1" in ids
+        assert "tool-2" in ids
+        assert "main-workflow" in ids
+
+    def test_create_multipart_deploy_with_process_description(self):
+        """
+        Test creating multipart content with an optional process description.
+        """
+        tool_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "baseCommand": ["echo"],
+            "inputs": {},
+            "outputs": {}
+        }
+
+        process_desc = {
+            "processDescription": {
+                "id": "test-tool",
+                "title": "Test Tool",
+                "description": "A test tool for multipart deployment"
+            }
+        }
+
+        content, content_type = create_multipart_deploy([tool_cwl], "localhost", process_description=process_desc)
+
+        # Verify content type
+        assert "multipart/related" in content_type
+        assert "boundary=" in content_type
+        assert isinstance(content, bytes)
+        # Extract boundary and verify it's in the raw content
+        boundary = content_type.split("boundary=")[1].split(";")[0].strip()
+        assert boundary.encode() in content
+
+        # Parse the generated multipart content
+        cwl_packages, parsed_desc = parse_multipart_deploy(content, content_type, request=None)
+
+        assert len(cwl_packages) == 1
+        assert parsed_desc is not None
+        assert parsed_desc.get("processDescription", {}).get("id") == "test-tool"
+
+    def test_create_multipart_deploy_empty_list(self):
+        """
+        Test that creating multipart from empty list raises error.
+        """
+        with pytest.raises(ValueError, match="At least one CWL file must be provided"):
+            create_multipart_deploy([], "localhost")
+
+    def test_create_multipart_deploy_missing_id_field(self):
+        """
+        Test that creating multipart with CWL missing 'id' field raises ValueError.
+
+        This tests the uncovered ValueError raise in create_multipart_deploy
+        when a CWL package is missing the required 'id' field.
+        """
+        tool_without_id = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            # Missing 'id' field
+            "baseCommand": ["echo"],
+            "inputs": {},
+            "outputs": {}
+        }
+
+        with pytest.raises(ValueError, match="missing required 'id' field"):
+            create_multipart_deploy([tool_without_id], "localhost")
+
+    def test_create_multipart_deploy_custom_boundary(self):
+        """
+        Test creating multipart with a custom boundary.
+        """
+        tool_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "baseCommand": ["echo"],
+            "inputs": {},
+            "outputs": {}
+        }
+
+        custom_boundary = "CustomBoundary123"
+        content, content_type = create_multipart_deploy([tool_cwl], "localhost", boundary=custom_boundary)
+
+        # Verify custom boundary is used
+        assert f"boundary={custom_boundary}" in content_type
+        assert custom_boundary.encode() in content
+
+    def test_create_multipart_deploy_with_file_paths(self, tmp_path):
+        """
+        Test creating multipart from CWL file paths.
+        """
+        # Create a temporary CWL file
+        tool_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "file-tool",
+            "baseCommand": ["echo"],
+            "inputs": {},
+            "outputs": {}
+        }
+
+        cwl_file = tmp_path / "tool.cwl"
+        with open(cwl_file, "w", encoding="utf-8") as f:
+            json.dump(tool_cwl, f)
+
+        # Create multipart from file path
+        content, content_type = create_multipart_deploy([str(cwl_file)], "localhost")
+
+        # Verify content
+        assert isinstance(content, bytes)
+        assert "multipart/related" in content_type
+        assert "boundary=" in content_type
+        # Extract boundary and verify it's in the raw content
+        boundary = content_type.split("boundary=")[1].split(";")[0].strip()
+        assert boundary.encode() in content
+
+        # Parse and verify
+        cwl_packages, _ = parse_multipart_deploy(content, content_type, request=None)
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "file-tool"
+
+    @pytest.mark.parametrize("package", [
+        {"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "simple-tool"},
+        {"cwlVersion": "v1.2", "$graph": "not-a-list", "id": "test-package"},
+    ], ids=["no_graph", "non_list_graph"])
+    def test_resolve_cwl_graph_returns_as_is(self, package):
+        """
+        Test ``resolve_cwl_graph`` returns package as-is for invalid or missing $graph.
+        """
+        result = resolve_cwl_graph(package)
+        assert result == package
+
+    def test_resolve_cwl_graph_single_item(self):
+        """
+        Test ``resolve_cwl_graph`` unpacks single-item ``$graph``.
+        """
+        package = {
+            "cwlVersion": "v1.2",
+            "$graph": [
+                {
+                    "class": "CommandLineTool",
+                    "id": "single-tool"
+                }
+            ]
+        }
+        result = resolve_cwl_graph(package)
+        assert isinstance(result, dict)
+        assert result["class"] == "CommandLineTool"
+        assert result["id"] == "single-tool"
+        assert result["cwlVersion"] == "v1.2"
+        assert "$graph" not in result
+
+    def test_resolve_cwl_graph_multiple_items(self):
+        """
+        Test ``resolve_cwl_graph`` returns tuple of (list, original) for multiple items in ``$graph``.
+        """
+        package = {
+            "cwlVersion": "v1.2",
+            "$graph": [
+                {"class": "CommandLineTool", "id": "tool-1"},
+                {"class": "Workflow", "id": "workflow-1"}
+            ]
+        }
+        result = resolve_cwl_graph(package)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        resolved_items = result[0]
+        original_package = result[1]
+        assert isinstance(resolved_items, list)
+        assert len(resolved_items) == 2
+        assert resolved_items[0]["id"] == "tool-1"
+        assert resolved_items[0]["cwlVersion"] == "v1.2"
+        assert resolved_items[1]["id"] == "workflow-1"
+        assert resolved_items[1]["cwlVersion"] == "v1.2"
+        # Original package should be preserved
+        assert original_package == package
+        assert "$graph" in original_package
+
+    @pytest.mark.parametrize("packages,expected_tool_count,expected_workflow", [
+        ([{"class": "Workflow", "id": "test-workflow"}], 0, "workflow"),
+        ([{"class": "CommandLineTool", "id": "test-tool"}], 1, None),
+        ([{"class": "ExpressionTool", "id": "test-expr"}], 1, None),
+    ], ids=["single_workflow", "command_line_tool", "expression_tool"])
+    def test_resolve_deployment_order_simple(self, packages, expected_tool_count, expected_workflow):
+        """
+        Test :func:`weaver.processes.utils.resolve_deployment_order` with single package types.
+        """
+        tools, main_workflow = resolve_deployment_order(packages)
+
+        assert len(tools) == expected_tool_count
+        if expected_tool_count > 0:
+            assert tools[0] == packages[0]
+        if expected_workflow == "workflow":
+            assert main_workflow == packages[0]
+        else:
+            assert main_workflow is None
+
+    def test_resolve_deployment_order_workflow_and_tools(self):
+        """
+        Test :func:`weaver.processes.utils.resolve_deployment_order` with workflow and multiple tools.
+        """
+        tool1 = {"class": "CommandLineTool", "id": "tool-1"}
+        tool2 = {"class": "ExpressionTool", "id": "tool-2"}
+        workflow = {"class": "Workflow", "id": "main-workflow"}
+
+        tools, main_workflow = resolve_deployment_order([tool1, tool2, workflow])
+
+        assert len(tools) == 2
+        assert tool1 in tools
+        assert tool2 in tools
+        assert main_workflow == workflow
+
+    def test_resolve_deployment_order_multiple_workflows_error(self):
+        """
+        Test :func:`weaver.processes.utils.resolve_deployment_order` raises error for multiple workflows.
+        """
+        workflow1 = {"class": "Workflow", "id": "workflow-1"}
+        workflow2 = {"class": "Workflow", "id": "workflow-2"}
+
+        with pytest.raises(HTTPNotImplemented) as exc_info:
+            resolve_deployment_order([workflow1, workflow2])
+
+        assert exc_info.value.json is not None
+        assert "Multiple Workflow definitions" in exc_info.value.json.get("title", "")
+
+    def test_resolve_deployment_order_tools_only_error(self):
+        """
+        Test :func:`weaver.processes.utils.resolve_deployment_order` raises error
+        when only tools are provided (no workflow).
+
+        According to CWL packed document specification, multiple tools without a workflow
+        are not supported, even with ``#main`` designation.
+        """
+        tool1 = {"class": "CommandLineTool", "id": "tool-1"}
+        tool2 = {"class": "CommandLineTool", "id": "tool-2"}
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            resolve_deployment_order([tool1, tool2])
+
+        assert exc_info.value.json is not None
+        assert "No entry point in $graph" in exc_info.value.json.get("title", "")
+        assert exc_info.value.json.get("cause", {}).get("workflow_count") == 0
+        assert exc_info.value.json.get("cause", {}).get("tool_count") == 2
+        assert exc_info.value.json.get("cause", {}).get("main_found") is False
+
+    def test_resolve_deployment_order_tools_with_main_error(self):
+        """
+        Test :func:`weaver.processes.utils.resolve_deployment_order` raises error
+        when multiple tools with ``#main`` but no workflow.
+
+        Multiple CommandLineTools or ExpressionTools are not supported without a Workflow,
+        even if one has id ``#main``.
+        """
+        tool1 = {"class": "CommandLineTool", "id": "#main"}
+        tool2 = {"class": "CommandLineTool", "id": "tool-2"}
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            resolve_deployment_order([tool1, tool2])
+
+        assert exc_info.value.json is not None
+        assert "No entry point in $graph" in exc_info.value.json.get("title", "")
+        assert exc_info.value.json.get("cause", {}).get("workflow_count") == 0
+        assert exc_info.value.json.get("cause", {}).get("tool_count") == 2
+        assert exc_info.value.json.get("cause", {}).get("main_found") is True
+
+    def test_resolve_deployment_order_no_packages(self):
+        """
+        Test :func:`weaver.processes.utils.resolve_deployment_order` with empty list returns empty results.
+        """
+        tools, main_workflow = resolve_deployment_order([])
+        assert not tools
+        assert main_workflow is None
+
+    def test_resolve_deployment_order_single_tool_among_multiple_packages(self):
+        """
+        Test :func:`weaver.processes.utils.resolve_deployment_order` with single tool among multiple packages.
+
+        This tests the case where only one valid tool is provided,
+        which should be implicitly treated as the main entry point.
+        """
+        # Provide two packages: one tool and one without a valid class
+        tool = {"class": "CommandLineTool", "id": "only-tool"}
+        invalid_pkg = {"someField": "value"}  # No class field
+
+        tools, main_workflow = resolve_deployment_order([tool, invalid_pkg])
+
+        # Single tool is returned in tools list AND as the main_workflow
+        assert len(tools) == 1
+        assert tools[0] == tool
+        assert main_workflow == tool  # Single tool becomes the implicit main entry point
+
+    def test_classify_multipart_part_without_content_id(self):
+        """
+        Test _classify_multipart_part with no content_id (empty string).
+        """
+        part_data = {
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {}
+        }
+        cwl_packages = []
+        parts_by_cid = {}
+
+        result = _classify_multipart_part(
+            part_data, cwl_packages, parts_by_cid,
+            content_id="", process_description=None  # Empty content_id
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0] == part_data
+        assert len(parts_by_cid) == 0  # Should not be added when content_id is empty
+        assert result is None
+
+    def test_parse_multipart_deploy_with_bytes_content(self):
+        """
+        Test parse_multipart_deploy properly decodes bytes content.
+        """
+        tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}}
+        })
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"\r\n"
+            f"{tool_cwl}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')  # Already bytes
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        cwl_packages, process_desc = parse_multipart_deploy(
+            multipart_body, content_type, request=None
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "test-tool"
+        assert process_desc is None
+
+    def test_parse_multipart_message_valid(self):
+        """
+        Test _parse_multipart_message with valid multipart content.
+        """
+        tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool"
+        })
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"\r\n"
+            f"{tool_cwl}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        msg = _parse_multipart_message(multipart_body, content_type, request=None)
+
+        assert msg.is_multipart()
+        assert len(msg.get_payload()) == 1
+
+    def test_parse_multipart_message_invalid_format(self):
+        """
+        Test _parse_multipart_message raises error for non-multipart format.
+        """
+        content_type = "multipart/mixed; boundary=----Boundary123"
+        non_multipart_content = b"Content-Type: text/plain\r\n\r\nPlain text"
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            _parse_multipart_message(non_multipart_content, content_type, request=None)
+
+        assert "multipart" in str(exc_info.value).lower()
+
+    def test_parse_multipart_message_parse_failure(self):
+        """
+        Test _parse_multipart_message handles email parsing exceptions.
+        """
+        # Mock message_from_bytes to raise an exception
+        with mock.patch("weaver.processes.utils.message_from_bytes") as mock_parse:
+            mock_parse.side_effect = ValueError("Invalid email format")
+
+            content_type = "multipart/mixed; boundary=----Boundary"
+            content = b"some content"
+
+            # Should raise HTTPBadRequest with parsing error
+            with pytest.raises(HTTPBadRequest) as exc_info:
+                _parse_multipart_message(content, content_type, request=None)
+
+            assert exc_info.value.json is not None
+            assert "Failed to parse multipart content" in exc_info.value.json.get("title", "")
+
+    @pytest.mark.parametrize("content_type,expected", [
+        ("multipart/related; boundary=----Boundary; start=workflow-main", "workflow-main"),
+        ('multipart/related; boundary=----Boundary; start="workflow-main"', "workflow-main"),
+        ("multipart/related; boundary=----Boundary; start=<workflow-main>", "workflow-main"),
+        ("multipart/mixed; boundary=----Boundary", None),
+        ("multipart/mixed; boundary=----Boundary; start=something", None),
+    ], ids=["with_start", "with_quotes", "with_angle_brackets", "no_start", "not_related"])
+    def test_extract_multipart_start_parameter(self, content_type, expected):
+        """
+        Test _extract_multipart_start_parameter handles various Content-Type header formats.
+        """
+        result = _extract_multipart_start_parameter(content_type)
+        assert result == expected
+
+    @pytest.mark.parametrize("content,content_type,should_parse", [
+        (json.dumps({"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "test-tool"}),
+         ContentType.APP_CWL_JSON, True),
+        ("{ not valid json", ContentType.APP_JSON, False),
+        ("plain text", "text/plain", False),
+    ], ids=["cwl_json", "invalid_json", "unsupported_content_type"])
+    def test_interpret_multipart_part(self, content, content_type, should_parse):
+        """
+        Test _interpret_multipart_part with various content types and validity.
+        """
+        from email.mime.text import MIMEText
+
+        part = MIMEText(content, _subtype="json" if "json" in content_type else "plain", _charset="utf-8")
+        part.replace_header("Content-Type", content_type)
+        if should_parse:
+            part.add_header("Content-ID", "<tool-1>")
+            part.add_header("Content-Location", "test-tool.cwl")
+
+        result = _interpret_multipart_part(part)
+
+        if should_parse:
+            assert result is not None
+            assert len(result) == 4
+            result_content_type, content_id, content_location, part_data = result
+            assert result_content_type == content_type
+            assert content_id == "tool-1"
+            assert content_location == "test-tool.cwl"
+            assert part_data["id"] == "test-tool"
+        else:
+            assert result is None
+
+    def test_organize_deploy_parts_valid(self):
+        """
+        Test _organize_deploy_parts successfully organizes CWL packages.
+        """
+        interpreted_parts = [
+            (ContentType.APP_CWL_JSON, "tool-1", "", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "id": "tool-1"
+            }),
+            (ContentType.APP_CWL_JSON, "workflow-1", "", {
+                "cwlVersion": "v1.2",
+                "class": "Workflow",
+                "id": "workflow-1"
+            })
+        ]
+
+        cwl_packages, process_desc = _organize_deploy_parts(interpreted_parts, root_workflow_cid="workflow-1")
+
+        assert len(cwl_packages) == 2
+        assert process_desc is None
+        # Workflow should be last due to root_workflow_cid
+        assert cwl_packages[-1]["class"] == "Workflow"
+
+    def test_organize_deploy_parts_no_cwl_error(self):
+        """
+        Test _organize_deploy_parts raises error when no CWL packages found.
+        """
+        interpreted_parts = [
+            (ContentType.APP_JSON, "", "", {"some": "data"})
+        ]
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            _organize_deploy_parts(interpreted_parts, root_workflow_cid=None)
+
+        assert "No CWL packages found" in exc_info.value.json.get("title", "")
+
+    def test_organize_deploy_parts_with_process_description(self):
+        """
+        Test _organize_deploy_parts correctly identifies process description.
+        """
+        interpreted_parts = [
+            (ContentType.APP_CWL_JSON, "tool-1", "", {
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "id": "tool-1"
+            }),
+            (ContentType.APP_JSON, "", "", {
+                "processDescription": {
+                    "id": "tool-1",
+                    "title": "Test Tool"
+                }
+            })
+        ]
+
+        cwl_packages, process_desc = _organize_deploy_parts(interpreted_parts, root_workflow_cid=None)
+
+        assert len(cwl_packages) == 1
+        assert process_desc is not None
+        assert process_desc["processDescription"]["title"] == "Test Tool"
+
+    def test_parse_multipart_deploy_no_start_parameter_non_workflow(self, caplog):
+        """
+        Test parse_multipart_deploy warning when no start parameter and first element is not a Workflow.
+        """
+        tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {"output": {"type": "File"}}
+        })
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"\r\n"
+            f"{tool_cwl}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/related; boundary={boundary}"  # multipart/related without start parameter
+
+        cwl_packages, _ = parse_multipart_deploy(
+            multipart_body, content_type, request=None
+        )
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "test-tool"
+        # Check that a warning was logged
+        assert any("No 'start' parameter provided" in record.message for record in caplog.records)
+
+    def test_create_multipart_deploy_single_workflow(self):
+        """
+        Test create_multipart_deploy with a single workflow (workflow_count == 1).
+        """
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "test-workflow",
+            "inputs": {"input": {"type": "string"}},
+            "outputs": {"output": {"type": "File"}},
+            "steps": {}
+        }
+
+        content, content_type = create_multipart_deploy([workflow_cwl], "localhost")
+
+        # Verify content was created
+        assert isinstance(content, bytes)
+        assert "multipart/related" in content_type
+        assert "boundary=" in content_type
+        # Extract boundary and verify it's in the raw content
+        boundary = content_type.split("boundary=")[1].split(";")[0].strip()
+        assert boundary.encode() in content
+
+        # Verify that the start parameter was added (workflow_count == 1 branch)
+        assert "start=test-workflow" in content_type
+
+        # Parse and verify
+        cwl_packages, _ = parse_multipart_deploy(content, content_type, request=None)
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "test-workflow"
+
+    def test_create_multipart_deploy_multiple_workflows(self):
+        """
+        Test create_multipart_deploy with multiple workflows.
+        """
+        workflow1 = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "workflow-1",
+            "inputs": {},
+            "outputs": {},
+            "steps": {}
+        }
+        workflow2 = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "workflow-2",
+            "inputs": {},
+            "outputs": {},
+            "steps": {}
+        }
+
+        content, content_type = create_multipart_deploy([workflow1, workflow2], "localhost")
+
+        # Verify content was created
+        assert isinstance(content, bytes)
+        assert "multipart/related" in content_type
+        assert "boundary=" in content_type
+        # Extract boundary and verify it's in the raw content
+        boundary = content_type.split("boundary=")[1].split(";")[0].strip()
+        assert boundary.encode() in content
+
+        # First workflow should be the main one
+        assert "start=workflow-1" in content_type

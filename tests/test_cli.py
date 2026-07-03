@@ -1486,3 +1486,54 @@ def test_cli_version_non_weaver():
         result = WeaverClient(url="https://fake.domain.com").version()
     assert result.code == 404
     assert "Failed to obtain server version." in result.message
+
+
+@pytest.mark.cli
+@pytest.mark.parametrize(
+    ["cwl_items", "expected_count", "expected_classes"],
+    [
+        # Single JSON string input
+        (
+            ['{"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "test-tool"}'],
+            1,
+            ["CommandLineTool"],
+        ),
+        # Single dict input
+        (
+            [{"cwlVersion": "v1.2", "class": "Workflow", "id": "test-workflow"}],
+            1,
+            ["Workflow"],
+        ),
+        # Multiple mixed inputs (JSON string + dict)
+        (
+            [
+                '{"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "tool1"}',
+                {"cwlVersion": "v1.2", "class": "Workflow", "id": "workflow1"},
+            ],
+            2,
+            ["CommandLineTool", "Workflow"],
+        ),
+        # Multiple dict inputs
+        (
+            [
+                {"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "tool1"},
+                {"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "tool2"},
+            ],
+            2,
+            ["CommandLineTool", "CommandLineTool"],
+        ),
+    ]
+)
+def test_parse_cwl_items(cwl_items, expected_count, expected_classes):
+    """
+    Test that _parse_cwl_items correctly handles CWL packages from various input formats.
+
+    Covers literal JSON strings, dict inputs, and mixed combinations.
+    """
+    result = WeaverClient._parse_cwl_items(cwl_items)
+
+    assert len(result) == expected_count
+    assert all(isinstance(item, dict) for item in result)
+    assert all(item.get("cwlVersion") == "v1.2" for item in result)
+    for i, expected_class in enumerate(expected_classes):
+        assert result[i]["class"] == expected_class

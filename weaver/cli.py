@@ -46,7 +46,7 @@ from weaver.processes.convert import (
     get_field,
     repr2json_input_values
 )
-from weaver.processes.utils import get_process_information
+from weaver.processes.utils import create_multipart_deploy, get_process_information
 from weaver.processes.wps_package import get_process_definition
 from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.sort import Sort, SortMethods
@@ -699,16 +699,68 @@ class WeaverClient(object):
             headers["Content-Type"] = ContentType.APP_CWL_JSON
         return body, headers
 
+    @staticmethod
+    def _parse_cwl_items(cwl):
+        # type: (List[Union[CWL, str]]) -> List[CWL]
+        """
+        Parse and load CWL items from various formats.
+
+        :param cwl: List of CWL items (dict, JSON string, or file path/URL).
+        :returns: List of parsed CWL package dictionaries.
+        :raises PackageRegistrationError: If any CWL item is invalid.
+        """
+        cwl_packages = []
+        for cwl_item in cwl:
+            if isinstance(cwl_item, str) and not cwl_item.startswith("{"):
+                # File reference or URL
+                cwl_data = load_file(cwl_item)
+            elif isinstance(cwl_item, str) and cwl_item.startswith("{") and cwl_item.endswith("}"):
+                # Literal JSON string
+                cwl_data = yaml.safe_load(cwl_item)
+            elif isinstance(cwl_item, dict):
+                # Already parsed CWL
+                cwl_data = cwl_item
+            else:
+                raise PackageRegistrationError(f"Invalid CWL item: {cwl_item}")
+
+            if not isinstance(cwl_data, dict) or cwl_data.get("cwlVersion") is None:
+                raise PackageRegistrationError("Invalid CWL structure in multi-CWL deployment.")
+
+            cwl_packages.append(cwl_data)
+
+        return cwl_packages
+
     def _parse_deploy_package(
         self,
+        url,            # type: Optional[URL]
         body,           # type: JSON
-        cwl,            # type: Optional[Union[CWL, str]]
+        cwl,            # type: Optional[Union[CWL, str, List[Union[CWL, str]]]]
         wps,            # type: Optional[str]
         process_id,     # type: Optional[str]
         headers,        # type: HeadersType
         settings,       # type: SettingsType
     ):                  # type: (...) -> OperationResult
         try:
+            # Handle multiple CWL files for multi-deployment
+            if isinstance(cwl, list) and len(cwl) > 1:
+                LOGGER.debug("Processing multi-CWL deployment with %d files", len(cwl))
+
+                cwl_packages = self._parse_cwl_items(cwl)
+
+                multipart_content, content_type = create_multipart_deploy(
+                    cwl_files=cwl_packages,
+                    url=url,
+                    process_description=body if body else None
+                )
+
+                # Return the multipart content as body
+                # The body will be sent as raw bytes with the appropriate Content-Type
+                headers["Content-Type"] = content_type
+                return OperationResult(True, process_id or "multi-cwl", multipart_content, headers=headers)
+
+            if isinstance(cwl, list) and len(cwl) == 1:
+                cwl = cwl[0]  # Unwrap single-item list
+
             if not body and cwl and isinstance(cwl, dict):
                 p_id = process_id or cwl.get("id")
                 cwl["id"] = p_id  # override if provided by processID
@@ -986,7 +1038,7 @@ class WeaverClient(object):
         self,
         process_id=None,        # type: Optional[str]
         body=None,              # type: Optional[Union[JSON, str]]
-        cwl=None,               # type: Optional[Union[CWL, str]]
+        cwl=None,               # type: Optional[Union[CWL, str, List[Union[CWL, str]]]]
         wps=None,               # type: Optional[str]
         token=None,             # type: Optional[str]
         username=None,          # type: Optional[str]
@@ -1006,6 +1058,7 @@ class WeaverClient(object):
 
         The referenced :term:`Application Package` must be one of:
         - :term:`CWL` body, local file or URL in :term:`JSON` or :term:`YAML` format
+        - List of :term:`CWL` bodies/files for multi-process deployment (workflow with tools)
         - :term:`WPS` process URL with :term:`XML` response
         - :term:`WPS-REST` process URL with :term:`JSON` response
         - :term:`OGC API - Processes` process URL with :term:`JSON` response
@@ -1035,6 +1088,15 @@ class WeaverClient(object):
             inserted into the body (i.e.: ``executionUnit``). If provided without additional :paramref:`body`,
             it instead be used as-is for the request body with the corresponding :term:`CWL` :term:`Media-Type`.
             If an embedded ``executionUnit`` containing the :term:`CWL` is desired, provide ``body={}`` explicitly.
+            Can also be a ``list`` of :term:`CWL` definitions (``dict``, ``str``,
+            or file paths) for multi-:term:`Process` deployment, which will be combined into a ``multipart`` request.
+            When deploying multiple :term:`CWL` files, at least one ``Workflow`` definition is required. The order
+            does not matter as tools are automatically deployed before workflows.
+            The ``Workflow`` will be deployed as the main :term:`Process` with the requested deployment ID, while
+            ``CommandLineTool`` definitions are deployed as supporting processes referenced by the ``Workflow``.
+            When using :term:`CWL` packed documents with ``$graph`` containing multiple items, the ``#main`` ID
+            designation should be used to specify the entry point. If multiple ``Workflow`` definitions exist
+            in a packed document, the one with ``id: "#main"`` will be deployed as the main :term:`Process`.
         :param wps:
             URL to an existing :term:`WPS` process (WPS-1/2 or WPS-REST/OGC-API) to represent as
             equivalent :term:`OGC API - Processes` representation. Note that it is up to the server to perform the
@@ -1067,22 +1129,35 @@ class WeaverClient(object):
         settings = copy.deepcopy(self._settings)
         settings["weaver.wps_restapi_url"] = base
         data = result.body
-        result = self._parse_deploy_package(data, cwl, wps, process_id, req_headers, settings)
+        result = self._parse_deploy_package(base, data, cwl, wps, process_id, req_headers, settings)
         if not result.success:
             return result
         p_id = result.message
         data = result.body
+        # Update headers if provided by the package parsing (e.g., for multipart content)
+        if result.headers:
+            req_headers.update(result.headers)
         if undeploy:
             LOGGER.debug("Performing requested undeploy of process: [%s]", p_id)
             result = self.undeploy(process_id=p_id, url=base)
             if result.code not in [200, 204, 404]:
                 return OperationResult(False, "Failed requested undeployment prior deployment.",
                                        body=result.body, text=result.text, code=result.code, headers=result.headers)
-        LOGGER.debug("Deployment Body:\n%s", OutputFormat.convert(data, OutputFormat.JSON_STR))
+
+        # Handle multipart content (bytes) vs JSON content
         path = f"{base}/processes"
-        resp = self._request("POST", path, json=data,
-                             headers=req_headers, x_headers=headers, settings=self._settings, auth=auth,
-                             request_timeout=request_timeout, request_retries=request_retries)
+        if isinstance(data, bytes):
+            # For multipart content, send as raw data
+            LOGGER.debug("Deployment with multipart content (%d bytes)", len(data))
+            resp = self._request("POST", path, data=data,
+                                 headers=req_headers, x_headers=headers, settings=self._settings, auth=auth,
+                                 request_timeout=request_timeout, request_retries=request_retries)
+        else:
+            # For JSON content, use json parameter
+            LOGGER.debug("Deployment Body:\n%s", OutputFormat.convert(data, OutputFormat.JSON_STR))
+            resp = self._request("POST", path, json=data,
+                                 headers=req_headers, x_headers=headers, settings=self._settings, auth=auth,
+                                 request_timeout=request_timeout, request_retries=request_retries)
         return self._parse_result(resp, with_links=with_links, nested_links="processSummary",
                                   with_headers=with_headers, output_format=output_format)
 
@@ -3574,10 +3649,13 @@ def make_parser():
     )
     op_deploy_app_pkg = op_deploy.add_mutually_exclusive_group()
     op_deploy_app_pkg.add_argument(
-        "--cwl", dest="cwl",
+        "--cwl", dest="cwl", action="append", metavar="CWL_FILE",
         help="Application Package of the process defined using Common Workflow Language (CWL) as JSON or YAML "
              "format when provided by file reference. File reference can be a local file or URL location. "
              "Can also be provided as literal string contents formatted as JSON. "
+             "Multiple CWL files can be provided (by repeating --cwl) to create a multi-CWL deployment with "
+             "nested workflows and tools. When multiple files are provided, they will be packaged as multipart "
+             "content for deployment. "
              "Provided contents will be inserted into an automatically generated request deploy body if none was "
              "specified with ``--body`` option (note: ``--process`` must be specified instead in that case). "
              "Otherwise, it will override the appropriate execution unit section within the provided deploy body."
