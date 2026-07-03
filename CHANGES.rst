@@ -32,6 +32,18 @@ Changes:
   The `CLI` accepts a mixture of local `CWL` file paths (as `JSON` or `YAML`) and remote URL references.
   The server handles ``Content-Type`` media-type detection and ``Content-Location`` header processing for external
   `CWL` files to fetch during deployment.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.14.0:
+
+`6.14.0 <https://github.com/crim-ca/weaver/tree/6.14.0>`_ (2026-07-03)
+====================================================================================================================
+
+Changes:
+--------
 - Rename Dockerfiles from ``docker/Dockerfile-{base,manager,worker}``
   to ``docker/{base,manager,worker}.dockerfile`` for a consistent naming and file extension scheme.
 - Refactor ``docker/base.dockerfile`` to a multi-stage build keeping build-only tooling out of runtime
