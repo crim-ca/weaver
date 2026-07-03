@@ -12,8 +12,8 @@ def curie(uri: str) -> str:
     """
     Convert a :term:`URI` to its :term:`CURIE` format.
     """
-    if uri.startswith("http://www.opengis.net/def/"):
-        uri = uri.replace("http://www.opengis.net/def/", "")
+    if "www.opengis.net/def/" in uri:
+        uri = uri.split("www.opengis.net/def/", 1)[-1]
         parts = uri.split("/")
         ns = parts[1].lower()
         typ = parts[0]
@@ -24,7 +24,7 @@ def curie(uri: str) -> str:
 
 
 @cache
-def normalize(uri: str, version: Optional[str] = None, secure: bool = False) -> str:
+def normalize(uri: str, version: Optional[str] = None, secure: bool = True) -> str:
     """
     Normalize :term:`URI` from various formats, such as :term:`CURIE`, :term:`URN` or HTTP(S).
 

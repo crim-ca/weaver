@@ -1609,9 +1609,7 @@ class WpsRestApiJobsTest(JobUtils):
             assert resp.content_type == ContentType.APP_JSON
             assert resp.json["cause"]["schema"] == {"const": sd.Execute._schema}
             assert resp.json["cause"]["name"] == "Content-Schema"
-            assert resp.json["type"] == (
-                "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-schema"
-            )
+            assert resp.json["type"] == sd.OGC_API_PROC_PART4_EXC_UNSUPPORTED_SCHEMA_URI
 
     def test_job_results_errors(self):
         """
@@ -2517,7 +2515,7 @@ class WpsRestApiJobsTest(JobUtils):
         body = {"inputs": {"test": 400}}
         resp = self.app.patch_json(path, params=body, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 423
-        assert resp.json["type"] == "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/locked"
+        assert resp.json["type"] == sd.OGC_API_PROC_PART4_EXC_LOCKED_URI
 
     @pytest.mark.oap_part4
     def test_job_update_unsupported_media_type(self):
@@ -2529,9 +2527,7 @@ class WpsRestApiJobsTest(JobUtils):
         resp = self.app.patch(path, params="data", expect_errors=True)
         assert resp.status_code == 415
         assert resp.content_type == ContentType.APP_JSON
-        assert resp.json["type"] == (
-            "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type"
-        )
+        assert resp.json["type"] == sd.OGC_API_PROC_PART4_EXC_UNSUPPORTED_MEDIA_TYPE_URI
 
     @pytest.mark.oap_part4
     def test_job_update_response_contents(self):
@@ -3817,3 +3813,30 @@ def test_get_job_status_profile_invalid(accept_type, accept_profile):
     request = MockedRequest(headers={"Accept": accept_type, "Accept-Profile": accept_profile})
     with pytest.raises(HTTPBadRequest):
         get_job_status_schema(request)
+
+
+@pytest.mark.parametrize(
+    ["accept_profile", "query_profile"],
+    [
+        params
+        for param in [
+            JobStatusProfileSchema.OGC.upper(),
+            JobStatusProfileSchema.OGC.lower(),
+            JobStatusProfileSchema.WPS.upper(),
+            JobStatusProfileSchema.WPS.lower(),
+            sd.OGC_API_PROC_PROFILE_JOB_DESC_URI.replace("http://", "https://"),
+            sd.OGC_API_PROC_PROFILE_JOB_DESC_URI.replace("https://", "http://"),
+        ]
+        for params in ((None, param), (param, None))
+    ]
+)
+def test_get_job_status_profile_valid(accept_profile, query_profile):
+    """
+    Test valid combinations of :term:`Job` status :term:`Profile`.
+    """
+    queries = {"profile": query_profile} if query_profile else {}
+    headers = {"Accept": ContentType.APP_JSON}
+    headers.update({"Accept-Profile": accept_profile} if accept_profile else {})
+    request = MockedRequest(params=queries, headers=headers)
+    profile, _ = get_job_status_schema(request)
+    assert profile == (query_profile or accept_profile)

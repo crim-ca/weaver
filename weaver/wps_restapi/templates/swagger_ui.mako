@@ -3,9 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <title>${api_title}</title>
-    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.32.0/swagger-ui.css">
-    <script src="https://unpkg.com/swagger-ui-dist@5.32.0/swagger-ui-standalone-preset.js"></script>
-    <script src="https://unpkg.com/swagger-ui-dist@5.32.0/swagger-ui-bundle.js"></script>
+    <style>
+        .parameter__enum,
+        .parameter__default {
+            display: inline;
+            flex-wrap: wrap;
+            white-space: normal !important;
+            word-break: break-all !important;
+            word-wrap: break-word !important;
+            overflow-wrap: anywhere !important;
+        }
+        .parameter__enum > p,
+        .parameter__default > p {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 75%;
+            width: 90%;
+        }
+    </style>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.32.8/swagger-ui.css">
+    <script src="https://unpkg.com/swagger-ui-dist@5.32.8/swagger-ui-standalone-preset.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.32.8/swagger-ui-bundle.js"></script>
     <script>
         addEventListener("DOMContentLoaded", function() {
             window.ui = SwaggerUIBundle({

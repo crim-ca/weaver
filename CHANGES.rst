@@ -12,6 +12,8 @@ Changes
 
 Changes:
 --------
+- Adjust OpenAPI ``Accept-Profile`` to report profiles applicable to specific endpoints rather than generic entries.
+- Update OGC profile, exception and link relation URIs to ``https://`` as per corresponding standard updates.
 - Rename Dockerfiles from ``docker/Dockerfile-{base,manager,worker}``
   to ``docker/{base,manager,worker}.dockerfile`` for a consistent naming and file extension scheme.
 - Refactor ``docker/base.dockerfile`` to a multi-stage build keeping build-only tooling out of runtime
