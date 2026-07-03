@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.15.0:
+
+`6.15.0 <https://github.com/crim-ca/weaver/tree/6.15.0>`_ (2026-07-03)
+====================================================================================================================
+
+Changes:
+--------
 - Add support for multipart `Process` deployment using ``multipart/related`` or ``multipart/mixed`` content types,
   allowing simultaneous upload of multiple `CWL` files (e.g.: ``class: Workflow`` and ``class: CommandLineTool``)
   along with optional `Process` description metadata (relates to `#56 <https://github.com/crim-ca/weaver/issues/56>`_,
