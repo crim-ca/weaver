@@ -15,6 +15,18 @@ Changes:
 - Adjusted OpenAPI `Job` result examples with by-value/href responses.
 - Adjust OpenAPI ``Accept-Profile`` to report profiles applicable to specific endpoints rather than generic entries.
 - Update OGC profile, exception and link relation URIs to ``https://`` as per corresponding standard updates.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.14.0:
+
+`6.14.0 <https://github.com/crim-ca/weaver/tree/6.14.0>`_ (2026-07-03)
+====================================================================================================================
+
+Changes:
+--------
 - Rename Dockerfiles from ``docker/Dockerfile-{base,manager,worker}``
   to ``docker/{base,manager,worker}.dockerfile`` for a consistent naming and file extension scheme.
 - Refactor ``docker/base.dockerfile`` to a multi-stage build keeping build-only tooling out of runtime
