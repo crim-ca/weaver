@@ -470,22 +470,21 @@ process deployment, and workflow step references:
     +----------------------+---------------------------+--------------------------------------------------------------+
     | Field                | Location                  | Purpose and Behavior                                         |
     +======================+===========================+==============================================================+
-    | ``Content-ID``       | MIME header               | - **Required** unique identifier for the part                |
+    | ``Content-ID``       | Part Header               | - **Required** unique identifier for the part                |
     |                      |                           | - Format: ``<id@domain>`` (:rfc:`2392`)                      |
     |                      |                           | - Used by ``start`` parameter to reference the main document |
     +----------------------+---------------------------+--------------------------------------------------------------+
-    | ``Content-Location`` | MIME header (optional)    | **When identifier (e.g., ``echo-tool``):**                   |
+    | ``Content-Location`` | Part Header (optional)    | Specifies a URI (relative or absolute) for the :term:`CWL`:  |
     |                      |                           |                                                              |
-    |                      |                           | - Used as process ID                                         |
+    |                      |                           | - Process ID extracted from the URI                          |
     |                      |                           | - Preferred for ``run`` references                           |
     |                      |                           | - Overrides ``id`` in :term:`CWL`                            |
-    |                      |                           | - Can be combined with body containing :term:`CWL` content   |
     |                      |                           |                                                              |
-    |                      |                           | **When URL (e.g., ``http://...``):**                         |
+    |                      |                           | **Behavior:**                                                |
     |                      |                           |                                                              |
-    |                      |                           | - If body is empty: fetches :term:`CWL` from that location   |
-    |                      |                           | - If body provided: acts as identifier, body used directly   |
-    |                      |                           | - ID derived from ``Content-Location`` or fetched ``id``     |
+    |                      |                           | - If absolute URL with empty body: fetches :term:`CWL`       |
+    |                      |                           | - If body provided: URI used as ID, body content used        |
+    |                      |                           | - Process ID derived from URI or ``id`` field in content     |
     +----------------------+---------------------------+--------------------------------------------------------------+
     | ``id``               | :term:`CWL` body          | - **Required** in each :term:`CWL` document                  |
     |                      |                           | - Used if no ``Content-Location``                            |
@@ -495,7 +494,7 @@ process deployment, and workflow step references:
     +----------------------+---------------------------+--------------------------------------------------------------+
     | ``run``              | Workflow step             | References a deployed tool by its process ID:                |
     |                      | (:term:`CWL` body)        |                                                              |
-    |                      |                           | - Value from ``Content-Location`` (if identifier)            |
+    |                      |                           | - Process ID extracted from ``Content-Location`` URI         |
     |                      |                           | - Value from ``id`` field (with ``#`` prefix removed)        |
     |                      |                           |                                                              |
     |                      |                           | During deployment, ``#`` prefixes in ``run`` are             |
@@ -604,12 +603,10 @@ described above (``start`` parameter, ``Workflow`` class, ``#main`` identifier, 
 Additional Metadata
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. fixme: support process meta multipart (https://github.com/crim-ca/weaver/issues/990)
 .. warning::
-    **Process description metadata in multipart requests is not yet implemented.**
-
-    While the multipart format supports including :term:`Process` description parts alongside :term:`CWL` documents,
-    this feature is not currently implemented. Any process description parts included in multipart requests
-    will be parsed but discarded during deployment.
+    Process description metadata in multipart requests is not yet implemented
+    (see `crim-ca/weaver#990 <https://github.com/crim-ca/weaver/issues/990>`_).
 
 Example Multipart Request
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

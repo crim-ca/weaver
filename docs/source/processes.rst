@@ -473,6 +473,7 @@ The request body requires mainly two components:
     (``application/cwl+json`` or ``application/cwl+yaml``) and unique ``Content-ID``.
     See :ref:`proc_ogc_api_multi_cwl` and :ref:`app_pkg_multipart` for detailed multipart structure and examples.
 
+.. fixme: support process meta multipart (https://github.com/crim-ca/weaver/issues/990) - update accepted parts
 .. note::
     Multiple :term:`CWL` packages can also be deployed using an array of ``executionUnit`` entries, where each
     entry contains either an inline ``unit`` object or an ``href`` reference to an external :term:`CWL` document.
