@@ -168,6 +168,8 @@
 .. _ogc-api-proc-part3-collection-input: https://docs.ogc.org/DRAFTS/21-009.html#section_collection_input
 .. |ogc-api-proc-part4| replace:: *OGC API - Processes* - Part 4: Job Management
 .. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
+.. |ogc-api-proc-part5| replace:: *OGC API - Processes - Part 5: Provenance*
+.. _ogc-api-proc-part5: https://docs.ogc.org/DRAFTS/26-038.html
 .. |ogc-tb20-gdc| replace:: *OGC Testbed-20* - GeoDataCubes
 .. _ogc-tb20-gdc: https://www.ogc.org/initiatives/ogc-testbed-20/
 .. |ogc-tb20-gdc-profile| replace:: *OGC Testbed-20* - GeoDataCubes (GDC) API Profile

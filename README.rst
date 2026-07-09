@@ -20,7 +20,7 @@ Weaver
     - |ogc-api-proc-part2|_
     - |ogc-api-proc-part3|_
     - |ogc-api-proc-part4|_
-    - |ogc-api-proc-part5|_
+    - |ogc-api-proc-part5|_ (`W3C PROV <https://www.w3.org/TR/prov-overview/>`_)
 * |wps-long|
 * |esgf| processes
 * |cwl-long| for |ogc-apppkg|_
