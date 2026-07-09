@@ -19,7 +19,8 @@ Weaver
     - |ogc-api-proc-part1-v2|_
     - |ogc-api-proc-part2|_
     - |ogc-api-proc-part3|_
-    - |ogc-api-proc-part4|_ (including Provenance)
+    - |ogc-api-proc-part4|_
+    - |ogc-api-proc-part5|_
 * |wps-long|
 * |esgf| processes
 * |cwl-long| for |ogc-apppkg|_
@@ -534,6 +535,8 @@ It is part of `PAVICS`_ and `Birdhouse`_ ecosystems and is available within the 
 .. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
 .. |ogc-api-proc-part4| replace:: *OGC API - Processes - Part 4: Job Management*
 .. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
+.. |ogc-api-proc-part5| replace:: *OGC API - Processes - Part 5: Provenance*
+.. _ogc-api-proc-part5: https://docs.ogc.org/DRAFTS/26-038.html
 .. |ogc-api-proc-code-sprint-2026-event| replace:: *OGC API - Processes January 2026 Code Sprint*
 .. _ogc-api-proc-code-sprint-2026-event: https://github.com/opengeospatial/developer-events/wiki/OGC-API-Processes-January-2026-Code-Sprint
 .. |ogc-api-proc-code-sprint-2026-test-suite| replace:: *Code Sprint Test Suite Matrix*
