@@ -92,7 +92,7 @@ from weaver.wps_restapi.providers.utils import forbid_local_only
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple, Type, Union
+    from typing import Any, Dict, List, Literal, NoReturn, Optional, Sequence, Tuple, Type, Union
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
     from weaver.formats import AnyContentEncoding, AnyContentType
@@ -1586,68 +1586,76 @@ def raise_job_bad_status_locked(job, container=None):
         )
 
 
-def raise_job_bad_status_success(job, container=None):
-    # type: (Job, Optional[AnySettingsContainer]) -> None
+def raise_job_bad_status_success(job, container=None, error_kind="results", error_type=None):
+    # type: (Job, Optional[AnySettingsContainer], Literal["results", "provenance"], Optional[str]) -> None
     """
     Raise the appropriate message for :term:`Job` not ready or unable to retrieve output results due to status.
     """
-    if not job.success:
-        links = job.links(container=container)
-        headers = [("Link", make_link_header(link)) for link in links]
-        if job.status == Status.FAILED:
-            err_code = None
-            err_info = None
-            err_known_modules = [
-                "pywps.exceptions",
-                "owslib.wps",
-                "weaver.exceptions",
-                "weaver.owsexceptions",
-            ]
-            # try to infer the cause, fallback to generic error otherwise
-            for error in job.exceptions:
-                try:
-                    if isinstance(error, dict):
-                        err_code = error.get("Code")
-                        err_info = error.get("Text")
-                    elif isinstance(error, str) and any(error.startswith(mod) for mod in err_known_modules):
-                        err_code, err_info = error.split(":", 1)
-                        err_code = err_code.split(".")[-1].strip()
-                        err_info = err_info.strip()
-                except Exception:
-                    err_code = None
-                if err_code:
-                    break
-            if not err_code:  # default
-                err_code = OWSNoApplicableCode.code
-                err_info = "unknown"
-            # /req/core/job-results-failed
-            raise HTTPBadRequest(
-                headers=headers,
-                json={
-                    "title": "JobResultsFailed",
-                    "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available",
-                    "detail": "Job results not available because execution failed.",
-                    "status": HTTPBadRequest.code,
-                    "error": err_code,
-                    "cause": err_info,
-                    "links": links
-                }
-            )
+    if job.success:
+        return
 
-        # /req/core/job-results-exception-results-not-ready
-        # must use OWS instead of HTTP class to preserve provided JSON body
-        # otherwise, pyramid considers it as not found view/path and rewrites contents in append slash handler
-        raise OWSNotFound(
+    links = job.links(container=container)
+    headers = [("Link", make_link_header(link)) for link in links]
+    if job.status == Status.FAILED and error_kind == "results":
+        err_code = None
+        err_info = None
+        err_known_modules = [
+            "pywps.exceptions",
+            "owslib.wps",
+            "weaver.exceptions",
+            "weaver.owsexceptions",
+        ]
+        # try to infer the cause, fallback to generic error otherwise
+        for error in job.exceptions:
+            try:
+                if isinstance(error, dict):
+                    err_code = error.get("Code")
+                    err_info = error.get("Text")
+                elif isinstance(error, str) and any(error.startswith(mod) for mod in err_known_modules):
+                    err_code, err_info = error.split(":", 1)
+                    err_code = err_code.split(".")[-1].strip()
+                    err_info = err_info.strip()
+            except Exception:
+                err_code = None
+            if err_code:
+                break
+        if not err_code:  # default
+            err_code = OWSNoApplicableCode.code
+            err_info = "unknown"
+        # /req/core/job-results-failed
+        raise HTTPBadRequest(
             headers=headers,
             json={
-                "title": "JobResultsNotReady",
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready",
-                "detail": "Job is not ready to obtain results.",
-                "status": HTTPNotFound.code,
-                "cause": {"status": job.status},
+                "title": "JobResultsFailed",
+                "type": "https://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available",
+                "detail": "Job results not available because execution failed.",
+                "status": HTTPBadRequest.code,
+                "error": err_code,
+                "cause": err_info,
                 "links": links
             }
         )
+
+    if error_kind == "provenance":
+        error_type = "https://www.opengis.net/def/exceptions/ogcapi-processes-5/1.0/prov-missing"
+    else:
+        error_type = "https://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready"
+    error_kind = error_kind.capitalize()
+
+    # /req/core/job-results-exception-results-not-ready
+    # must use OWS instead of HTTP class to preserve provided JSON body
+    # otherwise, pyramid considers it as not found view/path and rewrites contents in append slash handler
+    raise OWSNotFound(
+        headers=headers,
+        json={
+            "title": f"Job{error_kind}NotReady",
+            "type": error_type,
+            "detail": f"Job is not ready to obtain {error_kind} details.",
+            "status": HTTPNotFound.code,
+            "cause": {"status": job.status},
+            "links": links
+        }
+    )
 
 
 def raise_job_result_gone(job, container=None):
@@ -1757,7 +1765,7 @@ def get_job_prov_response(request):
     """
     job = get_job(request)
     raise_job_dismissed(job, request)
-    raise_job_bad_status_success(job, request)
+    raise_job_bad_status_success(job, request, error_kind="provenance")
 
     prov_path = request.path.rsplit("/prov", 1)[-1]
     prov_path = f"/prov{prov_path}"
@@ -1778,6 +1786,13 @@ def get_job_prov_response(request):
         prov_fmt, _ = ProvenanceFormat.resolve_compatible_formats(prov_path, fmt, None)
         if prov_fmt:
             return ProvenanceFormat.as_media_type(prov_fmt)
+        if fmt:
+            raise HTTPNotAcceptable(json={
+                "title": "JobProvenanceUnsupportedFormat",
+                "type": "https://www.opengis.net/def/exceptions/ogcapi-processes-5/1.0/prov-unsupported-format",
+                "detail": "Job provenance format could not be identified or is not supported.",
+                "cause": str(fmt),
+            })
         return prov_fmt
 
     prov_type = guess_target_format(
@@ -1793,7 +1808,7 @@ def get_job_prov_response(request):
         prov_err = HTTPNotAcceptable if prov_exists else JobGone
         prov_body = {
             "title": "NoJobProvenance",
-            "type": "no-job-provenance",  # unofficial
+            "type": "https://www.opengis.net/def/exceptions/ogcapi-processes-5/1.0/prov-missing",
             "detail": "Job provenance could not be retrieved for the specified job.",
             "cause": "Missing or invalid provenance details."
         }

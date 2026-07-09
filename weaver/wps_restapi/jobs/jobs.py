@@ -595,32 +595,32 @@ def cancel_job_batch(request):
     return HTTPOk(json=body)
 
 
-@sd.provider_inputs_service.get(
+@sd.provider_definition_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
-    schema=sd.ProviderInputsEndpoint(),
+    schema=sd.ProviderJobDefinitionEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_provider_inputs_responses,
+    response_schemas=sd.get_provider_job_definition_responses,
 )
-@sd.process_inputs_service.get(
+@sd.process_definition_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
-    schema=sd.ProcessInputsEndpoint(),
+    schema=sd.ProcessJobDefinitionEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_job_inputs_responses,
+    response_schemas=sd.get_job_definition_responses,
 )
-@sd.job_inputs_service.get(
+@sd.job_definition_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS],
-    schema=sd.JobInputsEndpoint(),
+    schema=sd.JobDefinitionEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas=sd.get_job_inputs_responses,
+    response_schemas=sd.get_job_definition_responses,
 )
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
-def get_job_inputs(request):
+def get_job_definition(request):
     # type: (PyramidRequest) -> AnyResponseType
     """
-    Retrieve the inputs values and outputs definitions of a job.
+    Retrieve the submitted inputs values, selected outputs, and other execution parametrization that defines a job.
     """
     job = get_job(request)
     schema = get_job_io_schema_query(request.params.get("schema"), strict=False, default=JobInputsOutputsSchema.OGC)
@@ -643,8 +643,9 @@ def get_job_inputs(request):
     with_links = asbool(request.params.get("links", True))
     job_links = None
     if with_links:
-        job_links = job.links(request, self_link="inputs")
+        job_links = job.links(request, self_link="definition")
     body = {
+        "entity": job.process_url(request),
         "mode": job_mode,
         "response": job.execution_response,
         "inputs": job_inputs,
@@ -652,7 +653,7 @@ def get_job_inputs(request):
         "headers": job_headers,
         "links": job_links,
     }
-    body = sd.JobInputsBody().deserialize(body)
+    body = sd.JobDefinitionBody().deserialize(body)
     return HTTPOk(json=body)
 
 
@@ -1041,7 +1042,7 @@ def includeme(config):
     config.add_cornice_service(sd.job_results_index_service)
     config.add_cornice_service(sd.job_outputs_service)
     config.add_cornice_service(sd.job_output_service)
-    config.add_cornice_service(sd.job_inputs_service)
+    config.add_cornice_service(sd.job_definition_service)
     config.add_cornice_service(sd.job_exceptions_service)
     config.add_cornice_service(sd.job_logs_service)
     config.add_cornice_service(sd.job_stats_service)
@@ -1052,7 +1053,7 @@ def includeme(config):
     config.add_cornice_service(sd.process_results_index_service)
     config.add_cornice_service(sd.process_outputs_service)
     config.add_cornice_service(sd.process_output_service)
-    config.add_cornice_service(sd.process_inputs_service)
+    config.add_cornice_service(sd.process_definition_service)
     config.add_cornice_service(sd.process_exceptions_service)
     config.add_cornice_service(sd.process_logs_service)
     config.add_cornice_service(sd.process_stats_service)
@@ -1063,7 +1064,7 @@ def includeme(config):
     config.add_cornice_service(sd.provider_results_index_service)
     config.add_cornice_service(sd.provider_outputs_service)
     config.add_cornice_service(sd.provider_output_service)
-    config.add_cornice_service(sd.provider_inputs_service)
+    config.add_cornice_service(sd.provider_definition_service)
     config.add_cornice_service(sd.provider_exceptions_service)
     config.add_cornice_service(sd.provider_logs_service)
     config.add_cornice_service(sd.provider_stats_service)

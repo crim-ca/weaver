@@ -37,7 +37,7 @@
             </li>
             <li>
                 <div class="nav-link">
-                    Go to <a href="#inputs">Job Inputs</a>
+                    Go to <a href="#definition">Job Definition</a>
                 </div>
             </li>
             <li>
@@ -141,15 +141,15 @@
     </div>
 
     <div class="content-section">
-        <h3 id="inputs">
-            <a href="#inputs">Inputs</a>
+        <h3 id="definition">
+            <a href="#definition">Definition</a>
         </h3>
         <div class="content-section-summary">
             Submitted request input values and output parametrization for the job execution.
         </div>
         <div class="content-section-content">
             ${util.build_job_toggle_button_code(
-                job, type="inputs", path="/inputs", format="json", language="json", queries="links=false"
+                job, type="definition", path="/definition", format="json", language="json", queries="links=false"
             )}
         </div>
     </div>
