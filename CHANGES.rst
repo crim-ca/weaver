@@ -15,6 +15,9 @@ Changes:
 - Align ``GET /jobs/{jobId}/definition`` (replaces ``GET /jobs/{jobId}/inputs``) with the
   most recent `OGC API - Processes - Part 4: Job Management` specification,
   which includes the ``entity`` URI of the appropriate `Process` definition at the root of the `Job`/`Workflow`.
+  To ensure backward compatibility, the ``/inputs`` requests will be redirected to the `Job` definition contents.
+  The `CLI` will keep invoking the ``/inputs`` endpoint if requested directly with the corresponding operation.
+  A ``definition`` operation is added to the `CLI` to directly access the new endpoint.
 - Support ``application/provenance+json`` and  ``application/provenance+xml`` for corresponding provenance media-types
   (fixes `#987 <https://github.com/crim-ca/weaver/issues/987>`_).
 - Update and add new ``/conformance`` references of `Job` definition and provenance requirements and recommendations.

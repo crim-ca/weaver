@@ -2268,7 +2268,16 @@ class WeaverClient(object):
 
     @copy_doc(_job_info)
     def inputs(self, *args, **kwargs):
+        LOGGER.warning(
+            "The '/jobs/{jobId}/inputs' endpoint is deprecated. "
+            "This is preserved for older servers that might rely on it. "
+            "Consider using the job 'definition' endpoint instead for newer servers."
+        )
         return self._job_info("/inputs", *args, **kwargs)
+
+    @copy_doc(_job_info)
+    def definition(self, *args, **kwargs):
+        return self._job_info("/definition", *args, **kwargs)
 
     @copy_doc(_job_info)
     def logs(self, *args, **kwargs):

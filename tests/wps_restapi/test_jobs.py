@@ -1418,7 +1418,7 @@ class WpsRestApiJobsTest(JobUtils):
         """
         # to make sure UUID is applied, use the "same format" (8-4-4-4-12), but with invalid definitions
         base_path = sd.job_service.path.format(job_id="thisisnt-some-real-uuid-allerrordata")
-        for sub_path in ["", "/inputs", "/outputs", "/results", "/logs", "/exceptions"]:
+        for sub_path in ["", "/definition", "/outputs", "/results", "/logs", "/exceptions"]:
             path = f"{base_path}{sub_path}"
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
@@ -2585,7 +2585,7 @@ class WpsRestApiJobsTest(JobUtils):
         )
 
         # check precondition job setup
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["inputs"] == {"test": "data"}
@@ -2667,7 +2667,7 @@ class WpsRestApiJobsTest(JobUtils):
         resp = self.app.patch_json(path, params=body, headers=headers)
         assert resp.status_code == 204
 
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["mode"] == ExecuteMode.AUTO

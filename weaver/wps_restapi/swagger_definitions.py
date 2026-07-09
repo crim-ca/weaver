@@ -552,6 +552,9 @@ provider_prov_runs_service = Service(
 )
 
 # backward compatibility deprecated routes
+job_inputs_service = Service(name="job_inputs", path=f"{job_service.path}/inputs")
+process_inputs_service = Service(name="process_inputs", path=process_service.path + job_inputs_service.path)
+provider_inputs_service = Service(name="provider_inputs", path=provider_service.path + process_inputs_service.path)
 job_result_service = Service(name="job_result", path=f"{job_service.path}/result")
 process_result_service = Service(name="process_result", path=process_service.path + job_result_service.path)
 provider_result_service = Service(name="provider_result", path=provider_service.path + process_result_service.path)
@@ -4037,14 +4040,6 @@ class ProviderResultValueEndpoint(ProviderAnyOutputEndpoint):
     pass
 
 
-class ProcessJobDefinitionEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeaders()
-
-
-class ProviderJobDefinitionEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
-
-
 class JobInputsOutputsQuery(ExtendedMappingSchema):
     schema = ExtendedSchemaNode(
         String(),
@@ -4063,9 +4058,32 @@ class JobInputsOutputsQuery(ExtendedMappingSchema):
     )
 
 
+class ProcessJobDefinitionEndpoint(LocalProcessPath, JobPath):
+    header = RequestHeaders()
+
+
+class ProviderJobDefinitionEndpoint(ProviderProcessPath, JobPath):
+    header = RequestHeaders()
+
+
 class JobDefinitionEndpoint(JobPath):
     header = RequestHeaders()
     querystring = JobInputsOutputsQuery()
+
+
+class ProcessJobInputsEndpoint(LocalProcessPath, JobPath):
+    deprecated = True
+    header = RequestHeadersNoBody()
+
+
+class ProviderJobInputsEndpoint(ProviderProcessPath, JobPath):
+    deprecated = True
+    header = RequestHeadersNoBody()
+
+
+class JobInputsEndpoint(JobPath):
+    deprecated = True
+    header = RequestHeadersNoBody()
 
 
 class JobResultsQuery(FormatQuery):
@@ -4916,6 +4934,7 @@ class BoundingBoxValue(OneOfKeywordSchema):
 
 
 class BoundingBoxObject(StrictMappingSchema):
+    _schema_include_deserialize = False
     _schema = OGC_API_PROC_BBOX_SCHEMA
     description = "Execute bounding box value provided inline."
     format = OGC_API_PROC_BBOX_FORMAT
@@ -8586,7 +8605,7 @@ class OkGetJobOutputsResponse(ExtendedMappingSchema):
     body = JobOutputsBody()
 
 
-class RedirectResultResponse(ExtendedMappingSchema):
+class RedirectResponse(ExtendedMappingSchema):
     header = RedirectHeaders()
 
 
@@ -9175,6 +9194,9 @@ get_provider_job_definition_responses = copy(get_job_definition_responses)
 get_provider_job_definition_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
+get_job_inputs_redirect_responses = {
+    "308": RedirectResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
+}
 get_job_outputs_responses = {
     "200": OkGetJobOutputsResponse(description="success", examples={
         "JobOutputs": {
@@ -9208,7 +9230,7 @@ get_prov_output_responses.update({
 })
 
 get_result_redirect_responses = {
-    "308": RedirectResultResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
+    "308": RedirectResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
 }
 get_job_results_responses = {
     "200": OkGetJobResultsResponse(description="success", examples={

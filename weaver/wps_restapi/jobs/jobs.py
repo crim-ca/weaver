@@ -657,6 +657,38 @@ def get_job_definition(request):
     return HTTPOk(json=body)
 
 
+@sd.provider_inputs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROVIDERS, sd.TAG_DEPRECATED],
+    schema=sd.ProviderJobInputsEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_job_inputs_redirect_responses,
+)
+@sd.process_inputs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_PROCESSES, sd.TAG_DEPRECATED],
+    schema=sd.ProcessJobInputsEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_job_inputs_redirect_responses,
+)
+@sd.job_inputs_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_DEPRECATED],
+    schema=sd.JobInputsEndpoint(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.get_job_inputs_redirect_responses,
+)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def redirect_job_inputs(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Deprecated job inputs endpoint that is now returned by corresponding job definition path.
+    """
+    location = f"{request.url.rsplit('/', 1)[0]}/definition"
+    LOGGER.warning("Deprecated route redirection [%s] -> [%s]", request.url, location)
+    return HTTPPermanentRedirect(comment="deprecated", location=location)
+
+
 @sd.provider_outputs_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
     schema=sd.ProviderOutputsEndpoint(),
@@ -1025,7 +1057,7 @@ def get_job_stats(request):
 def redirect_job_result(request):
     # type: (PyramidRequest) -> AnyResponseType
     """
-    Deprecated job result endpoint that is now returned by corresponding outputs path with added links.
+    Deprecated job result endpoint that is now returned by corresponding job outputs path.
     """
     location = f"{request.url.rsplit('/', 1)[0]}/outputs"
     LOGGER.warning("Deprecated route redirection [%s] -> [%s]", request.url, location)
@@ -1070,6 +1102,9 @@ def includeme(config):
     config.add_cornice_service(sd.provider_stats_service)
 
     # backward compatibility routes (deprecated)
+    config.add_cornice_service(sd.job_inputs_service)
+    config.add_cornice_service(sd.process_inputs_service)
+    config.add_cornice_service(sd.provider_inputs_service)
     config.add_cornice_service(sd.job_result_service)
     config.add_cornice_service(sd.process_result_service)
     config.add_cornice_service(sd.provider_result_service)
