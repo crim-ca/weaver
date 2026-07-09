@@ -385,6 +385,7 @@ if TYPE_CHECKING:
     AnyCookiesContainer = Union[CookiesBaseType, WPSRequest, PyramidRequest, AnyHeadersContainer]
     AnyHeadersCookieContainer = Union[AnyHeadersContainer, AnyCookiesContainer]
     AnyRequestType = Union[PyramidRequest, WerkzeugRequest, PreparedRequest, RequestsRequest, DummyRequest]
+    AnyResponseWithBodyType = Union[PyramidResponse, WebobResponse, TestResponse]  # only 'requests' not using 'webob'
     AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
     AnyResponseClass = Union[PyramidResponse, WebobResponse, HTTPException]
     AnyViewResponse = Union[AnyResponseClass, JSON]

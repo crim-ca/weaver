@@ -73,6 +73,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
     from typing_extensions import Annotated, Literal
 
+    from mock.mock import _patch as MockPatch
     from mypy_boto3_s3.client import S3Client
     from mypy_boto3_s3.literals import BucketLocationConstraintType, RegionName
     from mypy_boto3_s3.type_defs import CreateBucketConfigurationTypeDef
@@ -86,6 +87,7 @@ if TYPE_CHECKING:
         AnyRequestMethod,
         AnyRequestType,
         AnyResponseType,
+        AnyResponseWithBodyType,
         EnvContainer,
         HeadersType,
         JSON,
@@ -94,9 +96,6 @@ if TYPE_CHECKING:
     )
 
     S3Scheme = Literal["s3", "https"]
-
-    # pylint: disable=C0103,invalid-name,E1101,no-member
-    MockPatch = mock._patch  # noqa: W0212
 
     # [WPS1-URL, GetCapPathXML, [DescribePathXML]]
     MockConfigCall = Callable[[PreparedRequest], Union[RequestsResponse, Tuple[int, JSON], str, bytes, Exception, None]]
@@ -481,7 +480,7 @@ def mocked_sub_requests(app,                # type: TestApp
                         *args,              # type: Any
                         only_local=False,   # type: bool
                         **kwargs,           # type: Any
-                        ):                  # type: (...) -> Union[AnyResponseType, MockReturnType]
+                        ):                  # type: (...) -> Union[AnyResponseWithBodyType, MockReturnType]
     """
     Mocks request calls targeting a :class:`webTest.TestApp` to avoid sub-request calls to send real requests.
 
