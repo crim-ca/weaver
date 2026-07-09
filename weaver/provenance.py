@@ -87,11 +87,13 @@ class ProvenanceFormat(Constants):
     _media_types = {
         ContentType.APP_YAML: PROV_JSON,
         ContentType.APP_JSON: PROV_JSON,
+        ContentType.APP_PROV_JSON: PROV_JSON,
         ContentType.APP_JSONLD: PROV_JSONLD,
         ContentType.TEXT_TURTLE: PROV_TURTLE,
         ContentType.TEXT_PROVN: PROV_N,
         ContentType.TEXT_XML: PROV_XML,
         ContentType.APP_XML: PROV_XML,
+        ContentType.APP_PROV_XML: PROV_XML,
         ContentType.APP_NT: PROV_NT,
     }
     _rev_path_types = {_prov_type: _ctype for _ctype, _prov_type in _media_types.items()}
@@ -116,13 +118,19 @@ class ProvenanceFormat(Constants):
 
     @classmethod
     def formats(cls):
-        # type: () -> List["ProvenanceFormat"]
+        # type: () -> List[Union[ProvenanceFormat, str]]
         return cls.values()
 
     @classmethod
     def as_media_type(cls, prov_format):
         # type: (Optional[AnyProvenanceFormat]) -> Optional[AnyContentType]
-        return cls._rev_path_types.get(prov_format)
+        ctype = cls._rev_path_types.get(prov_format)
+        # specialize types when identified with known representations
+        if ctype == ContentType.APP_JSON:
+            ctype = ContentType.APP_PROV_JSON
+        elif ctype in ContentType.ANY_XML:
+            ctype = ContentType.APP_PROV_XML
+        return ctype
 
     @classmethod
     def resolve_compatible_formats(
@@ -326,8 +334,18 @@ class WeaverResearchObject(ResearchObject):
 
         # following agents are expected to exist (created by inherited class)
         cwltool_agent = document.get_record(cwl_prov_const.ACCOUNT_UUID)[0]
-        user_agent = document.get_record(cwl_prov_const.USER_UUID)[0]
+        user_uuid = self.orcid or cwl_prov_const.USER_UUID
+        user_agent = document.get_record(user_uuid)[0]
         wf_agent = document.get_record(self.engine_uuid)[0]  # current job run aligned with cwl workflow
+
+        # adjust user agent as software rather than person (see 'resolve_user'), and leave any other types untouched
+        user_types = cast(set, user_agent.get_attribute(prov_const.PROV_TYPE))
+        user_types.symmetric_difference_update({
+            prov_const.PROV["Person"],
+            cwl_prov_const.SCHEMA["Person"],
+            prov_const.PROV["SoftwareAgent"],
+            cwl_prov_const.SCHEMA["SoftwareApplication"],
+        })
 
         # define relationships cross-references: https://wf4ever.github.io/ro/wfprov.owl
         document.primary_source(weaver_instance_agent, weaver_code_entity)
@@ -349,10 +367,20 @@ class WeaverResearchObject(ResearchObject):
     def resolve_user(self):
         # type: () -> Tuple[str, str]
         """
-        Override :mod:`cwltool` default machine user.
+        Override :mod:`cwltool.cwlprov` default machine user.
+
+        It is expected that the :term:`CWL` runner will executed by the ``weaver-worker`` (i.e.: via :mod:`celery`).
+        Define a generic user to avoid exposing implementation-specific "OS" user that will not be informative
+        for the generated :term:`Provenance`. Using a distinct name than just "_Weaver_" allows preserving the
+        distinction between the :term:`API` _agent_ and the "user" _agent_ for which :term:`Job` execution is
+        acted on behalf between these _agent_ endoffs.
+
+        .. seealso::
+            :ref:`running-execution-details`
         """
-        weaver_full_name = f"crim-ca/weaver:{weaver_version}"
-        return weaver_full_name, weaver_full_name
+        weaver_short_name = "weaver-worker"
+        weaver_full_name = f"{weaver_short_name}@crim-ca/weaver:{weaver_version}"
+        return weaver_short_name, weaver_full_name
 
     def resolve_host(self):
         # type: () -> Tuple[str, str]

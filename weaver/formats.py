@@ -9,6 +9,7 @@ from functools import cache
 from io import StringIO
 from typing import TYPE_CHECKING, cast, overload
 from urllib.error import HTTPError, URLError
+from urllib.parse import unquote
 from urllib.request import urlopen
 
 import pandas as pd
@@ -110,6 +111,8 @@ class ContentType(Constants):
     APP_X_NETCDF = "application/x-netcdf"   # legacy
     APP_NT = "application/n-triples"
     APP_OCTET_STREAM = "application/octet-stream"
+    APP_PROV_JSON = "application/provenance+json"
+    APP_PROV_XML = "application/provenance+xml"
     APP_PDF = "application/pdf"
     APP_TAR = "application/x-tar"          # map to existing gzip for CWL
     APP_TAR_GZ = "application/tar+gzip"    # map to existing gzip for CWL
@@ -1213,7 +1216,7 @@ def guess_target_format(
     """
     from weaver.utils import get_header
 
-    format_query = request.params.get("format") or request.params.get("f")
+    format_query = unquote(request.params.get("format") or request.params.get("f") or "")
     format_source = "default"  # type: FormatSource
     content_type = None  # type: Optional[AnyContentType]
     if format_query:

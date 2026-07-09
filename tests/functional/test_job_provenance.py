@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.prov
+@pytest.mark.oap_part5
 class TestJobProvenanceBase(WpsConfigBase, ResourcesUtil):
     job_id = None   # type: Optional[AnyUUID]
     job_url = None  # type: Optional[str]
@@ -85,7 +86,7 @@ class TestJobProvenanceBase(WpsConfigBase, ResourcesUtil):
 
 @pytest.mark.job
 @pytest.mark.prov
-@pytest.mark.oap_part4
+@pytest.mark.oap_part5
 @pytest.mark.functional
 class TestJobProvenance(TestJobProvenanceBase):
     """
@@ -95,14 +96,21 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({}, {}),  # default is JSON
         ({"f": OutputFormat.JSON}, {}),
         ({"f": ProvenanceFormat.PROV_JSON}, {}),
+        ({"f": "prov+json"}, {}),
+        ({"f": "prov%2Bjson"}, {}),
+        ({"f": "provenance+json"}, {}),
+        ({"f": "provenance%2Bjson"}, {}),
         ({}, {"Accept": ContentType.APP_JSON}),
+        ({}, {"Accept": ContentType.APP_PROV_JSON}),
+        ({}, {"Accept": f"{ContentType.APP_PROV_JSON}; charset=utf-8"}),
+        ({}, {"Accept": f"{ContentType.APP_JSON}; profile=https://www.w3.org/ns/prov"}),
     ])
     def test_job_prov_json(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
         resp = self.app.get(prov_url, params=queries, headers=headers)
         assert resp.status_code == 200
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROV_JSON
         prov = resp.json
         assert "prefix" in prov
         assert "wfprov" in prov["prefix"]
@@ -113,6 +121,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({"f": "jsonld"}, {}),
         ({"f": ProvenanceFormat.PROV_JSONLD}, {}),
         ({}, {"Accept": ContentType.APP_JSONLD}),
+        ({}, {"Accept": f"{ContentType.APP_JSONLD}; profile=https://www.w3.org/TR/prov-jsonld/"}),
     ])
     def test_job_prov_json_ld(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -141,15 +150,21 @@ class TestJobProvenance(TestJobProvenanceBase):
     @parameterized.expand([
         ({"f": OutputFormat.XML}, {}),
         ({"f": ProvenanceFormat.PROV_XML}, {}),
+        ({"f": "prov+xml"}, {}),
+        ({"f": "prov%2Bxml"}, {}),
+        ({"f": "provenance+xml"}, {}),
+        ({"f": "provenance%2Bxml"}, {}),
         ({}, {"Accept": ContentType.TEXT_XML}),
         ({}, {"Accept": ContentType.APP_XML}),
+        ({}, {"Accept": ContentType.APP_PROV_XML}),
+        ({}, {"Accept": f"{ContentType.APP_PROV_XML}; charset=utf-8"}),
     ])
     def test_job_prov_xml(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
         resp = self.app.get(prov_url, params=queries, headers=headers)
         assert resp.status_code == 200
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
-        assert resp.content_type in ContentType.ANY_XML
+        assert resp.content_type == ContentType.APP_PROV_XML
         prov = resp.text
         assert "<prov:document xmlns:wfprov" in prov
 
@@ -186,6 +201,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({"f": "n"}, {}),
         ({"f": ProvenanceFormat.PROV_N}, {}),
         ({}, {"Accept": ContentType.TEXT_PROVN}),
+        ({}, {"Accept": f"{ContentType.TEXT_PROVN}; version=1"}),
     ])
     def test_job_prov_provn(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -195,6 +211,93 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.content_type == ContentType.TEXT_PROVN
         prov = resp.text
         assert "prov:type='wfprov:WorkflowEngine'" in prov
+
+    @parameterized.expand([
+        ({}, {"Accept": "application/unsupported"}),
+        ({"f": "unsupported"}, {}),
+        ({}, {"Accept": ContentType.APP_OCTET_STREAM}),
+        ({"f": "binary"}, {}),
+    ])
+    def test_job_prov_unsupported_format(self, queries, headers):
+        """
+        Test unsupported PROV format returns 406 Not Acceptable with proper error type.
+        """
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers, expect_errors=True)
+        assert resp.status_code == 406, f"Expected 406, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        assert "type" in resp.json, "Error response must include 'type' field"
+        assert resp.json["type"] == (
+            "https://www.opengis.net/def/exceptions/ogcapi-processes-5/1.0/prov-unsupported-format"
+        )
+        assert "detail" in resp.json
+
+    @parameterized.expand([
+        ({}, {}),
+        ({"f": OutputFormat.JSON}, {}),
+        ({}, {"Accept": ContentType.APP_JSON}),
+    ])
+    def test_job_prov_missing_on_failed_job(self, queries, headers):
+        """
+        Test that provenance is not available for failed jobs (404 Not Found with proper error type).
+        """
+        job = self.job_store.save_job(
+            "test",
+            process=self.proc_id,
+            status=Status.FAILED
+        )
+        prov_url = job.prov_url(self.settings)
+        resp = self.app.get(prov_url, params=queries, headers=headers, expect_errors=True)
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        assert "type" in resp.json, "Error response must include 'type' field"
+        assert resp.json["type"] == "https://www.opengis.net/def/exceptions/ogcapi-processes-5/1.0/prov-missing"
+        assert "detail" in resp.json
+
+    @parameterized.expand([
+        ({}, {}),
+        ({"f": OutputFormat.JSON}, {}),
+        ({}, {"Accept": ContentType.APP_JSON}),
+    ])
+    def test_job_prov_missing_on_pending_job(self, queries, headers):
+        """
+        Test that provenance is not available for pending jobs (404 Not Found with proper error type).
+        """
+        job = self.job_store.save_job(
+            "test",
+            process=self.proc_id,
+            status=Status.ACCEPTED
+        )
+        prov_url = job.prov_url(self.settings)
+        resp = self.app.get(prov_url, params=queries, headers=headers, expect_errors=True)
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        assert "type" in resp.json, "Error response must include 'type' field"
+        assert resp.json["type"] == "https://www.opengis.net/def/exceptions/ogcapi-processes-5/1.0/prov-missing"
+        assert "detail" in resp.json
+
+    @parameterized.expand([
+        ({"f": ProvenanceFormat.PROV_TURTLE}, {"Accept": ContentType.APP_JSON}, ContentType.TEXT_TURTLE),
+        ({"f": ProvenanceFormat.PROV_NT}, {"Accept": ContentType.TEXT_PLAIN}, ContentType.APP_NT),
+    ])
+    def test_job_prov_format_query_precedence(self, queries, headers, expected_content_type):
+        """
+        Test that format query parameter takes precedence over Accept header.
+        """
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type == expected_content_type
+
+    def test_job_prov_empty_accept_header(self):
+        """
+        Test that empty Accept header defaults to JSON.
+        """
+        prov_url = f"{self.job_url}/prov"
+        headers = {"Accept": ""}
+        resp = self.app.get(prov_url, headers=headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
 
     def test_job_prov_info_text(self):
         prov_url = f"{self.job_url}/prov/info"
@@ -207,6 +310,11 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert f"Workflow run ID: urn:uuid:{job_id}" in prov
 
     def test_job_prov_info_not_acceptable(self):
+        """
+        Check the unsupported format of job provenance info.
+
+        The endpoint doesn't support JSON like most API endpoints, only plain text.
+        """
         job = self.job_store.save_job(
             "test",
             process=self.proc_id,
@@ -215,10 +323,36 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov_url = job.prov_url(self.settings)
         headers = self.json_headers  # note: this is the test, while only plain text is supported
         resp = self.app.get(f"{prov_url}/info", headers=headers, expect_errors=True)
-        assert resp.status_code == 406
+        assert resp.status_code == 406, f"Expected 406, got {resp.status_code}"
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.APP_JSON, (
             "error should be in JSON regardless of Accept header or the normal contents media-type"
+        )
+
+    def test_job_status_prov_links_all_supported_formats(self):
+        """
+        Ensure successful job status advertises PROV links for every supported PROV format.
+        """
+        resp = self.app.get(self.job_url, headers=self.json_headers)
+        assert resp.status_code == 200
+        links = resp.json.get("links", [])
+        prov_links = [link for link in links if link.get("rel") == "https://www.w3.org/ns/prov"]
+        assert prov_links, "Expected provenance links in successful job status response."
+
+        expected_types = {
+            ContentType.APP_PROV_JSON,
+            ContentType.APP_JSONLD,
+            ContentType.APP_PROV_XML,
+            ContentType.TEXT_PROVN,
+            ContentType.APP_NT,
+            ContentType.TEXT_TURTLE,
+        }
+        prov_types = {link.get("type") for link in prov_links}
+        missing_types = expected_types - prov_types
+        assert not missing_types, f"Missing supported PROV link media-types: {sorted(missing_types)}"
+        assert all(
+            href_fmt[0].endswith("/prov") and href_fmt[1]
+            for href_fmt in (link["href"].split("?", 1) for link in prov_links)
         )
 
     @parameterized.expand(
@@ -304,7 +438,7 @@ class TestJobProvenance(TestJobProvenanceBase):
 
 
 @pytest.mark.prov
-@pytest.mark.oap_part4
+@pytest.mark.oap_part5
 @pytest.mark.functional
 class TestJobProvenanceDisabled(TestJobProvenanceBase):
     """

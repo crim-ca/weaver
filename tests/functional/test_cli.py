@@ -2997,6 +2997,7 @@ class TestWeaverCLIAuthHandler(TestWeaverClientAuthBase):
 
 
 @pytest.mark.prov
+@pytest.mark.oap_part5
 class TestWeaverClientProv(TestWeaverClientBase, TestJobProvenanceBase):
     def setUp(self):
         # purposely omit 'TestWeaverClientBase' setup to
@@ -3018,7 +3019,7 @@ class TestWeaverClientProv(TestWeaverClientBase, TestJobProvenanceBase):
         result = mocked_sub_requests(self.app, self.client.prov, self.job_url, output_format=OutputFormat.YAML)
         assert result.success
         ctype = clean_media_type_format(result.headers["Content-Type"], strip_parameters=True)
-        assert ctype == ContentType.APP_JSON, "original type should still be JSON (from API)"
+        assert ctype == ContentType.APP_PROV_JSON, "original type should still be JSON (from API)"
         assert isinstance(result.body, dict), "response body should still be the original PROV-JSON"
         assert isinstance(result.text, str), "text property should be the PROV-JSON represented as YAML string"
         assert yaml.safe_load(result.text) == result.body, "PROV-JSON contents should be identical in YAML format"
@@ -3031,7 +3032,7 @@ class TestWeaverClientProv(TestWeaverClientBase, TestJobProvenanceBase):
         result = mocked_sub_requests(self.app, self.client.prov, self.job_url, prov_format=ProvenanceFormat.PROV_XML)
         assert result.success
         ctype = clean_media_type_format(result.headers["Content-Type"], strip_parameters=True)
-        assert ctype == ContentType.APP_XML, "original type should still be XML (from API)"
+        assert ctype == ContentType.APP_PROV_XML, "original type should still be XML (from API)"
         assert isinstance(result.body, str), "body should be the PROV-XML representation"
         assert "actedOnBehalfOf" in result.body
         assert "agent" in result.body
