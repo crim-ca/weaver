@@ -239,9 +239,8 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         process_description = desc_result.body
         assert "id" in process_description and process_description["id"] == process_id
 
-        profile_rel = sd.OGC_API_PROC_PROFILE_PROC_DESC_URI
         profile = desc_result.headers.get("Profile") or desc_result.headers.get("Content-Profile")
-        assert ogc_def.normalize(profile) == profile_rel
+        assert ogc_def.normalize(profile) == sd.OGC_API_PROC_PROFILE_PROC_DESC_URI
 
     @pytest.mark.skipif(
         TEST_SERVER_OAP_PROC_EXEC_SYNC_UNSUPPORTED,

@@ -3,8 +3,12 @@
 """
 Utilities for handling :term:`OGC API` and :term:`OWS` conformance classes and definitions.
 """
+import re
 from functools import cache
 from typing import Optional
+
+
+URI_VERSION_REGEX = re.compile(r"[/:](0|[0-9]+.[0-9]+)[/:]")
 
 
 @cache
@@ -37,12 +41,12 @@ def normalize(uri: str, version: Optional[str] = None, secure: bool = True) -> s
         See `opengeospatial/NamingAuthority#120 <https://github.com/opengeospatial/NamingAuthority/issues/120>`_
         for more details.
     """
-    if version is None:
-        version = "1.0" if any(part in uri for part in ["/rel/", "/profile/", "ogc-rel:", "ogc-profile:"]) else "0"
+    if version is None and not re.match(URI_VERSION_REGEX, uri):
+        version = "1.0" if any(part in uri for part in ["/rel/", "ogc-rel:"]) else "0"
     if uri.startswith("urn:ogc:def:"):
         uri = uri.replace(":", "/").replace("//", f"/{version}/").replace("urn/ogc/def/", "http://www.opengis.net/def/")
     if uri.startswith("[ogc-") and uri.endswith("]"):
-        uri = uri[1:-1].replace(":", f"/ogc/{version}/").replace("ogc-", "http://www.opengis.net/def/")
+        uri = uri[1:-1].replace(":", f"/ogc/{version}/").replace("ogc-", "http://www.opengis.net/def/", 1)
     uri = uri.rstrip("/")
     uri = uri.replace("http://", "https://") if secure else uri.replace("https://", "http://")
     parts = uri.rsplit("/", 2)
