@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from weaver.base import EnumType
     from weaver.datatype import Job
     from weaver.formats import AnyContentType
-    from weaver.typedefs import AnyKey, AnySettingsContainer
+    from weaver.typedefs import AnyKey, AnySettingsContainer, URL
 
     AnyProvenanceFormat = Union[AnyContentType, "ProvenanceFormat"]
 
@@ -97,6 +97,18 @@ class ProvenanceFormat(Constants):
         ContentType.APP_NT: PROV_NT,
     }
     _rev_path_types = {_prov_type: _ctype for _ctype, _prov_type in _media_types.items()}
+    _profiles = {
+        ContentType.APP_YAML: "https://www.w3.org/submissions/prov-json/",
+        ContentType.APP_JSON: "https://www.w3.org/submissions/prov-json/",
+        ContentType.APP_PROV_JSON: "https://www.w3.org/submissions/prov-json/",
+        ContentType.APP_JSONLD: "https://www.w3.org/submissions/prov-jsonld/",
+        ContentType.TEXT_TURTLE: "https://www.w3.org/TR/prov-o/",
+        ContentType.TEXT_PROVN: "https://www.w3.org/TR/prov-n/",
+        ContentType.TEXT_XML: "https://www.w3.org/TR/prov-xml/",
+        ContentType.APP_XML: "https://www.w3.org/TR/prov-xml/",
+        ContentType.APP_PROV_XML: "https://www.w3.org/TR/prov-xml/",
+        ContentType.APP_NT: "https://www.w3.org/TR/prov-o/",
+    }
 
     @classmethod
     def get(                        # pylint: disable=W0221,W0237  # arguments differ/renamed for clarity
@@ -131,6 +143,12 @@ class ProvenanceFormat(Constants):
         elif ctype in ContentType.ANY_XML:
             ctype = ContentType.APP_PROV_XML
         return ctype
+
+    @classmethod
+    def as_profile(cls, prov_format):
+        # type: (Optional[AnyProvenanceFormat]) -> Optional[URL]
+        ctype = cls.as_media_type(prov_format)
+        return cls._profiles.get(ctype)
 
     @classmethod
     def resolve_compatible_formats(

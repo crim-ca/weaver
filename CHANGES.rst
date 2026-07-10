@@ -22,6 +22,7 @@ Changes:
   (fixes `#987 <https://github.com/crim-ca/weaver/issues/987>`_).
 - Update and add new ``/conformance`` references of `Job` definition and provenance requirements and recommendations.
 - Update `Job` provenance error responses with standard ``type`` URIs.
+- Add ``rel=profile`` link and ``Content-Profile`` header to `Job` provenance responses to indicate the applied profile.
 
 Fixes:
 ------

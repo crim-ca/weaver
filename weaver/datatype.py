@@ -1541,24 +1541,31 @@ class Job(Base, LoggerHandler):
         prov_path = f"/prov{extra_path}"
         return self.job_url(container=container, extra_path=prov_path)
 
-    def prov_path(self, container=None, extra_path=None, prov_format=None):
-        # type: (Optional[AnySettingsContainer], Optional[ProvenancePathType], Optional[AnyProvenanceFormat]) -> str
+    def prov_path(
+        self,
+        container=None,     # type: Optional[AnySettingsContainer]
+        extra_path=None,    # type: Optional[ProvenancePathType]
+        prov_format=None,   # type: Optional[AnyProvenanceFormat]
+    ):                      # type: (...) -> Optional[Path]
         """
-        Obtain the relative path of the ``PROV`` contents.
+        Obtain the relative path of the :term:`Provenance` contents.
+
+        :param container: Resolve application settings to obtain the storage root directory of provenance metadata.
+        :param extra_path: URI path of the provenance details to retrieve, or None to obtain the root directory.
+        :param prov_format: Provenance format or supported media-type to retrieve the corresponding contents.
         """
         job_path = self.result_path()
         prov_path = f"{job_path}-prov"
         prov_format = ProvenanceFormat.get(prov_format, allow_media_type=True)
         _prov_path_mapping = {
             (None, None): prov_path,  # the directory itself with all metadata
-            ("/prov", None): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
             ("/prov", ProvenanceFormat.PROV_JSON): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
             ("/prov", ProvenanceFormat.PROV_JSONLD): f"{prov_path}/metadata/provenance/primary.cwlprov.jsonld",
             ("/prov", ProvenanceFormat.PROV_TURTLE): f"{prov_path}/metadata/provenance/primary.cwlprov.ttl",
             ("/prov", ProvenanceFormat.PROV_XML): f"{prov_path}/metadata/provenance/primary.cwlprov.xml",
             ("/prov", ProvenanceFormat.PROV_N): f"{prov_path}/metadata/provenance/primary.cwlprov.provn",
             ("/prov", ProvenanceFormat.PROV_NT): f"{prov_path}/metadata/provenance/primary.cwlprov.nt",
-        }  # type: Dict[Tuple[Optional[ProvenancePathType], ProvenanceFormat], str]
+        }  # type: Dict[Tuple[Optional[ProvenancePathType], Optional[ProvenanceFormat]], Path]
         key = (extra_path, prov_format)
         resolved_path = _prov_path_mapping.get(key)
         if resolved_path:
@@ -1604,6 +1611,11 @@ class Job(Base, LoggerHandler):
         if fmt == ContentType.APP_YAML:
             data = json.loads(data)
             data = OutputFormat.convert(data, to=OutputFormat.YAML)
+        # normalize media-type
+        if fmt == ContentType.APP_JSON:
+            fmt = ContentType.APP_PROV_JSON
+        if fmt in ContentType.ANY_XML:
+            fmt = ContentType.APP_PROV_XML
         return data, fmt
 
     def links(self, container=None, self_link=None):

@@ -297,7 +297,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         headers = {"Accept": ""}
         resp = self.app.get(prov_url, headers=headers)
         assert resp.status_code == 200
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROV_JSON
 
     def test_job_prov_info_text(self):
         prov_url = f"{self.job_url}/prov/info"

@@ -1772,13 +1772,26 @@ def get_job_prov_response(request):
 
     def prov_format_handler(fmt):
         if isinstance(fmt, str):
+            fmt = fmt.strip()
             # special case of 'application/ld+json'
             # if passed by query parameter, the '+' is escaped to a space
             # also, consider if the %-escape was done explicitly for it
-            if unquote_plus(fmt) in ["ld+json", "ld json"]:
+            fmt_unquote = unquote_plus(fmt)
+            if fmt_unquote in ["ld+json", "ld json"]:
                 fmt = ProvenanceFormat.PROV_JSONLD
-            if "/" not in fmt and not fmt.lower().startswith("prov-"):
-                fmt = f"prov-{fmt}"
+            elif "/" not in fmt:
+                # Support interchangeable separators for PROV query aliases:
+                # prov+xml/prov-xml and provenance+xml/provenance-xml.
+                fmt = fmt_unquote.replace(" ", "+")
+                fmt_lower = fmt.lower()
+                if fmt_lower.startswith("provenance+"):
+                    fmt = f"prov-{fmt[11:]}"
+                elif fmt_lower.startswith("provenance-"):
+                    fmt = f"prov-{fmt[11:]}"
+                elif fmt_lower.startswith("prov+"):
+                    fmt = f"prov-{fmt[5:]}"
+                elif not fmt_lower.startswith("prov-"):
+                    fmt = f"prov-{fmt}"
             # special case of YAML that is obtained from PROV-JSON
             # early fix its media-type to resolve it correctly without ambiguity
             if fmt.lower() == "prov-yaml":
@@ -1798,13 +1811,14 @@ def get_job_prov_response(request):
     prov_type = guess_target_format(
         request,
         override_user_agent=True,
-        default=ContentType.APP_JSON,
+        default=ContentType.APP_PROV_JSON,
         format_handler=prov_format_handler,
     )
+    prov_type = clean_media_type_format(prov_type, strip_parameters=True)
     prov_data, prov_type = job.prov_data(request, prov_path, prov_type)
     if not prov_data:
         prov_dir = job.prov_path(request)
-        prov_exists = os.path.isdir(prov_dir)
+        prov_exists = prov_dir and os.path.isdir(prov_dir)
         prov_err = HTTPNotAcceptable if prov_exists else JobGone
         prov_body = {
             "title": "NoJobProvenance",
@@ -1818,6 +1832,12 @@ def get_job_prov_response(request):
             prov_body["value"] = {"run_id": str(request.matchdict["run_id"])}
         prov_body["status"] = prov_err.code
         return prov_err(json=prov_body, content_type=ContentType.APP_JSON)
+
     links = job.links(container=request, self_link="provenance")
-    headers = [("Link", make_link_header(link)) for link in links]
+    headers = []
+    if prov_type != ContentType.TEXT_PLAIN:
+        profile = ProvenanceFormat.as_profile(prov_type)
+        headers = [("Content-Profile", sd.OGC_API_PROC_PROFILE_RESULTS_URI)]
+        links.append({"href": profile, "rel": "profile", "title": "Profile of the provenance metadata."})
+    headers.extend([("Link", make_link_header(link)) for link in links])
     return HTTPOk(body=prov_data, headers=headers, content_type=prov_type, charset="utf-8")

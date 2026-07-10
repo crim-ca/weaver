@@ -1229,21 +1229,22 @@ def guess_target_format(
             format_source = "header"
         else:
             content_type = default or ""
-        for ctype in content_type.split(","):
-            ctype = clean_media_type_format(ctype, suffix_subtype=True, strip_parameters=True)
-            if override_user_agent and (ctype != default or not default):
-                # Because most browsers enforce a 'visual rendering' list of accept header, revert to JSON if detected.
-                # Request set by another client (e.g.: using 'requests') will have full control over desired content.
-                # Since browsers add '*/*' as any content fallback, use it as extra detection of undetected user-agent.
-                user_agent = get_header("user-agent", request.headers)
-                if (
-                    user_agent
-                    and any(browser in user_agent for browser in ["Mozilla", "Chrome", "Safari"])
-                    or "*/*" in content_type
-                ):
-                    content_type = default or ContentType.APP_JSON
-                    format_source = "default"
-                    break
+        if override_user_agent:
+            for ctype in content_type.split(","):
+                ctype = clean_media_type_format(ctype, suffix_subtype=False, strip_parameters=True)
+                if ctype != default or not default:
+                    # Because most browsers use a 'visual rendering' of accept media-types, revert to JSON if detected.
+                    # Request from another client (e.g.: using 'requests') will have full control over desired content.
+                    # Since browsers add '*/*' as fallback, use it as extra detection of unresolved user-agent.
+                    user_agent = get_header("user-agent", request.headers)
+                    if (
+                        user_agent
+                        and any(browser in user_agent for browser in ["Mozilla", "Chrome", "Safari"])
+                        or "*/*" in content_type
+                    ):
+                        content_type = default or ContentType.APP_JSON
+                        format_source = "default"
+                        break
     if not content_type or content_type == ContentType.ANY:
         content_type = default or ContentType.APP_JSON
         format_source = "default"
