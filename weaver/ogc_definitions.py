@@ -7,7 +7,6 @@ import re
 from functools import cache
 from typing import Optional
 
-
 URI_VERSION_REGEX = re.compile(r"[/:](0|[0-9]+.[0-9]+)[/:]")
 
 

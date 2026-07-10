@@ -24,7 +24,7 @@ import re
 from copy import copy
 from decimal import Decimal
 from functools import cache
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import colander
 import duration
@@ -858,6 +858,7 @@ class AcceptWithProfileOneOf(OneOfCaseInsensitive):
     """
     Defines a ``Accept`` header that embeds a ``profile`` paremeter quoted accordingly (if URI) when provided as tuple.
     """
+
     def __init__(self, choices, *args, **kwargs):
         # type: (Iterable[Union[str, Tuple[str, str]]], *Any, **Any) -> None
         values = []
@@ -875,6 +876,7 @@ class ProfileOneOf(OneOfCaseInsensitive):
     """
     Validates allowed values of an ``Accept-Profile`` header, ``profile`` query or other similar parameters.
     """
+
     def __call__(self, node, value):
         value = value.strip("<>").strip("\"")
         return super().__call__(node, value)
