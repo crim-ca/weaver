@@ -22,6 +22,7 @@ from pyramid.settings import asbool
 from pytest_dependency import depends
 
 from tests.resources import FUNCTIONAL_CODE_SPRINT_SERVERS, load_resource
+from weaver import ogc_definitions as ogc_def
 from weaver.cli import ValidateAuthHandlerAction, WeaverClient, parse_auth
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPreference
 from weaver.formats import ContentType, OutputFormat
@@ -32,6 +33,7 @@ from weaver.processes.constants import (
 )
 from weaver.processes.convert import normalize_ordered_io
 from weaver.utils import get_any_id, get_any_value
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from weaver.typedefs import CWL, JSON, Path
@@ -237,9 +239,9 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         process_description = desc_result.body
         assert "id" in process_description and process_description["id"] == process_id
 
-        profile_rel = "http://www.opengis.net/def/profile/OGC/0/ogc-process-description"
+        profile_rel = sd.OGC_API_PROC_PROFILE_PROC_DESC_URI
         profile = desc_result.headers.get("Profile") or desc_result.headers.get("Content-Profile")
-        assert profile == profile_rel
+        assert ogc_def.normalize(profile) == profile_rel
 
     @pytest.mark.skipif(
         TEST_SERVER_OAP_PROC_EXEC_SYNC_UNSUPPORTED,
@@ -307,7 +309,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             glob.glob(os.path.join(FUNCTIONAL_CODE_SPRINT_SERVERS, TEST_SERVER, "process-execute*.json")),
             [
                 None,
-                "http://www.opengis.net/def/profile/OGC/0/ogc-results",
+                sd.OGC_API_PROC_PROFILE_RESULTS_URI,
             ]
         ),
     )
