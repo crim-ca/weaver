@@ -3816,21 +3816,23 @@ def test_get_job_status_profile_invalid(accept_type, accept_profile):
 
 
 @pytest.mark.parametrize(
-    ["accept_profile", "query_profile"],
+    ["accept_profile", "query_profile", "expected_profile"],
     [
-        params
-        for param in [
-            JobStatusProfileSchema.OGC.upper(),
-            JobStatusProfileSchema.OGC.lower(),
-            JobStatusProfileSchema.WPS.upper(),
-            JobStatusProfileSchema.WPS.lower(),
-            sd.OGC_API_PROC_PROFILE_JOB_DESC_URI.replace("http://", "https://"),
-            sd.OGC_API_PROC_PROFILE_JOB_DESC_URI.replace("https://", "http://"),
-        ]
-        for params in ((None, param), (param, None))
+        (None, JobStatusProfileSchema.OGC.upper(), JobStatusProfileSchema.OGC),
+        (None, JobStatusProfileSchema.OGC.lower(), JobStatusProfileSchema.OGC),
+        (None, JobStatusProfileSchema.WPS.upper(), JobStatusProfileSchema.WPS),
+        (None, JobStatusProfileSchema.WPS.lower(), JobStatusProfileSchema.WPS),
+        (JobStatusProfileSchema.OGC.upper(), None, JobStatusProfileSchema.OGC),
+        (JobStatusProfileSchema.OGC.lower(), None, JobStatusProfileSchema.OGC),
+        (JobStatusProfileSchema.WPS.upper(), None, JobStatusProfileSchema.WPS),
+        (JobStatusProfileSchema.WPS.lower(), None, JobStatusProfileSchema.WPS),
+        (None, sd.OGC_API_PROC_PROFILE_JOB_DESC_URI.replace("http://", "https://"), JobStatusProfileSchema.OGC),
+        (sd.OGC_API_PROC_PROFILE_JOB_DESC_URI.replace("http://", "https://"), None, JobStatusProfileSchema.OGC),
+        (None, sd.OGC_API_PROC_PROFILE_JOB_DESC_URI.replace("https://", "http://"), JobStatusProfileSchema.OGC),
+        (sd.OGC_API_PROC_PROFILE_JOB_DESC_URI.replace("https://", "http://"), None, JobStatusProfileSchema.OGC),
     ]
 )
-def test_get_job_status_profile_valid(accept_profile, query_profile):
+def test_get_job_status_profile_valid(accept_profile, query_profile, expected_profile):
     """
     Test valid combinations of :term:`Job` status :term:`Profile`.
     """
@@ -3839,4 +3841,4 @@ def test_get_job_status_profile_valid(accept_profile, query_profile):
     headers.update({"Accept-Profile": accept_profile} if accept_profile else {})
     request = MockedRequest(params=queries, headers=headers)
     profile, _ = get_job_status_schema(request)
-    assert profile == (query_profile or accept_profile)
+    assert profile == expected_profile
