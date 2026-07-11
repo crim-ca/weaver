@@ -720,6 +720,7 @@ class TestWeaverClient(TestWeaverClientBase):
         result = mocked_sub_requests(self.app, self.client.undeploy, other_process)
         assert result.success
         assert not result.body
+        assert result.message == "Undeploy successful."
 
         path = f"/processes/{other_process}"
         resp = mocked_sub_requests(self.app, "get", path, expect_errors=True)
@@ -1240,16 +1241,30 @@ class TestWeaverCLI(TestWeaverClientBase):
             trim=False,
         )
         operations = [
+            "info",
+            "version",
+            "conformance",
             "deploy",
             "undeploy",
+            "register",
+            "unregister",
             "capabilities",
             "processes",
             "describe",
+            "package",
             "execute",
             "monitor",
             "dismiss",
             "results",
             "status",
+            "provenance",
+            "jobs",
+            "update-job",
+            "trigger-job",
+            "logs",
+            "exceptions",
+            "statistics",
+            "upload",
         ]
         assert all(any(op in line for line in lines) for op in operations)
 
@@ -1895,6 +1910,21 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert in_schema == in_oas  # injected by user provided process description
             assert out_schema == out_oas_oneof  # combined from user and auto-resolved definitions
             assert out_formats == out_any_fmt  # auto-resolved from CWL
+
+    def test_undeploy_process(self):
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "undeploy",
+                "-u", self.url,
+                "-p", self.test_process["FileInfo"],
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any("Undeploy successful." in line for line in lines)
 
     def test_describe(self):
         # prints formatted JSON ProcessDescription over many lines
