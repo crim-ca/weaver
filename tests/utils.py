@@ -103,7 +103,7 @@ if TYPE_CHECKING:
         Tuple[str, Union[str, MockConfigCall], Union[Sequence[str], Dict[str, Union[str, MockConfigCall]]]],
         Annotated[Sequence[str], 3]
     ]
-    MockReturnType = TypeVar("MockReturnType")
+    MockReturnTypeT = TypeVar("MockReturnTypeT")
     MockHttpMethod = Union[
         responses.HEAD,
         responses.GET,
@@ -116,7 +116,7 @@ if TYPE_CHECKING:
 
     CommandType = Callable[[Union[str, Tuple[str]]], int]
 
-    CompareType = TypeVar("CompareType")
+    CompareTypeT = TypeVar("CompareTypeT")
 
 LOGGER = logging.getLogger(".".join([__package__, __name__]))
 
@@ -476,11 +476,11 @@ def mocked_file_response(path, url):
 
 
 def mocked_sub_requests(app,                # type: TestApp
-                        method_function,    # type: Union[AnyRequestMethod, Callable[[Any, ...], MockReturnType]]
+                        method_function,    # type: Union[AnyRequestMethod, Callable[[Any, ...], MockReturnTypeT]]
                         *args,              # type: Any
                         only_local=False,   # type: bool
                         **kwargs,           # type: Any
-                        ):                  # type: (...) -> Union[AnyResponseWithBodyType, MockReturnType]
+                        ):                  # type: (...) -> Union[AnyResponseWithBodyType, MockReturnTypeT]
     """
     Mocks request calls targeting a :class:`webTest.TestApp` to avoid sub-request calls to send real requests.
 
@@ -1571,8 +1571,8 @@ def setup_test_file_hierarchy(test_paths, test_root_dir, test_data="data"):
 
 def assert_equal_any_order(result,          # type: Iterable[Any]
                            expect,          # type: Iterable[Any]
-                           comparer=None,   # type: Optional[Callable[[CompareType, CompareType], bool]]
-                           formatter=str,   # type: Optional[Callable[[CompareType], str]]
+                           comparer=None,   # type: Optional[Callable[[CompareTypeT, CompareTypeT], bool]]
+                           formatter=str,   # type: Optional[Callable[[CompareTypeT], str]]
                            diff=False,      # type: bool
                            ):               # type: (...) -> None
     if not callable(comparer):

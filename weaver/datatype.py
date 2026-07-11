@@ -110,6 +110,7 @@ if TYPE_CHECKING:
     from weaver.quotation.status import AnyQuoteStatus
     from weaver.status import AnyStatusType, StatusType
     from weaver.typedefs import (
+        URL,
         AnyLogLevel,
         AnyProcess,
         AnyProcessRef,
@@ -133,8 +134,7 @@ if TYPE_CHECKING:
         QuoteProcessParameters,
         QuoteProcessResults,
         QuoteStepOutputParameters,
-        Statistics,
-        URL
+        Statistics
     )
     from weaver.visibility import AnyVisibility
 

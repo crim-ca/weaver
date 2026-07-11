@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from weaver.base import EnumType
     from weaver.datatype import Job
     from weaver.formats import AnyContentType
-    from weaver.typedefs import AnyKey, AnySettingsContainer, URL
+    from weaver.typedefs import URL, AnyKey, AnySettingsContainer
 
     AnyProvenanceFormat = Union[AnyContentType, "ProvenanceFormat"]
 

@@ -148,6 +148,7 @@ disable=C0111,missing-docstring,
 
 per-file-ignores =
     .agents/skills/*/scripts/*:C0103,
+    weaver/wps_restapi/colander_extras.py:C0103,
     setup.py:C0103,
     docs/examples/*.py:C0103,
     tests/*:R1729
@@ -407,7 +408,7 @@ class-naming-style=PascalCase
 # Allow typing definitions that are matched as 'classes' to have slightly more versatile names.
 class-rgx=((_{0,2}[A-Z][a-zA-Z0-9]+)|((CWL|PKG|WPS|OAS|JSON|IO|ANY)_[a-zA-Z0-9_]+Types?))$
 
-typealias-rgx=_{0,2}(?!T[A-Z]|Type)((CWL|PKG|WPS|OAS|JSON|IO|ANY)_)?[A-Z]+[a-z0-9]+(?:[A-Z][a-z0-9]+)*$
+typealias-rgx=_{0,2}(?!T[A-Z]|Type)((CWL|PKG|WPS|OAS|JSON|IO|ANY)_)?[A-Z]+[a-z0-9]+(?:[A-Z][a-z0-9]+)*([A-Z0-9]+)?$
 
 # Naming style matching correct constant names.
 const-naming-style=UPPER_CASE
