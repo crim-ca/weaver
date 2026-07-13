@@ -12,13 +12,12 @@ definitions generated on the exposed endpoints (JSON and Swagger UI).
 The definitions are also employed to generate the `OpenAPI` definitions reported in the documentation published
 on `Weaver`'s `ReadTheDocs` page.
 """
-import json
-
 # pylint: disable=C0103,invalid-name
 # pylint: disable=E0241,duplicate-bases
 
 import datetime
 import inspect
+import json
 import os
 import re
 from copy import copy
@@ -129,6 +128,7 @@ from weaver.wps_restapi.colander_extras import (
     AnyOfKeywordSchema,
     BoundedRange,
     CommaSeparated,
+    DelimitedStringOneOf,
     EmptyMappingSchema,
     ExpandStringList,
     ExtendedBoolean as Boolean,
@@ -149,7 +149,6 @@ from weaver.wps_restapi.colander_extras import (
     SchemeURL,
     SemanticVersion,
     StrictMappingSchema,
-    StringOneOf,
     StringRange,
     XMLObject
 )
@@ -2457,7 +2456,7 @@ class JobStatusSearchEnum(ExtendedSchemaNode):
     title = "JobStatusSearch"
     default = Status.ACCEPTED
     example = Status.ACCEPTED
-    validator = StringOneOf(JOB_STATUS_SEARCH_API, delimiter=",", case_sensitive=False)
+    validator = DelimitedStringOneOf(JOB_STATUS_SEARCH_API, delimiter=",", case_sensitive=False)
 
 
 class JobTypeEnum(ExtendedSchemaNode):
@@ -2524,7 +2523,7 @@ class JobGroupsCommaSeparated(ExpandStringList, ExtendedSchemaNode):
     example = "process,service"
     missing = drop
     description = "Comma-separated list of grouping fields with which to list jobs."
-    validator = StringOneOf(["process", "provider", "service", "status"], delimiter=",", case_sensitive=True)
+    validator = DelimitedStringOneOf(["process", "provider", "service", "status"], delimiter=",", case_sensitive=True)
 
 
 class JobExecuteSubscribers(ExtendedMappingSchema):

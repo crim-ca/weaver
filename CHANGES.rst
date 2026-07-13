@@ -17,6 +17,11 @@ Changes:
 - Update OGC profile, exception and link relation URIs to ``https://`` as per corresponding standard updates.
 - Update CWL schema URL to ``https://w3id.org/cwl/v1.2/cwl-json-schema.yaml`` to match the official release instead
   of its GitHub raw contents copy.
+- Renamed ``StringOneOf`` to ``DelimitedStringOneOf`` to clarify the expected format of the field in contrast to the
+  similar ``OneOfCaseInsensitive`` definition (which ``DelimitedStringOneOf`` relies on), respectively for a single
+  string of allowed values delimited by a given character, and simply a string field validator of enum string values.
+- Added tests for ``DelimitedStringOneOf`` and ``OneOfCaseInsensitive`` to ensure their related case-sensitive value
+  handling remains consistent between them.
 
 Fixes:
 ------

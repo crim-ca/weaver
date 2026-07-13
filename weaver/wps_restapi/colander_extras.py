@@ -332,7 +332,7 @@ class OneOfCaseInsensitive(colander.OneOf):
             return super(OneOfCaseInsensitive, self).__call__(node, value)
 
 
-class StringOneOf(colander.OneOf):
+class DelimitedStringOneOf(colander.OneOf):
     """
     Validator that ensures the given value matches one of the available choices, but defined by string delimited values.
     """
@@ -341,15 +341,19 @@ class StringOneOf(colander.OneOf):
         # type: (Iterable[str], str, bool, Any) -> None
         self.delimiter = delimiter
         if not case_sensitive:
-            choices = OneOfCaseInsensitive(choices).choices
-        super(StringOneOf, self).__init__(choices, **kwargs)
+            # populate 'choices' with lower/upper to showcase the case-insensitive support
+            # however, actual validation will be performed with all cassing variants
+            choices = OneOfCaseInsensitive(choices, populate_variants=True).choices
+        super(DelimitedStringOneOf, self).__init__(choices, **kwargs)
+        validator = colander.OneOf if case_sensitive else OneOfCaseInsensitive
+        self._validator = validator(choices, **kwargs)
 
     def __call__(self, node, value):
         # type: (colander.SchemaNode, Any) -> None
         if not isinstance(value, str):
-            super(StringOneOf, self).__call__(node, value)  # raise accordingly
+            self._validator(node, value)  # raise accordingly
         for val in value.split(self.delimiter):
-            super(StringOneOf, self).__call__(node, val)  # raise accordingly
+            self._validator(node, val)
 
 
 class BoundedRange(colander.Range):
@@ -2339,7 +2343,7 @@ class OneOfKeywordSchema(KeywordMapper):
                     if len(node_fields) != 1:
                         continue
                     example = getattr(node_fields[0], "example", colander.null)
-                    values = getattr(node_fields[0], "validator", StringOneOf([colander.null]))
+                    values = getattr(node_fields[0], "validator", DelimitedStringOneOf([colander.null]))
                     discriminator_value = colander.null
                     if example is not colander.null:
                         discriminator_value = example

@@ -60,6 +60,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import compute_file_digest_multibase, fully_qualified_name, get_registry, load_file
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_url, map_wps_output_location
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Optional, Union
@@ -274,7 +275,7 @@ class TestWeaverClient(TestWeaverClientBase):
         else:
             self.fail("Could not find expected provider JSON link reference.")
         for link in result.body["links"]:
-            if link["rel"] != "http://www.opengis.net/def/rel/ogc/1.0/processes":
+            if link["rel"] != sd.OGC_API_PROC_REL_PROCESSES_URI:
                 continue
             assert link["href"] == f"{self.url}/providers/{prov_id}/processes"
             assert link["type"] == ContentType.APP_JSON
@@ -2053,7 +2054,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert any(f"\"jobID\": \"{job_id}\"" in line for line in lines)
             assert any(f"\"status\": \"{Status.SUCCESSFUL}\"" in line for line in lines)
             assert any(f"\"href\": \"{job_ref}/results\"" in line for line in lines)
-            assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
+            assert any(f"\"rel\": \"{sd.OGC_API_PROC_REL_JOB_RESULTS_URI}\"" in line for line in lines)
 
     def test_execute_auto_monitor(self):
         proc = self.test_process["Echo"]
@@ -2079,7 +2080,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             )
             assert any("\"jobID\": \"" in line for line in lines)  # don't care value, self-handled
             assert any(f"\"status\": \"{Status.SUCCESSFUL}\"" in line for line in lines)
-            assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
+            assert any(f"\"rel\": \"{sd.OGC_API_PROC_REL_JOB_RESULTS_URI}\"" in line for line in lines)
 
     def test_execute_result_by_reference(self):
         """
