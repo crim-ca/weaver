@@ -15,6 +15,8 @@ Changes:
 - Adjusted OpenAPI `Job` result examples with by-value/href responses.
 - Adjust OpenAPI ``Accept-Profile`` to report profiles applicable to specific endpoints rather than generic entries.
 - Update OGC profile, exception and link relation URIs to ``https://`` as per corresponding standard updates.
+- Update CWL schema URL to ``https://w3id.org/cwl/v1.2/cwl-json-schema.yaml`` to match the official release instead
+  of its GitHub raw contents copy.
 
 Fixes:
 ------
