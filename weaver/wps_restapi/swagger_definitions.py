@@ -7892,7 +7892,7 @@ class GetProcessJobQuery(LocalProcessQuery, GetJobQuery):
     pass
 
 
-class GetProcessJobEndpoint(LocalProcessPath):
+class GetProcessJobEndpoint(LocalProcessPath, JobPath):
     header = RequestHeadersNoBody()
     querystring = GetProcessJobQuery()
 

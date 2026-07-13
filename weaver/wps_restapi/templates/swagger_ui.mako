@@ -19,6 +19,9 @@
             font-size: 75%;
             width: 90%;
         }
+        .swagger-ui .response-col_links {
+            display: none;
+        }
     </style>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.32.8/swagger-ui.css">
     <script src="https://unpkg.com/swagger-ui-dist@5.32.8/swagger-ui-standalone-preset.js"></script>
