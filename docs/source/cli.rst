@@ -268,6 +268,7 @@ from the service. Requires a `Weaver` or |ogc-api-proc-part2|_ compliant instanc
 Sample Output:
 
 .. code-block:: text
+
     Undeploy successful.
 
 .. code-block:: python
