@@ -4062,9 +4062,12 @@ class GetJobAcceptHeaderJSON(AcceptHeader):
             # JSON by itself or embedding a 'profile' as shortcut or full URI
             [ContentType.APP_JSON] +
             [
+                # note:
+                #   typically non-JSON like interfacs like WPS (XML) are still allowed
+                #   in the context of Job Status response, it means to get the OGC API JSON with WPS status values
+                #   (i.e.: the 'WPS' portion refers to the 'weaver.status.map_status' resolution)
                 (ContentType.APP_JSON, profile)
                 for profile in JobStatusQueryProfileSchema.validator.choices
-                if "wps" not in profile.lower()
             ]
         ),
     )
