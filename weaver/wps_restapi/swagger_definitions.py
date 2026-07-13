@@ -271,8 +271,10 @@ OGC_API_PROC_PROFILE_RESULTS_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-results
 OGC_API_PROC_PROFILE_JOB_DESC_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/job-description"
 OGC_API_PROC_PROFILE_JOB_LIST_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/jobs-list"
 
-OGC_API_PROC_PROFILE_DOCKER_APP_URI = "https://www.opengis.net/profiles/eoc/dockerizedApplication"
-OGC_API_PROC_PROFILE_WPS_APP_URI = "https://www.opengis.net/profiles/eoc/wpsApplication"
+# Following are legacy definitions from OGC Testebeds and EO Apps Best Practices.
+# Therefore, leave them in 'http' for any operation relying on them explicitly (no auto https/versionless handling).
+OGC_API_PROC_PROFILE_DOCKER_APP_URI = "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+OGC_API_PROC_PROFILE_WPS_APP_URI = "http://www.opengis.net/profiles/eoc/wpsApplication"
 
 OGC_API_SCHEMA_JOB_STATUS_URI = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
 OGC_WPS_1_SCHEMA_JOB_STATUS_URI = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
