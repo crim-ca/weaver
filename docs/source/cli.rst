@@ -277,7 +277,7 @@ Sample Output:
     client.undeploy("docker-python-script-report")
 
 Because the undeploy request returns ``HTTP 204 No Content`` in case of success,
-the `weaver.cli.OperationResult` object returned by the method will return properties
+the :class:`weaver.cli.OperationResult` object returned by the method will return properties
 equivalent to that response.
 
 .. literalinclude:: ../../weaver/wps_restapi/examples/local_process_undeploy_success.http
