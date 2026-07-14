@@ -26,14 +26,17 @@ from weaver.processes.utils import (  # noqa: W0212
     _get_multipart_content,
     _interpret_multipart_part,
     _organize_deploy_parts,
+    _organize_job_execution_parts,
     _parse_multipart_message,
     create_multipart_deploy,
     parse_multipart_deploy,
+    parse_multipart_job_execution,
     register_cwl_processes_from_config,
     register_wps_processes_from_config,
     resolve_cwl_graph,
     resolve_deployment_order
 )
+from weaver.wps_restapi import swagger_definitions as sd
 
 WPS1_URL1 = resources.TEST_REMOTE_SERVER_URL
 WPS1_URL2 = "http://yet-another-server.com"
@@ -1808,3 +1811,461 @@ class TestMultipartDeployment:
 
         # First workflow should be the main one
         assert "start=workflow-1" in content_type
+
+
+@pytest.mark.multipart
+class TestMultipartJobExecution:
+    """
+    Test multipart job execution parsing functions.
+
+    These tests cover the ad-hoc workflow submission feature where users can submit
+    both CWL packages and execution request in a single multipart request.
+    """
+
+    @pytest.mark.parametrize("error_case,expected_error", [
+        ("missing_execution", "Missing execution request"),
+        ("missing_cwl", "Missing CWL packages"),
+        ("multiple_execution", "Multiple execution requests"),
+        ("empty_content", "Content is not multipart format"),
+    ], ids=["missing_execution_request", "missing_cwl_packages", "multiple_execution_requests", "empty_content"])
+    def test_parse_multipart_job_execution_errors(self, error_case, expected_error):
+        """
+        Test various error conditions in multipart job execution parsing.
+        """
+        boundary = "----Boundary123"
+
+        if error_case == "missing_execution":
+            # Only CWL, no execution request
+            tool_cwl = json.dumps({
+                "cwlVersion": "v1.2",
+                "class": "CommandLineTool",
+                "id": "test-tool",
+                "inputs": {},
+                "outputs": {}
+            })
+            multipart_body = (
+                f"------Boundary123\r\n"
+                f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+                f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+                f"\r\n"
+                f"{tool_cwl}\r\n"
+                f"------Boundary123--\r\n"
+            ).encode('utf-8')
+        elif error_case == "missing_cwl":
+            # Only execution request, no CWL
+            execution_request = json.dumps({
+                "inputs": {"param": "value"},
+                "outputs": {}
+            })
+            multipart_body = (
+                f"------Boundary123\r\n"
+                f"Content-Type: {ContentType.APP_JSON}\r\n"
+                f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+                f"\r\n"
+                f"{execution_request}\r\n"
+                f"------Boundary123--\r\n"
+            ).encode('utf-8')
+        elif error_case == "multiple_execution":
+            # Multiple execution requests
+            execution_request = json.dumps({
+                "inputs": {"param": "value"},
+                "outputs": {}
+            })
+            multipart_body = (
+                f"------Boundary123\r\n"
+                f"Content-Type: {ContentType.APP_JSON}\r\n"
+                f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+                f"\r\n"
+                f"{execution_request}\r\n"
+                f"------Boundary123\r\n"
+                f"Content-Type: {ContentType.APP_JSON}\r\n"
+                f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+                f"\r\n"
+                f"{execution_request}\r\n"
+                f"------Boundary123--\r\n"
+            ).encode('utf-8')
+        else:  # empty_content
+            multipart_body = (
+                f"------Boundary123--\r\n"
+            ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            parse_multipart_job_execution(multipart_body, content_type, request=None)
+
+        try:
+            error_message = exc_info.value.json.get("title", "")
+            assert expected_error in error_message
+        except (AttributeError, ValueError):
+            assert expected_error in str(exc_info.value)
+
+    @pytest.mark.parametrize("use_profiles", [True, False], ids=["with_profiles", "fallback_detection"])
+    def test_parse_multipart_job_execution_basic(self, use_profiles):
+        """
+        Test parsing multipart job execution with/without explicit Content-Profile headers.
+        """
+        # CWL tool
+        tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {"message": "string"} if use_profiles else {},
+            "outputs": {"output": {"type": "File"}} if use_profiles else {}
+        })
+
+        # Execution request
+        execution_request = json.dumps({
+            "inputs": {"message": "test"} if use_profiles else {"param": "value"},
+            "outputs": {"output": {"transmissionMode": "reference"}} if use_profiles else {},
+            "mode": "async"
+        } if use_profiles else {
+            "inputs": {"param": "value"},
+            "outputs": {}
+        })
+
+        boundary = "----Boundary123"
+        profile_header_cwl = f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n" if use_profiles else ""
+        profile_header_exec = f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n" if use_profiles else ""
+
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"{profile_header_cwl}"
+            f"\r\n"
+            f"{tool_cwl}\r\n"
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_JSON}\r\n"
+            f"{profile_header_exec}"
+            f"\r\n"
+            f"{execution_request}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        exec_req, cwl_packages = parse_multipart_job_execution(
+            multipart_body, content_type, request=None
+        )
+
+        # Verify execution request
+        assert exec_req is not None
+        assert "inputs" in exec_req
+
+        # Verify CWL packages
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "test-tool"
+        assert cwl_packages[0]["class"] == "CommandLineTool"
+
+    def test_parse_multipart_job_execution_workflow_with_multiple_tools(self):
+        """
+        Test parsing a workflow with multiple dependent tools.
+        """
+        # Tool 1
+        tool1_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "tool-1",
+            "inputs": {"input": "string"},
+            "outputs": {"output": {"type": "File"}}
+        })
+
+        # Tool 2
+        tool2_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "tool-2",
+            "inputs": {"file": "File"},
+            "outputs": {"result": {"type": "File"}}
+        })
+
+        # Workflow
+        workflow_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "main-workflow",
+            "inputs": {"input": "string"},
+            "outputs": {"result": {"type": "File", "outputSource": "step2/result"}},
+            "steps": {
+                "step1": {"run": "#tool-1", "in": {"input": "input"}, "out": ["output"]},
+                "step2": {"run": "#tool-2", "in": {"file": "step1/output"}, "out": ["result"]}
+            }
+        })
+
+        # Execution request
+        execution_request = json.dumps({
+            "inputs": {"input": "test"},
+            "outputs": {"result": {"transmissionMode": "reference"}}
+        })
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"\r\n"
+            f"{tool1_cwl}\r\n"
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"\r\n"
+            f"{tool2_cwl}\r\n"
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"\r\n"
+            f"{workflow_cwl}\r\n"
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_JSON}\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+            f"\r\n"
+            f"{execution_request}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        exec_req, cwl_packages = parse_multipart_job_execution(
+            multipart_body, content_type, request=None
+        )
+
+        # Verify execution request
+        assert exec_req is not None
+        assert exec_req["inputs"]["input"] == "test"
+
+        # Verify all CWL packages were extracted
+        assert len(cwl_packages) == 3
+        cwl_ids = [pkg["id"] for pkg in cwl_packages]
+        assert "tool-1" in cwl_ids
+        assert "tool-2" in cwl_ids
+        assert "main-workflow" in cwl_ids
+
+    def test_parse_multipart_job_execution_graph_expansion(self):
+        """
+        Test that $graph in CWL is properly expanded into separate packages.
+        """
+        # CWL with $graph
+        graph_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "$graph": [
+                {
+                    "class": "CommandLineTool",
+                    "id": "tool-1",
+                    "inputs": {},
+                    "outputs": {}
+                },
+                {
+                    "class": "Workflow",
+                    "id": "workflow-1",
+                    "inputs": {},
+                    "outputs": {},
+                    "steps": {}
+                }
+            ]
+        })
+
+        # Execution request
+        execution_request = json.dumps({
+            "inputs": {},
+            "outputs": {}
+        })
+
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"\r\n"
+            f"{graph_cwl}\r\n"
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_JSON}\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+            f"\r\n"
+            f"{execution_request}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        exec_req, cwl_packages = parse_multipart_job_execution(
+            multipart_body, content_type, request=None
+        )
+
+        # Verify $graph was expanded
+        assert len(cwl_packages) == 2
+        cwl_ids = [pkg["id"] for pkg in cwl_packages]
+        assert "tool-1" in cwl_ids
+        assert "workflow-1" in cwl_ids
+
+    def test_organize_job_execution_parts_with_profiles(self):
+        """
+        Test _organize_job_execution_parts with explicit profiles.
+        """
+        tool_data = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {}
+        }
+
+        exec_data = {
+            "inputs": {"param": "value"},
+            "outputs": {}
+        }
+
+        interpreted_parts = [
+            (ContentType.APP_CWL_JSON, "tool-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, tool_data),
+            (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, exec_data),
+        ]
+
+        exec_req, cwl_packages = _organize_job_execution_parts(interpreted_parts, None)
+
+        assert exec_req == exec_data
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0] == tool_data
+
+    def test_organize_job_execution_parts_fallback_detection(self):
+        """
+        Test _organize_job_execution_parts with fallback detection (no profiles).
+        """
+        tool_data = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {}
+        }
+
+        exec_data = {
+            "inputs": {"param": "value"},
+            "outputs": {}
+        }
+
+        # No profiles - should use fallback detection
+        interpreted_parts = [
+            (ContentType.APP_CWL_JSON, "tool-1", "", None, tool_data),
+            (ContentType.APP_JSON, "", "", None, exec_data),
+        ]
+
+        exec_req, cwl_packages = _organize_job_execution_parts(interpreted_parts, None)
+
+        assert exec_req == exec_data
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0] == tool_data
+
+    def test_organize_job_execution_parts_graph_expansion(self):
+        """
+        Test _organize_job_execution_parts expands $graph correctly.
+        """
+        graph_data = {
+            "cwlVersion": "v1.2",
+            "$graph": [
+                {"class": "CommandLineTool", "id": "tool-1", "inputs": {}, "outputs": {}},
+                {"class": "Workflow", "id": "workflow-1", "inputs": {}, "outputs": {}, "steps": {}}
+            ]
+        }
+
+        exec_data = {"inputs": {}, "outputs": {}}
+
+        interpreted_parts = [
+            (ContentType.APP_CWL_JSON, "graph-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, graph_data),
+            (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, exec_data),
+        ]
+
+        exec_req, cwl_packages = _organize_job_execution_parts(interpreted_parts, None)
+
+        assert exec_req == exec_data
+        # $graph should be expanded into 2 packages
+        assert len(cwl_packages) == 2
+        cwl_ids = [pkg["id"] for pkg in cwl_packages]
+        assert "tool-1" in cwl_ids
+        assert "workflow-1" in cwl_ids
+
+    @pytest.mark.parametrize("error_case,expected_title", [
+        ("missing_execution", "Missing execution request"),
+        ("missing_cwl", "Missing CWL packages"),
+        ("multiple_execution", "Multiple execution requests"),
+        ("ambiguous_execution", "Ambiguous multipart content"),
+    ], ids=["no_exec", "no_cwl", "multiple_exec", "ambiguous"])
+    def test_organize_job_execution_parts_errors(self, error_case, expected_title):
+        """
+        Test _organize_job_execution_parts error handling.
+        """
+        tool_data = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {}
+        }
+
+        exec_data = {"inputs": {"param": "value"}, "outputs": {}}
+
+        if error_case == "missing_execution":
+            # Only CWL, no execution request
+            interpreted_parts = [
+                (ContentType.APP_CWL_JSON, "tool-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, tool_data),
+            ]
+        elif error_case == "missing_cwl":
+            # Only execution request, no CWL
+            interpreted_parts = [
+                (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, exec_data),
+            ]
+        elif error_case == "multiple_execution":
+            # Multiple execution requests
+            interpreted_parts = [
+                (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, exec_data),
+                (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, exec_data),
+            ]
+        else:  # ambiguous_execution
+            # Multiple JSON parts that could be execution requests (fallback detection)
+            exec_data2 = {"inputs": {"other": "value"}, "outputs": {}}
+            interpreted_parts = [
+                (ContentType.APP_CWL_JSON, "tool-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, tool_data),
+                (ContentType.APP_JSON, "", "", None, exec_data),  # No profile
+                (ContentType.APP_JSON, "", "", None, exec_data2),  # No profile - ambiguous
+            ]
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            _organize_job_execution_parts(interpreted_parts, None)
+
+        assert expected_title in exc_info.value.json.get("title", "")
+
+    def test_organize_job_execution_parts_with_root_workflow_cid(self):
+        """
+        Test _organize_job_execution_parts reorders based on root workflow CID.
+        """
+        tool_data = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "tool-1",
+            "inputs": {},
+            "outputs": {}
+        }
+
+        workflow_data = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "main-workflow",
+            "inputs": {},
+            "outputs": {},
+            "steps": {}
+        }
+
+        exec_data = {"inputs": {}, "outputs": {}}
+
+        interpreted_parts = [
+            (ContentType.APP_CWL_JSON, "workflow-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, workflow_data),
+            (ContentType.APP_CWL_JSON, "tool-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, tool_data),
+            (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, exec_data),
+        ]
+
+        # Specify workflow-1 as root - it should be moved to the end
+        exec_req, cwl_packages = _organize_job_execution_parts(interpreted_parts, "workflow-1")
+
+        assert exec_req == exec_data
+        assert len(cwl_packages) == 2
+        # Workflow should be last
+        assert cwl_packages[-1]["id"] == "main-workflow"
+        assert cwl_packages[0]["id"] == "tool-1"

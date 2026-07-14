@@ -5,6 +5,8 @@ from celery.utils.log import get_task_logger
 from colander import Invalid
 from pyramid.httpexceptions import (
     HTTPBadRequest,
+    HTTPCreated,
+    HTTPException,
     HTTPNoContent,
     HTTPNotAcceptable,
     HTTPNotFound,
@@ -36,7 +38,7 @@ from weaver.processes.execution import (
     submit_job_dispatch_wps,
     update_job_parameters
 )
-from weaver.processes.utils import get_process
+from weaver.processes.utils import deploy_process_from_payload, get_process, parse_multipart_job_execution
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
@@ -217,6 +219,14 @@ def get_queried_jobs(request):
 
 
 @sd.jobs_service.post(
+    tags=[sd.TAG_EXECUTE, sd.TAG_JOBS, sd.TAG_PROCESSES],
+    content_type=list(ContentType.ANY_MULTIPART),
+    schema=sd.PostJobsEndpointMultipart(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_jobs_responses,
+)
+@sd.jobs_service.post(
     tags=[sd.TAG_EXECUTE, sd.TAG_JOBS],
     content_type=list(ContentType.ANY_XML),
     schema=sd.PostJobsEndpointXML(),
@@ -243,8 +253,53 @@ def create_job(request):
     prov_id = None
     try:
         ctype = get_header("Content-Type", request.headers, default=ContentType.APP_JSON)
+        ctype_full = ctype  # Keep full Content-Type with parameters
         ctype = clean_media_type_format(ctype, strip_parameters=True)
-        if ctype == ContentType.APP_JSON and "process" in request.json_body:
+
+        # Handle multipart ad-hoc workflow execution
+        if ctype in ContentType.ANY_MULTIPART:
+            # Parse multipart to separate execution request from CWL packages
+            execution_request, cwl_packages = parse_multipart_job_execution(
+                content=request.body,
+                content_type=ctype_full,
+                request=request
+            )
+
+            # Deploy the CWL packages
+            cwl_to_deploy = cwl_packages[0] if len(cwl_packages) == 1 else cwl_packages
+            deploy_response = deploy_process_from_payload(
+                payload=cwl_to_deploy,
+                container=request,
+                overwrite=False
+            )
+
+            # Extract the deployed process ID
+            if not isinstance(deploy_response, (HTTPCreated, HTTPOk)):
+                raise HTTPBadRequest(json={
+                    "title": "Unexpected deployment response",
+                    "description":
+                        f"Ad-hoc workflow deployment did not return expected response. "
+                        f"Got: {type(deploy_response)}",
+                })
+
+            deploy_body = deploy_response.json if hasattr(deploy_response, 'json') else deploy_response
+            proc_id = deploy_body.get("processSummary", {}).get("id")
+            if not proc_id:
+                raise HTTPBadRequest(json={
+                    "title": "Missing process ID",
+                    "description":
+                        f"Ad-hoc workflow deployment did not return a process ID. "
+                        f"Response: {deploy_body}",
+                })
+
+            # Update request to use execution parameters for normal job submission flow
+            request._json = execution_request
+            request.json_body = execution_request
+            # Update content type so validate_job_json doesn't reject it
+            request.content_type = ContentType.APP_JSON
+            # Continue to normal job submission below with ad-hoc tag
+
+        elif ctype == ContentType.APP_JSON and "process" in request.json_body:
             proc_url = request.json_body["process"]
             proc_url = sd.ProcessURL().deserialize(proc_url)
             prov_url, proc_id = proc_url.rsplit("/processes/", 1)
@@ -254,6 +309,8 @@ def create_job(request):
             proc_key = "ows:Identifier"
             body_xml = xml_util.fromstring(request.text)
             proc_id = body_xml.xpath(proc_key, namespaces=body_xml.getroottree().nsmap)[0].text
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPBadRequest(json={
             "title": "NoSuchProcess",
@@ -267,11 +324,16 @@ def create_job(request):
         process = get_process(process_id=proc_id)
         return submit_job_dispatch_wps(request, process)
 
+    # Build tags list
+    tags = ["wps-rest", "ogc-api"]
+    if ctype in ContentType.ANY_MULTIPART:
+        tags.append("ad-hoc")
+
     if prov_id:
         ref = get_service(request, provider_id=prov_id)
     else:
         ref = get_process(process_id=proc_id)
-    return submit_job(request, ref, process_id=proc_id, tags=["wps-rest", "ogc-api"])
+    return submit_job(request, ref, process_id=proc_id, tags=tags)
 
 
 @sd.jobs_service.post()

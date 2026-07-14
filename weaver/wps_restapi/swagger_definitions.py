@@ -7663,6 +7663,22 @@ class PostProcessJobsEndpointXML(PostJobsEndpointXML, LocalProcessPath):
     pass
 
 
+class ExecuteHeadersMultipart(ExecuteHeadersBase):
+    # Override content_type to allow multipart types without strict validation
+    # Multipart headers include parameters (e.g., boundary=...) that vary per request
+    content_type = ContentTypeHeader(
+        missing=drop,
+        default=ContentType.MULTIPART_MIXED,
+        example=ContentType.MULTIPART_MIXED
+    )
+
+
+class PostJobsEndpointMultipart(ExtendedMappingSchema):
+    header = ExecuteHeadersMultipart()
+    querystring = LocalProcessQuery()
+    # No body schema - multipart content is parsed manually in the handler
+
+
 class JobTitleNullable(OneOfKeywordSchema):
     description = "Job title to update, or unset if 'null'."
     _one_of = [
