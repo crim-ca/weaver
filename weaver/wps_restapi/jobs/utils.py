@@ -112,6 +112,7 @@ if TYPE_CHECKING:
         HeadersType,
         HTTPValid,
         JobValueFormat,
+        JobValueItem,
         JSON,
         Link,
         ProcessExecution,
@@ -167,7 +168,7 @@ def get_job(request):
             # new format: https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_job-exception-no-such-job
             json={
                 "title": title,
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
+                "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_JOB_URI,
                 "detail": desc,
                 "status": exception.code,
                 "cause": str(job_id)
@@ -191,7 +192,7 @@ def get_job(request):
             # new format: https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_job-exception-no-such-job
             json={
                 "title": title,
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
+                "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_JOB_URI,
                 "detail": desc,
                 "status": OWSNotFound.code,
                 "cause": str(provider_id)
@@ -208,7 +209,7 @@ def get_job(request):
             # note: although 'no-such-process' error, return 'no-such-job' because process could exist, only mismatches
             json={
                 "title": title,
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
+                "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_JOB_URI,
                 "detail": desc,
                 "status": OWSNotFound.code,
                 "cause": str(process_tag)
@@ -390,6 +391,8 @@ def get_job_status_schema(request):
         return content_headers
 
     profile = get_response_profile(request)
+    if profile and profile.startswith("http://"):
+        profile = profile.replace("http://", "https://")
     if profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URI:
         schema = sd.JobStatusProfileSchema.OGC
     elif profile == sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI:
@@ -597,8 +600,8 @@ def get_results(  # pylint: disable=R1260
 
                 # Add digestMultibase for resource integrity verification (W3C VC Data Integrity)
                 # Only compute for local files that can be accessed
+                file_path = cast(str, val_data)
                 try:
-                    file_path = val_data
                     if file_path.startswith(wps_url):
                         file_path = map_wps_output_location(file_path, settings, exists=True, url=False)
                     elif file_path.startswith("file://"):
@@ -978,7 +981,7 @@ def get_job_result_by_index(
     if index < 0:
         raise HTTPBadRequest(json={
             "title": "Job Output Invalid Index",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
+            "type": sd.OGC_API_PROC_PART1_EXC_INVALID_PARAMETER_URI,
             "detail": "Index must be non-negative.",
             "status": HTTPBadRequest.code,
             "value": index
@@ -995,7 +998,7 @@ def get_job_result_by_index(
         available_ids = [get_any_id(r) for r in job.results]
         raise HTTPNotFound(json={
             "title": "Job Output Not Found",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-output",
+            "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_OUTPUT_URI,
             "detail": f"Output '{output_id}' not found in job results.",
             "status": HTTPNotFound.code,
             "cause": f"Available outputs: {available_ids}" if available_ids else None,
@@ -1007,7 +1010,7 @@ def get_job_result_by_index(
     if not isinstance(output_value, list):
         raise HTTPUnprocessableEntity(json={
             "title": "Job Output Not Array",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
+            "type": sd.OGC_API_PROC_PART1_EXC_INVALID_PARAMETER_URI,
             "detail": f"Output '{output_id}' is not an array. Index access only applies to array outputs.",
             "status": HTTPUnprocessableEntity.code,
             "cause": {"output": output_id, "type": type(output_value).__name__}
@@ -1016,7 +1019,7 @@ def get_job_result_by_index(
     if index >= len(output_value):
         raise HTTPBadRequest(json={
             "title": "Job Output Index Out of Range",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
+            "type": sd.OGC_API_PROC_PART1_EXC_INVALID_PARAMETER_URI,
             "detail": f"Index {index} is out of range for output '{output_id}' (length: {len(output_value)}).",
             "status": HTTPBadRequest.code,
             "cause": {"index": index, "length": len(output_value), "output": output_id}
@@ -1577,7 +1580,7 @@ def raise_job_bad_status_locked(job, container=None):
             headers=headers,
             json={
                 "title": "Job Locked for Execution",
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/locked",
+                "type": sd.OGC_API_PROC_PART4_EXC_LOCKED_URI,
                 "detail": f"Job cannot be modified.{job_reason}",
                 "status": HTTPLocked.code,
                 "cause": {"status": job.status},
@@ -1625,7 +1628,7 @@ def raise_job_bad_status_success(job, container=None):
                 headers=headers,
                 json={
                     "title": "JobResultsFailed",
-                    "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available",
+                    "type": sd.OGC_API_PROC_PART1_EXC_RESULT_NOT_AVAILABLE_URI,
                     "detail": "Job results not available because execution failed.",
                     "status": HTTPBadRequest.code,
                     "error": err_code,
@@ -1641,7 +1644,7 @@ def raise_job_bad_status_success(job, container=None):
             headers=headers,
             json={
                 "title": "JobResultsNotReady",
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready",
+                "type": sd.OGC_API_PROC_PART1_EXC_RESULT_NOT_READY_URI,
                 "detail": "Job is not ready to obtain results.",
                 "status": HTTPNotFound.code,
                 "cause": {"status": job.status},
@@ -1663,7 +1666,7 @@ def raise_job_result_gone(job, container=None):
         headers=headers,
         json={
             "title": "JobResultGone",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available",
+            "type": sd.OGC_API_PROC_PART1_EXC_RESULT_NOT_AVAILABLE_URI,
             "status": JobGone.code,
             "detail": "One or more output data references in Job Results cannot be found.",
             "value": str(job.id),
@@ -1687,7 +1690,7 @@ def raise_job_dismissed(job, container=None):
             headers=headers,
             json={
                 "title": "JobDismissed",
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available",
+                "type": sd.OGC_API_PROC_PART1_EXC_RESULT_NOT_AVAILABLE_URI,
                 "status": JobGone.code,
                 "detail": "Job was dismissed and artifacts have been removed.",
                 "cause": {"status": job.status},

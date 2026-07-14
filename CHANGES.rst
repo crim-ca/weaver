@@ -20,6 +20,17 @@ Fixes:
 ------
 - Fix the `CLI` documentation about the reported result from ``undeploy`` command. It referred to a missing JSON
   response file, which is not valid since ``HTTP 204 No Content`` is returned for that successful operation.
+- Adjusted OpenAPI `Job` result examples with by-value/href responses.
+- Adjust OpenAPI ``Accept-Profile`` to report profiles applicable to specific endpoints rather than generic entries.
+- Update OGC profile, exception and link relation URIs to ``https://`` as per corresponding standard updates.
+- Update CWL schema URL to ``https://w3id.org/cwl/v1.2/cwl-json-schema.yaml`` to match the official release instead
+  of its GitHub raw contents copy.
+- Renamed ``StringOneOf`` to ``DelimitedStringOneOf`` to clarify the expected format of the field in contrast to the
+  similar ``OneOfCaseInsensitive`` definition (which ``DelimitedStringOneOf`` relies on), respectively for a single
+  string of allowed values delimited by a given character, and simply a string field validator of enum string values.
+- Added tests for ``DelimitedStringOneOf`` and ``OneOfCaseInsensitive`` to ensure their related case-sensitive value
+  handling remains consistent between them.
+- Fix invalid parsing of ``Link: <{URI}>; rel="profile"`` headers to extract the profile URI.
 
 .. _changes_6.15.0:
 

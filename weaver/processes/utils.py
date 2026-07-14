@@ -164,7 +164,7 @@ def get_process(process_id=None, request=None, settings=None, store=None, revisi
     except ProcessNotFound:
         raise ProcessNotFound(json={
             "title": "NoSuchProcess",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process",
+            "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_PROCESS_URI,
             "detail": sd.NotFoundProcessResponse.description,
             "status": ProcessNotFound.code,
             "cause": str(process_id)
@@ -908,7 +908,7 @@ def parse_process_deploy_content(
         except colander.Invalid as exc:
             raise HTTPUnsupportedMediaType(json={
                 "title": "Unsupported Media Type",
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/unsupported-media-type",
+                "type": sd.OGC_API_PROC_PART2_EXC_UNSUPPORTED_MEDIA_TYPE_URI,
                 "detail": str(exc),
                 "status": HTTPUnsupportedMediaType.code,
                 "cause": {"Content-Type": None if content_type is None else str(content_type)},
@@ -1203,7 +1203,7 @@ def _save_deploy_process(process, override, container):
         process_summary = new_process.summary(container=container)
     except ProcessRegistrationError as exc:
         raise HTTPConflict(json={
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/duplicated-process",
+            "type": sd.OGC_API_PROC_PART2_EXC_DUPLICATED_PROCESS_URI,
             "title": "Process definition conflict.",
             "detail": str(exc),
             "status": HTTPConflict.code,
@@ -1332,7 +1332,7 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
     """
     if not process.mutable:
         raise HTTPForbidden(json={
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/immutable-process",
+            "type": sd.OGC_API_PROC_PART2_EXC_IMMUTABLE_PROCESS_URI,
             "title": "Process immutable.",
             "detail": "Cannot update an immutable process.",
             "status": HTTPForbidden.code,
@@ -1402,7 +1402,7 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
         if new_version is not None:
             new_version = as_version_major_minor_patch(new_version, VersionFormat.STRING)
         raise HTTPConflict(json={
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/duplicated-process",
+            "type": sd.OGC_API_PROC_PART2_EXC_DUPLICATED_PROCESS_URI,
             "title": "Process definition conflict.",
             "detail": "Failed update of process conflicting with another definition or revision.",
             "status": HTTPConflict.code,

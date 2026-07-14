@@ -1,0 +1,9 @@
+{
+  "output": {
+    "href": "output data in plain text ...",
+    "mediaType": "text/plain",
+    "format": {
+      "mediaType": "text/plain"
+    }
+  }
+}
