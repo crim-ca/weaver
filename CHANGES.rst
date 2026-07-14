@@ -12,6 +12,14 @@ Changes
 
 Changes:
 --------
+- Adjust the `CLI` to return the ``OperationResult.message`` when the response body is empty (``HTTP 204 No Content``)
+  to provide a clearer message to the user of what happened and indicate the state of the operation.
+  Previously, the ``None`` content would be reported as is making it ambiguous about what occurred or whether it failed.
+
+Fixes:
+------
+- Fix the `CLI` documentation about the reported result from ``undeploy`` command. It referred to a missing JSON
+  response file, which is not valid since ``HTTP 204 No Content`` is returned for that successful operation.
 - Adjusted OpenAPI `Job` result examples with by-value/href responses.
 - Adjust OpenAPI ``Accept-Profile`` to report profiles applicable to specific endpoints rather than generic entries.
 - Update OGC profile, exception and link relation URIs to ``https://`` as per corresponding standard updates.
@@ -22,9 +30,6 @@ Changes:
   string of allowed values delimited by a given character, and simply a string field validator of enum string values.
 - Added tests for ``DelimitedStringOneOf`` and ``OneOfCaseInsensitive`` to ensure their related case-sensitive value
   handling remains consistent between them.
-
-Fixes:
-------
 - Fix invalid parsing of ``Link: <{URI}>; rel="profile"`` headers to extract the profile URI.
 
 .. _changes_6.15.0:
