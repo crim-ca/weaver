@@ -1599,3 +1599,58 @@ def test_bind_keyword_schema():
     schema = schema.bind(missing=True)
     result = schema.deserialize({})  # allowed because dynamic bind applied missing drop
     assert result == {}
+
+
+def test_one_of_string_case_sensitivity():
+    """
+    Tests :class:`ce.OneOfCaseInsensitive` and :class:`ce.DelimitedStringOneOf` interconnected implementations.
+    """
+
+    validator_ci = ce.OneOfCaseInsensitive(["A", "b"])
+    assert validator_ci.choices == ["A", "b"]
+
+    validator_ci_populate = ce.OneOfCaseInsensitive(["A", "b"], populate_variants=True)
+    assert validator_ci_populate.choices == ["A", "a", "b", "B"]
+
+    schema_enum = ce.ExtendedSchemaNode(colander.String(), validator=validator_ci)
+    for value in ["A", "a", "B", "b"]:
+        assert schema_enum.deserialize(value) == value
+    with pytest.raises(colander.Invalid):
+        schema_enum.deserialize("c")
+
+    schema_list_ci = ce.ExtendedSchemaNode(
+        colander.String(),
+        validator=ce.DelimitedStringOneOf(["A", "b"], delimiter=",", case_sensitive=False),
+    )
+    for value in ["A,b", "a,B", "A,B", "A"]:
+        assert schema_list_ci.deserialize(value) == value
+    with pytest.raises(colander.Invalid):
+        schema_list_ci.deserialize("A,c")
+
+    schema_list_ci_words = ce.ExtendedSchemaNode(
+        colander.String(),
+        validator=ce.DelimitedStringOneOf(["Abc", "XyZ"], delimiter=",", case_sensitive=False),
+    )
+    for value in ["Abc,XyZ", "abc,xyz", "ABC,XYZ", "aBc,xYz"]:
+        assert schema_list_ci_words.deserialize(value) == value
+    with pytest.raises(colander.Invalid):
+        schema_list_ci_words.deserialize("aBc,other")
+
+    schema_list_cs = ce.ExtendedSchemaNode(
+        colander.String(),
+        validator=ce.DelimitedStringOneOf(["A", "b"], delimiter=",", case_sensitive=True),
+    )
+    for value in ["A,b", "A", "b", "b,A,b"]:
+        assert schema_list_cs.deserialize(value) == value
+    with pytest.raises(colander.Invalid):
+        schema_list_cs.deserialize("a,B")
+    with pytest.raises(colander.Invalid):
+        schema_list_cs.deserialize("B")
+
+    schema_list_cs_words = ce.ExtendedSchemaNode(
+        colander.String(),
+        validator=ce.DelimitedStringOneOf(["Abc", "XyZ"], delimiter=",", case_sensitive=True),
+    )
+    assert schema_list_cs_words.deserialize("Abc,XyZ") == "Abc,XyZ"
+    with pytest.raises(colander.Invalid):
+        schema_list_cs_words.deserialize("aBc,xYz")

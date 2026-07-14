@@ -3027,7 +3027,7 @@ def test_ows_wps_json_default_complex_format():
             {
                 "dataType": WPS_BOUNDINGBOX_DATA,
                 "data": {
-                    "crs": ogc_def.normalize(ogc_def.OGC_DEF_CRS_CRS84_URI, version="0"),
+                    "crs": ogc_def.normalize(ogc_def.OGC_DEF_CRS_CRS84_URI, version="0", secure=False),
                     "bbox": [1., 2., 3., 4.],  # auto-resolve axis order XY
                 }
             },

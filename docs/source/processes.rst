@@ -3441,7 +3441,7 @@ Possible locations where :term:`Profile` can be specified are, in order of prece
 - ``Accept-Profile`` header directly providing the profile :term:`URI`.
 - ``Accept`` :term:`Media-Type` with a ``profile`` parameter.
 - ``Prefer`` header including a ``profile`` parameter.
-- ``Link`` header including a ``profile`` parameter.
+- ``Link`` header including a link relation named ``profile``.
 
 .. seealso::
     - Implementation of the resolution order in `Weaver` is provided in :func:`weaver.utils.get_response_profile`.
@@ -3457,15 +3457,17 @@ In `Weaver`, the prioritization strategy is defined in terms of most explicit an
 least probable ones regarding where the :term:`Profile` is potentially located. Another consideration for the order
 is the "*strictness requirement*" aspect of each header. The ``Accept`` header imposes a strict refusal of the
 request (``406 Not Acceptable``) if the :term:`Profile` is not supported for a given endpoint, while the ``Prefer``
-header is more relaxed and fulfillment is optional (the server is allowed to ignore it and respond successfully).
+header is more relaxed and fulfillment is optional. The server is allowed to ignore the failing ``Prefer`` condition
+and respond successfully, unless ``handling=strict`` (:rfc:`7240#section-4.4`) is indicated.
 
 The ``Link`` header is placed last, to potentially allow ``Prefer`` priority if a given :term:`Profile` can be
-respected, and revert back to :term:`Profile` specified by ``Link`` otherwise. This allows the simultaneous
-submission of ``Prefer: profile=...`` and ``Link: profile=...`` headers in a request with flexible outcomes between
+respected, and revert back to :term:`Profile` specified by ``Link`` otherwise. This allows the simultaneous submission
+of ``Prefer: profile="{URI}"`` and ``Link: <{URI}>; rel=profile`` headers in a request with flexible outcomes between
 clients and servers supporting different :term:`Profile` interoperability. In this case, the ``Link`` header can be
 used to provide a fallback if the :term:`Profile` in ``Prefer`` header cannot not be respected or resolved by the server
 for the given request context. Fulfilling the :term:`Profile` in ``Link`` header is "*more important*" in this fallback
-scenario, but still **NOT** mandatory, contrary to the ``Accept`` and ``Accept-Profile`` headers.
+scenario, but still **NOT** mandatory, contrary to the ``Accept`` and ``Accept-Profile`` headers that must be respected
+to fulfill the request successfully.
 
 .. _proc_content_negotiation_transforms:
 
