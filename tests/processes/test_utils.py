@@ -1886,7 +1886,7 @@ class TestMultipartJobExecution:
             ).encode('utf-8')
         else:  # empty_content
             multipart_body = (
-                f"------Boundary123--\r\n"
+                "------Boundary123--\r\n"
             ).encode('utf-8')
 
         content_type = f"multipart/mixed; boundary={boundary}"

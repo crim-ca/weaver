@@ -791,7 +791,8 @@ def _interpret_multipart_part(part, request=None):
     :param part: Single part from multipart message
     :param request: Optional request object for resolving relative ``Content-Location`` URLs
     :returns:
-        ``tuple`` of (content_type, content_id, content_location, profile, parsed_data) or ``None`` if part cannot be parsed
+        ``tuple`` of (content_type, content_id, content_location, profile, parsed_data) or ``None`` if part cannot
+        be parsed
     """
     part_content_type = part.get_content_type()
     content_id = part.get('Content-ID', '').strip('<>')
