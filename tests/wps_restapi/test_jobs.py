@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import datetime
+import json
 import logging
 import os
 import shutil
@@ -3754,6 +3755,318 @@ class WpsRestApiJobsTest(JobUtils):
         # Verify the digest is valid and deterministic
         expected_digest = compute_file_digest_multibase(test_file)
         assert output_result["digestMultibase"] == expected_digest
+
+    @pytest.mark.oap_part3
+    def test_job_ad_hoc_workflow_multipart_execution(self):
+        """
+        Test ad-hoc CWL workflow submission via multipart content to POST /jobs.
+
+        This validates that users can submit both the workflow definition (CWL) and
+        execution parameters (inputs/outputs) in a single multipart request to create
+        and execute a job without pre-deploying the process.
+
+        The multipart request contains:
+        - CWL workflow definition with Content-Profile: ogc-process-description
+        - Execution request with Content-Profile: ogc-execute-request
+        """
+
+        # Define a simple CWL CommandLineTool for the workflow
+        echo_tool_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "ad-hoc-echo-tool",
+            "inputs": {
+                "message": "string"
+            },
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {
+                        "glob": "output.txt"
+                    }
+                }
+            },
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "alpine:latest"
+                }
+            },
+            "baseCommand": ["sh", "-c"],
+            "arguments": [
+                "echo $(inputs.message) > output.txt"
+            ]
+        }
+
+        # Define a simple CWL Workflow
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "ad-hoc-test-workflow",
+            "inputs": {
+                "message": "string"
+            },
+            "outputs": {
+                "result": {
+                    "type": "File",
+                    "outputSource": "echo_step/output"
+                }
+            },
+            "steps": {
+                "echo_step": {
+                    "run": "ad-hoc-echo-tool",
+                    "in": {
+                        "message": "message"
+                    },
+                    "out": ["output"]
+                }
+            }
+        }
+
+        # Define the execution request with input values
+        # Note: inputs must match the CWL workflow definition
+        execution_request = {
+            "inputs": {
+                "message": "Hello from ad-hoc workflow!"
+            },
+            "outputs": {
+                "result": {
+                    "transmissionMode": "reference"
+                }
+            },
+            "mode": "async",
+            "response": "document"
+        }
+
+        # Create multipart content with proper profiles
+        boundary = "----AdHocWorkflowBoundary123"
+        multipart_body = (
+            f"------AdHocWorkflowBoundary123\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"Content-ID: <echo-tool>\r\n"
+            f"\r\n"
+            f"{json.dumps(echo_tool_cwl)}\r\n"
+            f"------AdHocWorkflowBoundary123\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"Content-ID: <workflow>\r\n"
+            f"\r\n"
+            f"{json.dumps(workflow_cwl)}\r\n"
+            f"------AdHocWorkflowBoundary123\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+            f"\r\n"
+            f"{json.dumps(execution_request)}\r\n"
+            f"------AdHocWorkflowBoundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type_header = f"multipart/mixed; boundary={boundary}"
+
+        # Submit the ad-hoc workflow execution request
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery(web_test_app=self.app):
+                stack.enter_context(mock_exec)
+
+            resp = mocked_sub_requests(
+                self.app, "post", "/jobs",
+                data=multipart_body,
+                headers={"Content-Type": content_type_header, "Accept": ContentType.APP_JSON},
+                only_local=True
+            )
+
+            # Verify the response
+            assert resp.status_code in [200, 201], (
+                f"Expected 200 or 201, got {resp.status_code}. "
+                f"Content-Type: {resp.content_type}. "
+                f"Body: {resp.text[:500] if hasattr(resp, 'text') else resp.body[:500]}"
+            )
+
+            result = resp.json
+            assert "jobID" in result, "Response should contain jobID"
+            assert "status" in result, "Response should contain status"
+            assert "processID" in result, "Response should contain processID"
+
+            job_id = result["jobID"]
+            process_id = result["processID"]
+
+            # Verify the process was deployed (it's the workflow ID)
+            assert process_id == "ad-hoc-test-workflow", "Expected workflow to be deployed as process"
+
+            # Verify the job was created in the store
+            job = self.job_store.fetch_by_id(job_id)
+            assert job is not None, "Job should be created in the store"
+            assert job.process == process_id, "Job should reference the deployed workflow"
+            assert "ad-hoc" in job.tags, "Job should be tagged as ad-hoc"
+
+            # Verify the workflow was deployed in the process store
+            process = self.process_store.fetch_by_id(process_id)
+            assert process is not None, "Workflow should be deployed as a process"
+            assert process.identifier == process_id
+
+    @pytest.mark.oap_part3
+    def test_job_ad_hoc_workflow_multipart_missing_execution_request(self):
+        """
+        Test that multipart request without execution request part is rejected.
+
+        Validates that proper error handling occurs when the execution request
+        (with ogc-execute-request profile) is missing from the multipart content.
+        """
+
+        # Define a simple CWL Workflow (without execution request)
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "test-workflow-no-exec",
+            "inputs": {"message": "string"},
+            "outputs": {"result": {"type": "File", "outputSource": "echo_step/output"}},
+            "steps": {
+                "echo_step": {
+                    "run": "#echo-tool",
+                    "in": {"message": "message"},
+                    "out": ["output"]
+                }
+            }
+        }
+
+        # Create multipart content WITHOUT execution request
+        boundary = "----TestBoundary456"
+        multipart_body = (
+            f"------TestBoundary456\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"\r\n"
+            f"{json.dumps(workflow_cwl)}\r\n"
+            f"------TestBoundary456--\r\n"
+        ).encode('utf-8')
+
+        content_type_header = f"multipart/mixed; boundary={boundary}"
+
+        # Submit the request and expect failure
+        resp = mocked_sub_requests(
+            self.app, "post", "/jobs",
+            data=multipart_body,
+            headers={"Content-Type": content_type_header, "Accept": ContentType.APP_JSON},
+            expect_errors=True,
+            only_local=True
+        )
+
+        # Verify error response
+        assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        result = resp.json
+        assert result["title"] == "Missing execution request"
+        assert sd.OGC_API_PROC_PROFILE_EXECUTE_URI in result["description"]
+
+    @pytest.mark.oap_part3
+    def test_job_ad_hoc_workflow_multipart_fallback_detection(self):
+        """
+        Test ad-hoc workflow submission with profile fallback detection.
+
+        When Content-Profile headers are omitted, the parser should detect:
+        - CWL content by 'class' field (Workflow, CommandLineTool)
+        - Execution request by 'inputs'/'outputs' fields
+        """
+        # Define a simple CWL CommandLineTool (without Content-Profile header)
+        echo_tool_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "fallback-echo-tool",
+            "inputs": {"message": "string"},
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {"glob": "output.txt"}
+                }
+            },
+            "requirements": {"DockerRequirement": {"dockerPull": "alpine:latest"}},
+            "baseCommand": ["sh", "-c"],
+            "arguments": ["echo $(inputs.message) > output.txt"]
+        }
+
+        # Define a CWL Workflow that references the tool (without Content-Profile header)
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "fallback-test-workflow",
+            "inputs": {"message": "string"},
+            "outputs": {
+                "result": {
+                    "type": "File",
+                    "outputSource": "echo_step/output"
+                }
+            },
+            "steps": {
+                "echo_step": {
+                    "run": "fallback-echo-tool",
+                    "in": {"message": "message"},
+                    "out": ["output"]
+                }
+            }
+        }
+
+        # Execution request without explicit profile
+        # Note: inputs must match the CWL workflow definition
+        execution_request = {
+            "inputs": {"message": "Fallback detection test"},
+            "mode": "async"
+        }
+
+        # Create multipart content WITHOUT Content-Profile headers
+        boundary = "----FallbackBoundary789"
+        multipart_body = (
+            f"------FallbackBoundary789\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"\r\n"
+            f"{json.dumps(echo_tool_cwl)}\r\n"
+            f"------FallbackBoundary789\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"\r\n"
+            f"{json.dumps(workflow_cwl)}\r\n"
+            f"------FallbackBoundary789\r\n"
+            f"Content-Type: application/json\r\n"
+            f"\r\n"
+            f"{json.dumps(execution_request)}\r\n"
+            f"------FallbackBoundary789--\r\n"
+        ).encode('utf-8')
+
+        content_type_header = f"multipart/mixed; boundary={boundary}"
+
+        # Submit the request
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery(web_test_app=self.app):
+                stack.enter_context(mock_exec)
+
+            resp = mocked_sub_requests(
+                self.app, "post", "/jobs",
+                data=multipart_body,
+                headers={"Content-Type": content_type_header, "Accept": ContentType.APP_JSON},
+                only_local=True
+            )
+
+            # Verify success despite missing profiles
+            assert resp.status_code in [200, 201], (
+                f"Expected success with fallback detection, got {resp.status_code}. Body: {resp.text[:500]}"
+            )
+
+            result = resp.json
+            assert "jobID" in result, "Response should contain jobID"
+            assert "status" in result, "Response should contain status"
+            assert "processID" in result, "Response should contain processID"
+            assert result["processID"] == "fallback-test-workflow"
+
+            job_id = result["jobID"]
+            process_id = result["processID"]
+
+            # Verify the job was created in the store
+            job = self.job_store.fetch_by_id(job_id)
+            assert job is not None, "Job should be created in the store"
+            assert job.process == process_id, "Job should reference the deployed workflow"
+            assert "ad-hoc" in job.tags, "Job should be tagged as ad-hoc"
+
+            # Verify the workflow was deployed in the process store
+            process = self.process_store.fetch_by_id(process_id)
+            assert process is not None, "Workflow should be deployed as a process"
+            assert process.identifier == process_id
 
 
 @pytest.mark.oap_part1

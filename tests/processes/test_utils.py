@@ -2087,7 +2087,7 @@ class TestMultipartJobExecution:
 
         content_type = f"multipart/mixed; boundary={boundary}"
 
-        exec_req, cwl_packages = parse_multipart_job_execution(
+        _, cwl_packages = parse_multipart_job_execution(
             multipart_body, content_type, request=None
         )
 
