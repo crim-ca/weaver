@@ -1645,8 +1645,8 @@ class TestMultipartDeployment:
 
         if should_parse:
             assert result is not None
-            assert len(result) == 4
-            result_content_type, content_id, content_location, part_data = result
+            assert len(result) == 5
+            result_content_type, content_id, content_location, _, part_data = result
             assert result_content_type == content_type
             assert content_id == "tool-1"
             assert content_location == "test-tool.cwl"
@@ -1659,12 +1659,12 @@ class TestMultipartDeployment:
         Test _organize_deploy_parts successfully organizes CWL packages.
         """
         interpreted_parts = [
-            (ContentType.APP_CWL_JSON, "tool-1", "", {
+            (ContentType.APP_CWL_JSON, "tool-1", "", "", {
                 "cwlVersion": "v1.2",
                 "class": "CommandLineTool",
                 "id": "tool-1"
             }),
-            (ContentType.APP_CWL_JSON, "workflow-1", "", {
+            (ContentType.APP_CWL_JSON, "workflow-1", "", "", {
                 "cwlVersion": "v1.2",
                 "class": "Workflow",
                 "id": "workflow-1"
@@ -1683,7 +1683,7 @@ class TestMultipartDeployment:
         Test _organize_deploy_parts raises error when no CWL packages found.
         """
         interpreted_parts = [
-            (ContentType.APP_JSON, "", "", {"some": "data"})
+            (ContentType.APP_JSON, "", "", "", {"some": "data"})
         ]
 
         with pytest.raises(HTTPBadRequest) as exc_info:
@@ -1696,12 +1696,12 @@ class TestMultipartDeployment:
         Test _organize_deploy_parts correctly identifies process description.
         """
         interpreted_parts = [
-            (ContentType.APP_CWL_JSON, "tool-1", "", {
+            (ContentType.APP_CWL_JSON, "tool-1", "", "", {
                 "cwlVersion": "v1.2",
                 "class": "CommandLineTool",
                 "id": "tool-1"
             }),
-            (ContentType.APP_JSON, "", "", {
+            (ContentType.APP_JSON, "", "", "", {
                 "processDescription": {
                     "id": "tool-1",
                     "title": "Test Tool"
