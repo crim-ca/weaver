@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import tempfile
+from email.mime.text import MIMEText
 from typing import cast
 
 import mock
@@ -22,6 +23,7 @@ from weaver.processes.constants import CWL_NAMESPACE_WEAVER_ID, CWL_REQUIREMENT_
 from weaver.processes.utils import (  # noqa: W0212
     _check_package_file,
     _classify_multipart_part,
+    _extract_multipart_profile,
     _extract_multipart_start_parameter,
     _get_multipart_content,
     _interpret_multipart_part,
@@ -1623,6 +1625,54 @@ class TestMultipartDeployment:
         result = _extract_multipart_start_parameter(content_type)
         assert result == expected
 
+    @pytest.mark.parametrize("headers,expected", [
+        # Content-Profile header (RFC 8521) - preferred method
+        ({"Content-Profile": "http://example.com/profile"}, "http://example.com/profile"),
+        ({"Content-Profile": "<http://example.com/profile>"}, "http://example.com/profile"),
+        ({"Content-Profile": "  http://example.com/profile  "}, "http://example.com/profile"),
+        # profile parameter in Content-Type header - fallback method
+        ({"Content-Type": "application/json; profile=http://example.com/profile"}, "http://example.com/profile"),
+        ({"Content-Type": 'application/json; profile="http://example.com/profile"'}, "http://example.com/profile"),
+        ({"Content-Type": "application/json; profile=<http://example.com/profile>"}, "http://example.com/profile"),
+        ({"Content-Type": "application/json; profile=http://example.com/profile; charset=utf-8"},
+         "http://example.com/profile"),
+        # Content-Profile takes precedence over Content-Type profile parameter
+        ({"Content-Profile": "http://primary.com/profile",
+          "Content-Type": "application/json; profile=http://fallback.com/profile"}, "http://primary.com/profile"),
+        # No profile specified
+        ({"Content-Type": "application/json"}, None),
+        ({}, None),
+    ], ids=[
+        "content_profile_header",
+        "content_profile_angle_brackets",
+        "content_profile_whitespace",
+        "content_type_profile_param",
+        "content_type_profile_quoted",
+        "content_type_profile_angle_brackets",
+        "content_type_profile_with_charset",
+        "content_profile_precedence",
+        "no_profile",
+        "no_headers"
+    ])
+    def test_extract_multipart_profile(self, headers, expected):
+        """
+        Test _extract_multipart_profile handles various profile specification methods.
+
+        Tests both RFC 8521 Content-Profile header and profile parameter in Content-Type header.
+        """
+        # Create a minimal multipart part with the specified headers
+        part = MIMEText("test content", _subtype="json", _charset="utf-8")
+
+        # Set the headers on the part
+        for header_name, header_value in headers.items():
+            if header_name in part:
+                part.replace_header(header_name, header_value)
+            else:
+                part.add_header(header_name, header_value)
+
+        result = _extract_multipart_profile(part)
+        assert result == expected
+
     @pytest.mark.parametrize("content,content_type,should_parse", [
         (json.dumps({"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "test-tool"}),
          ContentType.APP_CWL_JSON, True),
@@ -1633,8 +1683,6 @@ class TestMultipartDeployment:
         """
         Test _interpret_multipart_part with various content types and validity.
         """
-        from email.mime.text import MIMEText
-
         part = MIMEText(content, _subtype="json" if "json" in content_type else "plain", _charset="utf-8")
         part.replace_header("Content-Type", content_type)
         if should_parse:

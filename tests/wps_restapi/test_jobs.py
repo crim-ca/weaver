@@ -15,7 +15,7 @@ import mock
 import pytest
 from dateutil import parser as date_parser
 from parameterized import parameterized
-from pyramid.httpexceptions import HTTPBadRequest
+from pyramid.httpexceptions import HTTPBadRequest, HTTPCreated, HTTPInternalServerError
 
 from tests.functional.utils import JobUtils
 from tests.resources import load_example
@@ -4067,6 +4067,162 @@ class WpsRestApiJobsTest(JobUtils):
             process = self.process_store.fetch_by_id(process_id)
             assert process is not None, "Workflow should be deployed as a process"
             assert process.identifier == process_id
+
+    @pytest.mark.oap_part3
+    def test_job_ad_hoc_workflow_multipart_unexpected_deployment_response(self):
+        """
+        Test ad-hoc CWL workflow submission when deployment returns an unexpected response type.
+
+        This validates that the system properly handles cases where the deployment operation
+        returns a response that is not HTTPCreated or HTTPOk.
+        """
+        # Define a simple CWL Workflow
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "ad-hoc-error-workflow",
+            "inputs": {
+                "message": "string"
+            },
+            "outputs": {
+                "result": {
+                    "type": "string"
+                }
+            },
+            "steps": {}
+        }
+
+        # Define the execution request
+        execution_request = {
+            "inputs": {
+                "message": "Test"
+            },
+            "mode": "async",
+            "response": "document"
+        }
+
+        # Create multipart content
+        boundary = "----ErrorWorkflowBoundary456"
+        multipart_body = (
+            f"------ErrorWorkflowBoundary456\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"\r\n"
+            f"{json.dumps(workflow_cwl)}\r\n"
+            f"------ErrorWorkflowBoundary456\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+            f"\r\n"
+            f"{json.dumps(execution_request)}\r\n"
+            f"------ErrorWorkflowBoundary456--\r\n"
+        ).encode('utf-8')
+
+        content_type_header = f"multipart/mixed; boundary={boundary}"
+
+        # Mock deploy_process_from_payload to return an unexpected response type
+        with mock.patch("weaver.wps_restapi.jobs.jobs.deploy_process_from_payload") as mock_deploy:
+            # Return HTTPInternalServerError instead of HTTPCreated or HTTPOk
+            mock_deploy.return_value = HTTPInternalServerError()
+
+            with contextlib.ExitStack() as stack:
+                for mock_exec in mocked_execute_celery(web_test_app=self.app):
+                    stack.enter_context(mock_exec)
+
+                resp = mocked_sub_requests(
+                    self.app, "post", "/jobs",
+                    data=multipart_body,
+                    headers={"Content-Type": content_type_header, "Accept": ContentType.APP_JSON},
+                    only_local=True,
+                    expect_errors=True
+                )
+
+                # Verify that we get a 400 Bad Request with the expected error message
+                assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
+                result = resp.json
+                assert "title" in result
+                assert result["title"] == "Unexpected deployment response"
+                assert "description" in result
+                assert "Ad-hoc workflow deployment did not return expected response" in result["description"]
+
+    @pytest.mark.oap_part3
+    def test_job_ad_hoc_workflow_multipart_missing_process_id(self):
+        """
+        Test ad-hoc CWL workflow submission when deployment response is missing process ID.
+
+        This validates that the system properly handles cases where the deployment operation
+        succeeds but doesn't return a process ID in the response.
+        """
+        # Define a simple CWL Workflow
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "ad-hoc-missing-id-workflow",
+            "inputs": {
+                "message": "string"
+            },
+            "outputs": {
+                "result": {
+                    "type": "string"
+                }
+            },
+            "steps": {}
+        }
+
+        # Define the execution request
+        execution_request = {
+            "inputs": {
+                "message": "Test"
+            },
+            "mode": "async",
+            "response": "document"
+        }
+
+        # Create multipart content
+        boundary = "----MissingIDWorkflowBoundary789"
+        multipart_body = (
+            f"------MissingIDWorkflowBoundary789\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"\r\n"
+            f"{json.dumps(workflow_cwl)}\r\n"
+            f"------MissingIDWorkflowBoundary789\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+            f"\r\n"
+            f"{json.dumps(execution_request)}\r\n"
+            f"------MissingIDWorkflowBoundary789--\r\n"
+        ).encode('utf-8')
+
+        content_type_header = f"multipart/mixed; boundary={boundary}"
+
+        # Mock deploy_process_from_payload to return a response without a process ID
+        with mock.patch("weaver.wps_restapi.jobs.jobs.deploy_process_from_payload") as mock_deploy:
+            # Create a mock HTTPCreated response with empty processSummary
+            mock_response = HTTPCreated()
+            mock_response.json = {
+                "processSummary": {}  # Missing 'id' field
+            }
+            mock_deploy.return_value = mock_response
+
+            with contextlib.ExitStack() as stack:
+                for mock_exec in mocked_execute_celery(web_test_app=self.app):
+                    stack.enter_context(mock_exec)
+
+                resp = mocked_sub_requests(
+                    self.app, "post", "/jobs",
+                    data=multipart_body,
+                    headers={"Content-Type": content_type_header, "Accept": ContentType.APP_JSON},
+                    only_local=True,
+                    expect_errors=True
+                )
+
+                # Verify that we get a 400 Bad Request with the expected error message
+                assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
+                result = resp.json
+                assert "title" in result
+                assert result["title"] == "Missing process ID"
+                assert "description" in result
+                assert "Ad-hoc workflow deployment did not return a process ID" in result["description"]
 
 
 @pytest.mark.oap_part1
