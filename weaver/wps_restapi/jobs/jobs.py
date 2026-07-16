@@ -314,7 +314,7 @@ def create_job(request):
     except Exception as exc:
         raise HTTPBadRequest(json={
             "title": "NoSuchProcess",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process",
+            "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_PROCESS_URI,
             "detail": "Process URL or identifier reference could not be parsed.",
             "status": HTTPBadRequest.code,
             "cause": {"in": "body", proc_key: repr_json(proc_url, force_string=False)}
@@ -356,7 +356,7 @@ def create_job_unsupported_media_type(request):
     return HTTPUnsupportedMediaType(
         json={
             "title": "Unsupported Media Type",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type",
+            "type": sd.OGC_API_PROC_PART4_EXC_UNSUPPORTED_MEDIA_TYPE_URI,
             "detail": "Process URL or identifier reference missing or invalid.",
             "status": HTTPUnsupportedMediaType.code,
             "cause": {"in": "headers", "name": "Content-Type", "value": ctype},
@@ -411,10 +411,7 @@ def trigger_job_execution(request):
 @sd.provider_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
     schema=sd.GetProviderJobEndpoint(),
-    accept=[ContentType.APP_JSON] + [
-        f"{ContentType.APP_JSON}; profile={profile}"
-        for profile in JobStatusProfileSchema.values()
-    ],
+    accept=sd.GetJobAcceptHeaderJSON().validator.choices,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_provider_single_job_status_responses,
 )
@@ -440,10 +437,7 @@ def trigger_job_execution(request):
 @sd.process_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROCESSES],
     schema=sd.GetProcessJobEndpoint(),
-    accept=[ContentType.APP_JSON] + [
-        f"{ContentType.APP_JSON}; profile={profile}"
-        for profile in JobStatusProfileSchema.values()
-    ],
+    accept=sd.GetJobAcceptHeaderJSON().validator.choices,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
 )
@@ -469,10 +463,7 @@ def trigger_job_execution(request):
 @sd.job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS],
     schema=sd.GetJobEndpoint(),
-    accept=[ContentType.APP_JSON] + [
-        f"{ContentType.APP_JSON}; profile={profile}"
-        for profile in JobStatusProfileSchema.values()
-    ],
+    accept=sd.GetJobAcceptHeaderJSON().validator.choices,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
 )
@@ -805,7 +796,7 @@ def get_job_output(request):
         raise HTTPNotFound(
             json={
                 "title": "NoSuchOutput",
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-output",
+                "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_OUTPUT_URI,
                 "detail": "The requested output ID is not available in the job results.",
                 "status": HTTPNotFound.code,
                 "cause": f"Available outputs: {available_ids}" if available_ids else output_id,
@@ -910,7 +901,7 @@ def get_job_result_index(request):
     except (ValueError, TypeError):
         raise HTTPBadRequest(json={
             "title": "Job Output Invalid Index",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/invalid-parameter",
+            "type": sd.OGC_API_PROC_PART1_EXC_INVALID_PARAMETER_URI,
             "detail": "Index must be a valid integer.",
             "status": HTTPBadRequest.code,
             "value": request.matchdict.get("index")

@@ -1530,7 +1530,7 @@ def validate_job_json(request):
     """
     if ContentType.APP_JSON not in request.content_type:
         raise HTTPUnsupportedMediaType(json={
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type",
+            "type": sd.OGC_API_PROC_PART4_EXC_UNSUPPORTED_MEDIA_TYPE_URI,
             "title": "Unsupported Media-Type",
             "detail": f"Request 'Content-Type' header other than '{ContentType.APP_JSON}' is not supported.",
             "code": "InvalidHeaderValue",
@@ -1541,7 +1541,7 @@ def validate_job_json(request):
         json_body = request.json_body
     except Exception as ex:
         raise HTTPBadRequest(json={
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type",
+            "type": sd.OGC_API_PROC_PART4_EXC_UNSUPPORTED_MEDIA_TYPE_URI,
             "title": "Bad Request",
             "detail": f"Invalid JSON body cannot be decoded for job submission. [{ex}]",
         })
@@ -1561,7 +1561,7 @@ def validate_job_schema(
         if schema not in [None, body_schema._schema]:
             raise HTTPUnprocessableEntity(
                 json=sd.ErrorJsonResponseBodySchema(schema_include=True).deserialize({
-                    "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-schema",
+                    "type": sd.OGC_API_PROC_PART4_EXC_UNSUPPORTED_SCHEMA_URI,
                     "title": "Invalid Job Execution Schema",
                     "detail": "Specified Content-Schema reference is unsupported for job creation.",
                     "status": HTTPUnprocessableEntity.code,

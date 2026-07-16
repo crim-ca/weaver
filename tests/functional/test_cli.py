@@ -60,6 +60,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import compute_file_digest_multibase, fully_qualified_name, get_registry, load_file
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_url, map_wps_output_location
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Optional, Union
@@ -274,7 +275,7 @@ class TestWeaverClient(TestWeaverClientBase):
         else:
             self.fail("Could not find expected provider JSON link reference.")
         for link in result.body["links"]:
-            if link["rel"] != "http://www.opengis.net/def/rel/ogc/1.0/processes":
+            if link["rel"] != sd.OGC_API_PROC_REL_PROCESSES_URI:
                 continue
             assert link["href"] == f"{self.url}/providers/{prov_id}/processes"
             assert link["type"] == ContentType.APP_JSON
@@ -720,6 +721,7 @@ class TestWeaverClient(TestWeaverClientBase):
         result = mocked_sub_requests(self.app, self.client.undeploy, other_process)
         assert result.success
         assert not result.body
+        assert result.message == "Undeploy successful."
 
         path = f"/processes/{other_process}"
         resp = mocked_sub_requests(self.app, "get", path, expect_errors=True)
@@ -1240,16 +1242,30 @@ class TestWeaverCLI(TestWeaverClientBase):
             trim=False,
         )
         operations = [
+            "info",
+            "version",
+            "conformance",
             "deploy",
             "undeploy",
+            "register",
+            "unregister",
             "capabilities",
             "processes",
             "describe",
+            "package",
             "execute",
             "monitor",
             "dismiss",
             "results",
             "status",
+            "provenance",
+            "jobs",
+            "update-job",
+            "trigger-job",
+            "logs",
+            "exceptions",
+            "statistics",
+            "upload",
         ]
         assert all(any(op in line for line in lines) for op in operations)
 
@@ -1896,6 +1912,21 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert out_schema == out_oas_oneof  # combined from user and auto-resolved definitions
             assert out_formats == out_any_fmt  # auto-resolved from CWL
 
+    def test_undeploy_process(self):
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "undeploy",
+                "-u", self.url,
+                "-p", self.test_process["FileInfo"],
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any("Undeploy successful." in line for line in lines)
+
     def test_describe(self):
         # prints formatted JSON ProcessDescription over many lines
         proc = self.test_process["Echo"]
@@ -2053,7 +2084,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert any(f"\"jobID\": \"{job_id}\"" in line for line in lines)
             assert any(f"\"status\": \"{Status.SUCCESSFUL}\"" in line for line in lines)
             assert any(f"\"href\": \"{job_ref}/results\"" in line for line in lines)
-            assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
+            assert any(f"\"rel\": \"{sd.OGC_API_PROC_REL_JOB_RESULTS_URI}\"" in line for line in lines)
 
     def test_execute_auto_monitor(self):
         proc = self.test_process["Echo"]
@@ -2079,7 +2110,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             )
             assert any("\"jobID\": \"" in line for line in lines)  # don't care value, self-handled
             assert any(f"\"status\": \"{Status.SUCCESSFUL}\"" in line for line in lines)
-            assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
+            assert any(f"\"rel\": \"{sd.OGC_API_PROC_REL_JOB_RESULTS_URI}\"" in line for line in lines)
 
     def test_execute_result_by_reference(self):
         """
