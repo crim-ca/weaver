@@ -968,7 +968,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
         request=container if hasattr(container, 'body') else None,
         content=payload,
         content_type=c_type_full,  # Pass full Content-Type with parameters (e.g., boundary)
-        content_type_schema=sd.DeployContentType,
+        content_type_schema=sd.DeployContentTypeAny,
     )
 
     # Extract process ID from Content-ID header if provided (RFC 2392)

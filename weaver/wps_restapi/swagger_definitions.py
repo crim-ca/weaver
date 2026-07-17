@@ -7558,7 +7558,7 @@ class Deploy(OneOfKeywordSchema):
     ]
 
 
-class DeployContentType(ContentTypeHeader):
+class DeployContentTypeAny(ContentTypeHeader):
     example = ContentType.APP_JSON
     default = ContentType.APP_JSON
     validator = OneOf([
@@ -7573,19 +7573,52 @@ class DeployContentType(ContentTypeHeader):
     ])
 
 
-class DeployHeaders(RequestHeadersBody):
+class DeployContentTypeOGC(ContentTypeHeader):
+    example = ContentType.APP_JSON
+    default = ContentType.APP_JSON
+    validator = OneOf([
+        ContentType.APP_JSON,
+        ContentType.APP_OGC_PKG_JSON,
+        ContentType.APP_OGC_PKG_YAML,
+        ContentType.APP_YAML,
+    ])
+
+
+class DeployContentTypeCWL(ContentTypeHeader):
+    example = ContentType.APP_JSON
+    default = ContentType.APP_JSON
+    validator = OneOf([
+        ContentType.APP_CWL,
+        ContentType.APP_CWL_JSON,
+        ContentType.APP_CWL_YAML,
+        ContentType.APP_CWL_X,
+        ContentType.APP_YAML,
+        ContentType.APP_JSON,
+    ])
+
+
+class DeployHeadersAny(RequestHeadersBody):
     x_auth_docker = XAuthDockerHeader()
-    content_type = DeployContentType()
+    content_type = DeployContentTypeAny()
+
+
+class DeployHeadersOGC(RequestHeadersBody):
+    x_auth_docker = XAuthDockerHeader()
+    content_type = DeployContentTypeOGC()
+
+
+class DeployHeadersCWL(RequestHeadersBody):
+    x_auth_docker = XAuthDockerHeader()
+    content_type = DeployContentTypeCWL()
 
 
 class PostProcessesEndpoint(ExtendedMappingSchema):
-    header = DeployHeaders(description="Headers employed for process deployment.")
+    header = DeployHeadersAny(description="Headers employed for process deployment.")
     querystring = FormatQuery()
-    body = Deploy(title="Deploy", examples={
-        "DeployCWL": {
-            "summary": "Deploy a process from a CWL+JSON definition.",
-            "value": EXAMPLES["deploy_process_cwl.json"],
-        },
+
+
+class DeployBodyOGC(Deploy):
+    examples = {
         "DeployOGC": {
             "summary": "Deploy a process from an OGC Application Package definition.",
             "value": EXAMPLES["deploy_process_ogcapppkg.json"],
@@ -7594,16 +7627,32 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
             "summary": "Deploy a process from a remote WPS-1 reference URL.",
             "value": EXAMPLES["deploy_process_wps1.json"],
         }
-    })
+    }
 
 
-class PostProcessesEndpointCWLYAML(PostProcessesEndpoint):
-    body = PermissiveMappingSchema(title="DeployCWLYAML", examples={
+class DeployBodyCWL(Deploy):
+    examples = {
+        "DeployCWLJSON": {
+            "summary": "Deploy a process from a CWL+JSON definition.",
+            "value": EXAMPLES["deploy_process_cwl.json"],
+        },
         "DeployCWLYAML": {
             "summary": "Deploy a process from a CWL+YAML definition.",
             "value": EXAMPLES["deploy_process_yaml.cwl"],
         },
-    })
+    }
+
+
+class PostProcessesEndpointOGC(PostProcessesEndpoint):
+    header = DeployHeadersOGC(description="Headers employed for process deployment.")
+    querystring = FormatQuery()
+    body = DeployBodyOGC()
+
+
+class PostProcessesEndpointCWL(PostProcessesEndpoint):
+    header = DeployHeadersCWL(description="Headers employed for process deployment.")
+    querystring = FormatQuery()
+    body = DeployBodyCWL()
 
 
 class UpdateInputOutputBase(DescriptionType, InputOutputDescriptionMeta):
