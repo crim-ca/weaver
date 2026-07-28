@@ -3752,18 +3752,21 @@ class WpsRestApiJobsTest(JobUtils):
         expected_digest = compute_file_digest_multibase(test_file)
         assert output_result["digestMultibase"] == expected_digest
 
+    @pytest.mark.multipart
+    @pytest.mark.job
+    @pytest.mark.functional
     @pytest.mark.oap_part3
     def test_job_ad_hoc_workflow_multipart_execution(self):
         """
-        Test ad-hoc CWL workflow submission via multipart content to POST /jobs.
+        Test ad-hoc CWL workflow submission via multipart content to ``POST /jobs``.
 
         This validates that users can submit both the workflow definition (CWL) and
         execution parameters (inputs/outputs) in a single multipart request to create
         and execute a job without pre-deploying the process.
 
         The multipart request contains:
-        - CWL workflow definition with Content-Profile: ogc-process-description
-        - Execution request with Content-Profile: ogc-execute-request
+        - CWL workflow definition with ``Content-Profile: ogc-process-description``
+        - Execution request with ``Content-Profile: ogc-execute-request``
         """
 
         # Define a simple CWL CommandLineTool for the workflow
@@ -3871,8 +3874,8 @@ class WpsRestApiJobsTest(JobUtils):
             )
 
             # Verify the response
-            assert resp.status_code in [200, 201], (
-                f"Expected 200 or 201, got {resp.status_code}. "
+            assert resp.status_code == 201, (
+                f"Expected 201 (Created) for async job execution, got {resp.status_code}. "
                 f"Content-Type: {resp.content_type}. "
                 f"Body: {resp.text[:500] if hasattr(resp, 'text') else resp.body[:500]}"
             )
@@ -3899,6 +3902,9 @@ class WpsRestApiJobsTest(JobUtils):
             assert process is not None, "Workflow should be deployed as a process"
             assert process.identifier == process_id
 
+    @pytest.mark.multipart
+    @pytest.mark.job
+    @pytest.mark.functional
     @pytest.mark.oap_part3
     def test_job_ad_hoc_workflow_multipart_missing_execution_request(self):
         """
@@ -3953,14 +3959,17 @@ class WpsRestApiJobsTest(JobUtils):
         assert result["title"] == "Missing execution request"
         assert sd.OGC_API_PROC_PROFILE_EXECUTE_URI in result["description"]
 
+    @pytest.mark.multipart
+    @pytest.mark.job
+    @pytest.mark.functional
     @pytest.mark.oap_part3
     def test_job_ad_hoc_workflow_multipart_fallback_detection(self):
         """
         Test ad-hoc workflow submission with profile fallback detection.
 
-        When Content-Profile headers are omitted, the parser should detect:
-        - CWL content by 'class' field (Workflow, CommandLineTool)
-        - Execution request by 'inputs'/'outputs' fields
+        When ``Content-Profile`` headers are omitted, the parser should detect:
+        - CWL content by ``class`` field (``Workflow``, ``CommandLineTool``)
+        - Execution request by ``inputs``/``outputs`` fields
         """
         # Define a simple CWL CommandLineTool (without Content-Profile header)
         echo_tool_cwl = {
@@ -4040,8 +4049,9 @@ class WpsRestApiJobsTest(JobUtils):
             )
 
             # Verify success despite missing profiles
-            assert resp.status_code in [200, 201], (
-                f"Expected success with fallback detection, got {resp.status_code}. Body: {resp.text[:500]}"
+            assert resp.status_code == 201, (
+                f"Expected 201 (Created) for async job execution with fallback detection, "
+                f"got {resp.status_code}. Body: {resp.text[:500]}"
             )
 
             result = resp.json
@@ -4064,13 +4074,16 @@ class WpsRestApiJobsTest(JobUtils):
             assert process is not None, "Workflow should be deployed as a process"
             assert process.identifier == process_id
 
+    @pytest.mark.multipart
+    @pytest.mark.job
+    @pytest.mark.functional
     @pytest.mark.oap_part3
     def test_job_ad_hoc_workflow_multipart_unexpected_deployment_response(self):
         """
         Test ad-hoc CWL workflow submission when deployment returns an unexpected response type.
 
         This validates that the system properly handles cases where the deployment operation
-        returns a response that is not HTTPCreated or HTTPOk.
+        returns a response that is not :class:`HTTPCreated` or :class:`HTTPOk`.
         """
         # Define a simple CWL Workflow
         workflow_cwl = {
@@ -4118,7 +4131,13 @@ class WpsRestApiJobsTest(JobUtils):
         # Mock deploy_process_from_payload to return an unexpected response type
         with mock.patch("weaver.wps_restapi.jobs.jobs.deploy_process_from_payload") as mock_deploy:
             # Return HTTPInternalServerError instead of HTTPCreated or HTTPOk
-            mock_deploy.return_value = HTTPInternalServerError()
+            # Include error details to simulate a real deployment failure
+            deployment_error = HTTPInternalServerError(json={
+                "title": "Deployment failed",
+                "detail": "Invalid CWL: missing required field 'baseCommand'",
+                "cause": "CWL validation error"
+            })
+            mock_deploy.return_value = deployment_error
 
             with contextlib.ExitStack() as stack:
                 for mock_exec in mocked_execute_celery(web_test_app=self.app):
@@ -4139,7 +4158,17 @@ class WpsRestApiJobsTest(JobUtils):
                 assert result["title"] == "Unexpected deployment response"
                 assert "description" in result
                 assert "Ad-hoc workflow deployment did not return expected response" in result["description"]
+                # Verify that deployment error details are forwarded to help users debug
+                assert "error" in result, "Response should include deployment error details"
+                deploy_error = result["error"]
+                assert "title" in deploy_error, "Deployment error should include title"
+                assert deploy_error["title"] == "Deployment failed"
+                assert "detail" in deploy_error, "Deployment error should include detail for debugging"
+                assert "Invalid CWL" in deploy_error["detail"], "Error detail should help identify CWL issue"
 
+    @pytest.mark.multipart
+    @pytest.mark.job
+    @pytest.mark.functional
     @pytest.mark.oap_part3
     def test_job_ad_hoc_workflow_multipart_missing_process_id(self):
         """
@@ -4218,7 +4247,7 @@ class WpsRestApiJobsTest(JobUtils):
                 assert "title" in result
                 assert result["title"] == "Missing process ID"
                 assert "description" in result
-                assert "Ad-hoc workflow deployment did not return a process ID" in result["description"]
+                assert "Ad-hoc workflow deployment did not provide a process ID" in result["description"]
 
 
 @pytest.mark.oap_part1

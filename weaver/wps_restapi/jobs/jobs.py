@@ -275,12 +275,24 @@ def create_job(request):
 
             # Extract the deployed process ID
             if not isinstance(deploy_response, (HTTPCreated, HTTPOk)):
-                raise HTTPBadRequest(json={
+                # Extract deployment error details to help users debug their CWL definition
+                deploy_error = None
+                if hasattr(deploy_response, 'json'):
+                    try:
+                        deploy_error = deploy_response.json
+                    except Exception:  # noqa: S110  # nosec: B110
+                        pass
+
+                error_json = {
                     "title": "Unexpected deployment response",
                     "description":
                         f"Ad-hoc workflow deployment did not return expected response. "
                         f"Got: {type(deploy_response)}",
-                })
+                }
+                if deploy_error:
+                    error_json["error"] = deploy_error
+
+                raise HTTPBadRequest(json=error_json)
 
             deploy_body = deploy_response.json if hasattr(deploy_response, 'json') else deploy_response
             proc_id = deploy_body.get("processSummary", {}).get("id")
@@ -288,16 +300,14 @@ def create_job(request):
                 raise HTTPBadRequest(json={
                     "title": "Missing process ID",
                     "description":
-                        f"Ad-hoc workflow deployment did not return a process ID. "
+                        f"Ad-hoc workflow deployment did not provide a process ID. "
                         f"Response: {deploy_body}",
                 })
 
             # Update request to use execution parameters for normal job submission flow
             request._json = execution_request
             request.json_body = execution_request
-            # Update content type so validate_job_json doesn't reject it
             request.content_type = ContentType.APP_JSON
-            # Continue to normal job submission below with ad-hoc tag
 
         elif ctype == ContentType.APP_JSON and "process" in request.json_body:
             proc_url = request.json_body["process"]

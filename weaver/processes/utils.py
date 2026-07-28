@@ -82,6 +82,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
+    from email.message import Message
     from typing import Any, Dict, List, Optional, Tuple, Union
 
     from docker.client import DockerClient
@@ -761,7 +762,7 @@ def _extract_multipart_start_parameter(content_type):
 
 
 def _extract_multipart_profile(part):
-    # type: (Any) -> Optional[str]
+    # type: (Message) -> Optional[str]
     """
     Extract the ``Content-Profile`` header from a multipart part.
 
@@ -784,7 +785,7 @@ def _extract_multipart_profile(part):
 
 
 def _interpret_multipart_part(part, request=None):
-    # type: (Any, Optional[AnyRequestType]) -> Optional[Tuple[str, str, str, str, JSON]]
+    # type: (Message, Optional[AnyRequestType]) -> Optional[Tuple[str, str, str, str, JSON]]
     """
     Interpret a single multipart part: decode, fetch content if needed, and parse.
 
@@ -829,8 +830,9 @@ def _organize_deploy_parts(interpreted_parts, root_workflow_cid):
     """
     Organize interpreted multipart parts into CWL packages and process description.
 
-    :param interpreted_parts: ``list`` of interpreted parts (content_type, content_id, content_location, profile, data)
-    :param root_workflow_cid: Content-ID of root workflow from ``start`` parameter (if any)
+    :param interpreted_parts:
+        ``list`` of interpreted parts ``(content_type, content_id, content_location, profile, data)``
+    :param root_workflow_cid: ``Content-ID`` of root workflow from ``start`` parameter (if any)
     :returns: ``tuple`` of (``list`` of :term:`CWL` packages, optional process description)
     :raises HTTPBadRequest: If no CWL packages found or root workflow validation fails
     """
@@ -860,8 +862,9 @@ def _organize_job_execution_parts(interpreted_parts, root_workflow_cid):
     """
     Organize interpreted multipart parts into execution request and CWL packages for ad-hoc job execution.
 
-    :param interpreted_parts: ``list`` of interpreted parts (content_type, content_id, content_location, profile, data)
-    :param root_workflow_cid: Content-ID of root workflow from ``start`` parameter (if any)
+    :param interpreted_parts:
+        ``list`` of interpreted parts ``(content_type, content_id, content_location, profile, data)``
+    :param root_workflow_cid: ``Content-ID`` of root workflow from ``start`` parameter (if any)
     :returns:
         ``tuple`` of (execution request JSON, ``list`` of :term:`CWL` packages to deploy)
     :raises HTTPBadRequest: If execution request or CWL packages are missing or invalid

@@ -1726,91 +1726,9 @@ When an ad-hoc execution request is received:
 Example Ad-hoc Execution Request
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. code-block:: http
-
-    POST /jobs HTTP/1.1
-    Host: weaver.example.com
-    Content-Type: multipart/mixed; boundary="adhoc-boundary"
-
-    --adhoc-boundary
-    Content-Type: application/cwl+json
-
-    {
-      "cwlVersion": "v1.2",
-      "class": "CommandLineTool",
-      "id": "adhoc-echo-tool",
-      "baseCommand": ["echo"],
-      "inputs": {
-        "message": "string"
-      },
-      "outputs": {
-        "output": {
-          "type": "stdout"
-        }
-      },
-      "requirements": {
-        "DockerRequirement": {
-          "dockerPull": "alpine:latest"
-        }
-      },
-      "stdout": "output.txt"
-    }
-
-    --adhoc-boundary
-    Content-Type: application/cwl+json
-
-    {
-      "cwlVersion": "v1.2",
-      "class": "Workflow",
-      "id": "adhoc-workflow",
-      "inputs": {
-        "message": "string"
-      },
-      "outputs": {
-        "result": {
-          "type": "File",
-          "outputSource": "echo_step/output"
-        }
-      },
-      "steps": {
-        "echo_step": {
-          "run": "adhoc-echo-tool",
-          "in": {
-            "message": "message"
-          },
-          "out": ["output"]
-        }
-      }
-    }
-
-    --adhoc-boundary
-    Content-Type: application/json
-    Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/process-description
-
-    {
-      "id": "adhoc-workflow",
-      "title": "Ad-hoc Echo Workflow",
-      "description": "Example ad-hoc workflow deployed and executed inline."
-    }
-
-    --adhoc-boundary
-    Content-Type: application/json
-    Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/execute
-
-    {
-      "inputs": {
-        "message": "Hello from ad-hoc workflow!"
-      },
-      "outputs": {
-        "result": {
-          "transmissionMode": "reference"
-        }
-      },
-      "mode": "async",
-      "response": "document"
-    }
-
-    --adhoc-boundary--
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_execute_adhoc.http
+    :language: http
+    :caption: Ad-hoc workflow execution request with multipart content
 
 The response will be a standard :term:`Job` status document (see :ref:`proc_op_execute`) with the ``jobID``,
 ``processID`` (the deployed workflow ID), and execution status. The job can be monitored and results retrieved
