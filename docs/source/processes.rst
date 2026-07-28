@@ -1694,6 +1694,137 @@ The following table presents complete execution examples combining various :term
     - :ref:`proc_exec_kvp_outputs` for output parameter options
     - :ref:`proc_exec_kvp_response` for response control parameters
 
+.. _proc_exec_adhoc:
+
+Execution of Ad-hoc Workflow
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+`Weaver` supports |ogc-api-proc-part3-cwl-ad-hoc-exec|_ from the |ogc-api-proc-part3|_ standard, which allows
+users to deploy and execute a :term:`CWL` workflow in a single request to the ``POST /jobs`` endpoint using
+``multipart/mixed`` or ``multipart/related`` content types. This eliminates the need for separate
+:ref:`deployment <proc_op_deploy>` and :ref:`execution <proc_op_execute>` steps when running one-time workflows
+or testing workflow definitions.
+
+The multipart request must contain:
+
+1. One or more :term:`CWL` parts (workflow and any dependent tools) with ``Content-Type: application/cwl[+json|+yaml]``.
+   Optionally, additional :term:`Process` metadata parts can be provided with
+   ``Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/process-description``
+   (see `crim-ca/weaver#990 <https://github.com/crim-ca/weaver/issues/990>`_).
+   The example below demonstrates this optional metadata part.
+2. One execution request part with ``Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/execute``
+   containing the job inputs and execution parameters.
+
+The structure follows the same concepts and procedures defined in :ref:`proc_ogc_api_multi_cwl`.
+
+When an ad-hoc execution request is received:
+
+- The workflow (and any dependent tools) are automatically deployed with ``ad-hoc`` tagging
+- The job is immediately submitted for execution using the provided inputs
+- The workflow remains deployed after execution and can be reused or cleaned up later
+
+Example Ad-hoc Execution Request
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: http
+
+    POST /jobs HTTP/1.1
+    Host: weaver.example.com
+    Content-Type: multipart/mixed; boundary="adhoc-boundary"
+
+    --adhoc-boundary
+    Content-Type: application/cwl+json
+
+    {
+      "cwlVersion": "v1.2",
+      "class": "CommandLineTool",
+      "id": "adhoc-echo-tool",
+      "baseCommand": ["echo"],
+      "inputs": {
+        "message": "string"
+      },
+      "outputs": {
+        "output": {
+          "type": "stdout"
+        }
+      },
+      "requirements": {
+        "DockerRequirement": {
+          "dockerPull": "alpine:latest"
+        }
+      },
+      "stdout": "output.txt"
+    }
+
+    --adhoc-boundary
+    Content-Type: application/cwl+json
+
+    {
+      "cwlVersion": "v1.2",
+      "class": "Workflow",
+      "id": "adhoc-workflow",
+      "inputs": {
+        "message": "string"
+      },
+      "outputs": {
+        "result": {
+          "type": "File",
+          "outputSource": "echo_step/output"
+        }
+      },
+      "steps": {
+        "echo_step": {
+          "run": "adhoc-echo-tool",
+          "in": {
+            "message": "message"
+          },
+          "out": ["output"]
+        }
+      }
+    }
+
+    --adhoc-boundary
+    Content-Type: application/json
+    Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/process-description
+
+    {
+      "id": "adhoc-workflow",
+      "title": "Ad-hoc Echo Workflow",
+      "description": "Example ad-hoc workflow deployed and executed inline."
+    }
+
+    --adhoc-boundary
+    Content-Type: application/json
+    Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/execute
+
+    {
+      "inputs": {
+        "message": "Hello from ad-hoc workflow!"
+      },
+      "outputs": {
+        "result": {
+          "transmissionMode": "reference"
+        }
+      },
+      "mode": "async",
+      "response": "document"
+    }
+
+    --adhoc-boundary--
+
+The response will be a standard :term:`Job` status document (see :ref:`proc_op_execute`) with the ``jobID``,
+``processID`` (the deployed workflow ID), and execution status. The job can be monitored and results retrieved
+using the standard :term:`Job` endpoints.
+
+.. note::
+    The deployed workflow and tools remain available after ad-hoc execution and are tagged with ``ad-hoc`` for
+    identification. They can be cleaned up using the :ref:`Undeploy <proc_op_undeploy>` operation if no longer needed.
+
+.. seealso::
+    - :ref:`proc_op_execute` for execution request details
+    - :ref:`app_pkg_multipart` for multipart :term:`CWL` packaging
+    - `crim-ca/weaver#834 <https://github.com/crim-ca/weaver/issues/834>`_ for implementation details
+
 .. _proc_exec_steps:
 
 Execution Steps

@@ -14,8 +14,8 @@ Changes:
 --------
 - Add support for ad-hoc `CWL` workflow execution through the ``POST /jobs`` endpoint using ``multipart/mixed``
   or ``multipart/related`` content types. Users can now deploy and execute a `Process` in a single request by
-  submitting both the `CWL` workflow definition (with ``Content-Profile: http://www.opengis.net/def/ogcapi-processes/2.0/process-description``)
-  and execution parameters (with ``Content-Profile: http://www.opengis.net/def/ogcapi-processes/2.0/execute``)
+  submitting both the `CWL` workflow definition (with ``Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/process-description``)
+  and execution parameters (with ``Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/execute``)
   in a multipart request body. The workflow is automatically deployed (with temporary ``ad-hoc`` tagging) before
   execution, eliminating the need for separate deployment and execution steps for one-time workflow runs
   (resolves `#834 <https://github.com/crim-ca/weaver/issues/834>`_).

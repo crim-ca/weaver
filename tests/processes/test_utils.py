@@ -1625,40 +1625,44 @@ class TestMultipartDeployment:
         result = _extract_multipart_start_parameter(content_type)
         assert result == expected
 
-    @pytest.mark.parametrize("headers,expected", [
-        # Content-Profile header (RFC 8521) - preferred method
-        ({"Content-Profile": "http://example.com/profile"}, "http://example.com/profile"),
-        ({"Content-Profile": "<http://example.com/profile>"}, "http://example.com/profile"),
-        ({"Content-Profile": "  http://example.com/profile  "}, "http://example.com/profile"),
-        # profile parameter in Content-Type header - fallback method
-        ({"Content-Type": "application/json; profile=http://example.com/profile"}, "http://example.com/profile"),
-        ({"Content-Type": 'application/json; profile="http://example.com/profile"'}, "http://example.com/profile"),
-        ({"Content-Type": "application/json; profile=<http://example.com/profile>"}, "http://example.com/profile"),
-        ({"Content-Type": "application/json; profile=http://example.com/profile; charset=utf-8"},
-         "http://example.com/profile"),
-        # Content-Profile takes precedence over Content-Type profile parameter
-        ({"Content-Profile": "http://primary.com/profile",
-          "Content-Type": "application/json; profile=http://fallback.com/profile"}, "http://primary.com/profile"),
-        # No profile specified
-        ({"Content-Type": "application/json"}, None),
-        ({}, None),
-    ], ids=[
-        "content_profile_header",
-        "content_profile_angle_brackets",
-        "content_profile_whitespace",
-        "content_type_profile_param",
-        "content_type_profile_quoted",
-        "content_type_profile_angle_brackets",
-        "content_type_profile_with_charset",
-        "content_profile_precedence",
-        "no_profile",
-        "no_headers"
-    ])
+    @pytest.mark.parametrize(
+        ["headers", "expected"],
+        [
+            # Content-Profile header (RFC 8521) - preferred method
+            ({"Content-Profile": "http://example.com/profile"}, "http://example.com/profile"),
+            ({"Content-Profile": "<http://example.com/profile>"}, "http://example.com/profile"),
+            ({"Content-Profile": "  http://example.com/profile  "}, "http://example.com/profile"),
+            # profile parameter in Content-Type header - fallback method
+            ({"Content-Type": "application/json; profile=http://example.com/profile"}, "http://example.com/profile"),
+            ({"Content-Type": 'application/json; profile="http://example.com/profile"'}, "http://example.com/profile"),
+            ({"Content-Type": "application/json; profile=<http://example.com/profile>"}, "http://example.com/profile"),
+            ({"Content-Type": "application/json; profile=http://example.com/profile; charset=utf-8"},
+             "http://example.com/profile"),
+            # Content-Profile takes precedence over Content-Type profile parameter
+            ({"Content-Profile": "http://primary.com/profile",
+              "Content-Type": "application/json; profile=http://fallback.com/profile"}, "http://primary.com/profile"),
+            # No profile specified
+            ({"Content-Type": "application/json"}, None),
+            ({}, None),
+        ],
+        ids=[
+            "content_profile_header",
+            "content_profile_angle_brackets",
+            "content_profile_whitespace",
+            "content_type_profile_param",
+            "content_type_profile_quoted",
+            "content_type_profile_angle_brackets",
+            "content_type_profile_with_charset",
+            "content_profile_precedence",
+            "no_profile",
+            "no_headers"
+        ],
+    )
     def test_extract_multipart_profile(self, headers, expected):
         """
-        Test _extract_multipart_profile handles various profile specification methods.
+        Test :func:`_extract_multipart_profile` handles various profile specification methods.
 
-        Tests both RFC 8521 Content-Profile header and profile parameter in Content-Type header.
+        Tests both :rfc:`8521` ``Content-Profile`` header and ``profile`` parameter in ``Content-Type`` header.
         """
         # Create a minimal multipart part with the specified headers
         part = MIMEText("test content", _subtype="json", _charset="utf-8")
@@ -1862,6 +1866,8 @@ class TestMultipartDeployment:
 
 
 @pytest.mark.multipart
+@pytest.mark.oap_part3
+@pytest.mark.job
 class TestMultipartJobExecution:
     """
     Test multipart job execution parsing functions.
@@ -1870,72 +1876,128 @@ class TestMultipartJobExecution:
     both CWL packages and execution request in a single multipart request.
     """
 
-    @pytest.mark.parametrize("error_case,expected_error", [
-        ("missing_execution", "Missing execution request"),
-        ("missing_cwl", "Missing CWL packages"),
-        ("multiple_execution", "Multiple execution requests"),
-        ("empty_content", "Content is not multipart format"),
-    ], ids=["missing_execution_request", "missing_cwl_packages", "multiple_execution_requests", "empty_content"])
-    def test_parse_multipart_job_execution_errors(self, error_case, expected_error):
+    def test_parse_multipart_job_execution_missing_execution(self):
         """
-        Test various error conditions in multipart job execution parsing.
+        Test error when multipart contains only CWL but no execution request.
         """
         boundary = "----Boundary123"
+        tool_cwl = json.dumps({
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "test-tool",
+            "inputs": {},
+            "outputs": {}
+        })
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"\r\n"
+            f"{tool_cwl}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
 
-        if error_case == "missing_execution":
-            # Only CWL, no execution request
-            tool_cwl = json.dumps({
-                "cwlVersion": "v1.2",
-                "class": "CommandLineTool",
-                "id": "test-tool",
-                "inputs": {},
-                "outputs": {}
-            })
-            multipart_body = (
-                f"------Boundary123\r\n"
-                f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
-                f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
-                f"\r\n"
-                f"{tool_cwl}\r\n"
-                f"------Boundary123--\r\n"
-            ).encode('utf-8')
-        elif error_case == "missing_cwl":
-            # Only execution request, no CWL
-            execution_request = json.dumps({
-                "inputs": {"param": "value"},
-                "outputs": {}
-            })
-            multipart_body = (
-                f"------Boundary123\r\n"
-                f"Content-Type: {ContentType.APP_JSON}\r\n"
-                f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
-                f"\r\n"
-                f"{execution_request}\r\n"
-                f"------Boundary123--\r\n"
-            ).encode('utf-8')
-        elif error_case == "multiple_execution":
-            # Multiple execution requests
-            execution_request = json.dumps({
-                "inputs": {"param": "value"},
-                "outputs": {}
-            })
-            multipart_body = (
-                f"------Boundary123\r\n"
-                f"Content-Type: {ContentType.APP_JSON}\r\n"
-                f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
-                f"\r\n"
-                f"{execution_request}\r\n"
-                f"------Boundary123\r\n"
-                f"Content-Type: {ContentType.APP_JSON}\r\n"
-                f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
-                f"\r\n"
-                f"{execution_request}\r\n"
-                f"------Boundary123--\r\n"
-            ).encode('utf-8')
-        else:  # empty_content
-            multipart_body = (
-                "------Boundary123--\r\n"
-            ).encode('utf-8')
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            parse_multipart_job_execution(multipart_body, content_type, request=None)
+
+        error_message = exc_info.value.json.get("title", "")
+        assert "Missing execution request" in error_message
+
+    def test_parse_multipart_job_execution_missing_cwl(self):
+        """
+        Test error when multipart contains only execution request but no CWL packages.
+        """
+        boundary = "----Boundary123"
+        execution_request = json.dumps({
+            "inputs": {"param": "value"},
+            "outputs": {}
+        })
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_JSON}\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+            f"\r\n"
+            f"{execution_request}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            parse_multipart_job_execution(multipart_body, content_type, request=None)
+
+        error_message = exc_info.value.json.get("title", "")
+        assert "Missing CWL packages" in error_message
+
+    def test_parse_multipart_job_execution_multiple_execution(self):
+        """
+        Test error when multipart contains multiple execution requests.
+        """
+        boundary = "----Boundary123"
+        execution_request = json.dumps({
+            "inputs": {"param": "value"},
+            "outputs": {}
+        })
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_JSON}\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+            f"\r\n"
+            f"{execution_request}\r\n"
+            f"------Boundary123\r\n"
+            f"Content-Type: {ContentType.APP_JSON}\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+            f"\r\n"
+            f"{execution_request}\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            parse_multipart_job_execution(multipart_body, content_type, request=None)
+
+        error_message = exc_info.value.json.get("title", "")
+        assert "Multiple execution requests" in error_message
+
+    def test_parse_multipart_job_execution_no_valid_parts(self):
+        """
+        Test error when multipart has valid structure but no interpretable parts.
+
+        All parts have unsupported content types that get skipped during interpretation,
+        resulting in empty interpreted_parts list.
+        """
+        boundary = "----Boundary123"
+        multipart_body = (
+            f"------Boundary123\r\n"
+            f"Content-Type: text/plain\r\n"
+            f"\r\n"
+            f"This is plain text and will be skipped\r\n"
+            f"------Boundary123\r\n"
+            f"Content-Type: text/html\r\n"
+            f"\r\n"
+            f"<html><body>This will also be skipped</body></html>\r\n"
+            f"------Boundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        with pytest.raises(HTTPBadRequest) as exc_info:
+            parse_multipart_job_execution(multipart_body, content_type, request=None)
+
+        error_message = exc_info.value.json.get("title", "")
+        assert "Empty multipart content" in error_message
+
+    def test_parse_multipart_job_execution_empty_content(self):
+        """
+        Test error when content is not multipart format (empty multipart body).
+        """
+        boundary = "----Boundary123"
+        multipart_body = (
+            "------Boundary123--\r\n"
+        ).encode('utf-8')
 
         content_type = f"multipart/mixed; boundary={boundary}"
 
@@ -1944,35 +2006,39 @@ class TestMultipartJobExecution:
 
         try:
             error_message = exc_info.value.json.get("title", "")
-            assert expected_error in error_message
+            assert "Content is not multipart format" in error_message
         except (AttributeError, ValueError):
-            assert expected_error in str(exc_info.value)
+            assert "Content is not multipart format" in str(exc_info.value)
 
     @pytest.mark.parametrize("use_profiles", [True, False], ids=["with_profiles", "fallback_detection"])
     def test_parse_multipart_job_execution_basic(self, use_profiles):
         """
-        Test parsing multipart job execution with/without explicit Content-Profile headers.
+        Test parsing multipart job execution with/without explicit ``Content-Profile`` headers.
+
+        When ``use_profiles=True``, parts include ``Content-Profile`` headers that explicitly identify
+        CWL packages and execution requests per OGC API - Processes specification.
+
+        When ``use_profiles=False``, the parser must use fallback detection based on ``Content-Type``
+        and JSON structure to distinguish between CWL packages (contain "class", "cwlVersion") and
+        execution requests (contain "inputs", "outputs").
         """
-        # CWL tool
+        # CWL CommandLineTool definition
         tool_cwl = json.dumps({
             "cwlVersion": "v1.2",
             "class": "CommandLineTool",
             "id": "test-tool",
-            "inputs": {"message": "string"} if use_profiles else {},
-            "outputs": {"output": {"type": "File"}} if use_profiles else {}
+            "inputs": {},
+            "outputs": {}
         })
 
-        # Execution request
+        # Job execution request with input parameters
         execution_request = json.dumps({
-            "inputs": {"message": "test"} if use_profiles else {"param": "value"},
-            "outputs": {"output": {"transmissionMode": "reference"}} if use_profiles else {},
-            "mode": "async"
-        } if use_profiles else {
             "inputs": {"param": "value"},
             "outputs": {}
         })
 
         boundary = "----Boundary123"
+        # Add Content-Profile headers only when use_profiles=True
         profile_header_cwl = f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n" if use_profiles else ""
         profile_header_exec = f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n" if use_profiles else ""
 
@@ -1996,11 +2062,11 @@ class TestMultipartJobExecution:
             multipart_body, content_type, request=None
         )
 
-        # Verify execution request
+        # Verify execution request was correctly identified
         assert exec_req is not None
         assert "inputs" in exec_req
 
-        # Verify CWL packages
+        # Verify CWL package was correctly identified
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "test-tool"
         assert cwl_packages[0]["class"] == "CommandLineTool"
@@ -2230,51 +2296,73 @@ class TestMultipartJobExecution:
         assert "tool-1" in cwl_ids
         assert "workflow-1" in cwl_ids
 
-    @pytest.mark.parametrize("error_case,expected_title", [
-        ("missing_execution", "Missing execution request"),
-        ("missing_cwl", "Missing CWL packages"),
-        ("multiple_execution", "Multiple execution requests"),
-        ("ambiguous_execution", "Ambiguous multipart content"),
-    ], ids=["no_exec", "no_cwl", "multiple_exec", "ambiguous"])
-    def test_organize_job_execution_parts_errors(self, error_case, expected_title):
+    @pytest.mark.parametrize(
+        ["interpreted_parts", "expected_title"],
+        [
+            # Only CWL, no execution request
+            (
+                [
+                    (ContentType.APP_CWL_JSON, "tool-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, {
+                        "cwlVersion": "v1.2",
+                        "class": "CommandLineTool",
+                        "id": "test-tool",
+                        "inputs": {},
+                        "outputs": {}
+                    }),
+                ],
+                "Missing execution request"
+            ),
+            # Only execution request, no CWL
+            (
+                [
+                    (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, {
+                        "inputs": {"param": "value"},
+                        "outputs": {}
+                    }),
+                ],
+                "Missing CWL packages"
+            ),
+            # Multiple execution requests
+            (
+                [
+                    (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, {
+                        "inputs": {"param": "value"},
+                        "outputs": {}
+                    }),
+                    (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, {
+                        "inputs": {"param": "value"},
+                        "outputs": {}
+                    }),
+                ],
+                "Multiple execution requests"
+            ),
+            # Multiple JSON parts without profiles (ambiguous)
+            (
+                [
+                    (ContentType.APP_CWL_JSON, "tool-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, {
+                        "cwlVersion": "v1.2",
+                        "class": "CommandLineTool",
+                        "id": "test-tool",
+                        "inputs": {},
+                        "outputs": {}
+                    }),
+                    (ContentType.APP_JSON, "", "", None, {"inputs": {"param": "value"}, "outputs": {}}),
+                    (ContentType.APP_JSON, "", "", None, {"inputs": {"other": "value"}, "outputs": {}}),
+                ],
+                "Ambiguous multipart content"
+            ),
+        ],
+        ids=[
+            "no_exec",
+            "no_cwl",
+            "multiple_exec",
+            "ambiguous",
+        ],
+    )
+    def test_organize_job_execution_parts_errors(self, interpreted_parts, expected_title):
         """
         Test _organize_job_execution_parts error handling.
         """
-        tool_data = {
-            "cwlVersion": "v1.2",
-            "class": "CommandLineTool",
-            "id": "test-tool",
-            "inputs": {},
-            "outputs": {}
-        }
-
-        exec_data = {"inputs": {"param": "value"}, "outputs": {}}
-
-        if error_case == "missing_execution":
-            # Only CWL, no execution request
-            interpreted_parts = [
-                (ContentType.APP_CWL_JSON, "tool-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, tool_data),
-            ]
-        elif error_case == "missing_cwl":
-            # Only execution request, no CWL
-            interpreted_parts = [
-                (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, exec_data),
-            ]
-        elif error_case == "multiple_execution":
-            # Multiple execution requests
-            interpreted_parts = [
-                (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, exec_data),
-                (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, exec_data),
-            ]
-        else:  # ambiguous_execution
-            # Multiple JSON parts that could be execution requests (fallback detection)
-            exec_data2 = {"inputs": {"other": "value"}, "outputs": {}}
-            interpreted_parts = [
-                (ContentType.APP_CWL_JSON, "tool-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, tool_data),
-                (ContentType.APP_JSON, "", "", None, exec_data),  # No profile
-                (ContentType.APP_JSON, "", "", None, exec_data2),  # No profile - ambiguous
-            ]
-
         with pytest.raises(HTTPBadRequest) as exc_info:
             _organize_job_execution_parts(interpreted_parts, None)
 
@@ -2282,7 +2370,7 @@ class TestMultipartJobExecution:
 
     def test_organize_job_execution_parts_with_root_workflow_cid(self):
         """
-        Test _organize_job_execution_parts reorders based on root workflow CID.
+        Test :func:`_organize_job_execution_parts` reorders based on root workflow CID.
         """
         tool_data = {
             "cwlVersion": "v1.2",
