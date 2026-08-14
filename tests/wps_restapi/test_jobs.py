@@ -4129,7 +4129,7 @@ class WpsRestApiJobsTest(JobUtils):
         content_type_header = f"multipart/mixed; boundary={boundary}"
 
         # Mock deploy_process_from_payload to return an unexpected response type
-        with mock.patch("weaver.wps_restapi.jobs.jobs.deploy_process_from_payload") as mock_deploy:
+        with mock.patch("weaver.wps_restapi.jobs.utils.deploy_process_from_payload") as mock_deploy:
             # Return HTTPInternalServerError instead of HTTPCreated or HTTPOk
             # Include error details to simulate a real deployment failure
             deployment_error = HTTPInternalServerError(json={
@@ -4221,7 +4221,7 @@ class WpsRestApiJobsTest(JobUtils):
         content_type_header = f"multipart/mixed; boundary={boundary}"
 
         # Mock deploy_process_from_payload to return a response without a process ID
-        with mock.patch("weaver.wps_restapi.jobs.jobs.deploy_process_from_payload") as mock_deploy:
+        with mock.patch("weaver.wps_restapi.jobs.utils.deploy_process_from_payload") as mock_deploy:
             # Create a mock HTTPCreated response with empty processSummary
             mock_response = HTTPCreated()
             mock_response.json = {

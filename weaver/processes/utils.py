@@ -874,8 +874,9 @@ def _organize_job_execution_parts(interpreted_parts, root_workflow_cid):
     fallback_json_parts = []
 
     for content_type_part, content_id, content_location, profile, part_data in interpreted_parts:
-        # Check if this is an execution request based on profile
-        if profile == sd.OGC_API_PROC_PROFILE_EXECUTE_URI:
+        # Check if this is an execution request based on profile (string or list)
+        if (profile == sd.OGC_API_PROC_PROFILE_EXECUTE_URI or
+                (isinstance(profile, list) and sd.OGC_API_PROC_PROFILE_EXECUTE_URI in profile)):
             if execution_request is not None:
                 raise HTTPBadRequest(json={
                     "title": "Multiple execution requests",
@@ -885,14 +886,17 @@ def _organize_job_execution_parts(interpreted_parts, root_workflow_cid):
                     ),
                 })
             execution_request = part_data
-        # Check if this is a deployment part based on profile or content
-        elif profile == sd.OGC_API_PROC_PROFILE_PROC_DESC_URI or (
-            isinstance(part_data, dict) and part_data.get("class") in ["CommandLineTool", "Workflow", "ExpressionTool"]
-        ) or (
-            isinstance(part_data, dict) and "cwlVersion" in part_data and "$graph" in part_data
-        ):
+        # Check if this is a deployment part based on profile (string or list) or content
+        elif (profile == sd.OGC_API_PROC_PROFILE_PROC_DESC_URI or
+              (isinstance(profile, list) and sd.OGC_API_PROC_PROFILE_PROC_DESC_URI in profile) or (
+                  isinstance(part_data, dict) and part_data.get("class") in [
+                             "CommandLineTool", "Workflow", "ExpressionTool"]
+              ) or (
+                  isinstance(part_data, dict) and "cwlVersion" in part_data and "$graph" in part_data
+              )):
             deployment_parts.append((content_type_part, content_id, content_location, profile, part_data))
         # JSON/YAML parts without profile could be execution request (fallback)
+        # Note: YAML content has already been parsed to dict by _interpret_multipart_part
         elif isinstance(part_data, dict) and content_type_part in [ContentType.APP_JSON, ContentType.APP_YAML]:
             fallback_json_parts.append(part_data)
 
@@ -929,15 +933,16 @@ def _organize_job_execution_parts(interpreted_parts, root_workflow_cid):
             "title": "Missing CWL packages",
             "description": (
                 "Multipart request must contain at least one CWL package part for ad-hoc workflow execution. "
-                f"Use Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI} header "
-                "on CWL parts or ensure CWL content has 'class' field."
+                "CWL parts should use CWL-specific Content-Type (e.g., application/cwl+json) or "
+                f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI} header, "
+                "or include 'class' field in the CWL content."
             ),
         })
 
     # Extract CWL packages from deployment parts
     cwl_packages = []
     parts_by_cid = {}
-    for _, content_id, _, _, part_data in deployment_parts:
+    for content_type_part, content_id, _, _, part_data in deployment_parts:
         if isinstance(part_data, dict):
             if "class" in part_data and part_data["class"] in ["CommandLineTool", "Workflow", "ExpressionTool"]:
                 cwl_packages.append(part_data)

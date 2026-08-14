@@ -38,7 +38,7 @@ from weaver.processes.execution import (
     submit_job_dispatch_wps,
     update_job_parameters
 )
-from weaver.processes.utils import deploy_process_from_payload, get_process, parse_multipart_job_execution
+from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
@@ -46,6 +46,7 @@ from weaver.transform.const import CONVERSION_DICT
 from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
+    deploy_multipart_job_workflow,
     dismiss_job_task,
     get_job,
     get_job_io_schema_query,
@@ -220,7 +221,7 @@ def get_queried_jobs(request):
 
 @sd.jobs_service.post(
     tags=[sd.TAG_EXECUTE, sd.TAG_JOBS, sd.TAG_PROCESSES],
-    content_type=list(ContentType.ANY_MULTIPART),
+    content_type=[ContentType.MULTIPART_MIXED, ContentType.MULTIPART_RELATED],
     schema=sd.PostJobsEndpointMultipart(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
@@ -258,55 +259,11 @@ def create_job(request):
 
         # Handle multipart ad-hoc workflow execution
         if ctype in ContentType.ANY_MULTIPART:
-            # Parse multipart to separate execution request from CWL packages
-            execution_request, cwl_packages = parse_multipart_job_execution(
-                content=request.body,
-                content_type=ctype_full,
-                request=request
-            )
+            proc_id, execution_body = deploy_multipart_job_workflow(request, ctype_full)
 
-            # Deploy the CWL packages
-            cwl_to_deploy = cwl_packages[0] if len(cwl_packages) == 1 else cwl_packages
-            deploy_response = deploy_process_from_payload(
-                payload=cwl_to_deploy,
-                container=request,
-                overwrite=False
-            )
-
-            # Extract the deployed process ID
-            if not isinstance(deploy_response, (HTTPCreated, HTTPOk)):
-                # Extract deployment error details to help users debug their CWL definition
-                deploy_error = None
-                if hasattr(deploy_response, 'json'):
-                    try:
-                        deploy_error = deploy_response.json
-                    except Exception:  # noqa: S110  # nosec: B110
-                        pass
-
-                error_json = {
-                    "title": "Unexpected deployment response",
-                    "description":
-                        f"Ad-hoc workflow deployment did not return expected response. "
-                        f"Got: {type(deploy_response)}",
-                }
-                if deploy_error:
-                    error_json["error"] = deploy_error
-
-                raise HTTPBadRequest(json=error_json)
-
-            deploy_body = deploy_response.json if hasattr(deploy_response, 'json') else deploy_response
-            proc_id = deploy_body.get("processSummary", {}).get("id")
-            if not proc_id:
-                raise HTTPBadRequest(json={
-                    "title": "Missing process ID",
-                    "description":
-                        f"Ad-hoc workflow deployment did not provide a process ID. "
-                        f"Response: {deploy_body}",
-                })
-
-            # Update request to use execution parameters for normal job submission flow
-            request._json = execution_request
-            request.json_body = execution_request
+            # Update request to use execution body for normal job submission flow
+            request._json = execution_body
+            request.json_body = execution_body
             request.content_type = ContentType.APP_JSON
 
         elif ctype == ContentType.APP_JSON and "process" in request.json_body:

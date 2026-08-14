@@ -7761,7 +7761,14 @@ class ExecuteHeadersMultipart(ExecuteHeadersBase):
     content_type = ContentTypeHeader(
         missing=drop,
         default=ContentType.MULTIPART_MIXED,
-        example=ContentType.MULTIPART_MIXED
+        example=f"{ContentType.MULTIPART_MIXED}; boundary=\"...\"",
+        description=(
+            "Content-Type for multipart request. Must be one of: "
+            f"'{ContentType.MULTIPART_MIXED}; boundary=\"...\"' or "
+            f"'{ContentType.MULTIPART_RELATED}; boundary=\"...\"'. "
+            "The boundary parameter is required and varies per request."
+        ),
+        validator=OneOf([ContentType.MULTIPART_MIXED, ContentType.MULTIPART_RELATED])
     )
 
 
