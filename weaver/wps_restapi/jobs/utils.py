@@ -164,6 +164,21 @@ def deploy_multipart_job_workflow(request, ctype_full):
         overwrite=False
     )
 
+    # Guard against an unexpected return value (deploy_process_from_payload normally raises on error,
+    # but defensive check preserves forwards error details if it ever returns one instead)
+    if not isinstance(deploy_response, (HTTPCreated, HTTPOk)):
+        deploy_error = getattr(deploy_response, "json", None)
+        error_json = {
+            "title": "Unexpected deployment response",
+            "description": (
+                "Ad-hoc workflow deployment did not return expected response. "
+                f"Got: {type(deploy_response)}"
+            ),
+        }
+        if deploy_error:
+            error_json["error"] = deploy_error
+        raise HTTPBadRequest(json=error_json)
+
     # Extract the deployed process ID
     deploy_body = deploy_response.json if hasattr(deploy_response, "json") else deploy_response
     proc_id = deploy_body.get("processSummary", {}).get("id")

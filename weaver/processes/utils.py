@@ -1043,8 +1043,9 @@ def parse_process_deploy_content(
         if full_content_type:
             content_type = full_content_type
 
-    # If content is already a parsed dict (from recursive calls), skip parsing
-    if isinstance(content, dict):
+    # If content is already a parsed dict or pre-parsed list, skip parsing
+    # (list = multi-CWL packages already extracted; re-parsing the request body would pick up the execute part)
+    if isinstance(content, (dict, list)):
         pass  # Content already parsed, proceed to validation
     elif content_type and any(mt in content_type.lower() for mt in ContentType.ANY_MULTIPART):
         LOGGER.info("Detected multipart deployment request")
