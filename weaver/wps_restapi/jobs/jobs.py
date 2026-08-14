@@ -766,7 +766,9 @@ def get_job_output(request):
             "value": result_media_type
         })
 
-    return resolve_result_single(job, result, output_id, accept, headers=headers, settings=settings)
+    resp = resolve_result_single(job, result, output_id, accept, headers=headers, settings=settings)
+    resp.headers.add("Link", make_link_header(sd.OGC_API_PROC_PROFILE_OGC_VALUES_URI, rel="profile"))
+    return resp
 
 
 @sd.provider_results_service.get(
