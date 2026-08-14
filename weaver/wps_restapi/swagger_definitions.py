@@ -7768,6 +7768,8 @@ class ExecuteHeadersMultipart(ExecuteHeadersBase):
             f"'{ContentType.MULTIPART_RELATED}; boundary=\"...\"'. "
             "The boundary parameter is required and varies per request."
         ),
+        # strip boundary and other parameters before validating the media-type
+        preparer=lambda v: v.split(";", 1)[0].strip().lower() if isinstance(v, str) else v,
         validator=OneOf([ContentType.MULTIPART_MIXED, ContentType.MULTIPART_RELATED])
     )
 

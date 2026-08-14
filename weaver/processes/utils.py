@@ -64,6 +64,7 @@ from weaver.utils import (
     generate_diff,
     get_any_id,
     get_header,
+    get_response_profile,
     get_sane_name,
     get_settings,
     get_url_without_query,
@@ -769,19 +770,12 @@ def _extract_multipart_profile(part):
     :param part: Single part from multipart message
     :returns: Profile URI if found, ``None`` otherwise
     """
-    # Try Content-Profile header (RFC 8521)
-    profile = part.get('Content-Profile', '').strip().strip('<>')
-    if profile:
-        return profile
-
-    # Try profile parameter in Content-Type header
-    content_type_full = part.get('Content-Type', '')
-    if 'profile=' in content_type_full:
-        profile_part = content_type_full.split('profile=')[1].split(';')[0].strip().strip('"').strip('<>')
-        if profile_part:
-            return profile_part
-
-    return None
+    # Map part headers to the equivalent request headers get_response_profile understands:
+    # Content-Profile (RFC 8521) -> Accept-Profile, Content-Type -> Accept (for profile= parameter)
+    return get_response_profile(request_headers={
+        "Accept-Profile": part.get("Content-Profile", ""),
+        "Accept": part.get("Content-Type", ""),
+    })
 
 
 def _interpret_multipart_part(part, request=None):
