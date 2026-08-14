@@ -5,7 +5,6 @@ from celery.utils.log import get_task_logger
 from colander import Invalid
 from pyramid.httpexceptions import (
     HTTPBadRequest,
-    HTTPCreated,
     HTTPException,
     HTTPNoContent,
     HTTPNotAcceptable,
