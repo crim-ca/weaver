@@ -165,26 +165,6 @@ def deploy_multipart_job_workflow(request, ctype_full):
     )
 
     # Extract the deployed process ID
-    if not isinstance(deploy_response, (HTTPCreated, HTTPOk)):
-        # Extract deployment error details to help users debug their CWL definition
-        deploy_error = None
-        if hasattr(deploy_response, "json"):
-            try:
-                deploy_error = deploy_response.json
-            except Exception:  # noqa: S110  # nosec: B110
-                pass
-
-        error_json = {
-            "title": "Unexpected deployment response",
-            "description":
-                "Ad-hoc workflow deployment did not return expected response. "
-                f"Got: {type(deploy_response)}",
-        }
-        if deploy_error:
-            error_json["error"] = deploy_error
-
-        raise HTTPBadRequest(json=error_json)
-
     deploy_body = deploy_response.json if hasattr(deploy_response, "json") else deploy_response
     proc_id = deploy_body.get("processSummary", {}).get("id")
     if not proc_id:
