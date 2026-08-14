@@ -7822,7 +7822,7 @@ class PostJobsEndpointMultipart(ExtendedMappingSchema):
         examples={
             "ExecuteAdHoc": {
                 "summary": "Execute an ad-hoc workflow using multipart content.",
-                "value": EXAMPLES["job_execute_adhoc.http"],
+                "value": EXAMPLES["job_execute_adhoc_body.http"],
             }
         }
     )
