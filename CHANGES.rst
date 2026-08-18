@@ -25,6 +25,8 @@ Changes:
 
 Fixes:
 ------
+- Fix rendering of `OpenAPI` definitions for ``POST /processes`` deployment such that each indicated ``Content-Type``
+  correctly provides its corresponding examples for `OGC Application Package` and `CWL` representations in YAML/JSON.
 - Fix the `CLI` documentation about the reported result from ``undeploy`` command. It referred to a missing JSON
   response file, which is not valid since ``HTTP 204 No Content`` is returned for that successful operation.
 - Adjusted OpenAPI `Job` result examples with by-value/href responses.
