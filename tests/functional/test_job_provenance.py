@@ -13,6 +13,7 @@ from tests.utils import mocked_execute_celery, mocked_sub_requests, mocked_wps_o
 from weaver.formats import ContentType, OutputFormat
 from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.status import Status
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Optional
@@ -227,9 +228,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.status_code == 406, f"Expected 406, got {resp.status_code}"
         assert resp.content_type == ContentType.APP_JSON
         assert "type" in resp.json, "Error response must include 'type' field"
-        assert resp.json["type"] == (
-            "https://www.opengis.net/def/exceptions/ogcapi-processes-5/1.0/prov-unsupported-format"
-        )
+        assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI
         assert "detail" in resp.json
 
     @parameterized.expand([
@@ -251,7 +250,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
         assert resp.content_type == ContentType.APP_JSON
         assert "type" in resp.json, "Error response must include 'type' field"
-        assert resp.json["type"] == "https://www.opengis.net/def/exceptions/ogcapi-processes-5/1.0/prov-missing"
+        assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_MISSING_URI
         assert "detail" in resp.json
 
     @parameterized.expand([
@@ -273,7 +272,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
         assert resp.content_type == ContentType.APP_JSON
         assert "type" in resp.json, "Error response must include 'type' field"
-        assert resp.json["type"] == "https://www.opengis.net/def/exceptions/ogcapi-processes-5/1.0/prov-missing"
+        assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_MISSING_URI
         assert "detail" in resp.json
 
     @parameterized.expand([
