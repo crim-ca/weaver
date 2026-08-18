@@ -69,13 +69,14 @@ curl -X GET \
 ```json
 {
   "conformsTo": [
-    "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/core",
-    "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/ogc-process-description",
-    "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/json",
-    "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/job-list",
-    "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/deploy-replace-undeploy",
-    "http://www.opengis.net/spec/ogcapi-processes-3/0.0/conf/workflows",
-    "http://www.opengis.net/spec/ogcapi-processes-4/1.0/conf/job-management"
+    "https://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/core",
+    "https://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/ogc-process-description",
+    "https://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/json",
+    "https://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/job-list",
+    "https://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/deploy-replace-undeploy",
+    "https://www.opengis.net/spec/ogcapi-processes-3/0.0/conf/workflows",
+    "https://www.opengis.net/spec/ogcapi-processes-4/1.0/conf/job-management",
+    "https://www.opengis.net/spec/ogcapi-processes-5/1.0/conf/provenance"
   ]
 }
 ```

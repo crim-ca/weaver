@@ -127,11 +127,13 @@ def notify_job_email(job, to_email_recipient, container):
         raise IOError(f"Code: {code}, Message: {error_message}")
 
 
-# https://stackoverflow.com/a/55147077
 def get_crypto_key(settings, salt, rounds):
     # type: (SettingsType, bytes, int) -> bytes
     """
     Get the cryptographic key used for encoding and decoding the email.
+
+    .. seealso::
+        https://stackoverflow.com/a/55147077
     """
     backend = default_backend()
     pwd = str2bytes(settings.get("weaver.wps_email_encrypt_salt"))  # use old param for backward-compat even if not salt

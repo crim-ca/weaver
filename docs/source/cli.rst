@@ -265,15 +265,24 @@ from the service. Requires a `Weaver` or |ogc-api-proc-part2|_ compliant instanc
 
     weaver undeploy -u ${WEAVER_URL} -p docker-python-script-report
 
+Sample Output:
+
+.. code-block:: text
+
+    Undeploy successful.
+
 .. code-block:: python
     :caption: Python
 
     client.undeploy("docker-python-script-report")
 
-Sample Output:
+Because the undeploy request returns ``HTTP 204 No Content`` in case of success,
+the :class:`weaver.cli.OperationResult` object returned by the method will return properties
+equivalent to that response.
 
-.. literalinclude:: ../../weaver/wps_restapi/examples/local_process_undeploy_success.json
-    :language: json
+.. literalinclude:: ../../weaver/wps_restapi/examples/local_process_undeploy_success.http
+    :caption: Empty response indicating successful undeployment of the :term:`Process`
+    :language: http
 
 .. _cli_example_getcap:
 
@@ -525,9 +534,13 @@ Retrieves the :ref:`Job Results <proc_op_result>` from a successful :term:`Job` 
     client.results("14c68477-c3ed-4784-9c0f-a4c9e1344db5")
 
 
-Sample Output:
+Depending on submitted :ref:`proc_exec_results` arguments, the :term:`Job` results can be returned in various formats.
+The following examples show common representations of results returned by value or by reference.
 
-.. literalinclude:: ../../weaver/wps_restapi/examples/job_results.json
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_results_by_value.json
+    :language: json
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_results_by_reference.json
     :language: json
 
 .. _cli_example_job_prov:

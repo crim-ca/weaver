@@ -23,6 +23,9 @@ Changes:
 - Update and add new ``/conformance`` references of `Job` definition and provenance requirements and recommendations.
 - Update `Job` provenance error responses with standard ``type`` URIs.
 - Add ``rel=profile`` link and ``Content-Profile`` header to `Job` provenance responses to indicate the applied profile.
+- Adjust the `CLI` to return the ``OperationResult.message`` when the response body is empty (``HTTP 204 No Content``)
+  to provide a clearer message to the user of what happened and indicate the state of the operation.
+  Previously, the ``None`` content would be reported as is making it ambiguous about what occurred or whether it failed.
 
 Fixes:
 ------
@@ -33,6 +36,21 @@ Fixes:
   special characters (e.g., a space between its parameters), it would fail due to the missing URL encoding. Finally, the
   actual URL returned was missing the ``/results/`` portion of the ``/jobs/{jobId}/results/{outputId}`` endpoint.
 - Fix missing ``unquote`` operation to handle URL encoding for ``?f={mediaType}`` on result endpoint for above change.
+- Fix rendering of `OpenAPI` definitions for ``POST /processes`` deployment such that each indicated ``Content-Type``
+  correctly provides its corresponding examples for `OGC Application Package` and `CWL` representations in YAML/JSON.
+- Fix the `CLI` documentation about the reported result from ``undeploy`` command. It referred to a missing JSON
+  response file, which is not valid since ``HTTP 204 No Content`` is returned for that successful operation.
+- Adjusted OpenAPI `Job` result examples with by-value/href responses.
+- Adjust OpenAPI ``Accept-Profile`` to report profiles applicable to specific endpoints rather than generic entries.
+- Update OGC profile, exception and link relation URIs to ``https://`` as per corresponding standard updates.
+- Update CWL schema URL to ``https://w3id.org/cwl/v1.2/cwl-json-schema.yaml`` to match the official release instead
+  of its GitHub raw contents copy.
+- Renamed ``StringOneOf`` to ``DelimitedStringOneOf`` to clarify the expected format of the field in contrast to the
+  similar ``OneOfCaseInsensitive`` definition (which ``DelimitedStringOneOf`` relies on), respectively for a single
+  string of allowed values delimited by a given character, and simply a string field validator of enum string values.
+- Added tests for ``DelimitedStringOneOf`` and ``OneOfCaseInsensitive`` to ensure their related case-sensitive value
+  handling remains consistent between them.
+- Fix invalid parsing of ``Link: <{URI}>; rel="profile"`` headers to extract the profile URI.
 
 .. _changes_6.15.0:
 

@@ -1196,7 +1196,10 @@ class WeaverClient(object):
         resp = self._request("DELETE", path,
                              headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
-        return self._parse_result(resp, with_links=with_links, with_headers=with_headers, output_format=output_format)
+        return self._parse_result(
+            resp, message="Undeploy successful.",
+            with_links=with_links, with_headers=with_headers, output_format=output_format,
+        )
 
     def capabilities(
         self,
@@ -4099,12 +4102,13 @@ def main(*args):
         msg = "Operation failed due to exception."
         err = fully_qualified_name(exc)
         result = OperationResult(False, message=msg, body={"message": msg, "cause": str(exc), "error": err})
+    output = result.text or result.message
     if result.success:
         LOGGER.info("%s successful. %s\n", oper.title(), result.message)
-        print(result.text)  # use print in case logger disabled or level error/warn
+        print(output)  # use print in case logger disabled or level error/warn
         return 0
     LOGGER.error("%s failed. %s\n---\nStatus Code: %s\n---", oper.title(), result.message, result.code)
-    print(result.text)
+    print(output)
     return -1
 
 
