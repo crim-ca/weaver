@@ -7644,13 +7644,17 @@ class DeployBodyCWL(Deploy):
 
 
 class PostProcessesEndpointOGC(PostProcessesEndpoint):
-    header = DeployHeadersOGC(description="Headers employed for process deployment.")
+    header = DeployHeadersOGC(
+        description="Headers employed for process deployment to represent OGC Application Package content.",
+    )
     querystring = FormatQuery()
     body = DeployBodyOGC()
 
 
 class PostProcessesEndpointCWL(PostProcessesEndpoint):
-    header = DeployHeadersCWL(description="Headers employed for process deployment.")
+    header = DeployHeadersCWL(
+        description="Headers employed for process deployment to represent CWL content.",
+    )
     querystring = FormatQuery()
     body = DeployBodyCWL()
 
