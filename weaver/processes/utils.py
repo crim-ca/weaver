@@ -877,7 +877,10 @@ def parse_process_deploy_content(
     # If content is already a parsed dict (from recursive calls), skip parsing
     if isinstance(content, dict):
         pass  # Content already parsed, proceed to validation
-    elif content_type and (clean_media_type_format(content_type, strip_parameters=True) in ContentType.ANY_MULTIPART):
+    elif (
+        content_type and
+        clean_media_type_format(content_type, strip_parameters=True).lower() in ContentType.ANY_MULTIPART
+    ):
         LOGGER.info("Detected multipart deployment request")
         cwl_packages, _ = parse_multipart_deploy(
             content=content if content is not None else request.body,

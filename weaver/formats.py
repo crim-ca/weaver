@@ -1115,7 +1115,7 @@ def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=F
                 media_type = media_type.split(",", 1)[0] + media_type[colon_pos:]
         else:
             media_type = media_type.split(",", 1)[0]
-    media_type = media_type.strip().lower()
+    media_type = media_type.strip()
     if suffix_subtype and "+" in media_type:
         # parameters are not necessarily stripped, need to re-append them after if any
         parts = media_type.split(";", 1)
