@@ -6259,7 +6259,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                                        data=exec_content, headers=self.json_headers, only_local=True)
             assert resp.status_code == 404, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert resp.content_type == ContentType.APP_JSON
-            assert resp.json["type"] == "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process"
+            assert resp.json["type"] == sd.OGC_API_PROC_PART1_EXC_NO_SUCH_PROCESS_URI
 
     @pytest.mark.oap_part4
     def test_execute_jobs_process_malformed_json(self):
@@ -6275,7 +6275,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                                        data=exec_content, headers=self.json_headers, only_local=True)
             assert resp.status_code == 400, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert resp.content_type == ContentType.APP_JSON
-            assert resp.json["type"] == "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process"
+            assert resp.json["type"] == sd.OGC_API_PROC_PART1_EXC_NO_SUCH_PROCESS_URI
             assert resp.json["cause"] == {"in": "body", "process": "xyz"}
 
     @pytest.mark.oap_part4
@@ -6297,7 +6297,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
                                        data=exec_content, headers=headers, only_local=True)
             assert resp.status_code == 400, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert resp.content_type == ContentType.APP_JSON
-            assert resp.json["type"] == "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process"
+            assert resp.json["type"] == sd.OGC_API_PROC_PART1_EXC_NO_SUCH_PROCESS_URI
             assert resp.json["cause"] == {"in": "body", "ows:Identifier": None}
 
     @pytest.mark.oap_part4
@@ -6313,9 +6313,7 @@ class WpsPackageAppTestResultResponses(WpsConfigBase, ResourcesUtil):
             resp = mocked_sub_requests(self.app, "post", path, timeout=5, data="", headers=headers, only_local=True)
             assert resp.status_code == 415, f"Failed with: [{resp.status_code}]\nReason:\n{resp.text}"
             assert resp.content_type == ContentType.APP_JSON
-            assert resp.json["type"] == (
-                "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type"
-            )
+            assert resp.json["type"] == sd.OGC_API_PROC_PART4_EXC_UNSUPPORTED_MEDIA_TYPE_URI
             assert resp.json["cause"] == {"in": "headers", "name": "Content-Type", "value": ContentType.TEXT_PLAIN}
 
 

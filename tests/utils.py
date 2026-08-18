@@ -416,6 +416,18 @@ class MockedRequest(DummyRequest):
     def text(self):
         return bytes2str(self.body) if self.body else json.dumps(self.json, ensure_ascii=False)
 
+    @property
+    def content_type(self):
+        """
+        Return the Content-Type from headers, defaulting to application/json if JSON body is present.
+        """
+        if hasattr(self, 'headers') and 'Content-Type' in self.headers:
+            return self.headers['Content-Type']
+        # Default to JSON content type if json attribute is set
+        if self.json:
+            return ContentType.APP_JSON
+        return None
+
 
 class MockedResponse(TestResponse):
     """

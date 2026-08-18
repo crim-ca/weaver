@@ -187,16 +187,21 @@ def get_processes(request):
 
 @sd.processes_service.post(
     tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
-    schema=sd.PostProcessesEndpointCWLYAML(),
+    schema=sd.PostProcessesEndpointCWL(),
     accept=ContentType.APP_JSON,
-    content_type=[ContentType.APP_CWL_YAML, ContentType.APP_CWL, ContentType.APP_CWL_X],
+    content_type=[
+        ctype for ctype in
+        sd.DeployContentTypeCWL.validator.choices
+        if ctype not in sd.DeployContentTypeOGC.validator.choices
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.post_processes_responses,
 )
 @sd.processes_service.post(
     tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
-    schema=sd.PostProcessesEndpoint(),
+    schema=sd.PostProcessesEndpointOGC(),
     accept=ContentType.APP_JSON,
+    content_type=sd.DeployContentTypeOGC.validator.choices,
     renderer=OutputFormat.JSON,
     response_schemas=sd.post_processes_responses,
 )
@@ -438,7 +443,7 @@ def set_process_visibility(request):
         process = store.fetch_by_id(process_id)
         if not process.mutable:
             raise HTTPForbidden(json={
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/immutable-process",
+                "type": sd.OGC_API_PROC_PART2_EXC_IMMUTABLE_PROCESS_URI,
                 "title": "Process immutable.",
                 "detail": "Cannot change the visibility of builtin process.",
                 "status": HTTPForbidden.code,
@@ -473,7 +478,7 @@ def delete_local_process(request):
     process_id = process.id
     if not process.mutable:
         raise HTTPForbidden(json={
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0/immutable-process",
+            "type": sd.OGC_API_PROC_PART2_EXC_IMMUTABLE_PROCESS_URI,
             "title": "Process immutable.",
             "detail": "Cannot delete an immutable process.",
             "status": HTTPForbidden.code,

@@ -215,6 +215,42 @@ Sample Output:
     :language: json
 
 
+Multi-CWL Deployment Example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When deploying a :term:`Workflow` with multiple dependent :term:`CWL` tools, the ``weaver deploy`` command
+can accept multiple :term:`CWL` file paths and automatically deploy them in the correct order.
+
+.. code-block:: bash
+    :caption: Command Line
+
+    weaver deploy \
+      -u https://weaver.example.com \
+      echo-tool.cwl \
+      cat-tool.cwl \
+      main-workflow.cwl
+
+.. code-block:: python
+    :caption: Python
+
+    client.deploy(
+        cwl=["echo-tool.cwl", "cat-tool.cwl", "main-workflow.cwl"]
+    )
+
+The CLI will automatically:
+
+1. Analyze dependencies between :term:`CWL` definitions
+2. Deploy all ``CommandLineTool`` and ``ExpressionTool`` definitions first
+3. Deploy the main :term:`Workflow` last, once all dependencies are available
+4. Skip tools that already exist (allowing deployment retries after failures)
+
+The order in which files are provided to the CLI does not matter - dependencies are resolved automatically.
+
+.. seealso::
+    - :ref:`app_pkg_workflow` for details on :term:`Workflow` definitions
+    - :ref:`proc_ogc_api_multi_cwl` for HTTP API multipart deployment requests
+
+
 .. _cli_undeploy:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -229,15 +265,24 @@ from the service. Requires a `Weaver` or |ogc-api-proc-part2|_ compliant instanc
 
     weaver undeploy -u ${WEAVER_URL} -p docker-python-script-report
 
+Sample Output:
+
+.. code-block:: text
+
+    Undeploy successful.
+
 .. code-block:: python
     :caption: Python
 
     client.undeploy("docker-python-script-report")
 
-Sample Output:
+Because the undeploy request returns ``HTTP 204 No Content`` in case of success,
+the :class:`weaver.cli.OperationResult` object returned by the method will return properties
+equivalent to that response.
 
-.. literalinclude:: ../../weaver/wps_restapi/examples/local_process_undeploy_success.json
-    :language: json
+.. literalinclude:: ../../weaver/wps_restapi/examples/local_process_undeploy_success.http
+    :caption: Empty response indicating successful undeployment of the :term:`Process`
+    :language: http
 
 .. _cli_example_getcap:
 
@@ -489,9 +534,13 @@ Retrieves the :ref:`Job Results <proc_op_result>` from a successful :term:`Job` 
     client.results("14c68477-c3ed-4784-9c0f-a4c9e1344db5")
 
 
-Sample Output:
+Depending on submitted :ref:`proc_exec_results` arguments, the :term:`Job` results can be returned in various formats.
+The following examples show common representations of results returned by value or by reference.
 
-.. literalinclude:: ../../weaver/wps_restapi/examples/job_results.json
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_results_by_value.json
+    :language: json
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_results_by_reference.json
     :language: json
 
 .. _cli_example_job_prov:

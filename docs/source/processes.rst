@@ -259,6 +259,41 @@ Where the referenced file hosted at ``"https://remote-file-server.com/my-package
     "<...>": "<...>"
 
 
+.. _proc_ogc_api_multi_cwl:
+
+Package as Multiple CWL Documents
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When deploying a :term:`Workflow` with multiple dependent :term:`CWL` tools, `Weaver` supports
+the ``multipart/related`` content format as defined in |ogc-api-proc-part2|_.
+This allows packaging multiple :term:`CWL` documents in a single HTTP request using standard MIME multipart encoding.
+
+The key advantage of this approach is that users can develop and test their :term:`Workflow` locally using
+separate :term:`CWL` files, then deploy them as-is to `Weaver` without manual modifications. In contrast,
+`CWL Packed Documents`_ (using ``$graph``) or nested tool definitions require manual consolidation and
+restructuring of multiple files into a single document before deployment.
+
+.. _CWL Packed Documents: https://www.commonwl.org/v1.2/Workflow.html#Packed_documents
+
+.. note::
+
+    Users do not need to manually construct the ``multipart/related`` request format. The :ref:`CLI <cli>` and
+    :ref:`Python client <client_commands>` automatically handle multipart encoding and boundary generation
+    when multiple :term:`CWL` files are provided, making the deployment process seamless.
+
+`Weaver` also supports `CWL Packed Documents`_ via ``$graph`` arrays if needed. Both the multipart approach
+and ``$graph`` approach ultimately resolve to equivalent internal representations, so users can choose
+whichever method best fits their workflow development process.
+
+.. seealso::
+    For automated multi-CWL deployment using the CLI, refer to :ref:`cli_example_deploy`.
+
+.. note::
+
+    For HTTP API requests, use ``multipart/related`` content format to package multiple :term:`CWL` documents
+    in a single request body. See :ref:`app_pkg_multipart` for detailed examples and structure.
+
+
 .. _proc_esgf_cwt:
 
 ESGF-CWT
@@ -430,6 +465,22 @@ The request body requires mainly two components:
     If the :term:`Process` can be directly represented and converted from the :term:`CWL`, it
     can be directly deployed (i.e.: provided as is rather than embedding it in ``executionUnit``) when combined with
     the appropriate ``application/cwl+json`` or ``application/cwl+yaml`` :term:`Media-Type` in ``Content-Type`` header.
+
+.. note::
+    For deploying multiple related :term:`CWL` packages (e.g., a :term:`Workflow` with dependent tools),
+    the ``multipart/related`` :term:`Media-Type` can be used in the ``Content-Type`` header to package
+    all :term:`CWL` documents in a single request. Each part should specify its own content type
+    (``application/cwl+json`` or ``application/cwl+yaml``) and unique ``Content-ID``.
+    See :ref:`proc_ogc_api_multi_cwl` and :ref:`app_pkg_multipart` for detailed multipart structure and examples.
+
+.. fixme: support process meta multipart (https://github.com/crim-ca/weaver/issues/990) - update accepted parts
+.. note::
+    Multiple :term:`CWL` packages can also be deployed using an array of ``executionUnit`` entries, where each
+    entry contains either an inline ``unit`` object or an ``href`` reference to an external :term:`CWL` document.
+    This approach resolves the multi-:term:`CWL` references in an equivalent fashion to the ``multipart/related``
+    content case described above, but allows deployment through standard :term:`JSON` request bodies without
+    requiring multipart encoding. Only :term:`CWL`-like :term:`Media-Types` are accepted to avoid ambiguities
+    with other deployment formats (e.g.: ``application/json`` or ``application/ogcapppkg+json``).
 
 .. seealso::
     Section :ref:`cwl-wps-mapping` provides further details about notable considerations that
@@ -3390,7 +3441,7 @@ Possible locations where :term:`Profile` can be specified are, in order of prece
 - ``Accept-Profile`` header directly providing the profile :term:`URI`.
 - ``Accept`` :term:`Media-Type` with a ``profile`` parameter.
 - ``Prefer`` header including a ``profile`` parameter.
-- ``Link`` header including a ``profile`` parameter.
+- ``Link`` header including a link relation named ``profile``.
 
 .. seealso::
     - Implementation of the resolution order in `Weaver` is provided in :func:`weaver.utils.get_response_profile`.
@@ -3406,15 +3457,17 @@ In `Weaver`, the prioritization strategy is defined in terms of most explicit an
 least probable ones regarding where the :term:`Profile` is potentially located. Another consideration for the order
 is the "*strictness requirement*" aspect of each header. The ``Accept`` header imposes a strict refusal of the
 request (``406 Not Acceptable``) if the :term:`Profile` is not supported for a given endpoint, while the ``Prefer``
-header is more relaxed and fulfillment is optional (the server is allowed to ignore it and respond successfully).
+header is more relaxed and fulfillment is optional. The server is allowed to ignore the failing ``Prefer`` condition
+and respond successfully, unless ``handling=strict`` (:rfc:`7240#section-4.4`) is indicated.
 
 The ``Link`` header is placed last, to potentially allow ``Prefer`` priority if a given :term:`Profile` can be
-respected, and revert back to :term:`Profile` specified by ``Link`` otherwise. This allows the simultaneous
-submission of ``Prefer: profile=...`` and ``Link: profile=...`` headers in a request with flexible outcomes between
+respected, and revert back to :term:`Profile` specified by ``Link`` otherwise. This allows the simultaneous submission
+of ``Prefer: profile="{URI}"`` and ``Link: <{URI}>; rel=profile`` headers in a request with flexible outcomes between
 clients and servers supporting different :term:`Profile` interoperability. In this case, the ``Link`` header can be
 used to provide a fallback if the :term:`Profile` in ``Prefer`` header cannot not be respected or resolved by the server
 for the given request context. Fulfilling the :term:`Profile` in ``Link`` header is "*more important*" in this fallback
-scenario, but still **NOT** mandatory, contrary to the ``Accept`` and ``Accept-Profile`` headers.
+scenario, but still **NOT** mandatory, contrary to the ``Accept`` and ``Accept-Profile`` headers that must be respected
+to fulfill the request successfully.
 
 .. _proc_content_negotiation_transforms:
 

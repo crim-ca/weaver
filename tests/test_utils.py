@@ -83,6 +83,7 @@ from weaver.utils import (
     make_dirs,
     make_link_header,
     null,
+    parse_content_id,
     parse_kvp,
     parse_number_with_unit,
     pass_http_error,
@@ -2541,6 +2542,8 @@ def test_explode_headers(test_headers, expect_headers, expect_get_all):
         (MockRequest("?profile=param", headers={"Profile": "header"}), {}, "param"),
         (MockRequest("?profile=param", headers={"Accept-Profile": "header"}), {}, "param"),
         (MockRequest("?random=param", headers={"Accept-Profile": "header"}), {}, "header"),
+        (MockRequest("/test", headers={"Link": "<https://example.com>; rel=profile"}), {}, "https://example.com"),
+        (MockRequest("/test", headers={"Link": "<https://example.com>; rel=\"profile\""}), {}, "https://example.com"),
         (MockRequest("/test", headers={"Accept-Profile": "header"}), {"Accept-Profile": "x-header"}, "x-header"),
         (MockRequest("/test", headers={"Random": "other"}), {"Accept-Profile": "x-header"}, "x-header"),
         (MockRequest("/test", headers={}), {"Accept-Profile": "x-header"}, "x-header"),
@@ -2558,3 +2561,35 @@ def test_make_link_header():
 
     link = make_link_header("https://example.com/test", type="text/plain", rel="test")
     assert link == "<https://example.com/test>; rel=\"test\"; type=\"text/plain\""
+
+
+@pytest.mark.parametrize(
+    ["content_id", "expect_resource", "expect_context"],
+    [
+        ("<resource123@context456>", "resource123", "context456"),
+        ("<fe9c497e-811f-4bf8-b1a8-63005cea8e99@12345678-1234-5678-1234-567812345678>",
+         "fe9c497e-811f-4bf8-b1a8-63005cea8e99", "12345678-1234-5678-1234-567812345678"),
+    ]
+)
+def test_parse_content_id_valid(content_id, expect_resource, expect_context):
+    """Test parsing of valid Content-ID header format according to RFC 2392."""
+    resource_id, context_id = parse_content_id(content_id)
+    assert resource_id == expect_resource
+    assert context_id == expect_context
+
+
+@pytest.mark.parametrize(
+    "invalid_content_id",
+    [
+        "resource123@context456>",   # Missing '<' at start
+        "<resource123@context456",   # Missing '>' at end
+        "resource123@context456",    # Missing both '<' and '>'
+        "<resource123-context456>",  # Missing '@' separator
+        "",                          # Empty string
+        "<>",                        # Only brackets
+    ]
+)
+def test_parse_content_id_invalid(invalid_content_id):
+    """Test that invalid Content-ID formats raise ValueError."""
+    with pytest.raises(ValueError, match="Invalid Content-ID format"):
+        parse_content_id(invalid_content_id)

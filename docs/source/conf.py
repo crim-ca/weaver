@@ -473,6 +473,9 @@ linkcheck_ignore = [
     # ignore agent skills during docs build,
     # links will be validated by local markdown checks instead
     r"./\.agents/.*",
+    # ignore stackoverflow redirects causing failures
+    # https://github.com/orgs/sphinx-doc/discussions/12032
+    r"https://stackoverflow\.com/.*",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md

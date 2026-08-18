@@ -12,6 +12,67 @@ Changes
 
 Changes:
 --------
+- Adjust the `CLI` to return the ``OperationResult.message`` when the response body is empty (``HTTP 204 No Content``)
+  to provide a clearer message to the user of what happened and indicate the state of the operation.
+  Previously, the ``None`` content would be reported as is making it ambiguous about what occurred or whether it failed.
+
+Fixes:
+------
+- Fix rendering of `OpenAPI` definitions for ``POST /processes`` deployment such that each indicated ``Content-Type``
+  correctly provides its corresponding examples for `OGC Application Package` and `CWL` representations in YAML/JSON.
+- Fix the `CLI` documentation about the reported result from ``undeploy`` command. It referred to a missing JSON
+  response file, which is not valid since ``HTTP 204 No Content`` is returned for that successful operation.
+- Adjusted OpenAPI `Job` result examples with by-value/href responses.
+- Adjust OpenAPI ``Accept-Profile`` to report profiles applicable to specific endpoints rather than generic entries.
+- Update OGC profile, exception and link relation URIs to ``https://`` as per corresponding standard updates.
+- Update CWL schema URL to ``https://w3id.org/cwl/v1.2/cwl-json-schema.yaml`` to match the official release instead
+  of its GitHub raw contents copy.
+- Renamed ``StringOneOf`` to ``DelimitedStringOneOf`` to clarify the expected format of the field in contrast to the
+  similar ``OneOfCaseInsensitive`` definition (which ``DelimitedStringOneOf`` relies on), respectively for a single
+  string of allowed values delimited by a given character, and simply a string field validator of enum string values.
+- Added tests for ``DelimitedStringOneOf`` and ``OneOfCaseInsensitive`` to ensure their related case-sensitive value
+  handling remains consistent between them.
+- Fix invalid parsing of ``Link: <{URI}>; rel="profile"`` headers to extract the profile URI.
+
+.. _changes_6.15.0:
+
+`6.15.0 <https://github.com/crim-ca/weaver/tree/6.15.0>`_ (2026-07-03)
+====================================================================================================================
+
+Changes:
+--------
+- Add support for multipart `Process` deployment using ``multipart/related`` or ``multipart/mixed`` content types,
+  allowing simultaneous upload of multiple `CWL` files (e.g.: ``class: Workflow`` and ``class: CommandLineTool``)
+  along with optional `Process` description metadata (relates to `#56 <https://github.com/crim-ca/weaver/issues/56>`_,
+  resolves `#717 <https://github.com/crim-ca/weaver/issues/717>`_,
+  resolves `#874 <https://github.com/crim-ca/weaver/issues/874>`_).
+- Add support for `CWL` ``$graph`` representation with multiple entries, enabling deployment of workflows with
+  embedded step definitions without manual preprocessing
+  (resolves `#56 <https://github.com/crim-ca/weaver/issues/56>`_).
+- Add support for multiple ``executionUnit`` `CWL` entries in deployment payloads. Multiple execution units can now
+  be deployed in a single request using either inline ``unit`` objects or ``href`` URL references, allowing
+  deployment of workflows with multiple step definitions without requiring multipart encoding. This approach only
+  accepts CWL-like media-types to avoid ambiguities with other deployment formats
+  (e.g.: ``application/json`` or ``application/ogcapppkg+json``).
+- Add validation during multipart deployment to ensure at least one ``class: Workflow`` is present and properly
+  identified as the main workflow from media-type hints or ``Content-ID`` references.
+- Add `CLI` support for deploying multiple `CWL` files by repeating ``--cwl`` arguments to automatically generate
+  ``multipart/related`` request payloads, simplifying deployment of workflows with multiple step definitions.
+  The `CLI` accepts a mixture of local `CWL` file paths (as `JSON` or `YAML`) and remote URL references.
+  The server handles ``Content-Type`` media-type detection and ``Content-Location`` header processing for external
+  `CWL` files to fetch during deployment.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.14.0:
+
+`6.14.0 <https://github.com/crim-ca/weaver/tree/6.14.0>`_ (2026-07-03)
+====================================================================================================================
+
+Changes:
+--------
 - Rename Dockerfiles from ``docker/Dockerfile-{base,manager,worker}``
   to ``docker/{base,manager,worker}.dockerfile`` for a consistent naming and file extension scheme.
 - Refactor ``docker/base.dockerfile`` to a multi-stage build keeping build-only tooling out of runtime
