@@ -187,16 +187,21 @@ def get_processes(request):
 
 @sd.processes_service.post(
     tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
-    schema=sd.PostProcessesEndpointCWLYAML(),
+    schema=sd.PostProcessesEndpointCWL(),
     accept=ContentType.APP_JSON,
-    content_type=[ContentType.APP_CWL_YAML, ContentType.APP_CWL, ContentType.APP_CWL_X],
+    content_type=[
+        ctype for ctype in
+        sd.DeployContentTypeCWL.validator.choices
+        if ctype not in sd.DeployContentTypeOGC.validator.choices
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.post_processes_responses,
 )
 @sd.processes_service.post(
     tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
-    schema=sd.PostProcessesEndpoint(),
+    schema=sd.PostProcessesEndpointOGC(),
     accept=ContentType.APP_JSON,
+    content_type=sd.DeployContentTypeOGC.validator.choices,
     renderer=OutputFormat.JSON,
     response_schemas=sd.post_processes_responses,
 )
