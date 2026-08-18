@@ -1685,7 +1685,7 @@ class TestMultipartDeployment:
     ], ids=["cwl_json", "invalid_json", "unsupported_content_type"])
     def test_interpret_multipart_part(self, content, content_type, should_parse):
         """
-        Test _interpret_multipart_part with various content types and validity.
+        Test :func:`_interpret_multipart_part` with various content types and validity.
         """
         part = MIMEText(content, _subtype="json" if "json" in content_type else "plain", _charset="utf-8")
         part.replace_header("Content-Type", content_type)
@@ -2351,12 +2351,28 @@ class TestMultipartJobExecution:
                 ],
                 "Ambiguous multipart content"
             ),
+            # Process-description profile with non-CWL structure (missing required CWL fields)
+            (
+                [
+                    (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, {
+                        "inputs": {"param": "value"},
+                        "outputs": {}
+                    }),
+                    # profile claims this is a process description, but data has no 'class' or '$graph'
+                    (ContentType.APP_JSON, "desc-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, {
+                        "title": "My Process",
+                        "description": "A process without required CWL fields",
+                    }),
+                ],
+                "Missing CWL packages"
+            ),
         ],
         ids=[
             "no_exec",
             "no_cwl",
             "multiple_exec",
             "ambiguous",
+            "mismatching_profile",
         ],
     )
     def test_organize_job_execution_parts_errors(self, interpreted_parts, expected_title):
