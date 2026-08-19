@@ -7558,21 +7558,6 @@ class Deploy(OneOfKeywordSchema):
     ]
 
 
-class DeployContentTypeAny(ContentTypeHeader):
-    example = ContentType.APP_JSON
-    default = ContentType.APP_JSON
-    validator = OneOf([
-        ContentType.APP_JSON,
-        ContentType.APP_CWL,
-        ContentType.APP_CWL_JSON,
-        ContentType.APP_CWL_YAML,
-        ContentType.APP_CWL_X,
-        ContentType.APP_OGC_PKG_JSON,
-        ContentType.APP_OGC_PKG_YAML,
-        ContentType.APP_YAML,
-    ])
-
-
 class DeployContentTypeOGC(ContentTypeHeader):
     example = ContentType.APP_JSON
     default = ContentType.APP_JSON
@@ -7597,6 +7582,25 @@ class DeployContentTypeCWL(ContentTypeHeader):
     ])
 
 
+class DeployContentTypeMultipart(ContentTypeHeader):
+    # boundary value aligned with 'DeployBodyMultipart' example
+    # aligned with the documented multipart definition in 'package.rst' (but more complete with entire request)
+    example = f"{ContentType.MULTIPART_RELATED}; boundary=\"boundary123\""
+    default = ContentType.MULTIPART_MIXED
+    # mostly for listing the plain headers via OpenAPI, actual validation needs 'allow_content_type_multipart' callable
+    validator = OneOf(list(ContentType.ANY_MULTIPART))
+
+
+class DeployContentTypeAny(ContentTypeHeader):
+    example = ContentType.APP_JSON
+    default = ContentType.APP_JSON
+    validator = OneOf(sorted(
+        set(DeployContentTypeOGC.validator.choices) |
+        set(DeployContentTypeCWL.validator.choices) |
+        set(DeployContentTypeMultipart.validator.choices)
+    ))
+
+
 class DeployHeadersAny(RequestHeadersBody):
     x_auth_docker = XAuthDockerHeader()
     content_type = DeployContentTypeAny()
@@ -7612,9 +7616,9 @@ class DeployHeadersCWL(RequestHeadersBody):
     content_type = DeployContentTypeCWL()
 
 
-class PostProcessesEndpoint(ExtendedMappingSchema):
-    header = DeployHeadersAny(description="Headers employed for process deployment.")
-    querystring = FormatQuery()
+class DeployHeadersMultipart(RequestHeadersBody):
+    x_auth_docker = XAuthDockerHeader()
+    content_type = DeployContentTypeMultipart()
 
 
 class DeployBodyOGC(Deploy):
@@ -7643,20 +7647,48 @@ class DeployBodyCWL(Deploy):
     }
 
 
-class PostProcessesEndpointOGC(PostProcessesEndpoint):
-    header = DeployHeadersOGC(
-        description="Headers employed for process deployment to represent OGC Application Package content.",
+class DeployBodyMultipart(Deploy):
+    examples = {
+        "DeployMultipartCWL": {
+            "summary": "Deploy a workflow process from multipart CWL definition.",
+            "value": EXAMPLES["deploy_process_multipart_cwl.txt"],
+        },
+    }
+
+
+class PostProcessesEndpoint(ExtendedMappingSchema):
+    # WARNING:
+    #   Although each OGC, CWL, Multipart request/response bodies have their respective content-type values, the
+    #   Cornice Swagger generation employs the 'accept' and 'content_type' view decorator parameters to create a
+    #   distinct toggle menu between them in Swagger UI. The request 'Accept' and 'Content-Type' *global parameters*
+    #   that may be submitted with "Try it out" option must provide all possible combinations. Otherwise, only options
+    #   from the first registered decorator view will be present. However, for Cornice Swagger to detect the views as
+    #   distinct body/content representations (and therefore create the toggle), they need to be registered with
+    #   separate schemas (i.e.: PostProcessesEndpointOGC, PostProcessesEndpointCWL, PostProcessesEndpointMultipart).
+    header = DeployHeadersAny(
+        description=(
+            "Headers employed for process deployment with a single CWL,"
+            "an OGC Application Package, or multipart contents that "
+            "represents multiple CWL applications (forming a workflow) and/or a "
+            "mixture of OGC Application Package and OGC Process Description metadata."
+        ),
     )
     querystring = FormatQuery()
+
+
+class PostProcessesEndpointOGC(PostProcessesEndpoint):
+    # header = DeployHeadersOGC()  # see 'PostProcessesEndpoint'
     body = DeployBodyOGC()
 
 
 class PostProcessesEndpointCWL(PostProcessesEndpoint):
-    header = DeployHeadersCWL(
-        description="Headers employed for process deployment to represent CWL content.",
-    )
-    querystring = FormatQuery()
+    # header = DeployHeadersCWL()  # see 'PostProcessesEndpoint'
     body = DeployBodyCWL()
+
+
+class PostProcessesEndpointMultipart(PostProcessesEndpoint):
+    # header = DeployHeadersMultipart()  # see 'PostProcessesEndpoint'
+    body = DeployBodyMultipart()
 
 
 class UpdateInputOutputBase(DescriptionType, InputOutputDescriptionMeta):

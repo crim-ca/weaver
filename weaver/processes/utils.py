@@ -51,7 +51,7 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
-from weaver.formats import ContentType, repr_json
+from weaver.formats import ContentType, clean_media_type_format, repr_json
 from weaver.processes.constants import PACKAGE_EXTENSIONS
 from weaver.processes.convert import get_field, normalize_ordered_io, set_field
 from weaver.processes.types import ProcessType
@@ -1047,7 +1047,10 @@ def parse_process_deploy_content(
     # (list = multi-CWL packages already extracted; re-parsing the request body would pick up the execute part)
     if isinstance(content, (dict, list)):
         pass  # Content already parsed, proceed to validation
-    elif content_type and any(mt in content_type.lower() for mt in ContentType.ANY_MULTIPART):
+    elif (
+        content_type and
+        clean_media_type_format(content_type, strip_parameters=True).lower() in ContentType.ANY_MULTIPART
+    ):
         LOGGER.info("Detected multipart deployment request")
         cwl_packages, _ = parse_multipart_deploy(
             content=content if content is not None else request.body,
