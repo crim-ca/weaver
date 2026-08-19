@@ -43,7 +43,7 @@
       ],
       [
         "lint-list-item-indent",
-        "mixed"
+        "one"
       ],
       [
         "lint-maximum-line-length",

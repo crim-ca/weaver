@@ -64,6 +64,7 @@ from weaver.utils import (
     generate_diff,
     get_any_id,
     get_header,
+    get_response_profile,
     get_sane_name,
     get_settings,
     get_url_without_query,
@@ -82,6 +83,7 @@ from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
+    from email.message import Message
     from typing import Any, Dict, List, Optional, Tuple, Union
 
     from docker.client import DockerClient
@@ -760,19 +762,37 @@ def _extract_multipart_start_parameter(content_type):
     return None
 
 
+def _extract_multipart_profile(part):
+    # type: (Message) -> Optional[str]
+    """
+    Extract the ``Content-Profile`` header from a multipart part.
+
+    :param part: Single part from multipart message
+    :returns: Profile URI if found, ``None`` otherwise
+    """
+    # Map part headers to the equivalent request headers get_response_profile understands:
+    # Content-Profile (RFC 8521) -> Accept-Profile, Content-Type -> Accept (for profile= parameter)
+    return get_response_profile(request_headers={
+        "Accept-Profile": part.get("Content-Profile", ""),
+        "Accept": part.get("Content-Type", ""),
+    })
+
+
 def _interpret_multipart_part(part, request=None):
-    # type: (Any, Optional[AnyRequestType]) -> Optional[Tuple[str, str, str, JSON]]
+    # type: (Message, Optional[AnyRequestType]) -> Optional[Tuple[str, str, str, str, JSON]]
     """
     Interpret a single multipart part: decode, fetch content if needed, and parse.
 
     :param part: Single part from multipart message
     :param request: Optional request object for resolving relative ``Content-Location`` URLs
     :returns:
-        ``tuple`` of (content_type, content_id, content_location, parsed_data) or ``None`` if part cannot be parsed
+        ``tuple`` of (content_type, content_id, content_location, profile, parsed_data) or ``None`` if part cannot
+        be parsed
     """
     part_content_type = part.get_content_type()
     content_id = part.get('Content-ID', '').strip('<>')
     content_location = part.get('Content-Location', '').strip()
+    content_profile = _extract_multipart_profile(part)
 
     # Decode part content
     part_content = part.get_payload(decode=True)
@@ -791,7 +811,7 @@ def _interpret_multipart_part(part, request=None):
             part_content_type in [ContentType.APP_JSON, ContentType.APP_YAML]):
         try:
             part_data = yaml.safe_load(part_content)
-            return part_content_type, content_id, content_location, part_data
+            return part_content_type, content_id, content_location, content_profile, part_data
         except Exception as exc:
             LOGGER.warning("Failed to parse part with Content-Type %s: %s", part_content_type, exc)
             return None
@@ -800,12 +820,13 @@ def _interpret_multipart_part(part, request=None):
 
 
 def _organize_deploy_parts(interpreted_parts, root_workflow_cid):
-    # type: (List[Tuple[str, str, str, JSON]], Optional[str]) -> Tuple[List[CWL], Optional[JSON]]
+    # type: (List[Tuple[str, str, str, str, JSON]], Optional[str]) -> Tuple[List[CWL], Optional[JSON]]
     """
     Organize interpreted multipart parts into CWL packages and process description.
 
-    :param interpreted_parts: ``list`` of interpreted parts (content_type, content_id, content_location, data)
-    :param root_workflow_cid: Content-ID of root workflow from ``start`` parameter (if any)
+    :param interpreted_parts:
+        ``list`` of interpreted parts ``(content_type, content_id, content_location, profile, data)``
+    :param root_workflow_cid: ``Content-ID`` of root workflow from ``start`` parameter (if any)
     :returns: ``tuple`` of (``list`` of :term:`CWL` packages, optional process description)
     :raises HTTPBadRequest: If no CWL packages found or root workflow validation fails
     """
@@ -813,7 +834,7 @@ def _organize_deploy_parts(interpreted_parts, root_workflow_cid):
     process_description = None
     parts_by_cid = {}
 
-    for _, content_id, _, part_data in interpreted_parts:
+    for _, content_id, _, _, part_data in interpreted_parts:
         process_description = _classify_multipart_part(
             part_data, cwl_packages, parts_by_cid, content_id, process_description
         )
@@ -828,6 +849,111 @@ def _organize_deploy_parts(interpreted_parts, root_workflow_cid):
     cwl_packages = _validate_and_reorder_multipart_workflow(cwl_packages, root_workflow_cid, parts_by_cid)
 
     return cwl_packages, process_description
+
+
+def _organize_job_execution_parts(interpreted_parts, root_workflow_cid):
+    # type: (List[Tuple[str, str, str, str, JSON]], Optional[str]) -> Tuple[JSON, List[CWL]]
+    """
+    Organize interpreted multipart parts into execution request and CWL packages for ad-hoc job execution.
+
+    :param interpreted_parts:
+        ``list`` of interpreted parts ``(content_type, content_id, content_location, profile, data)``
+    :param root_workflow_cid: ``Content-ID`` of root workflow from ``start`` parameter (if any)
+    :returns:
+        ``tuple`` of (execution request JSON, ``list`` of :term:`CWL` packages to deploy)
+    :raises HTTPBadRequest: If execution request or CWL packages are missing or invalid
+    """
+    execution_request = None
+    deployment_parts = []
+    fallback_json_parts = []
+
+    for content_type_part, content_id, content_location, profile, part_data in interpreted_parts:
+        # Check if this is an execution request based on Content-Profile (can contain multiple URIs)
+        if profile and sd.OGC_API_PROC_PROFILE_EXECUTE_URI in profile:
+            if execution_request is not None:
+                raise HTTPBadRequest(json={
+                    "title": "Multiple execution requests",
+                    "description": (
+                        "Multipart request must contain exactly one execution request part "
+                        f"(profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI})"
+                    ),
+                })
+            execution_request = part_data
+        # Check if this is a deployment part based on content
+        elif ((
+            isinstance(part_data, dict) and part_data.get("class") in ["CommandLineTool", "Workflow", "ExpressionTool"]
+        ) or (
+            isinstance(part_data, dict) and "cwlVersion" in part_data and "$graph" in part_data
+        )):
+            deployment_parts.append((content_type_part, content_id, content_location, profile, part_data))
+        # JSON/YAML parts without profile could be execution request (fallback)
+        # Note: YAML content has already been parsed to dict by _interpret_multipart_part
+        elif isinstance(part_data, dict) and content_type_part in [ContentType.APP_JSON, ContentType.APP_YAML]:
+            fallback_json_parts.append(part_data)
+
+    # If no execution request found via profile, try fallback detection
+    if execution_request is None:
+        # Look for parts with "inputs" and/or "outputs" fields (typical execute request)
+        for part_data in fallback_json_parts:
+            if "inputs" in part_data or "outputs" in part_data:
+                # Ensure it's not a CWL (which also has inputs/outputs but with different structure)
+                if "class" not in part_data and "cwlVersion" not in part_data:
+                    if execution_request is not None:
+                        raise HTTPBadRequest(json={
+                            "title": "Ambiguous multipart content",
+                            "description": (
+                                "Multiple JSON parts detected that could be execution requests. "
+                                f"Please specify {sd.OGC_API_PROC_PROFILE_EXECUTE_URI} profile "
+                                "on the execution request part."
+                            ),
+                        })
+                    execution_request = part_data
+
+    if execution_request is None:
+        raise HTTPBadRequest(json={
+            "title": "Missing execution request",
+            "description": (
+                "Multipart request must contain one execution request part. "
+                f"Use Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI} header "
+                "or include a JSON part with 'inputs' and/or 'outputs' fields."
+            ),
+        })
+
+    if not deployment_parts:
+        raise HTTPBadRequest(json={
+            "title": "Missing CWL packages",
+            "description": (
+                "Multipart request must contain at least one CWL package part for ad-hoc workflow execution. "
+                "CWL parts should use CWL-specific Content-Type (e.g., application/cwl+json) "
+                "or include 'class' field in the CWL content."
+                # FIXME:https://github.com/crim-ca/weaver/issues/990
+                # Extra metadata need to be defined with the relevant profile to distinguish from execution json
+                # f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI} header, "
+            ),
+        })
+
+    # Extract CWL packages from deployment parts
+    cwl_packages = []
+    parts_by_cid = {}
+    for _, content_id, _, _, part_data in deployment_parts:
+        if not isinstance(part_data, dict):
+            continue
+        if part_data.get("class") in ["CommandLineTool", "Workflow", "ExpressionTool"]:
+            cwl_packages.append(part_data)
+            if content_id:
+                parts_by_cid[content_id] = part_data
+        elif "cwlVersion" in part_data and "$graph" in part_data:
+            # Expand $graph
+            for item in part_data["$graph"]:
+                cwl_packages.append(item)
+                item_id = item.get("id", "")
+                if item_id:
+                    parts_by_cid[item_id] = item
+
+    # Validate and reorder workflow if needed
+    cwl_packages = _validate_and_reorder_multipart_workflow(cwl_packages, root_workflow_cid, parts_by_cid)
+
+    return execution_request, cwl_packages
 
 
 def parse_multipart_deploy(content, content_type, request=None):
@@ -855,6 +981,39 @@ def parse_multipart_deploy(content, content_type, request=None):
     return _organize_deploy_parts(interpreted_parts, root_workflow_cid)
 
 
+def parse_multipart_job_execution(content, content_type, request=None):
+    # type: (Union[str, bytes], str, Optional[AnyRequestType]) -> Tuple[JSON, List[CWL]]
+    """
+    Parse ``multipart/mixed`` or ``multipart/related`` ad-hoc workflow execution request.
+
+    Separates execution request (job parameters) from deployment parts (CWL packages).
+    This enables ad-hoc workflow submission where the workflow definition and execution
+    parameters are provided together in a single request to ``POST /jobs``.
+
+    :param content: Raw multipart content (``str`` or ``bytes``)
+    :param content_type: ``Content-Type`` header value (must include ``boundary`` parameter)
+    :param request: Optional request object for extracting body
+    :returns: ``tuple`` of (execution request JSON, ``list`` of :term:`CWL` packages to deploy)
+    :raises HTTPBadRequest: If multipart content is malformed, invalid, or missing required parts
+    """
+    msg = _parse_multipart_message(content, content_type, request)
+    root_workflow_cid = _extract_multipart_start_parameter(content_type)
+    interpreted_parts = []
+
+    for part in msg.get_payload():
+        interpreted = _interpret_multipart_part(part, request)
+        if interpreted:
+            interpreted_parts.append(interpreted)
+
+    if not interpreted_parts:
+        raise HTTPBadRequest(json={
+            "title": "Empty multipart content",
+            "description": "Multipart request must contain at least one valid part.",
+        })
+
+    return _organize_job_execution_parts(interpreted_parts, root_workflow_cid)
+
+
 def parse_process_deploy_content(
     request=None,                                       # type: Optional[AnyRequestType]
     content=None,                                       # type: Optional[Union[JSON, str]]
@@ -874,8 +1033,9 @@ def parse_process_deploy_content(
         if full_content_type:
             content_type = full_content_type
 
-    # If content is already a parsed dict (from recursive calls), skip parsing
-    if isinstance(content, dict):
+    # If content is already a parsed dict or pre-parsed list, skip parsing
+    # (list = multi-CWL packages already extracted; re-parsing the request body would pick up the execute part)
+    if isinstance(content, (dict, list)):
         pass  # Content already parsed, proceed to validation
     elif (
         content_type and
