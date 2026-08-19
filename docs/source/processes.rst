@@ -1709,10 +1709,10 @@ The multipart request must contain:
 
 1. One or more :term:`CWL` parts (workflow and any dependent tools) with ``Content-Type: application/cwl[+json|+yaml]``.
    Optionally, additional :term:`Process` metadata parts can be provided with
-   ``Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/process-description``
+   ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-process-description``
    (see `crim-ca/weaver#990 <https://github.com/crim-ca/weaver/issues/990>`_).
    The example below demonstrates this optional metadata part.
-2. One execution request part with ``Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/execute``
+2. One execution request part with ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-execute-request``
    containing the job inputs and execution parameters.
 
 The structure follows the same concepts and procedures defined in :ref:`proc_ogc_api_multi_cwl`.

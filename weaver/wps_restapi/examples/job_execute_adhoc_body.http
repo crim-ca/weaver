@@ -51,7 +51,7 @@ Content-Type: application/cwl+json
 
 --adhoc-boundary
 Content-Type: application/json
-Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/process-description
+Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-process-description
 
 {
   "id": "adhoc-workflow",
@@ -61,7 +61,7 @@ Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/process-descri
 
 --adhoc-boundary
 Content-Type: application/json
-Content-Profile: https://www.opengis.net/def/ogcapi-processes/2.0/execute
+Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-execute-request
 
 {
   "inputs": {

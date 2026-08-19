@@ -3765,7 +3765,6 @@ class WpsRestApiJobsTest(JobUtils):
         and execute a job without pre-deploying the process.
 
         The multipart request contains:
-        - CWL workflow definition with ``Content-Profile: ogc-process-description``
         - Execution request with ``Content-Profile: ogc-execute-request``
         """
 
