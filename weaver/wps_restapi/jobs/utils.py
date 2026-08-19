@@ -56,6 +56,7 @@ from weaver.formats import (
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
+from weaver.processes.utils import deploy_process_from_payload, parse_multipart_job_execution
 from weaver.provenance import ProvenanceFormat
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
@@ -132,6 +133,64 @@ if TYPE_CHECKING:
     MultiPartFieldsType = Sequence[Tuple[str, MultiPartFieldsParamsType]]
 
 LOGGER = get_task_logger(__name__)
+
+
+def deploy_multipart_job_workflow(request, ctype_full):
+    # type: (PyramidRequest, str) -> Tuple[str, JSON]
+    """
+    Handle multipart ad-hoc workflow deployment and extract process ID with execution body.
+
+    Parse the multipart request to separate the execution body from CWL packages,
+    deploy the CWL packages as an ad-hoc process, and return the deployed process ID
+    along with the execution body to be used for job submission.
+
+    :param request: Pyramid request containing the multipart content.
+    :param ctype_full: Full Content-Type header including boundary parameter.
+    :return: Tuple of (process_id, execution_body).
+    :raises HTTPBadRequest: If deployment fails or process ID cannot be extracted.
+    """
+    # Parse multipart to separate execution body from CWL packages
+    execution_body, cwl_packages = parse_multipart_job_execution(
+        content=request.body,
+        content_type=ctype_full,
+        request=request
+    )
+
+    # Deploy the CWL packages
+    cwl_to_deploy = cwl_packages[0] if len(cwl_packages) == 1 else cwl_packages
+    deploy_response = deploy_process_from_payload(
+        payload=cwl_to_deploy,
+        container=request,
+        overwrite=False
+    )
+
+    # Guard against an unexpected return value (deploy_process_from_payload normally raises on error,
+    # but defensive check preserves forwards error details if it ever returns one instead)
+    if not isinstance(deploy_response, (HTTPCreated, HTTPOk)):
+        deploy_error = getattr(deploy_response, "json", None)
+        error_json = {
+            "title": "Unexpected deployment response",
+            "description": (
+                "Ad-hoc workflow deployment did not return expected response. "
+                f"Got: {type(deploy_response)}"
+            ),
+        }
+        if deploy_error:
+            error_json["error"] = deploy_error
+        raise HTTPBadRequest(json=error_json)
+
+    # Extract the deployed process ID
+    deploy_body = deploy_response.json if hasattr(deploy_response, "json") else deploy_response
+    proc_id = deploy_body.get("processSummary", {}).get("id")
+    if not proc_id:
+        raise HTTPBadRequest(json={
+            "title": "Missing process ID",
+            "description":
+                "Ad-hoc workflow deployment did not provide a process ID. "
+                f"Response: {deploy_body}",
+        })
+
+    return proc_id, execution_body
 
 
 def get_job(request):

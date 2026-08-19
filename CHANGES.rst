@@ -12,6 +12,14 @@ Changes
 
 Changes:
 --------
+- Add support for ad-hoc `CWL` workflow execution through the ``POST /jobs`` endpoint using ``multipart/mixed``
+  or ``multipart/related`` content types. Users can now deploy and execute a `Process` in a single request by
+  submitting both the `CWL` workflow definition and execution parameters
+  (with ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-execute-request``)
+  in a multipart request body.
+  The workflow is automatically deployed (with temporary ``ad-hoc`` tagging) before
+  execution, eliminating the need for separate deployment and execution steps for one-time workflow runs
+  (resolves `#834 <https://github.com/crim-ca/weaver/issues/834>`_).
 - Adjust the `CLI` to return the ``OperationResult.message`` when the response body is empty (``HTTP 204 No Content``)
   to provide a clearer message to the user of what happened and indicate the state of the operation.
   Previously, the ``None`` content would be reported as is making it ambiguous about what occurred or whether it failed.
