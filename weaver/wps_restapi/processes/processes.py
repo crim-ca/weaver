@@ -185,18 +185,31 @@ def get_processes(request):
         })
 
 
+# place multipart at the top such that the OpenAPI specification will load the decorator last
+# which ensures that the most common OGC / JSON content representation is shown by default on Swagger-UI
 @sd.processes_service.post(
     tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
-    schema=sd.PostProcessesEndpointCWLYAML(),
+    schema=sd.PostProcessesEndpointMultipart(),
     accept=ContentType.APP_JSON,
-    content_type=[ContentType.APP_CWL_YAML, ContentType.APP_CWL, ContentType.APP_CWL_X],
+    # pyramid/webob 'request.content_type' automatically strips extra parameters
+    # therefore, the cornice validator does not need to manage the dynamic boundary
+    content_type=sd.DeployContentTypeMultipart.validator.choices,
     renderer=OutputFormat.JSON,
     response_schemas=sd.post_processes_responses,
 )
 @sd.processes_service.post(
     tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
-    schema=sd.PostProcessesEndpoint(),
+    schema=sd.PostProcessesEndpointCWL(),
     accept=ContentType.APP_JSON,
+    content_type=list(set(sd.DeployContentTypeCWL.validator.choices) - set(sd.DeployContentTypeOGC.validator.choices)),
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_processes_responses,
+)
+@sd.processes_service.post(
+    tags=[sd.TAG_PROCESSES, sd.TAG_DEPLOY],
+    schema=sd.PostProcessesEndpointOGC(),
+    accept=ContentType.APP_JSON,
+    content_type=sd.DeployContentTypeOGC.validator.choices,
     renderer=OutputFormat.JSON,
     response_schemas=sd.post_processes_responses,
 )
@@ -206,7 +219,7 @@ def add_local_process(request):
     """
     Register a local process.
     """
-    return deploy_process_from_payload(request.text, request)  # use text to allow parsing as JSON or YAML
+    return deploy_process_from_payload(request.text, request)  # use text to allow parsing JSON, YAML, Multipart, etc.
 
 
 @sd.process_service.put(
