@@ -929,7 +929,7 @@ def _organize_job_execution_parts(interpreted_parts, root_workflow_cid):
                 # FIXME:https://github.com/crim-ca/weaver/issues/990
                 # Extra metadata need to be defined with the relevant profile to distinguish from execution json
                 # f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI} header, "
-            ),  
+            ),
         })
 
     # Extract CWL packages from deployment parts
