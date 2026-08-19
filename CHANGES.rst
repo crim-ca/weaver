@@ -12,6 +12,11 @@ Changes
 
 Changes:
 --------
+- Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}`` endpoint
+  to align with the latest OGC API - Processes Core specification.
+- Added the N-output response header for N-output retrieval responses.
+- Added the OGC Values profile link to ``/jobs/{jobId}/outputs/{outputId}`` responses:
+  ``Link: <https://www.opengis.net/def/profile/OGC/0/ogc-values>; rel="profile"``
 - Adjust the `CLI` to return the ``OperationResult.message`` when the response body is empty (``HTTP 204 No Content``)
   to provide a clearer message to the user of what happened and indicate the state of the operation.
   Previously, the ``None`` content would be reported as is making it ambiguous about what occurred or whether it failed.
