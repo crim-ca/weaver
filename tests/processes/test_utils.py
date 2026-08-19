@@ -1891,7 +1891,6 @@ class TestMultipartJobExecution:
         multipart_body = (
             f"------Boundary123\r\n"
             f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
-            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
             f"\r\n"
             f"{tool_cwl}\r\n"
             f"------Boundary123--\r\n"
@@ -2039,13 +2038,11 @@ class TestMultipartJobExecution:
 
         boundary = "----Boundary123"
         # Add Content-Profile headers only when use_profiles=True
-        profile_header_cwl = f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n" if use_profiles else ""
         profile_header_exec = f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n" if use_profiles else ""
 
         multipart_body = (
             f"------Boundary123\r\n"
             f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
-            f"{profile_header_cwl}"
             "\r\n"
             f"{tool_cwl}\r\n"
             f"------Boundary123\r\n"
@@ -2116,17 +2113,14 @@ class TestMultipartJobExecution:
         multipart_body = (
             f"------Boundary123\r\n"
             f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
-            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
             f"\r\n"
             f"{tool1_cwl}\r\n"
             f"------Boundary123\r\n"
             f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
-            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
             f"\r\n"
             f"{tool2_cwl}\r\n"
             f"------Boundary123\r\n"
             f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
-            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
             f"\r\n"
             f"{workflow_cwl}\r\n"
             f"------Boundary123\r\n"
@@ -2188,7 +2182,6 @@ class TestMultipartJobExecution:
         multipart_body = (
             f"------Boundary123\r\n"
             f"Content-Type: {ContentType.APP_CWL_JSON}\r\n"
-            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
             f"\r\n"
             f"{graph_cwl}\r\n"
             f"------Boundary123\r\n"
@@ -2229,7 +2222,7 @@ class TestMultipartJobExecution:
         }
 
         interpreted_parts = [
-            (ContentType.APP_CWL_JSON, "tool-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, tool_data),
+            (ContentType.APP_CWL_JSON, "tool-1", "", None, tool_data),
             (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, exec_data),
         ]
 
@@ -2283,7 +2276,7 @@ class TestMultipartJobExecution:
         exec_data = {"inputs": {}, "outputs": {}}
 
         interpreted_parts = [
-            (ContentType.APP_CWL_JSON, "graph-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, graph_data),
+            (ContentType.APP_CWL_JSON, "graph-1", "", None, graph_data),
             (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, exec_data),
         ]
 
@@ -2302,7 +2295,7 @@ class TestMultipartJobExecution:
             # Only CWL, no execution request
             (
                 [
-                    (ContentType.APP_CWL_JSON, "tool-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, {
+                    (ContentType.APP_CWL_JSON, "tool-1", "", None, {
                         "cwlVersion": "v1.2",
                         "class": "CommandLineTool",
                         "id": "test-tool",
@@ -2339,7 +2332,7 @@ class TestMultipartJobExecution:
             # Multiple JSON parts without profiles (ambiguous)
             (
                 [
-                    (ContentType.APP_CWL_JSON, "tool-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, {
+                    (ContentType.APP_CWL_JSON, "tool-1", "", None, {
                         "cwlVersion": "v1.2",
                         "class": "CommandLineTool",
                         "id": "test-tool",
@@ -2408,8 +2401,8 @@ class TestMultipartJobExecution:
         exec_data = {"inputs": {}, "outputs": {}}
 
         interpreted_parts = [
-            (ContentType.APP_CWL_JSON, "workflow-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, workflow_data),
-            (ContentType.APP_CWL_JSON, "tool-1", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, tool_data),
+            (ContentType.APP_CWL_JSON, "workflow-1", "", None, workflow_data),
+            (ContentType.APP_CWL_JSON, "tool-1", "", None, tool_data),
             (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_EXECUTE_URI, exec_data),
         ]
 

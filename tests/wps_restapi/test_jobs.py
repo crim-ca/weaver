@@ -3841,13 +3841,11 @@ class WpsRestApiJobsTest(JobUtils):
         multipart_body = (
             f"------AdHocWorkflowBoundary123\r\n"
             f"Content-Type: application/cwl+json\r\n"
-            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
             f"Content-ID: <echo-tool>\r\n"
             f"\r\n"
             f"{json.dumps(echo_tool_cwl)}\r\n"
             f"------AdHocWorkflowBoundary123\r\n"
             f"Content-Type: application/cwl+json\r\n"
-            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
             f"Content-ID: <workflow>\r\n"
             f"\r\n"
             f"{json.dumps(workflow_cwl)}\r\n"

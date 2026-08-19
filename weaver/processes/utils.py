@@ -879,8 +879,8 @@ def _organize_job_execution_parts(interpreted_parts, root_workflow_cid):
                     ),
                 })
             execution_request = part_data
-        # Check if this is a deployment part based on profile or content
-        elif ((profile and sd.OGC_API_PROC_PROFILE_PROC_DESC_URI in profile) or (
+        # Check if this is a deployment part based on content
+        elif ((
             isinstance(part_data, dict) and part_data.get("class") in ["CommandLineTool", "Workflow", "ExpressionTool"]
         ) or (
             isinstance(part_data, dict) and "cwlVersion" in part_data and "$graph" in part_data
@@ -924,10 +924,12 @@ def _organize_job_execution_parts(interpreted_parts, root_workflow_cid):
             "title": "Missing CWL packages",
             "description": (
                 "Multipart request must contain at least one CWL package part for ad-hoc workflow execution. "
-                "CWL parts should use CWL-specific Content-Type (e.g., application/cwl+json) or "
-                f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI} header, "
+                "CWL parts should use CWL-specific Content-Type (e.g., application/cwl+json) "
                 "or include 'class' field in the CWL content."
-            ),
+                # FIXME:https://github.com/crim-ca/weaver/issues/990
+                # Extra metadata need to be defined with the relevant profile to distinguish from execution json
+                # f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI} header, "
+            ),  
         })
 
     # Extract CWL packages from deployment parts
@@ -947,18 +949,6 @@ def _organize_job_execution_parts(interpreted_parts, root_workflow_cid):
                 item_id = item.get("id", "")
                 if item_id:
                     parts_by_cid[item_id] = item
-
-    # a process-description-only part satisfies the earlier guard but yields no CWL to deploy
-    if not cwl_packages:
-        raise HTTPBadRequest(json={
-            "title": "Missing CWL packages",
-            "description": (
-                "Multipart request must contain at least one CWL package part for ad-hoc workflow execution. "
-                "CWL parts should use CWL-specific Content-Type (e.g., application/cwl+json) or "
-                f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI} header, "
-                "or include 'class' field in the CWL content."
-            ),
-        })
 
     # Validate and reorder workflow if needed
     cwl_packages = _validate_and_reorder_multipart_workflow(cwl_packages, root_workflow_cid, parts_by_cid)
