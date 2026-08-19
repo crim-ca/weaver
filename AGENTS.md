@@ -105,6 +105,7 @@ Complete skill catalog organized by domain:
 - [weaver-install](.agents/skills/weaver-install/SKILL.md) - Install Weaver and its dependencies
 - [weaver-ci-validate](.agents/skills/weaver-ci-validate/SKILL.md) - Run tests, lint checks and fixes with Makefile
   targets
+- [weaver-code-review](.agents/skills/weaver-code-review/SKILL.md) - Apply repository-specific code review rules
 - [weaver-skill-create](.agents/skills/weaver-skill-create/SKILL.md) - How to create Agent Skills for Weaver
   codebase
 - [weaver-skills-update](.agents/skills/weaver-skills-update/SKILL.md) - Update Agent Skills related to Weaver

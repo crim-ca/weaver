@@ -1,10 +1,15 @@
 ---
-name: code-review
-description: Additional rules for repository specific code reviews.
+name: weaver-code-review
+description: |
+  Apply repository-specific code review rules for Weaver pull requests.
+  Validates CHANGES.rst updates, formatting style, documentation, comments, and review practices.
+  Use when performing or requesting code reviews on Weaver contributions.
+license: Apache-2.0
 metadata:
   category: github
   version: 1.0.0
   author: fmigneault
+allowed-tools: file_read grep_search
 ---
 
 # Weaver Code Review
