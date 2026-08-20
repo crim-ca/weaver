@@ -326,6 +326,13 @@ Glossary
         | Corresponds to a date/time interval employed for :term:`OpenSearch` queries in the context
           of :term:`EOImage` inputs.
 
+    Transform
+        Additional :term:`Media-Type` transformation operations that can augment a native :term:`Process`
+        definition to offer supplementary :ref:`content-negotiation` capabilities of its :term:`Job` results.
+
+        .. seealso::
+            Refer to :ref:`proc_content_negotiation_transforms` section for more details.
+
     UoM
         | Unit of Measure
         | Represents a measurement defined as literal value associated with a specific unit that could take advantage

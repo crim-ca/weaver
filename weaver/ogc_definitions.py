@@ -3,8 +3,11 @@
 """
 Utilities for handling :term:`OGC API` and :term:`OWS` conformance classes and definitions.
 """
+import re
 from functools import cache
 from typing import Optional
+
+URI_VERSION_REGEX = re.compile(r"[/:](0|[0-9]+.[0-9]+)[/:]")
 
 
 @cache
@@ -12,8 +15,8 @@ def curie(uri: str) -> str:
     """
     Convert a :term:`URI` to its :term:`CURIE` format.
     """
-    if uri.startswith("http://www.opengis.net/def/"):
-        uri = uri.replace("http://www.opengis.net/def/", "")
+    if "www.opengis.net/def/" in uri:
+        uri = uri.split("www.opengis.net/def/", 1)[-1]
         parts = uri.split("/")
         ns = parts[1].lower()
         typ = parts[0]
@@ -24,7 +27,7 @@ def curie(uri: str) -> str:
 
 
 @cache
-def normalize(uri: str, version: Optional[str] = None, secure: bool = False) -> str:
+def normalize(uri: str, version: Optional[str] = None, secure: bool = True) -> str:
     """
     Normalize :term:`URI` from various formats, such as :term:`CURIE`, :term:`URN` or HTTP(S).
 
@@ -37,12 +40,12 @@ def normalize(uri: str, version: Optional[str] = None, secure: bool = False) -> 
         See `opengeospatial/NamingAuthority#120 <https://github.com/opengeospatial/NamingAuthority/issues/120>`_
         for more details.
     """
-    if version is None:
-        version = "1.0" if any(part in uri for part in ["/rel/", "/profile/", "ogc-rel:", "ogc-profile:"]) else "0"
+    if version is None and not re.match(URI_VERSION_REGEX, uri):
+        version = "1.0" if any(part in uri for part in ["/rel/", "ogc-rel:"]) else "0"
     if uri.startswith("urn:ogc:def:"):
         uri = uri.replace(":", "/").replace("//", f"/{version}/").replace("urn/ogc/def/", "http://www.opengis.net/def/")
     if uri.startswith("[ogc-") and uri.endswith("]"):
-        uri = uri[1:-1].replace(":", f"/ogc/{version}/").replace("ogc-", "http://www.opengis.net/def/")
+        uri = uri[1:-1].replace(":", f"/ogc/{version}/").replace("ogc-", "http://www.opengis.net/def/", 1)
     uri = uri.rstrip("/")
     uri = uri.replace("http://", "https://") if secure else uri.replace("https://", "http://")
     parts = uri.rsplit("/", 2)

@@ -14,13 +14,132 @@ Changes:
 --------
 - Implement the `CLI` ``replace`` operation to update an existing `Process` definition
   (resolves `#906 <https://github.com/crim-ca/weaver/issues/906>`_).
+- Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}`` endpoint
+  to align with the latest OGC API - Processes Core specification.
+- Added the N-output response header for N-output retrieval responses.
+- Added the OGC Values profile link to ``/jobs/{jobId}/outputs/{outputId}`` responses:
+  ``Link: <https://www.opengis.net/def/profile/OGC/0/ogc-values>; rel="profile"``
+- Add support for ad-hoc `CWL` workflow execution through the ``POST /jobs`` endpoint using ``multipart/mixed``
+  or ``multipart/related`` content types. Users can now deploy and execute a `Process` in a single request by
+  submitting both the `CWL` workflow definition and execution parameters
+  (with ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-execute-request``)
+  in a multipart request body.
+  The workflow is automatically deployed (with temporary ``ad-hoc`` tagging) before
+  execution, eliminating the need for separate deployment and execution steps for one-time workflow runs
+  (resolves `#834 <https://github.com/crim-ca/weaver/issues/834>`_).
+- Adjust the `CLI` to return the ``OperationResult.message`` when the response body is empty (``HTTP 204 No Content``)
+  to provide a clearer message to the user of what happened and indicate the state of the operation.
+  Previously, the ``None`` content would be reported as is making it ambiguous about what occurred or whether it failed.
+
+Fixes:
+------
+- Fix rendering of `OpenAPI` definitions for ``POST /processes`` deployment such that each indicated ``Content-Type``
+  correctly provides an example for ``multipart/*`` representation of a `Workflow`.
+- Fix rendering of `OpenAPI` definitions for ``POST /processes`` deployment such that each indicated ``Content-Type``
+  correctly provides its corresponding examples for `OGC Application Package` and `CWL` representations in YAML/JSON.
+- Fix `OpenAPI` combination of ``Accept`` and ``Content-Type`` header values from all `OGC Application Package`, `CWL`
+  and ``multipart/*`` schemas when aggregated under the *request parameters* of the `Swagger-UI` representation.
+- Fix the `CLI` documentation about the reported result from ``undeploy`` command. It referred to a missing JSON
+  response file, which is not valid since ``HTTP 204 No Content`` is returned for that successful operation.
+- Adjusted OpenAPI `Job` result examples with by-value/href responses.
+- Adjust OpenAPI ``Accept-Profile`` to report profiles applicable to specific endpoints rather than generic entries.
+- Update OGC profile, exception and link relation URIs to ``https://`` as per corresponding standard updates.
+- Update CWL schema URL to ``https://w3id.org/cwl/v1.2/cwl-json-schema.yaml`` to match the official release instead
+  of its GitHub raw contents copy.
+- Renamed ``StringOneOf`` to ``DelimitedStringOneOf`` to clarify the expected format of the field in contrast to the
+  similar ``OneOfCaseInsensitive`` definition (which ``DelimitedStringOneOf`` relies on), respectively for a single
+  string of allowed values delimited by a given character, and simply a string field validator of enum string values.
+- Added tests for ``DelimitedStringOneOf`` and ``OneOfCaseInsensitive`` to ensure their related case-sensitive value
+  handling remains consistent between them.
+- Fix invalid parsing of ``Link: <{URI}>; rel="profile"`` headers to extract the profile URI.
+
+.. _changes_6.15.0:
+
+`6.15.0 <https://github.com/crim-ca/weaver/tree/6.15.0>`_ (2026-07-03)
+
+Changes:
+--------
+- Add support for multipart `Process` deployment using ``multipart/related`` or ``multipart/mixed`` content types,
+  allowing simultaneous upload of multiple `CWL` files (e.g.: ``class: Workflow`` and ``class: CommandLineTool``)
+  along with optional `Process` description metadata (relates to `#56 <https://github.com/crim-ca/weaver/issues/56>`_,
+  resolves `#717 <https://github.com/crim-ca/weaver/issues/717>`_,
+  resolves `#874 <https://github.com/crim-ca/weaver/issues/874>`_).
+- Add support for `CWL` ``$graph`` representation with multiple entries, enabling deployment of workflows with
+  embedded step definitions without manual preprocessing
+  (resolves `#56 <https://github.com/crim-ca/weaver/issues/56>`_).
+- Add support for multiple ``executionUnit`` `CWL` entries in deployment payloads. Multiple execution units can now
+  be deployed in a single request using either inline ``unit`` objects or ``href`` URL references, allowing
+  deployment of workflows with multiple step definitions without requiring multipart encoding. This approach only
+  accepts CWL-like media-types to avoid ambiguities with other deployment formats
+  (e.g.: ``application/json`` or ``application/ogcapppkg+json``).
+- Add validation during multipart deployment to ensure at least one ``class: Workflow`` is present and properly
+  identified as the main workflow from media-type hints or ``Content-ID`` references.
+- Add `CLI` support for deploying multiple `CWL` files by repeating ``--cwl`` arguments to automatically generate
+  ``multipart/related`` request payloads, simplifying deployment of workflows with multiple step definitions.
+  The `CLI` accepts a mixture of local `CWL` file paths (as `JSON` or `YAML`) and remote URL references.
+  The server handles ``Content-Type`` media-type detection and ``Content-Location`` header processing for external
+  `CWL` files to fetch during deployment.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.14.0:
+
+`6.14.0 <https://github.com/crim-ca/weaver/tree/6.14.0>`_ (2026-07-03)
+====================================================================================================================
+
+Changes:
+--------
+- Rename Dockerfiles from ``docker/Dockerfile-{base,manager,worker}``
+  to ``docker/{base,manager,worker}.dockerfile`` for a consistent naming and file extension scheme.
+- Refactor ``docker/base.dockerfile`` to a multi-stage build keeping build-only tooling out of runtime
+  while preserving Python app execution and Node.js support for `CWL` JavaScript evaluation.
+- Reduce Docker image sizes compared to ``6.12.0`` by about ``19%`` overall:
+  - ``manager`` image from ~1214 MB to ~976 MB.
+  - ``worker`` image from ~1261 MB to ~1023 MB.
+- Harden Docker images by removing unnecessary package-management tooling and bootstrap packages
+  after install steps (e.g.: ``apt``, ``libapt-pkg``, ``perl-base``, ``curl``, ``gnupg``).
+- Harden Docker runtime by removing ``pip`` and ``ensurepip`` after all required install steps,
+  while keeping ``setuptools``/``pkg_resources`` for ``pyramid`` compatibility.
+- Update Python dependency cleanup logic to recursively remove non-empty directories of unnecessary files
+  (e.g.: ``__pycache__``, ``tests``/``test``) to reduce Docker image size.
+- Switch PDF text generation fallback font in ``weaver/transform/handlers.py`` from ``Arial`` to ``Helvetica``
+  to avoid dependency on system-installed fonts in runtime images, since installed fonts are removed.
+- Update Docker smoke-tests to employ ``unittest`` since ``pytest`` is no longer available as runtime
+  installation and execution, due to installation tooling removal. These tests also validate the tooling removal.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.13.0:
+
+`6.13.0 <https://github.com/crim-ca/weaver/tree/6.13.0>`_ (2026-06-06)
+====================================================================================================================
+
+Changes:
+--------
+- Add documentation details about `Job` single-output and transform formatting features.
+- Add documentation summary of relevant `Job` endpoints for quicker reference of available operations.
+- Set up `Weaver Agent Skills <https://github.com/crim-ca/weaver/agents/skills/>`_ based on
+  the `Agent Skill Specification <https://agentskills.io/specification>`_
+  to help AI agents interact with `Weaver` and its API more seamlessly.
+  - Integrates skills for the `CLI`, the Python ``WeaverClient`` and minimal ``curl`` endpoints for correspond commands.
+  - Integrates skills for common `CWL` design and debugging tasks, with alignment concerns for `Weaver` deployment.
+  - Integrates skills for code management and installation steps, including skills self-validation for extensibility.
+  - See also the configured `Context7 Documentation Updater for Weaver <https://context7.com/crim-ca/weaver>`_.
 - Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded
   `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification
   following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification.
 
 Fixes:
 ------
-- No change.
+- Update ``cwl-utils>=0.42`` to handle internal ``TypeError`` on ``None`` reference when processing `CWL` definitions
+  with JavaScript parser. This is mostly to avoid sporadic ``check-links`` errors when generating documentation details,
+  which is the only place it has been observed so far, not within in actual `Process` runtimes (relates
+  to `common-workflow-language/cwl-utils#137 <https://github.com/common-workflow-language/cwl-utils/issues/137>`_).
+- Allow ``Accept-Profile`` reporting within `Job Inputs` parameters to contain ``<>`` without failing validation.
 
 .. _changes_6.12.0:
 
@@ -41,9 +160,9 @@ Changes:
 - Add ``weaver.transform`` module providing format conversion handlers for `Job` outputs. Output formats are dynamically
   extended from the original `Process` definition to provide alternate result representations without modifying the deployed
   `Process` metadata.
-- Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded 
-  `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification 
-  following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification. 
+- Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded
+  `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification
+  following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification.
   Job outputs now include ``digestMultibase`` for local files (resolves `#898 <https://github.com/crim-ca/weaver/issues/898>`_).
 - Add ``/per/core/process-exception-job-gone`` and ``/per/core/job-results-exception-job-gone``
   conformance definitions that allow the HTTP 410 status code for dismissed `Job` and their results.
@@ -3290,7 +3409,7 @@ Fixes:
 .. _changes_0.1.3:
 
 `0.1.3 <https://github.com/crim-ca/weaver/tree/0.1.3>`_ (2019-03-07)
-=========================================================================================================================
+====================================================================================================================
 
 - Add useful `Makefile` targets for deployment.
 - Add badges indications in ``README.rst`` for tracking from repo landing page.
@@ -3303,7 +3422,7 @@ Fixes:
 .. _changes_0.1.2:
 
 `0.1.2 <https://github.com/crim-ca/weaver/tree/0.1.2>`_ (2019-03-05)
-=========================================================================================================================
+====================================================================================================================
 
 - Introduce ``WPS1Requirement`` and corresponding ``Wps1Process`` to run a `WPS-1` process under `CWL`.
 - Remove `mongodb` requirement, assume it is running on an external service or docker image.
@@ -3314,7 +3433,7 @@ Fixes:
 .. _changes_0.1.1:
 
 `0.1.1 <https://github.com/crim-ca/weaver/tree/0.1.1>`_ (2019-03-04)
-=========================================================================================================================
+====================================================================================================================
 
 - Modify `Dockerfile` to use lighter ``debian:latest`` instead of ``birdhouse/bird-base:latest``.
 - Modify `Dockerfile` to reduce build time by reusing built image layers (requirements installation mostly).
@@ -3324,7 +3443,7 @@ Fixes:
 .. _changes_0.1.0:
 
 `0.1.0 <https://github.com/crim-ca/weaver/tree/0.1.0>`_ (2019-02-26)
-=========================================================================================================================
+====================================================================================================================
 
 - Initial Release. Based off `Twitcher`_ tag `ogc-0.4.7`.
 

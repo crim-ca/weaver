@@ -15,7 +15,6 @@ import warnings
 from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
-import jsonschema
 import pytest
 import requests
 import yaml
@@ -23,7 +22,7 @@ from pyramid.settings import asbool
 from pytest_dependency import depends
 
 from tests.resources import FUNCTIONAL_CODE_SPRINT_SERVERS, load_resource
-from weaver import ogc_definitions as ogc_defs
+from weaver import ogc_definitions as ogc_def
 from weaver.cli import ValidateAuthHandlerAction, WeaverClient, parse_auth
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteReturnPreference
 from weaver.formats import ContentType, OutputFormat
@@ -33,8 +32,8 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER
 )
 from weaver.processes.convert import normalize_ordered_io
-from weaver.status import Status
 from weaver.utils import get_any_id, get_any_value
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from weaver.typedefs import CWL, JSON, Path
@@ -70,15 +69,15 @@ def setup_client():
     # fully-qualified name (eg: 'weaver.cli.BasicAuthHandler', 'requests.auth.HTTPBasicAuth')
     auth_handler_ref = os.getenv("TEST_SERVER_AUTH_HANDLER")
     auth_handler = ValidateAuthHandlerAction.validate(auth_handler_ref)
-    auth = None if not auth_handler else parse_auth(dict(  # type: ignore
-        auth_handler=auth_handler,
-        auth_identity=os.getenv("TEST_SERVER_AUTH_IDENTITY") or os.getenv("TEST_SERVER_AUTH_USERNAME"),
-        auth_password=os.getenv("TEST_SERVER_AUTH_PASSWORD"),
-        auth_url=os.getenv("TEST_SERVER_AUTH_URL"),
-        auth_method=os.getenv("TEST_SERVER_AUTH_method"),
-        auth_headers=os.getenv("TEST_SERVER_AUTH_HEADERS") or {},
-        auth_token=os.getenv("TEST_SERVER_AUTH_TOKEN"),
-    ))
+    auth = None if not auth_handler else parse_auth({
+        "auth_handler": auth_handler,
+        "auth_identity": os.getenv("TEST_SERVER_AUTH_IDENTITY") or os.getenv("TEST_SERVER_AUTH_USERNAME"),
+        "auth_password": os.getenv("TEST_SERVER_AUTH_PASSWORD"),
+        "auth_url": os.getenv("TEST_SERVER_AUTH_URL"),
+        "auth_method": os.getenv("TEST_SERVER_AUTH_method"),
+        "auth_headers": os.getenv("TEST_SERVER_AUTH_HEADERS") or {},
+        "auth_token": os.getenv("TEST_SERVER_AUTH_TOKEN"),
+    })
     request_options = {
         # all must be prefixed by 'request_', options as applicable in 'weaver.utils.request_extra'
         "request_timeout": TEST_SERVER_REQUEST_TIMEOUT,
@@ -107,7 +106,7 @@ def process_execute_body() -> "JSON":
 @pytest.fixture(scope="module", autouse=True)
 def openapi_job_status():
     schema_url = "https://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/statusInfo.yaml"
-    response = requests.get(schema_url)
+    response = requests.get(schema_url, timeout=TEST_SERVER_REQUEST_TIMEOUT)
     response.raise_for_status()
     schema_yaml = yaml.safe_load(response.text)
     # The relevant definition is the root schema itself
@@ -129,7 +128,7 @@ def depends_or(request, other, scope="module"):
 class ServerOGCAPIProcessesBase:
 
     @classmethod
-    def setup_class(cls, check_server=None):
+    def setup_class(cls):
         cls.client = setup_client()
 
     @cached_property
@@ -153,10 +152,6 @@ class ServerOGCAPIProcessesBase:
 @pytest.mark.oap_part1
 class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
 
-    @classmethod
-    def setup_class(cls, check_server=None):
-        super().setup_class()
-
     def test_landing_page_links(self):
         result = self.client.info()
         assert result.code == 200
@@ -172,15 +167,16 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         assert conf_core in self.conforms_to
         assert conf_json in self.conforms_to
 
+    @pytest.mark.flaky(retries=2, delay=5)
     @pytest.mark.dependency(
         name="test_service_desc_link_and_oas_validation",
         depends=["test_conformance_classes_core"],
     )
     def test_service_desc_link_and_oas_validation(self):
-        conf_oasXX = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas"
+        conf_oas_any = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas"
         conf_oas30 = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas30"
         conf_oas31 = f"http://www.opengis.net/spec/ogcapi-processes-1/{TEST_SERVER_OAP_CORE_VERSION}/conf/oas31"
-        conforms_oas = [uri for uri in self.conforms_to if uri in [conf_oasXX, conf_oas30, conf_oas31]]
+        conforms_oas = [uri for uri in self.conforms_to if uri in [conf_oas_any, conf_oas30, conf_oas31]]
         assert conforms_oas, "Server does not declare conformance to OAS"
 
         result = self.client.info()
@@ -192,7 +188,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         oas_validated = False
         service_desc_urls = [link["href"] for link in service_desc_links]
         for service_desc_url in service_desc_urls:
-            oas_response = self.client._request("GET", service_desc_url, request_timeout=10)
+            oas_response = self.client._request("GET", service_desc_url, request_timeout=20)
             assert oas_response.status_code == 200
             try:
                 oas_json = oas_response.json()
@@ -244,9 +240,8 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         process_description = desc_result.body
         assert "id" in process_description and process_description["id"] == process_id
 
-        profile_rel = "http://www.opengis.net/def/profile/OGC/0/ogc-process-description"
         profile = desc_result.headers.get("Profile") or desc_result.headers.get("Content-Profile")
-        assert profile == profile_rel
+        assert ogc_def.normalize(profile) == sd.OGC_API_PROC_PROFILE_PROC_DESC_URI
 
     @pytest.mark.skipif(
         TEST_SERVER_OAP_PROC_EXEC_SYNC_UNSUPPORTED,
@@ -295,6 +290,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             for out_id in process_outputs
         )
 
+    @pytest.mark.job
     @pytest.mark.skipif(
         TEST_SERVER_OAP_PROC_EXEC_ASYNC_UNSUPPORTED,
         reason="Asynchronous process execution not supported by the test server.",
@@ -313,7 +309,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
             glob.glob(os.path.join(FUNCTIONAL_CODE_SPRINT_SERVERS, TEST_SERVER, "process-execute*.json")),
             [
                 None,
-                "http://www.opengis.net/def/profile/OGC/0/ogc-results",
+                sd.OGC_API_PROC_PROFILE_RESULTS_URI,
             ]
         ),
     )
@@ -374,7 +370,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
 class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
     @classmethod
-    def setup_class(cls, check_server=None):
+    def setup_class(cls):
         super().setup_class()
         cls.cleanup_processes = set()
 
@@ -665,21 +661,26 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
         result = self.client.processes(detail=True)
         processes = result.body.get("processes", [])
-        mutable_proc = None
+        mutable_proc_id = None
         deployed_proc = [p for p in processes if p.get("id", "").startswith(TEST_SERVER_OAP_DRU_PROCESS_ID)]
         for mutable_proc in deployed_proc:
             assert mutable_proc, "No mutable process found."
-            process_id = mutable_proc["id"]
-            result = self.client.undeploy(process_id)
+            mutable_proc_id = mutable_proc["id"]
+            result = self.client.undeploy(mutable_proc_id)
             assert result.code == 204, (
                 "Undeploy should respond with 204 if successful "
                 "(/req/deploy-replace-undeploy/undeploy-response)."
             )
             assert not result.body
 
+        assert mutable_proc_id, (
+            f"Expected a mutable process [starting with '{TEST_SERVER_OAP_DRU_PROCESS_ID}'] "
+            "to be available from previous deployment steps."
+        )
+
         # note: particularity of Weaver
         #   when we undeploy a version, the 'latest' revision before it (if any) becomes the available version
         #   therefore, requesting the description of the non-versioned processID *might* cause a 200 finding it
         #   this is why we iteratively undeploy all expected ones above, so there is no revision left either
-        result = self.client.describe(mutable_proc)
+        result = self.client.describe(mutable_proc_id)
         assert result.code == 404

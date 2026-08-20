@@ -60,6 +60,7 @@ from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import compute_file_digest_multibase, fully_qualified_name, get_registry, load_file
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_output_url, map_wps_output_location
+from weaver.wps_restapi import swagger_definitions as sd
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Optional, Union
@@ -274,7 +275,7 @@ class TestWeaverClient(TestWeaverClientBase):
         else:
             self.fail("Could not find expected provider JSON link reference.")
         for link in result.body["links"]:
-            if link["rel"] != "http://www.opengis.net/def/rel/ogc/1.0/processes":
+            if link["rel"] != sd.OGC_API_PROC_REL_PROCESSES_URI:
                 continue
             assert link["href"] == f"{self.url}/providers/{prov_id}/processes"
             assert link["type"] == ContentType.APP_JSON
@@ -449,6 +450,268 @@ class TestWeaverClient(TestWeaverClientBase):
             result = mocked_sub_requests(self.app, self.client.deploy, test_id, cwl=package)
         assert result.success
 
+    def test_deploy_multi_cwl(self):
+        """
+        Test deploying multiple CWL files (``Workflow`` with ``CommandLineTool`` definitions) using the CLI.
+        """
+        # Create tool CWL definitions
+        tool1_id = f"{self.test_process_prefix}tool-1"
+        tool1_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": tool1_id,
+            "baseCommand": ["echo"],
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "debian:stretch-slim"
+                }
+            },
+            "inputs": {"input": {"type": "string", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "output.txt"}}},
+            "stdout": "output.txt"
+        }
+
+        tool2_id = f"{self.test_process_prefix}tool-2"
+        tool2_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": tool2_id,
+            "baseCommand": ["cat"],
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "debian:stretch-slim"
+                }
+            },
+            "inputs": {"file": {"type": "File", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "output.txt"}}},
+            "stdout": "output.txt"
+        }
+
+        # Create workflow that uses the tools
+        test_id = f"{self.test_process_prefix}multi-cwl-workflow"
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": test_id,
+            "inputs": {
+                "message": {"type": "string"}
+            },
+            "outputs": {
+                "result": {
+                    "type": "File",
+                    "outputSource": "step2/output"
+                }
+            },
+            "steps": {
+                "step1": {
+                    "run": tool1_id,
+                    "in": {"input": "message"},
+                    "out": ["output"]
+                },
+                "step2": {
+                    "run": tool2_id,
+                    "in": {"file": "step1/output"},
+                    "out": ["output"]
+                }
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tool1_path = os.path.join(tmp_dir, "tool-1.cwl")
+            tool2_path = os.path.join(tmp_dir, "tool-2.cwl")
+            workflow_path = os.path.join(tmp_dir, "workflow.cwl")
+
+            with open(tool1_path, "w", encoding="utf-8") as f:
+                json.dump(tool1_cwl, f)
+            with open(tool2_path, "w", encoding="utf-8") as f:
+                json.dump(tool2_cwl, f)
+            with open(workflow_path, "w", encoding="utf-8") as f:
+                json.dump(workflow_cwl, f)
+
+            # Deploy using list of CWL files
+            result = mocked_sub_requests(
+                self.app,
+                self.client.deploy,
+                test_id,
+                cwl=[tool1_path, tool2_path, workflow_path]
+            )
+
+        assert result.success
+        assert "processSummary" in result.body
+        assert result.body["processSummary"]["id"] == test_id
+        assert "deploymentDone" in result.body
+        assert result.body["deploymentDone"] is True
+
+        # Verify the workflow was deployed
+        result = mocked_sub_requests(self.app, self.client.describe, test_id)
+        assert result.success
+        assert result.body["id"] == test_id
+        assert result.body["processDescriptionURL"]
+
+    def test_deploy_multi_cwl_tools_only(self):
+        """
+        Test deploying multiple CWL ``CommandLineTool`` files without a workflow is rejected.
+
+        According to CWL packed document specification, when there's no workflow
+        and no ``#main`` entry point, deployment must fail.
+
+        .. seealso::
+            https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents
+        """
+        tool1_id = f"{self.test_process_prefix}multi-tool-1"
+        tool1_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": tool1_id,
+            "baseCommand": ["echo"],
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "debian:stretch-slim"
+                }
+            },
+            "inputs": {"input": {"type": "string", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "output.txt"}}},
+            "stdout": "output.txt"
+        }
+
+        tool2_id = f"{self.test_process_prefix}multi-tool-2"
+        tool2_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": tool2_id,
+            "baseCommand": ["cat"],
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "debian:stretch-slim"
+                }
+            },
+            "inputs": {"file": {"type": "File", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "output.txt"}}},
+            "stdout": "output.txt"
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tool1_path = os.path.join(tmp_dir, "tool-1.cwl")
+            tool2_path = os.path.join(tmp_dir, "tool-2.cwl")
+
+            with open(tool1_path, "w", encoding="utf-8") as f:
+                json.dump(tool1_cwl, f)
+            with open(tool2_path, "w", encoding="utf-8") as f:
+                json.dump(tool2_cwl, f)
+
+            # Deploy using list of CWL files - should fail without workflow or #main
+            result = mocked_sub_requests(
+                self.app,
+                self.client.deploy,
+                tool1_id,
+                cwl=[tool1_path, tool2_path]
+            )
+
+        # Should fail with 400 error for missing entry point
+        assert not result.success
+        assert result.code == 400
+        assert "No entry point in $graph" in result.text or "No Workflow definition" in result.text
+
+    def test_deploy_multi_cwl_cli(self):
+        """
+        Test deploying multiple CWL files using the CLI with repeated ``--cwl`` arguments.
+        """
+        tool1_id = f"{self.test_process_prefix}multi-cwl-cli-tool-1"
+        tool1_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": tool1_id,
+            "baseCommand": ["echo"],
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "debian:stretch-slim"
+                }
+            },
+            "inputs": {"input": {"type": "string", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "output.txt"}}},
+            "stdout": "output.txt"
+        }
+
+        tool2_id = f"{self.test_process_prefix}multi-cwl-cli-tool-2"
+        tool2_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": tool2_id,
+            "baseCommand": ["cat"],
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "debian:stretch-slim"
+                }
+            },
+            "inputs": {"file": {"type": "File", "inputBinding": {"position": 1}}},
+            "outputs": {"output": {"type": "File", "outputBinding": {"glob": "output.txt"}}},
+            "stdout": "output.txt"
+        }
+
+        workflow_id = f"{self.test_process_prefix}multi-cwl-cli-workflow"
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": workflow_id,
+            "inputs": {
+                "message": {"type": "string"}
+            },
+            "outputs": {
+                "result": {
+                    "type": "File",
+                    "outputSource": "step2/output"
+                }
+            },
+            "steps": {
+                "step1": {
+                    "run": tool1_id,
+                    "in": {"input": "message"},
+                    "out": ["output"]
+                },
+                "step2": {
+                    "run": tool2_id,
+                    "in": {"file": "step1/output"},
+                    "out": ["output"]
+                }
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tool1_path = os.path.join(tmp_dir, "tool-1.cwl")
+            tool2_path = os.path.join(tmp_dir, "tool-2.cwl")
+            workflow_path = os.path.join(tmp_dir, "workflow.cwl")
+
+            with open(tool1_path, "w", encoding="utf-8") as f:
+                json.dump(tool1_cwl, f)
+            with open(tool2_path, "w", encoding="utf-8") as f:
+                json.dump(tool2_cwl, f)
+            with open(workflow_path, "w", encoding="utf-8") as f:
+                json.dump(workflow_cwl, f)
+
+            # Deploy using multiple --cwl arguments
+            lines = mocked_sub_requests(
+                self.app, run_command,
+                [
+                    "deploy",
+                    "-u", self.url,
+                    "--cwl", tool1_path,
+                    "--cwl", tool2_path,
+                    "--cwl", workflow_path,
+                    "-D",  # avoid conflict just in case
+                ],
+                trim=False,
+                entrypoint=weaver_cli,
+                only_local=True,
+            )
+
+        assert any(f"\"id\": \"{workflow_id}\"" in line for line in lines)
+        assert any("\"deploymentDone\": true" in line for line in lines)
+
+        # Verify the workflow was deployed
+        result = mocked_sub_requests(self.app, self.client.describe, workflow_id)
+        assert result.success
+        assert result.body["id"] == workflow_id
+
     def test_undeploy(self):
         # deploy a new process to leave the test one available
         other_payload = copy.deepcopy(self.test_payload["Echo"])
@@ -458,6 +721,7 @@ class TestWeaverClient(TestWeaverClientBase):
         result = mocked_sub_requests(self.app, self.client.undeploy, other_process)
         assert result.success
         assert not result.body
+        assert result.message == "Undeploy successful."
 
         path = f"/processes/{other_process}"
         resp = mocked_sub_requests(self.app, "get", path, expect_errors=True)
@@ -1142,6 +1406,7 @@ class TestWeaverClient(TestWeaverClientBase):
             assert result.success
             assert "undefined" not in result.message
 
+    @pytest.mark.job
     def test_jobs_search_multi_status(self):
         self.job_store.clear_jobs()
         proc = self.test_process["Echo"]
@@ -1194,16 +1459,30 @@ class TestWeaverCLI(TestWeaverClientBase):
             trim=False,
         )
         operations = [
+            "info",
+            "version",
+            "conformance",
             "deploy",
             "undeploy",
+            "register",
+            "unregister",
             "capabilities",
             "processes",
             "describe",
+            "package",
             "execute",
             "monitor",
             "dismiss",
             "results",
             "status",
+            "provenance",
+            "jobs",
+            "update-job",
+            "trigger-job",
+            "logs",
+            "exceptions",
+            "statistics",
+            "upload",
         ]
         assert all(any(op in line for line in lines) for op in operations)
 
@@ -1850,6 +2129,21 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert out_schema == out_oas_oneof  # combined from user and auto-resolved definitions
             assert out_formats == out_any_fmt  # auto-resolved from CWL
 
+    def test_undeploy_process(self):
+        lines = mocked_sub_requests(
+            self.app, run_command,
+            [
+                # weaver
+                "undeploy",
+                "-u", self.url,
+                "-p", self.test_process["FileInfo"],
+            ],
+            trim=False,
+            entrypoint=weaver_cli,
+            only_local=True,
+        )
+        assert any("Undeploy successful." in line for line in lines)
+
     def test_describe(self):
         # prints formatted JSON ProcessDescription over many lines
         proc = self.test_process["Echo"]
@@ -2007,7 +2301,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert any(f"\"jobID\": \"{job_id}\"" in line for line in lines)
             assert any(f"\"status\": \"{Status.SUCCESSFUL}\"" in line for line in lines)
             assert any(f"\"href\": \"{job_ref}/results\"" in line for line in lines)
-            assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
+            assert any(f"\"rel\": \"{sd.OGC_API_PROC_REL_JOB_RESULTS_URI}\"" in line for line in lines)
 
     def test_execute_auto_monitor(self):
         proc = self.test_process["Echo"]
@@ -2033,7 +2327,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             )
             assert any("\"jobID\": \"" in line for line in lines)  # don't care value, self-handled
             assert any(f"\"status\": \"{Status.SUCCESSFUL}\"" in line for line in lines)
-            assert any("\"rel\": \"http://www.opengis.net/def/rel/ogc/1.0/results\"" in line for line in lines)
+            assert any(f"\"rel\": \"{sd.OGC_API_PROC_REL_JOB_RESULTS_URI}\"" in line for line in lines)
 
     def test_execute_result_by_reference(self):
         """
@@ -2322,6 +2616,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         )
         assert any(bad_input_value in line for line in lines)
 
+    @pytest.mark.job
     def test_jobs(self):
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -2339,6 +2634,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert any("total" in line for line in lines)
         assert any("limit" in line for line in lines)
 
+    @pytest.mark.job
     def test_jobs_no_links_limit_status_filters(self):
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -2365,6 +2661,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert "total" in body and isinstance(body["total"], int)  # ignore actual variable amount
         assert "links" not in body
 
+    @pytest.mark.job
     def test_jobs_no_links_nested_detail(self):
         lines = mocked_sub_requests(
             self.app, run_command,
@@ -2389,6 +2686,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert all("links" not in job for job in body["jobs"])
         assert "links" not in body
 
+    @pytest.mark.job
     def test_jobs_filter_status_multi(self):
         self.job_store.clear_jobs()
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
@@ -2428,6 +2726,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert len(jobs_accept) == 1 and jobs_accept[0]["jobID"] == str(job_a.uuid)
         assert len(jobs_success) == 1 and jobs_success[0]["jobID"] == str(job_s.uuid)
 
+    @pytest.mark.job
     def test_jobs_filter_tags(self):
         self.job_store.clear_jobs()
         job1 = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
@@ -2475,6 +2774,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert isinstance(body["jobs"], list)
             self.assert_equal_with_jobs_diffs(body["jobs"], expect_jobs, test_tags, jobs=jobs)
 
+    @pytest.mark.job
     @mocked_remote_server_requests_wps1([
         "https://random.com",
         resources.load_resource(resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML).replace(
@@ -2539,6 +2839,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert len(body["jobs"]) == 1
         assert body["jobs"] == [str(job2.uuid)]
 
+    @pytest.mark.job
     def test_output_format_json_pretty(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         for format_option in [[], ["-F", OutputFormat.JSON_STR]]:
@@ -2558,6 +2859,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert lines[-1].endswith("}")
             assert any("jobID" in line for line in lines)
 
+    @pytest.mark.job
     def test_output_format_json_pretty_and_headers(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         lines = mocked_sub_requests(
@@ -2584,6 +2886,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert result[-1].endswith("}")
         assert any("jobID" in line for line in result)
 
+    @pytest.mark.job
     def test_output_format_json_raw(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         for format_option in [["-F", OutputFormat.JSON], ["-F", OutputFormat.JSON_RAW]]:
@@ -2603,6 +2906,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             assert lines[0].endswith("}")
             assert "jobID" in lines[0]
 
+    @pytest.mark.job
     def test_output_format_yaml_pretty(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         lines = mocked_sub_requests(
@@ -2625,6 +2929,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         else:
             raise AssertionError("JobID not found for validation.")
 
+    @pytest.mark.job
     def test_output_format_xml_pretty(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         lines = mocked_sub_requests(
@@ -2645,6 +2950,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert lines[-1].endswith("</result>")
         assert any("jobID" in line for line in lines)
 
+    @pytest.mark.job
     def test_output_format_xml_pretty_and_headers(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         lines = mocked_sub_requests(
@@ -2672,6 +2978,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert result[-1].endswith("</result>")
         assert any("jobID" in line for line in result)
 
+    @pytest.mark.job
     def test_output_format_xml_raw(self):
         job_url = f"{self.url}/jobs/{self.test_job.id}"
         lines = mocked_sub_requests(
@@ -2690,6 +2997,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert lines[0].startswith("<?xml")
         assert lines[0].endswith("</result>")
 
+    @pytest.mark.job
     def test_job_logs(self):
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
         job.save_log(message="test start", progress=0, status=Status.ACCEPTED)
@@ -2716,6 +3024,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         assert f"100% {Status.SUCCESSFUL}" in lines[3]
         assert lines[4] == "]"
 
+    @pytest.mark.job
     def test_job_exceptions(self):
         xml_error = resources.load_example("wps_access_forbidden_response.xml", xml=True)
         wps_error = WPSException(xml_error.xpath(".//ows:Exception", namespaces={"ows": DEFAULT_OWS_NAMESPACE})[0])
@@ -2746,6 +3055,7 @@ class TestWeaverCLI(TestWeaverClientBase):
             {"Code": "AccessForbidden", "Locator": "service", "Text": "Access to service is forbidden."}
         ]
 
+    @pytest.mark.job
     def test_job_statistics(self):
         job = self.job_store.save_job(task_id=uuid.uuid4(), process="test-process", access=Visibility.PUBLIC)
         job.statistics = resources.load_example("job_statistics.json")
@@ -2770,6 +3080,7 @@ class TestWeaverCLI(TestWeaverClientBase):
         body = json.loads(text)
         assert body == job.statistics
 
+    @pytest.mark.job
     @parameterized.expand([
         ("results", Status.FAILED, "JobResultsFailed", True),
         ("statistics", Status.FAILED, "NoJobStatistics", True),

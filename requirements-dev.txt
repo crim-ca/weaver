@@ -24,6 +24,10 @@ flynt
 isort>=5
 # FIXME: pin 'marshmallow' dependency of 'safery' to fix compatibility (https://github.com/pyupio/safety/issues/711)
 marshmallow<4
+mdformat
+mdformat-frontmatter
+mdformat-gfm
+mdformat-tables
 mock<6
 # AWS mock tests (against boto3)
 # (fix werkzeug>=2.2.2 dependency, see https://github.com/spulec/moto/issues/5341)
@@ -41,7 +45,7 @@ pytest-server-fixtures
 #pytest-rerunfailures
 pytest-retry
 pydocstyle
-pylint>=3,<4
+pylint>=4.0.5,<5
 pylint-per-file-ignores
 responses
 safety

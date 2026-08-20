@@ -100,7 +100,7 @@ class Constants(object, metaclass=_Const):
 
     @classmethod
     def values(cls):
-        # type: () -> List[AnyKey]
+        # type: () -> List[PropertyDataTypeT]
         """
         Returns the literal values assigned to corresponding enum elements.
         """

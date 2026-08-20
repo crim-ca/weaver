@@ -58,6 +58,7 @@ def test_encrypt_decrypt_email_raise(email_func):
         pytest.fail("Should have raised for invalid/missing settings")
 
 
+@pytest.mark.job
 def test_notify_email_job_complete():
     test_url = "https://test-weaver.example.com"
     settings = {
@@ -111,6 +112,7 @@ def test_notify_email_job_complete():
         assert test_job_err_url in message
 
 
+@pytest.mark.job
 def test_notify_job_email_custom_template():
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".mako") as email_template_file:
         email_template_file.writelines([

@@ -136,10 +136,11 @@ if TYPE_CHECKING:
     )
     from weaver.visibility import AnyVisibility
 
+    # pylint: disable=C0103  # false-positive invalid name for typing
     AnyParams = Dict[str, Any]
-    _Authentication: TypeAlias = "Authentication"
-    _DockerAuthentication: TypeAlias = "DockerAuthentication"
-    AnyAuthentication = Union[_Authentication, _DockerAuthentication]
+    AuthenticationType: TypeAlias = "Authentication"
+    DockerAuthenticationType: TypeAlias = "DockerAuthentication"
+    AnyAuthentication = Union[AuthenticationType, DockerAuthenticationType]
 
 LOGGER = getLogger(__name__)
 

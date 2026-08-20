@@ -166,6 +166,8 @@
 .. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
 .. |ogc-api-proc-part3-collection-input| replace:: *Collection Input*
 .. _ogc-api-proc-part3-collection-input: https://docs.ogc.org/DRAFTS/21-009.html#section_collection_input
+.. |ogc-api-proc-part3-cwl-ad-hoc-exec| replace:: :term:`CWL` *ad-hoc* workflow execution
+.. _ogc-api-proc-part3-cwl-ad-hoc-exec: https://docs.ogc.org/DRAFTS/21-009.html#section_cwl_workflows
 .. |ogc-api-proc-part4| replace:: *OGC API - Processes* - Part 4: Job Management
 .. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
 .. |ogc-tb20-gdc| replace:: *OGC Testbed-20* - GeoDataCubes
@@ -268,8 +270,8 @@
 .. _data_sources.yml.example: ../../../config/data_sources.yml.example
 .. _wps_processes.yml.example: ../../../config/wps_processes.yml.example
 .. _request_options.yml.example: ../../../config/request_options.yml.example
-.. _Dockerfile-manager: ../../../docker/Dockerfile-manager
-.. _Dockerfile-worker: ../../../docker/Dockerfile-worker
+.. _manager.dockerfile: ../../../docker/manager.dockerfile
+.. _worker.dockerfile: ../../../docker/worker.dockerfile
 .. _docker-compose.yml.example: ../../../docker/docker-compose.yml.example
 .. _default-notify-email-template: ../../../weaver/wps_restapi/templates/notification_email_example.mako
 .. |default-notify-email-template| replace:: Default Notification Email Mako Template

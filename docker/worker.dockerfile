@@ -1,0 +1,35 @@
+ARG DOCKER_BASE="weaver:base"
+FROM ${DOCKER_BASE}
+LABEL description.short="Weaver Worker"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+		curl \
+		gnupg \
+	# NOTE: Only 'worker' image should be using docker, 'manager' is only for API. \
+	&& install -m 0755 -d /etc/apt/keyrings \
+	&& curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+	&& chmod a+r /etc/apt/keyrings/docker.gpg \
+	&& echo "\
+		deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+		https://download.docker.com/linux/debian \
+		"$(. /etc/os-release && echo "${VERSION_CODENAME}")" stable" | \
+		tee /etc/apt/sources.list.d/docker.list > /dev/null \
+	&& apt-get update \
+	# NOTE:
+	#   Only install CLI package, 'docker-ce' and 'containerd.io' not required as they should be provided by host.
+	#   Docker sibling execution is expected. See 'docker/docker-compose.yml.example' for details.
+	&& apt-get install -y --no-install-recommends docker-ce-cli \
+	&& rm -f /etc/apt/sources.list.d/docker.list \
+	&& rm -f /etc/apt/keyrings/docker.gpg \
+	&& apt-get purge -y --auto-remove \
+		curl \
+		gnupg \
+	# harden runtime image by removing package manager tooling after all required installs are complete
+	&& apt-get purge -y --allow-remove-essential \
+		apt \
+		libapt-pkg7.0 \
+	&& rm -rf /var/lib/apt/lists/*
+
+# run app
+# see CHANGES (4.15.0), celery>=5 needs '-A' before 'worker'
+CMD celery -A pyramid_celery.celery_app worker -B -E --ini "${APP_CONFIG_DIR}/weaver.ini"
