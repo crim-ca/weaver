@@ -270,6 +270,7 @@ OGC_API_PROC_PROFILE_EXECUTE_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-execute
 OGC_API_PROC_PROFILE_RESULTS_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-results"
 OGC_API_PROC_PROFILE_JOB_DESC_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/job-description"
 OGC_API_PROC_PROFILE_JOB_LIST_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/jobs-list"
+OGC_API_PROC_PROFILE_OGC_VALUES_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-values"
 
 # Following are legacy definitions from OGC Testebeds and EO Apps Best Practices.
 # Therefore, leave them in 'http' for any operation relying on them explicitly (no auto https/versionless handling).
@@ -7838,6 +7839,81 @@ class PostJobsEndpointXML(ExtendedMappingSchema):
 
 class PostProcessJobsEndpointXML(PostJobsEndpointXML, LocalProcessPath):
     pass
+
+
+class ExecuteHeadersMultipart(ExecuteHeadersBase):
+    # Override content_type to allow multipart types without strict validation
+    # Multipart headers include parameters (e.g., boundary=...) that vary per request
+    content_type = ContentTypeHeader(
+        missing=drop,
+        default=ContentType.MULTIPART_MIXED,
+        example=f"{ContentType.MULTIPART_MIXED}; boundary=\"...\"",
+        description=(
+            "Content-Type for multipart request. Must be one of: "
+            f"'{ContentType.MULTIPART_MIXED}; boundary=\"...\"' or "
+            f"'{ContentType.MULTIPART_RELATED}; boundary=\"...\"'. "
+            "The boundary parameter is required and varies per request."
+        ),
+        # strip boundary and other parameters before validating the media-type
+        preparer=lambda v: v.split(";", 1)[0].strip().lower() if isinstance(v, str) else v,
+        validator=OneOf([ContentType.MULTIPART_MIXED, ContentType.MULTIPART_RELATED])
+    )
+
+
+class DeployCWLPart(AnyOfKeywordSchema):
+    """
+    CWL package part in multipart request.
+
+    Can be either a single CWL definition or a CWL with $graph.
+    """
+    _any_of = [
+        DeployCWL(),
+        DeployCWLGraph(),
+    ]
+
+
+class ExecuteBodyMultipart(ExtendedMappingSchema):
+    """
+    Multipart request body for ad-hoc workflow execution.
+
+    Properties represent the different parts that can be included in the multipart request.
+    Parts are matched by Content-Type and Content-Profile headers, not by property names.
+
+    See: https://swagger.io/docs/specification/v3_0/describing-request-body/multipart-requests/
+    """
+    deploy_cwl = DeployCWLPart(
+        missing=drop,
+        description=(
+            "CWL tools and workflow parts. "
+            "One or more parts with Content-Type: application/cwl+json or application/cwl+yaml."
+        )
+    )
+    process_meta = ProcessDeployment(
+        missing=drop,
+        description=(
+            "Optional process description metadata. "
+            f"Part with Content-Profile: {OGC_API_PROC_PROFILE_PROC_DESC_URI}"
+        )
+    )
+    execute_body = Execute(
+        description=(
+            "Execution request body with inputs and parameters. "
+            f"Part with Content-Profile: {OGC_API_PROC_PROFILE_EXECUTE_URI}"
+        )
+    )
+
+
+class PostJobsEndpointMultipart(ExtendedMappingSchema):
+    header = ExecuteHeadersMultipart()
+    querystring = LocalProcessQuery()
+    body = ExecuteBodyMultipart(
+        examples={
+            "ExecuteAdHoc": {
+                "summary": "Execute an ad-hoc workflow using multipart content.",
+                "value": EXAMPLES["job_execute_adhoc_body.http"],
+            }
+        }
+    )
 
 
 class JobTitleNullable(OneOfKeywordSchema):
