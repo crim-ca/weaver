@@ -166,6 +166,8 @@
 .. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
 .. |ogc-api-proc-part3-collection-input| replace:: *Collection Input*
 .. _ogc-api-proc-part3-collection-input: https://docs.ogc.org/DRAFTS/21-009.html#section_collection_input
+.. |ogc-api-proc-part3-cwl-ad-hoc-exec| replace:: :term:`CWL` *ad-hoc* workflow execution
+.. _ogc-api-proc-part3-cwl-ad-hoc-exec: https://docs.ogc.org/DRAFTS/21-009.html#section_cwl_workflows
 .. |ogc-api-proc-part4| replace:: *OGC API - Processes* - Part 4: Job Management
 .. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
 .. |ogc-api-proc-part5| replace:: *OGC API - Processes - Part 5: Provenance*

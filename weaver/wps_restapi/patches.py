@@ -78,8 +78,12 @@ class ServiceAutoAcceptDecorator(CorniceService):
     parameters over multiple separate decorator calls.
     """
 
-    def decorator(self, method, accept=None, **kwargs):
-        # type: (RequestMethod, Optional[str, Sequence[str]], Any) -> Callable[[AnyViewCallable], AnyViewCallable]
+    def decorator(
+        self,
+        method,         # type: RequestMethod
+        accept=None,    # type: Optional[Union[str, Sequence[str]]]
+        **kwargs,       # type: Any
+    ):                  # type: (...) -> Callable[[AnyViewCallable], AnyViewCallable]
         if not accept:
             return super().decorator(method, **kwargs)  # don't inject 'accept=None', causes cornice-swagger error
         if isinstance(accept, str):

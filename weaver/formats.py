@@ -1075,7 +1075,7 @@ def map_cwl_media_type(cwl_format):
 def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=False):
     # type: (str, bool, bool) -> Optional[str]
     """
-    Obtains a generic media-type identifier by cleaning up any additional parameters.
+    Obtains a generic :term:`Media-Type` identifier by cleaning up any additional parameters.
 
     Removes any additional namespace key or URL from :paramref:`media_type` so that it corresponds to the generic
     representation (e.g.: ``application/json``) instead of the ``<namespace-name>:<format>`` mapping variant used

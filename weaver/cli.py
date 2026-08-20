@@ -746,7 +746,6 @@ class WeaverClient(object):
                 LOGGER.debug("Processing multi-CWL deployment with %d files", len(cwl))
 
                 cwl_packages = self._parse_cwl_items(cwl)
-
                 multipart_content, content_type = create_multipart_deploy(
                     cwl_files=cwl_packages,
                     url=url,
