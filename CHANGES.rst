@@ -15,6 +15,9 @@ Changes:
 - Adjust the `CLI` to return the ``OperationResult.message`` when the response body is empty (``HTTP 204 No Content``)
   to provide a clearer message to the user of what happened and indicate the state of the operation.
   Previously, the ``None`` content would be reported as is making it ambiguous about what occurred or whether it failed.
+- Update all `Builtin Processes` with ``MAJOR.MINOR.PATCH`` versions to ensure consistent reporting and access of
+  their `Process` description. The API does not allow fetching a partial ``MAJOR.MINOR`` version, meaning their reported
+  revision numbers were automatically invalid and unresolvable.
 
 Fixes:
 ------
