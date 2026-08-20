@@ -5,6 +5,7 @@ from celery.utils.log import get_task_logger
 from colander import Invalid
 from pyramid.httpexceptions import (
     HTTPBadRequest,
+    HTTPException,
     HTTPNoContent,
     HTTPNotAcceptable,
     HTTPNotFound,
@@ -44,6 +45,7 @@ from weaver.transform.const import CONVERSION_DICT
 from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
+    deploy_multipart_job_workflow,
     dismiss_job_task,
     get_job,
     get_job_io_schema_query,
@@ -217,6 +219,14 @@ def get_queried_jobs(request):
 
 
 @sd.jobs_service.post(
+    tags=[sd.TAG_EXECUTE, sd.TAG_JOBS, sd.TAG_PROCESSES],
+    content_type=[ContentType.MULTIPART_MIXED, ContentType.MULTIPART_RELATED],
+    schema=sd.PostJobsEndpointMultipart(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_jobs_responses,
+)
+@sd.jobs_service.post(
     tags=[sd.TAG_EXECUTE, sd.TAG_JOBS],
     content_type=list(ContentType.ANY_XML),
     schema=sd.PostJobsEndpointXML(),
@@ -243,8 +253,19 @@ def create_job(request):
     prov_id = None
     try:
         ctype = get_header("Content-Type", request.headers, default=ContentType.APP_JSON)
+        ctype_full = ctype  # Keep full Content-Type with parameters
         ctype = clean_media_type_format(ctype, strip_parameters=True)
-        if ctype == ContentType.APP_JSON and "process" in request.json_body:
+
+        # Handle multipart ad-hoc workflow execution
+        if ctype in ContentType.ANY_MULTIPART:
+            proc_id, execution_body = deploy_multipart_job_workflow(request, ctype_full)
+
+            # Update request to use execution body for normal job submission flow
+            request._json = execution_body
+            request.json_body = execution_body
+            request.content_type = ContentType.APP_JSON
+
+        elif ctype == ContentType.APP_JSON and "process" in request.json_body:
             proc_url = request.json_body["process"]
             proc_url = sd.ProcessURL().deserialize(proc_url)
             prov_url, proc_id = proc_url.rsplit("/processes/", 1)
@@ -254,6 +275,8 @@ def create_job(request):
             proc_key = "ows:Identifier"
             body_xml = xml_util.fromstring(request.text)
             proc_id = body_xml.xpath(proc_key, namespaces=body_xml.getroottree().nsmap)[0].text
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPBadRequest(json={
             "title": "NoSuchProcess",
@@ -267,11 +290,16 @@ def create_job(request):
         process = get_process(process_id=proc_id)
         return submit_job_dispatch_wps(request, process)
 
+    # Build tags list
+    tags = ["wps-rest", "ogc-api"]
+    if ctype in ContentType.ANY_MULTIPART:
+        tags.append("ad-hoc")
+
     if prov_id:
         ref = get_service(request, provider_id=prov_id)
     else:
         ref = get_process(process_id=proc_id)
-    return submit_job(request, ref, process_id=proc_id, tags=["wps-rest", "ogc-api"])
+    return submit_job(request, ref, process_id=proc_id, tags=tags)
 
 
 @sd.jobs_service.post()
@@ -766,7 +794,9 @@ def get_job_output(request):
             "value": result_media_type
         })
 
-    return resolve_result_single(job, result, output_id, accept, headers=headers, settings=settings)
+    resp = resolve_result_single(job, result, output_id, accept, headers=headers, settings=settings)
+    resp.headers.add("Link", make_link_header(sd.OGC_API_PROC_PROFILE_OGC_VALUES_URI, rel="profile"))
+    return resp
 
 
 @sd.provider_results_service.get(

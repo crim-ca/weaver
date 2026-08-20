@@ -270,6 +270,7 @@ OGC_API_PROC_PROFILE_EXECUTE_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-execute
 OGC_API_PROC_PROFILE_RESULTS_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-results"
 OGC_API_PROC_PROFILE_JOB_DESC_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/job-description"
 OGC_API_PROC_PROFILE_JOB_LIST_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/jobs-list"
+OGC_API_PROC_PROFILE_OGC_VALUES_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-values"
 
 # Following are legacy definitions from OGC Testebeds and EO Apps Best Practices.
 # Therefore, leave them in 'http' for any operation relying on them explicitly (no auto https/versionless handling).
@@ -7558,21 +7559,6 @@ class Deploy(OneOfKeywordSchema):
     ]
 
 
-class DeployContentTypeAny(ContentTypeHeader):
-    example = ContentType.APP_JSON
-    default = ContentType.APP_JSON
-    validator = OneOf([
-        ContentType.APP_JSON,
-        ContentType.APP_CWL,
-        ContentType.APP_CWL_JSON,
-        ContentType.APP_CWL_YAML,
-        ContentType.APP_CWL_X,
-        ContentType.APP_OGC_PKG_JSON,
-        ContentType.APP_OGC_PKG_YAML,
-        ContentType.APP_YAML,
-    ])
-
-
 class DeployContentTypeOGC(ContentTypeHeader):
     example = ContentType.APP_JSON
     default = ContentType.APP_JSON
@@ -7597,6 +7583,25 @@ class DeployContentTypeCWL(ContentTypeHeader):
     ])
 
 
+class DeployContentTypeMultipart(ContentTypeHeader):
+    # boundary value aligned with 'DeployBodyMultipart' example
+    # aligned with the documented multipart definition in 'package.rst' (but more complete with entire request)
+    example = f"{ContentType.MULTIPART_RELATED}; boundary=\"boundary123\""
+    default = ContentType.MULTIPART_MIXED
+    # mostly for listing the plain headers via OpenAPI, actual validation needs 'allow_content_type_multipart' callable
+    validator = OneOf(list(ContentType.ANY_MULTIPART))
+
+
+class DeployContentTypeAny(ContentTypeHeader):
+    example = ContentType.APP_JSON
+    default = ContentType.APP_JSON
+    validator = OneOf(sorted(
+        set(DeployContentTypeOGC.validator.choices) |
+        set(DeployContentTypeCWL.validator.choices) |
+        set(DeployContentTypeMultipart.validator.choices)
+    ))
+
+
 class DeployHeadersAny(RequestHeadersBody):
     x_auth_docker = XAuthDockerHeader()
     content_type = DeployContentTypeAny()
@@ -7612,9 +7617,9 @@ class DeployHeadersCWL(RequestHeadersBody):
     content_type = DeployContentTypeCWL()
 
 
-class PostProcessesEndpoint(ExtendedMappingSchema):
-    header = DeployHeadersAny(description="Headers employed for process deployment.")
-    querystring = FormatQuery()
+class DeployHeadersMultipart(RequestHeadersBody):
+    x_auth_docker = XAuthDockerHeader()
+    content_type = DeployContentTypeMultipart()
 
 
 class DeployBodyOGC(Deploy):
@@ -7643,20 +7648,48 @@ class DeployBodyCWL(Deploy):
     }
 
 
-class PostProcessesEndpointOGC(PostProcessesEndpoint):
-    header = DeployHeadersOGC(
-        description="Headers employed for process deployment to represent OGC Application Package content.",
+class DeployBodyMultipart(Deploy):
+    examples = {
+        "DeployMultipartCWL": {
+            "summary": "Deploy a workflow process from multipart CWL definition.",
+            "value": EXAMPLES["deploy_process_multipart_cwl.txt"],
+        },
+    }
+
+
+class PostProcessesEndpoint(ExtendedMappingSchema):
+    # WARNING:
+    #   Although each OGC, CWL, Multipart request/response bodies have their respective content-type values, the
+    #   Cornice Swagger generation employs the 'accept' and 'content_type' view decorator parameters to create a
+    #   distinct toggle menu between them in Swagger UI. The request 'Accept' and 'Content-Type' *global parameters*
+    #   that may be submitted with "Try it out" option must provide all possible combinations. Otherwise, only options
+    #   from the first registered decorator view will be present. However, for Cornice Swagger to detect the views as
+    #   distinct body/content representations (and therefore create the toggle), they need to be registered with
+    #   separate schemas (i.e.: PostProcessesEndpointOGC, PostProcessesEndpointCWL, PostProcessesEndpointMultipart).
+    header = DeployHeadersAny(
+        description=(
+            "Headers employed for process deployment with a single CWL,"
+            "an OGC Application Package, or multipart contents that "
+            "represents multiple CWL applications (forming a workflow) and/or a "
+            "mixture of OGC Application Package and OGC Process Description metadata."
+        ),
     )
     querystring = FormatQuery()
+
+
+class PostProcessesEndpointOGC(PostProcessesEndpoint):
+    # header = DeployHeadersOGC()  # see 'PostProcessesEndpoint'
     body = DeployBodyOGC()
 
 
 class PostProcessesEndpointCWL(PostProcessesEndpoint):
-    header = DeployHeadersCWL(
-        description="Headers employed for process deployment to represent CWL content.",
-    )
-    querystring = FormatQuery()
+    # header = DeployHeadersCWL()  # see 'PostProcessesEndpoint'
     body = DeployBodyCWL()
+
+
+class PostProcessesEndpointMultipart(PostProcessesEndpoint):
+    # header = DeployHeadersMultipart()  # see 'PostProcessesEndpoint'
+    body = DeployBodyMultipart()
 
 
 class UpdateInputOutputBase(DescriptionType, InputOutputDescriptionMeta):
@@ -7806,6 +7839,81 @@ class PostJobsEndpointXML(ExtendedMappingSchema):
 
 class PostProcessJobsEndpointXML(PostJobsEndpointXML, LocalProcessPath):
     pass
+
+
+class ExecuteHeadersMultipart(ExecuteHeadersBase):
+    # Override content_type to allow multipart types without strict validation
+    # Multipart headers include parameters (e.g., boundary=...) that vary per request
+    content_type = ContentTypeHeader(
+        missing=drop,
+        default=ContentType.MULTIPART_MIXED,
+        example=f"{ContentType.MULTIPART_MIXED}; boundary=\"...\"",
+        description=(
+            "Content-Type for multipart request. Must be one of: "
+            f"'{ContentType.MULTIPART_MIXED}; boundary=\"...\"' or "
+            f"'{ContentType.MULTIPART_RELATED}; boundary=\"...\"'. "
+            "The boundary parameter is required and varies per request."
+        ),
+        # strip boundary and other parameters before validating the media-type
+        preparer=lambda v: v.split(";", 1)[0].strip().lower() if isinstance(v, str) else v,
+        validator=OneOf([ContentType.MULTIPART_MIXED, ContentType.MULTIPART_RELATED])
+    )
+
+
+class DeployCWLPart(AnyOfKeywordSchema):
+    """
+    CWL package part in multipart request.
+
+    Can be either a single CWL definition or a CWL with $graph.
+    """
+    _any_of = [
+        DeployCWL(),
+        DeployCWLGraph(),
+    ]
+
+
+class ExecuteBodyMultipart(ExtendedMappingSchema):
+    """
+    Multipart request body for ad-hoc workflow execution.
+
+    Properties represent the different parts that can be included in the multipart request.
+    Parts are matched by Content-Type and Content-Profile headers, not by property names.
+
+    See: https://swagger.io/docs/specification/v3_0/describing-request-body/multipart-requests/
+    """
+    deploy_cwl = DeployCWLPart(
+        missing=drop,
+        description=(
+            "CWL tools and workflow parts. "
+            "One or more parts with Content-Type: application/cwl+json or application/cwl+yaml."
+        )
+    )
+    process_meta = ProcessDeployment(
+        missing=drop,
+        description=(
+            "Optional process description metadata. "
+            f"Part with Content-Profile: {OGC_API_PROC_PROFILE_PROC_DESC_URI}"
+        )
+    )
+    execute_body = Execute(
+        description=(
+            "Execution request body with inputs and parameters. "
+            f"Part with Content-Profile: {OGC_API_PROC_PROFILE_EXECUTE_URI}"
+        )
+    )
+
+
+class PostJobsEndpointMultipart(ExtendedMappingSchema):
+    header = ExecuteHeadersMultipart()
+    querystring = LocalProcessQuery()
+    body = ExecuteBodyMultipart(
+        examples={
+            "ExecuteAdHoc": {
+                "summary": "Execute an ad-hoc workflow using multipart content.",
+                "value": EXAMPLES["job_execute_adhoc_body.http"],
+            }
+        }
+    )
 
 
 class JobTitleNullable(OneOfKeywordSchema):

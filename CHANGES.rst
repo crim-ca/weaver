@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}`` endpoint
+  to align with the latest OGC API - Processes Core specification.
+- Added the N-output response header for N-output retrieval responses.
+- Added the OGC Values profile link to ``/jobs/{jobId}/outputs/{outputId}`` responses:
+  ``Link: <https://www.opengis.net/def/profile/OGC/0/ogc-values>; rel="profile"``
+- Add support for ad-hoc `CWL` workflow execution through the ``POST /jobs`` endpoint using ``multipart/mixed``
+  or ``multipart/related`` content types. Users can now deploy and execute a `Process` in a single request by
+  submitting both the `CWL` workflow definition and execution parameters
+  (with ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-execute-request``)
+  in a multipart request body.
+  The workflow is automatically deployed (with temporary ``ad-hoc`` tagging) before
+  execution, eliminating the need for separate deployment and execution steps for one-time workflow runs
+  (resolves `#834 <https://github.com/crim-ca/weaver/issues/834>`_).
 - Adjust the `CLI` to return the ``OperationResult.message`` when the response body is empty (``HTTP 204 No Content``)
   to provide a clearer message to the user of what happened and indicate the state of the operation.
   Previously, the ``None`` content would be reported as is making it ambiguous about what occurred or whether it failed.
@@ -19,7 +32,11 @@ Changes:
 Fixes:
 ------
 - Fix rendering of `OpenAPI` definitions for ``POST /processes`` deployment such that each indicated ``Content-Type``
+  correctly provides an example for ``multipart/*`` representation of a `Workflow`.
+- Fix rendering of `OpenAPI` definitions for ``POST /processes`` deployment such that each indicated ``Content-Type``
   correctly provides its corresponding examples for `OGC Application Package` and `CWL` representations in YAML/JSON.
+- Fix `OpenAPI` combination of ``Accept`` and ``Content-Type`` header values from all `OGC Application Package`, `CWL`
+  and ``multipart/*`` schemas when aggregated under the *request parameters* of the `Swagger-UI` representation.
 - Fix the `CLI` documentation about the reported result from ``undeploy`` command. It referred to a missing JSON
   response file, which is not valid since ``HTTP 204 No Content`` is returned for that successful operation.
 - Adjusted OpenAPI `Job` result examples with by-value/href responses.

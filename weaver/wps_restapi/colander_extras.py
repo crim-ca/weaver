@@ -807,17 +807,19 @@ class OAS3Parameter(object):
     def convert(self):
         # type: () -> Dict[str, Any]
         spec = {}
-        for name, attr in [
-            ("style", "style"),
-            ("explode", "explode"),
-            ("allowReserved", "allow_reserved"),
-            ("summary", "summary"),
-            ("description", "description"),
-            ("example", "example"),
-            ("examples", "examples"),
+        for name, attr, strip in [
+            ("style", "style", True),
+            ("explode", "explode", True),
+            ("allowReserved", "allow_reserved", False),
+            ("summary", "summary", True),
+            ("description", "description", True),
+            ("example", "example", False),  # in case content newlines are relevant
+            ("examples", "examples", False),
         ]:
             value = getattr(self, attr)
             if value is not None:
+                if strip and isinstance(value, str):
+                    value = value.strip()
                 spec[name] = value
         return spec
 
