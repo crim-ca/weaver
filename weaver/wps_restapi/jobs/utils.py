@@ -1092,7 +1092,8 @@ def get_job_result_by_index(
         result = {"value": indexed_element}
 
     accept = guess_target_format(request, default=None)
-    return resolve_result_single(job, result, output_id, accept, headers={}, settings=request)
+    headers = ResponseHeaders([("OGC-Output-Values-Count", str(len(output_value)))])
+    return resolve_result_single(job, result, output_id, accept, headers=headers, settings=request)
 
 
 def generate_or_resolve_result(

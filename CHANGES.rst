@@ -12,6 +12,11 @@ Changes
 
 Changes:
 --------
+- Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}`` endpoint
+  to align with the latest OGC API - Processes Core specification.
+- Added the N-output response header for N-output retrieval responses.
+- Added the OGC Values profile link to ``/jobs/{jobId}/outputs/{outputId}`` responses:
+  ``Link: <https://www.opengis.net/def/profile/OGC/0/ogc-values>; rel="profile"``
 - Add support for ad-hoc `CWL` workflow execution through the ``POST /jobs`` endpoint using ``multipart/mixed``
   or ``multipart/related`` content types. Users can now deploy and execute a `Process` in a single request by
   submitting both the `CWL` workflow definition and execution parameters
