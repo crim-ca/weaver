@@ -16,7 +16,7 @@ import sys
 import tempfile
 import uuid
 from configparser import ConfigParser
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, overload
 
 # Note: do NOT import 'boto3' here otherwise 'moto' will not be able to mock it effectively
@@ -49,6 +49,7 @@ from weaver.utils import (
     bytes2str,
     fetch_file,
     generate_diff,
+    get_file_header_datetime,
     get_header,
     get_path_kvp,
     get_url_without_query,
@@ -85,6 +86,7 @@ if TYPE_CHECKING:
         AnyRequestMethod,
         AnyRequestType,
         AnyResponseType,
+        EnvContainer,
         HeadersType,
         JSON,
         Path,
@@ -327,8 +329,8 @@ def get_links(resp_links):
     return link_dict
 
 
-def run_command(command, trim=True, expect_error=False, entrypoint=None):
-    # type: (Union[str, Iterable[str]], bool, bool, Optional[CommandType]) -> List[str]
+def run_command(command, trim=True, expect_error=False, entrypoint=None, env=None):
+    # type: (Union[str, Iterable[str]], bool, bool, Optional[CommandType], Optional[EnvContainer]) -> List[str]
     """
     Run a CLI operation and retrieve the produced output.
 
@@ -347,6 +349,8 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         Main command to pass arguments directly (instead of using subprocess) and returning the command exit status.
         This is useful to simulate calling the command from the shell, but remain in current
         Python context to preserve any active mocks.
+    :param env:
+        Environment variables to override for the command execution.
     :return: retrieved command standard output or error as applicable.
     """
     # pylint: disable=R1732
@@ -361,7 +365,8 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
             out = sys.executable  # fallback for some systems that fail above call
         python_path = os.path.split(out)[0]
         debug_path = os.path.expandvars(os.environ["PATH"])
-        env = {"PATH": f"{python_path}:{debug_path}"}
+        env = env or {}
+        env.update({"PATH": f"{python_path}:{debug_path}"})
         std = {"stderr": subprocess.PIPE, "stdout": subprocess.PIPE}
         proc = subprocess.Popen(command, env=env, universal_newlines=True, **std)  # nosec
         out, err = proc.communicate()
@@ -370,7 +375,11 @@ def run_command(command, trim=True, expect_error=False, entrypoint=None):
         stdout = io.StringIO()
         stderr = io.StringIO()
         try:
-            with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
+            with (
+                contextlib.redirect_stderr(stderr),
+                contextlib.redirect_stdout(stdout),
+                mock.patch.dict(os.environ, env or {}),
+            ):
                 ret = entrypoint(*tuple(command))
         except SystemExit as exc:
             ret = exc.code
@@ -406,6 +415,18 @@ class MockedRequest(DummyRequest):
     @property
     def text(self):
         return bytes2str(self.body) if self.body else json.dumps(self.json, ensure_ascii=False)
+
+    @property
+    def content_type(self):
+        """
+        Return the Content-Type from headers, defaulting to application/json if JSON body is present.
+        """
+        if hasattr(self, 'headers') and 'Content-Type' in self.headers:
+            return self.headers['Content-Type']
+        # Default to JSON content type if json attribute is set
+        if self.json:
+            return ContentType.APP_JSON
+        return None
 
 
 class MockedResponse(TestResponse):
@@ -950,6 +971,7 @@ class FileServer(SimpleHTTPTestServer):
         This server takes more time to start than usual mocks. Use it sparingly, and consider maintaining a single
         instance over multiple tests of a complete test suite rather than recreating a server for each test.
     """
+
     def __init__(self):  # pylint: disable=W0231
         self._port = self.get_port()
         self._uri = f"http://0.0.0.0:{self._port}"
@@ -1021,10 +1043,10 @@ def mocked_file_server(directory,                   # type: str
                 mime_type, encoding = mimetypes.guess_type(file_path)
                 headers.update({
                     "Server": "mocked_wps_output",
-                    "Date": str(datetime.utcnow()),
+                    "Date": get_file_header_datetime(datetime.now(timezone.utc)),
                     "Content-Type": mime_type or ContentType.TEXT_PLAIN,
                     "Content-Encoding": encoding or "",
-                    "Last-Modified": str(datetime.fromtimestamp(os.stat(file_path).st_mtime))
+                    "Last-Modified": get_file_header_datetime(datetime.fromtimestamp(os.stat(file_path).st_mtime))
                 })
                 if request.method == "HEAD":
                     headers.pop("Content-Length", None)
@@ -1246,10 +1268,13 @@ def mocked_dismiss_process():
 def mocked_process_job_runner(job_task_id="mocked-job-id"):
     # type: (str) -> Iterable[MockPatch]
     """
-    Provides a mock that will bypass execution of the process when called during job submission.
+    Provides a mock that will bypass execution of the :term:`Process` when called during :term:`Job` submission.
+
+    Th execution request parsing will still occur, but the result will return a fake :term:`Job` task ID.
 
     .. seealso::
-        - :func:`mocked_execute_celery` to still execute the process, but directly instead of within ``Celery`` worker.
+        - :func:`mocked_execute_celery` to still execute the :term:`Process`,
+        but directly instead of within :mod:`celery` worker.
     """
     result = mock.MagicMock()
     result.id = job_task_id

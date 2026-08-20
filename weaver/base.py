@@ -1,6 +1,7 @@
 """
 Definitions of base classes employed across multiple modules to avoid circular import errors.
 """
+
 import abc
 import enum
 import inspect
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnyKey
 
     ConstantsType: TypeAlias = "Constants"
-    PropertyDataTypeT = TypeVar("PropertyDataTypeT", bound=ConstantsType)
+    PropertyDataTypeT = TypeVar("PropertyDataTypeT", bound=Union[ConstantsType, str])
 
 # pylint: disable=E1120,no-value-for-parameter
 
@@ -99,7 +100,7 @@ class Constants(object, metaclass=_Const):
 
     @classmethod
     def values(cls):
-        # type: () -> List[AnyKey]
+        # type: () -> List[PropertyDataTypeT]
         """
         Returns the literal values assigned to corresponding enum elements.
         """
@@ -109,7 +110,7 @@ class Constants(object, metaclass=_Const):
 
 class classproperty(property):  # pylint: disable=C0103,invalid-name
     """
-    Mimics :class:`property` decorator, but applied onto ``classmethod`` in backward compatible way.
+    Mimics :class:`property` decorator, but applied onto :class:`classmethod` in backward compatible way.
 
     .. note::
         This decorator purposely only supports getter attribute to define unmodifiable class properties.
@@ -117,6 +118,7 @@ class classproperty(property):  # pylint: disable=C0103,invalid-name
     .. seealso::
         https://stackoverflow.com/a/5191224
     """
+
     def __init__(
         self,
         fget=None,  # type: Optional[Callable[[object], PropertyDataTypeT]]

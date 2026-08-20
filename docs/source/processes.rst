@@ -259,6 +259,41 @@ Where the referenced file hosted at ``"https://remote-file-server.com/my-package
     "<...>": "<...>"
 
 
+.. _proc_ogc_api_multi_cwl:
+
+Package as Multiple CWL Documents
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When deploying a :term:`Workflow` with multiple dependent :term:`CWL` tools, `Weaver` supports
+the ``multipart/related`` content format as defined in |ogc-api-proc-part2|_.
+This allows packaging multiple :term:`CWL` documents in a single HTTP request using standard MIME multipart encoding.
+
+The key advantage of this approach is that users can develop and test their :term:`Workflow` locally using
+separate :term:`CWL` files, then deploy them as-is to `Weaver` without manual modifications. In contrast,
+`CWL Packed Documents`_ (using ``$graph``) or nested tool definitions require manual consolidation and
+restructuring of multiple files into a single document before deployment.
+
+.. _CWL Packed Documents: https://www.commonwl.org/v1.2/Workflow.html#Packed_documents
+
+.. note::
+
+    Users do not need to manually construct the ``multipart/related`` request format. The :ref:`CLI <cli>` and
+    :ref:`Python client <client_commands>` automatically handle multipart encoding and boundary generation
+    when multiple :term:`CWL` files are provided, making the deployment process seamless.
+
+`Weaver` also supports `CWL Packed Documents`_ via ``$graph`` arrays if needed. Both the multipart approach
+and ``$graph`` approach ultimately resolve to equivalent internal representations, so users can choose
+whichever method best fits their workflow development process.
+
+.. seealso::
+    For automated multi-CWL deployment using the CLI, refer to :ref:`cli_example_deploy`.
+
+.. note::
+
+    For HTTP API requests, use ``multipart/related`` content format to package multiple :term:`CWL` documents
+    in a single request body. See :ref:`app_pkg_multipart` for detailed examples and structure.
+
+
 .. _proc_esgf_cwt:
 
 ESGF-CWT
@@ -406,7 +441,7 @@ Following steps represent the typical steps applied to deploy a process, execute
 Register a New Process (Deploy)
 -----------------------------------------
 
-Deployment of a new process is accomplished through the ``POST {WEAVER_URL}/processes`` |deploy-req|_ request.
+Deployment of a new process is accomplished through the |deploy-req|_ request.
 
 .. seealso::
     |ogc-api-proc-part2|_ specification.
@@ -415,11 +450,41 @@ The request body requires mainly two components:
 
 - | ``processDescription``:
   | Defines the :term:`Process` identifier, metadata, inputs, outputs, and some execution specifications.
-    This mostly corresponds to information that is provided by traditional :term:`WPS`
-    or :term:`OGC API - Processes` definitions.
+    This mostly corresponds to *additional* information that is provided by traditional :term:`WPS`
+    or :term:`OGC API - Processes` definitions. A notable situation when this is required is when the
+    following ``executionUnit`` cannot directly resolve certain definitions specific to :term:`OGC API - Processes`,
+    such as a :term:`Media-Type` or :ref:`cwl-file-format` not explicitly handled by :term:`CWL`.
+
 - | ``executionUnit``:
   | Defines the core details of the |app_pkg|_. This corresponds to the explicit :term:`CWL` definition
     or other :ref:`proc_types` references that indicates how to execute the underlying application.
+
+.. _proc_op_deploy_cwl:
+
+.. note::
+    If the :term:`Process` can be directly represented and converted from the :term:`CWL`, it
+    can be directly deployed (i.e.: provided as is rather than embedding it in ``executionUnit``) when combined with
+    the appropriate ``application/cwl+json`` or ``application/cwl+yaml`` :term:`Media-Type` in ``Content-Type`` header.
+
+.. note::
+    For deploying multiple related :term:`CWL` packages (e.g., a :term:`Workflow` with dependent tools),
+    the ``multipart/related`` :term:`Media-Type` can be used in the ``Content-Type`` header to package
+    all :term:`CWL` documents in a single request. Each part should specify its own content type
+    (``application/cwl+json`` or ``application/cwl+yaml``) and unique ``Content-ID``.
+    See :ref:`proc_ogc_api_multi_cwl` and :ref:`app_pkg_multipart` for detailed multipart structure and examples.
+
+.. fixme: support process meta multipart (https://github.com/crim-ca/weaver/issues/990) - update accepted parts
+.. note::
+    Multiple :term:`CWL` packages can also be deployed using an array of ``executionUnit`` entries, where each
+    entry contains either an inline ``unit`` object or an ``href`` reference to an external :term:`CWL` document.
+    This approach resolves the multi-:term:`CWL` references in an equivalent fashion to the ``multipart/related``
+    content case described above, but allows deployment through standard :term:`JSON` request bodies without
+    requiring multipart encoding. Only :term:`CWL`-like :term:`Media-Types` are accepted to avoid ambiguities
+    with other deployment formats (e.g.: ``application/json`` or ``application/ogcapppkg+json``).
+
+.. seealso::
+    Section :ref:`cwl-wps-mapping` provides further details about notable considerations that
+    could require additional fields in ``processDescription`` for an adequate :term:`Process` definition.
 
 .. |app_pkg| replace:: Application Package
 .. _app_pkg: docs/source/package.rst
@@ -485,6 +550,7 @@ the |getcap-req|_ request.
 
 
 .. _proc_op_undeploy:
+.. _proc_op_replace:
 .. _proc_op_update:
 
 Modify an Existing Process (Update, Replace, Undeploy)
@@ -527,23 +593,24 @@ to the following table. When a combination of the below items occur, the higher 
     :name: table-process-version
     :align: center
 
-    +-------------+-----------+---------------------------------+------------------------------------------------------+
-    | HTTP Method | Level     | Change                          | Examples                                             |
-    +=============+===========+=================================+======================================================+
-    | ``PATCH``   | ``PATCH`` | Modifications to metadata       | - :term:`Process` ``description``, ``title`` strings |
-    |             |           | not impacting the               | - :term:`Process` ``keywords``, ``metadata`` lists   |
-    |             |           | :term:`Process` execution       | - inputs/outputs ``description``, ``title`` strings  |
-    |             |           | or definition.                  | - inputs/outputs ``keywords``, ``metadata`` lists    |
-    +-------------+-----------+---------------------------------+------------------------------------------------------+
-    | ``PATCH``   | ``MINOR`` | Modification that impacts *how* | - :term:`Process` ``jobControlOptions`` (async/sync) |
-    |             |           | the :term:`Process` could be    | - :term:`Process` ``outputTransmission`` (ref/value) |
-    |             |           | executed, but not its           | - :term:`Process` ``visibility``                     |
-    |             |           | definition.                     |                                                      |
-    +-------------+-----------+---------------------------------+------------------------------------------------------+
-    | ``PUT``     | ``MAJOR`` | Modification that impacts       | - Any :term:`Application Package` modification       |
-    |             |           | *what* the :term:`Process`      | - Any inputs/outputs change (formats, occurs, type)  |
-    |             |           | executes.                       | - Any inputs/outputs addition or removal             |
-    +-------------+-----------+---------------------------------+------------------------------------------------------+
+    +-------------+-----------+----------------------------+-----------------------------------------------------------+
+    | HTTP Method | Level     | Change                     | Examples                                                  |
+    +=============+===========+============================+===========================================================+
+    | ``PATCH``   | ``PATCH`` | Modifications to metadata  | - :term:`Process` ``description``, ``title`` strings      |
+    |             |           | not impacting the          | - :term:`Process` ``keywords``, ``metadata`` lists        |
+    |             |           | :term:`Process` execution  | - inputs/outputs ``description``, ``title`` strings       |
+    |             |           | or definition.             | - inputs/outputs ``keywords``, ``metadata`` lists         |
+    +-------------+-----------+----------------------------+-----------------------------------------------------------+
+    | ``PATCH``   | ``MINOR`` | Modification that impacts  | - :term:`Process` ``jobControlOptions`` (async/sync)      |
+    |             |           | *how* the :term:`Process`  | - :term:`Process` ``outputTransmission`` (ref/value)      |
+    |             |           | could be executed, but not | - :term:`Process` ``visibility``                          |
+    |             |           | its definition.            |                                                           |
+    +-------------+-----------+----------------------------+-----------------------------------------------------------+
+    | ``PUT``     | ``MAJOR`` | Modification that impacts  | - Any :term:`Application Package` modification            |
+    |             |           | *what* the :term:`Process` | - Any inputs/outputs change (formats, occurs, type)       |
+    |             |           | executes.                  | - Any inputs/outputs addition or removal                  |
+    |             |           |                            | - Replacing a :ref:`Docker Auth-Token <app_pkg_docker>`   |
+    +-------------+-----------+----------------------------+-----------------------------------------------------------+
 
 .. note::
     For all applicable fields of updating a :term:`Process`, refer to the schema of |update-req|_.
@@ -593,14 +660,18 @@ this level of fined-grained control is not required.
     ``{processID}`` portion as their identifier.
 
 If the user desires a specific version to deploy, the ``PUT`` request should be used with the appropriate ``version``
-within the request body. It is although up to the user to provide the full definition of that :term:`Process`,
-as ``PUT`` request will completely replace the previous definition rather than transfer over previous updates
-(i.e: ``PATCH`` requests).
+within the request body. However, it is up to the user to provide the full definition of that updated :term:`Process`,
+since ``PUT`` request will *"replace"* the updated definition from scratch, taking exactly the contents provided in
+the request, rather than transfer over missing parameters from the old :term:`Process` (i.e: as ``PATCH`` request does).
 
 Even when a :term:`Process` is *"replaced"* using ``PUT``, the older revision is not actually removed and undeployed
-(``DELETE`` request). It is therefore still possible to refer to the old revision using explicit references with the
-corresponding ``version``. `Weaver` keeps track of revisions by corresponding ``{processID}`` entries such that if
-the latest revision is undeployed, the previous revision will automatically become the latest once again. For complete
+(``DELETE`` request). Instead, the referenced ``processID`` is is replaced to its explicit ``{processID}:{version}``
+revision, and the new definition is swapped as the new ``processID`` reference. It is therefore still possible to refer
+to the old revision using explicit references with the corresponding ``version``, while the ``processID`` will appear
+as *"replaced"* from the point of view of a client not aware of `Weaver`'s revision management.
+
+`Weaver` keeps track of revisions by corresponding ``{processID}`` entries such that if the latest revision is
+undeployed, the previous revision in semantic order will automatically become the latest once again. For complete
 replacement, the user should instead perform a ``DELETE`` of all existing revisions (to avoid conflicts) followed by a
 new :ref:`Deploy <proc_op_deploy>` request.
 
@@ -674,7 +745,7 @@ better illustrate where each of the mentioned parameters in following sections a
       applicable to `Weaver`, which align with :term:`OGC API - Processes`, but that can also support additional
       capabilities.
     - |ogc-api-proc-exec-outputs|_ offers general details on ``transmissionMode`` parameter of requested outputs.
-    - |ogc-api-proc-exec-mode|_ describes general details about the execution negotiation (`sync`/`async`),
+    - |ogc-api-proc-exec-mode|_ describes general details about the execution negotiation (``sync``/``async``),
       formerly with ``mode`` parameter, and more recently with ``Prefer`` header.
     - |ogc-api-proc-exec-responses-sync|_ and |ogc-api-proc-exec-responses-async|_ provide
       a complete listing of available ``response`` formats considering all other parameters.
@@ -715,6 +786,11 @@ reference :term:`URL`.
 For outputs that correspond to literal data, such as plain strings or numbers, `Weaver` will typically prefer
 returning the ``value`` directly. However, alternate link representations can also be obtained if specified in the
 execution request, using ``transmissionMode`` overrides for the desired outputs.
+
+.. _proc_exec_body_outputs_filtering:
+
+Execution Body Outputs Filtering
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When the ``outputs`` section is omitted, it simply means that the :term:`Process` to be executed
 should return *all* outputs it offers in the created :ref:`Job Results <proc_op_result>`.
@@ -1098,10 +1174,574 @@ The ``Prefer`` header is also used by |oap| v2.0 to control how the results are 
 separate ``transmissionMode`` parameter. By reducing the amount of parameters involved, v2.0 makes the request easier
 to submit with a single header (also used to indicate the :ref:`proc_exec_mode`), but limits certain representation
 combinations only possible with v1.0. These limited representations can be retrieved by involving more advanced
-:term:`Profile` and :term:`Media-Type` *Content Negotiation* techniques.
+:term:`Profile` and :term:`Media-Type` :ref:`proc_content_negotiation` techniques.
 
 .. seealso::
     Examples of typical contents for many of the combinations are provided under the :ref:`proc_op_job_results` section.
+
+.. _proc_exec_kvp:
+
+Execution KVP-Encoded
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. versionadded:: 6.10.0
+
+In addition to the :term:`JSON`-based :ref:`POST Process Execution <proc_op_execute>` requests, `Weaver`
+supports :term:`Key-Value Pair (KVP) <KVP>` encoded :term:`Process` execution using HTTP GET requests.
+This execution method is defined by the |ogc-api-proc-part1-kvp|_ definitions, allowing :term:`Process`
+parameters to be specified directly in the :term:`URL` query string.
+
+:term:`KVP` execution provides an alternative approach to submitting :term:`Job` requests that can be more convenient
+for simple executions, URL-based :term:`Workflow` sub-:term:`Process` invocations, or integration with systems that
+prefer GET-based operations.
+All :term:`KVP` requests are converted internally to the equivalent :term:`JSON` execution format, ensuring consistent
+behavior with POST-based executions.
+
+.. seealso::
+    - |ogc-api-proc-part1-kvp|_ for the complete specification
+    - :ref:`proc_op_execute` for the equivalent POST-based execution method
+
+:term:`KVP` execution requests use the following endpoint:
+
+.. code-block:: http
+
+    GET /processes/{processID}/execution?<parameters> HTTP/1.1
+    Host: weaver.example.com
+
+All execution ``<parameters>`` are provided as query string key-value pairs, using either direct values
+and using extended bracket notation for additional qualifiers in the style of :term:`OpenAPI` ``deepObject`` queries.
+
+.. code-block:: text
+
+    ?parameter[qualifier]=value
+
+All parameter *qualifiers* are case-insensitive. The casing of the primary *parameters* depend of their context.
+Certain parameters (notably ``response``) are reserved for alignment with other |ogc-api-proc|_ requirements and
+extensions, which therefore allow case-insensitive names. However, input and output identifiers directly mapped to the
+:term:`Process` description parameters preserve their original case to ensure adequate resolution and avoid ambiguities.
+
+.. warning::
+    This casing management is a non-standard |ogc-api-proc-part1-kvp|_ behavior enforced by `Weaver`
+    to ensure data integrity.
+
+The values of the parameters are also case-sensitive as to not alter the intended meaning of the submitted values
+for execution of the :term:`Process`. However, adequate :term:`URL` encoding and escape mechanisms apply to ensure
+that special characters are properly transmitted and parsed. Following should be considered for :term:`URL` encoding:
+
+- Embedded :term:`JSON` arrays (``[`` and ``]``) conflicting with ``[qualifier]`` notation
+- Reserved characters in :term:`URL` query strings (``&``, ``=``) conflicting with :term:`KVP` separation
+- Special :term:`URL` characters such as ``+``, ``%``, and ``#`` that require encoding to avoid misinterpretation
+
+The following table summarizes all supported :term:`KVP` parameter qualifiers,
+each of them prefixed by the applicable ``{parameterID}`` or ``response``.
+For advanced examples, see their corresponding sections.
+
+.. table:: KVP Parameter Qualifiers
+    :name: table-kvp-qualifiers
+    :align: center
+    :widths: 15 40 45
+
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | Qualifier         | Context                                  | Description                                      |
+    +===================+==========================================+==================================================+
+    | ``[value]``       | :ref:`Input <proc_exec_kvp_inputs>`      | Qualified value for the input                    |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[mediaType]``   | :ref:`Input <proc_exec_kvp_inputs>`,     | :term:`Media-Type` specification                 |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                  |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[encoding]``    | :ref:`Input <proc_exec_kvp_inputs>`,     | Encoding (e.g., ``base64``, ``gzip``)            |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                  |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[schema]``      | :ref:`Input <proc_exec_kvp_inputs>`,     | Schema :term:`URL` or URL-encoded :term:`JSON`   |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    |                                                  |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[profile]``     | :ref:`Input <proc_exec_kvp_inputs>`,     | Content :term:`Profile`                          |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    | (:term:`URI` or short name)                      |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[crs]``         | :ref:`Input <proc_exec_kvp_inputs>`,     | Coordinate Reference System (:term:`CRS`) for    |
+    |                   | :ref:`Output <proc_exec_kvp_outputs>`    | the bounding box [#kvpBboxNote]_                 |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[href]``        | :ref:`Input <proc_exec_kvp_inputs>`      | Reference :term:`URL` for input data             |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[type]``        | :ref:`Input <proc_exec_kvp_inputs>`      | :term:`Media-Type` for referenced input          |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[include]``     | :ref:`Output <proc_exec_kvp_outputs>`    | Request output with ``true`` (otherwise omit)    |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[f]``           | :ref:`Response <proc_exec_kvp_response>` | Format (short, maps to ``Accept`` header)        |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[format]``      | :ref:`Response <proc_exec_kvp_response>` | Format (explicit alias for ``[f]``)              |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[prefer]``      | :ref:`Response <proc_exec_kvp_response>` | Execution preference (maps to ``Prefer`` header) |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+    | ``[profile]``     | :ref:`Response <proc_exec_kvp_response>` | Response :term:`Profile` [#kvpProfile]_          |
+    +-------------------+------------------------------------------+--------------------------------------------------+
+
+.. [#kvpBboxNote]
+    Although the |ogc-api-proc-part1-kvp|_ requirements considers the ``[crs]`` qualifier as optional for a bounding
+    box, it is **STRONGLY RECOMMENDED** to always include it to avoid ambiguity and ensure correct interpretation of
+    the coordinates. Providing the ``[crs]`` helps parameter parsing disambiguate between bounding box coordinates and
+    a generic array of numeric values that employ similar comma-separated array representations.
+
+.. _proc_exec_kvp_inputs:
+
+KVP Input Parameters
+^^^^^^^^^^^^^^^^^^^^
+
+Input values can be specified using multiple formats depending on their data type and requirements.
+The following table shows :term:`KVP` notation alongside their equivalent :term:`JSON` POST body representations.
+
+.. note::
+    All inputs can be provided using :term:`URL`-encoded string as long as their decoded value results
+    into a valid :term:`JSON` structure. The values can be provided directly if there is no ambiguity between their
+    values and reserved :term:`URL` characters, including the explicit ``,`` comma separator representation below.
+    In other words, an ``array`` of numerics could be provided either
+    as ``arrayOfValues=[1,2,4,10,7]`` or ``arrayOfValues=%5B1%2C2%2C4%2C10%2C7%5D`` interchangeably.
+
+    For convenience, a comma-separated list of values (e.g.: ``arrayOfValues=1,2,4,10,7``) is supported.
+    To avoid misinterpretation with the :term:`URL`-encoded :term:`JSON` structure, the commas must **NOT** be
+    :term:`URL`-encoded (i.e.: not ``%2C``), but their nested values can employ escaped characters as needed.
+    For example, the value ``arrayOfSimpleValues=1,2%2C5,4,10%2C7`` would be interpreted as an array of
+    values: ``[1, "2,5", 4, "10,7"]``. Inputs will be converted to ``float`` or ``integer`` values when possible,
+    but will be kept as strings otherwise. If the :term:`Process` requires ``float``, explicit ``.`` could be
+    needed with the numeric values to ensure proper conversion.
+
+.. note::
+    Bounding box coordinates are handled like the comma-separated array value above, but with additional
+    requirement of 2D or 3D coordinates (i.e.: 4 or 6 float values required). The order of these values depend entirely
+    on the relevant ``[crs]`` and defaults to the ``OGC:CRS84`` (or ``OGC:CRS84h`` for 3D) in long :term:`URI` format,
+    with the expected ``WGS:84`` ellipsoid using longitude-latitude coordinates ``lon1,lat1[,alt1],lon2,lat2[,alt2]``.
+    The ``[crs]`` qualifier should be provided to ensure correct interpretation of the coordinates [#kvpBboxNote]_.
+
+.. note::
+    If necessary by the :term:`Process` to interpret a certain input value correctly, a ``string`` may be
+    accompanied by ``contentMediaType``, ``contentEncoding`` and ``contentSchema`` qualifiers to provide
+    additional context about the value's content and structure.
+
+.. note::
+    Binary data (typically a file) can be provided **by-reference**, **by-value** (i.e.: ``{inputID}={binary-data}``),
+    or using **Qualified Value** (using the ``[value]`` and other optional format encoding qualifiers).
+
+.. table:: KVP Input Parameter Examples
+    :name: table-kvp-inputs
+    :class: table-code
+    :align: center
+    :widths: 50 50
+
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | KVP Query Parameters                                  | Equivalent JSON Body                                  |
+    +=======================================================+=======================================================+
+    | **Simple Literals** (``string``, ``number``, ``boolean``)                                                     |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    ?message=Hello&count=42&enabled=true               |    {                                                  |
+    |                                                       |      "inputs": {                                      |
+    |                                                       |        "message": "Hello",                            |
+    |                                                       |        "count": 42,                                   |
+    |                                                       |        "enabled": true                                |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Complex Value** (URL-encoded :term:`JSON` object)                                                           |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    ?config=%7B%22threshold%22%3A0.5%7D                |    {                                                  |
+    |                                                       |      "inputs": {                                      |
+    |                                                       |        "config": {                                    |
+    |                                                       |          "threshold": 0.5                             |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Array** (comma-separated values)                                                                            |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    ?data-values=1.5,2.3,4.7,3.2                       |    {                                                  |
+    |                                                       |      "inputs": {                                      |
+    |                                                       |        "data-values": [1.5, 2.3, 4.7, 3.2]            |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **URL Reference**                                                                                             |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    ?input[href]=http://example.com/data.json          |    {                                                  |
+    |    &input[type]=application/json                      |      "inputs": {                                      |
+    |                                                       |        "input": {                                     |
+    |                                                       |          "href": "http://example.com/data.json",      |
+    |                                                       |          "type": "application/json"                   |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Bounding Box** [#kvpBboxNote]_                                                                              |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    ?input-geom=5.8,47.2,15.1,55.1                     |    {                                                  |
+    |    &input-geom[crs]=urn:ogc:def:crs:OGC:2:84          |      "inputs": {                                      |
+    |                                                       |        "input-geom": {                                |
+    |                                                       |          "bbox": [5.8, 47.2, 15.1, 55.1],             |
+    |                                                       |          "crs": "urn:ogc:def:crs:OGC:2:84"            |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Encoded Value** (``string`` with ``content*`` qualifiers, *note* decoded ``%3D`` to ``=``)                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    ?data=I1Rlc3Q%3D                                   |    {                                                  |
+    |    &data[contentMediaType]=text/markdown              |      "inputs": {                                      |
+    |    &data[encoding]=base64                             |        "data": {                                      |
+    |                                                       |          "value": "I1Rlc3Q=",                         |
+    |                                                       |          "mediaType": "text/markdown",                |
+    |                                                       |          "encoding": "base64"                         |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Qualified Value** (``value`` with format qualifiers)                                                        |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    ?image[value]=SGVsbG8gV29ybGQh                     |    {                                                  |
+    |    &image[mediaType]=image/png                        |      "inputs": {                                      |
+    |    &image[encoding]=binary                            |        "image": {                                     |
+    |                                                       |          "value": "SGVsbG8gV29ybGQh",                 |
+    |                                                       |          "mediaType": "image/png",                    |
+    |                                                       |          "encoding": "binary"                         |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Qualified Value with Profile**                                                                              |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    ?features[value]=                                  |    {                                                  |
+    |       %7B%22type%22%3A%22Point%22%2C                  |      "inputs": {                                      |
+    |       %22coordinates%22%3A%5B-90.0%2C50.0%5D%7D       |        "features": {                                  |
+    |    &features[mediaType]=application/geo%2Bjson        |          "value": {                                   |
+    |    &features[profile]=geojson-geometry                |            "type": "Point",                           |
+    |                                                       |            "coordinates": [-90.0, 50.0],              |
+    |                                                       |          },                                           |
+    |                                                       |          "mediaType": "application/geo+json",         |
+    |                                                       |          "profile": "geojson-geometry"                |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+
+.. _proc_exec_kvp_outputs:
+
+KVP Output Parameters
+^^^^^^^^^^^^^^^^^^^^^
+
+Specific outputs can be requested and their format controlled using bracket notation qualifiers.
+
+.. warning::
+    The ``[include]`` qualifier is **required** to request an output. This is to ensure that it can be distinguished
+    from :ref:`proc_exec_kvp_inputs` identifiers. Additional format qualifiers are optional and can be combined as
+    needed.
+
+Similarly to :ref:`proc_exec_body_outputs_filtering` in the :term:`JSON` POST body request case, including
+any ``{outputID}[include]=true`` parameter triggers the filtering behaviour, which means any other outputs will be
+omitted from the response. If other outputs are desired, they must be explicitly included with their
+own ``[include]`` parameter. If no outputs are indicated, the response will **omit** all outputs available from
+the :term:`Process` (i.e.: |res-empty| response [#resNoContent]_). If desired, the request can be explicit by
+indicating ``{outputID}[include]=false`` for outputs that should be omitted, but this is not required since
+it is the default behaviour.
+
+The following table shows :term:`KVP` notation alongside their equivalent :term:`JSON` POST body representations.
+
+.. table:: KVP Output Parameter Examples
+    :name: table-kvp-outputs
+    :class: table-code
+    :align: center
+    :widths: 50 50
+
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | KVP Query Parameters                                  | Equivalent JSON Body                                  |
+    +=======================================================+=======================================================+
+    | **Basic Output Selection**                                                                                    |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    ?output1[include]=true                             |    {                                                  |
+    |    &output2[include]=false                            |      "outputs": {                                     |
+    |                                                       |        "output1": {}                                  |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Output with Format Control**                                                                                |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    ?result[include]=true                              |    {                                                  |
+    |    &result[mediaType]=application/json                |      "outputs": {                                     |
+    |    &result[encoding]=gzip                             |        "result": {                                    |
+    |                                                       |          "format": {                                  |
+    |                                                       |            "mediaType": "application/json",           |
+    |                                                       |            "encoding": "gzip"                         |
+    |                                                       |          }                                            |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Output with Schema**                                                                                        |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    ?data[include]=true                                |    {                                                  |
+    |    &data[schema]=http://example.com/schema.json       |      "outputs": {                                     |
+    |                                                       |        "data": {                                      |
+    |                                                       |          "format": {                                  |
+    |                                                       |            "schema": "http://example.com/schema.json" |
+    |                                                       |          }                                            |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Output with Profile**                                                                                       |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: json                                  |
+    |                                                       |                                                       |
+    |    ?result[include]=true                              |    {                                                  |
+    |    &result[mediaType]=application/geo%2Bjson          |      "outputs": {                                     |
+    |    &result[profile]=geojson-feature                   |        "result": {                                    |
+    |                                                       |          "format": {                                  |
+    |                                                       |            "mediaType": "application/geo+json",       |
+    |                                                       |            "profile": "geojson-feature"               |
+    |                                                       |          }                                            |
+    |                                                       |        }                                              |
+    |                                                       |      }                                                |
+    |                                                       |    }                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+
+.. _proc_exec_kvp_response:
+
+KVP Response Parameters
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Response format and execution preferences can be controlled using ``response`` bracket notation parameters.
+These map directly to HTTP headers for consistent behavior across GET and POST execution methods.
+
+.. table:: KVP Response Parameter Examples
+    :name: table-kvp-response
+    :class: table-code
+    :align: center
+    :widths: 50 50
+
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | KVP Query Parameters                                  | Equivalent HTTP Header                                |
+    +=======================================================+=======================================================+
+    | **Response Format** (short form)                                                                              |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: text                                  |
+    |                                                       |                                                       |
+    |    ?response[f]=application/json                      |    Accept: application/json                           |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Response Format** (explicit alias)                                                                          |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: text                                  |
+    |                                                       |                                                       |
+    |    ?response[format]=application/json                 |    Accept: application/json                           |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Response Profile** (for :ref:`proc_exec_results`) [#kvpProfile]_                                            |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: text                                  |
+    |                                                       |                                                       |
+    |    ?response[profile]=[ogc-rel:results]               |    Accept-Profile: [ogc-rel:results]                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Execution Preference** (async)                                                                              |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: text                                  |
+    |                                                       |                                                       |
+    |    ?response[prefer]=respond-async                    |    Prefer: respond-async                              |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | **Execution Preference** (sync with timeout)                                                                  |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | .. code-block:: text                                  |
+    |                                                       |                                                       |
+    |    ?response[prefer]=wait=30                          |    Prefer: wait=30                                    |
+    +-------------------------------------------------------+-------------------------------------------------------+
+
+.. [#kvpProfile]
+    The behavior of :term:`Profile` parameters vary depending on :ref:`Execution Mode <proc_exec_mode>`.
+
+.. warning::
+
+    The ``profile`` and ``response[profile]`` parameters have different implications depending on the
+    :ref:`Execution Mode <proc_exec_mode>`. Other precaution must also be taken to avoid confusion
+    between these parameters and the other ``[profile]`` qualifiers used for inputs and outputs.
+
+    **Synchronous Execution** (``Prefer: wait``):
+        Both ``profile`` and ``response[profile]`` are **equivalent** and apply to the same immediate response
+        containing the :ref:`proc_exec_results`. They can be used interchangeably because the response return
+        directly from the execution request.
+
+    **Asynchronous Execution** (``Prefer: respond-async``):
+        - ``profile`` applies to the :ref:`Job Status <proc_op_status>` response
+          (the immediate *HTTP 201 Created* response)
+        - ``response[profile]`` applies to the **final** :ref:`proc_exec_results`
+          (retrieved by subsequent :ref:`Job Result <proc_op_result>` request)
+          This can be relevant the profile of the results as a whole is relevant (e.g.: ``response[profile]=stac``),
+          such as when combined with the ``response=collection`` parameter.
+
+    **Input/Output Profile Qualifiers** (``{inputID}[profile]``, ``{outputID}[profile]``):
+        These format qualifiers are **independent** of :ref:`Execution Mode <proc_exec_mode>` and always specify
+        the content :term:`Profile` for those specific inputs or outputs, regardless of whether execution is
+        |synchronous|_ or |asynchronous|_.
+
+    **Example for Asynchronous Execution:**
+
+    .. code-block:: text
+        :caption:  Request asynchronous execution profiles applicable to different concepts
+
+        ?...
+        &input[href]=http://example.com/data.json
+        &input[type]=application/geo%2Bjson
+        &input[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/geojson-geometry
+        &output[include]=true
+        &output[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature-collection
+        &response=collection
+        &response[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/stac
+        &response[prefer]=respond-async
+        &profile=ogc
+        &f=json
+
+    In this example, the immediate :ref:`Job Status <proc_op_status>` is obtained |asynchronously|_, and explicitly
+    requests its :term:`OGC` representation (rather than :term:`openEO` for example), and requests it to be returned
+    in :term:`JSON` (rather than :term:`YAML` for example).
+    It requests that the :ref:`Job Result <proc_op_result>` from that execution to be represented as a :term:`STAC`
+    collection (e.g.: to include relevant metadata and ``assets`` specific to it), although the :term:`Process` itself
+    is expected to produce a :term:`GeoJSON` ``FeatureCollection`` as output (rather than a ``Polygon`` for example),
+    generated from an input :term:`GeoJSON` ``Geometry``.
+    It desires the response to be provided as :ref:`Collection Output <proc_col_outputs>`, compatible with :term:`STAC`.
+
+    In this case, the input/output profiles are handled by the underlying :term:`Process` execution,
+    while the response profiles (:ref:`Job Status <proc_op_status>` / :ref:`Job Result <proc_op_result>`) are
+    specifically for `Weaver` as :term:`OGC API - Processes` request interactions.
+
+    .. note::
+        In most situations, this level of granular control over profiles is not necessary since sensible results
+        are applied based on common patterns. However, they might be necessary in situations of highly overloaded
+        :term:`Media-Types` such as :term:`GeoJSON` and :term:`JSON`, or for partially compatible :term:`API` or
+        responses between :term:`STAC`, :term:`OGC` and :term:`openEO` specifications. In certain cases, only a few
+        of them might be necessary, but it is important to reflect precisely where the :term:`Profile` applies.
+
+    .. seealso::
+        - :ref:`Response Content Negotiation <proc_content_negotiation>`
+
+.. note::
+    - Both ``response[f]`` and ``response[format]`` are accepted and equivalent
+    - ``response[format]`` provides a more explicit parameter name for better API clarity
+    - These parameters are optional and can be combined with input/output parameters
+
+.. _proc_exec_kvp_examples:
+
+KVP Execution Examples
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The following table presents complete execution examples combining various :term:`KVP` features:
+
+.. table:: Complete KVP Execution Examples
+    :name: table-kvp-examples
+    :class: table-code
+    :align: center
+    :widths: 50 50
+
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | KVP Query Parameters                                  | Description                                           |
+    +=======================================================+=======================================================+
+    | .. code-block:: text                                  | Simple literal input with URL-encoded space           |
+    |                                                       |                                                       |
+    |    message=Hello%20World                              |                                                       |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | Multiple inputs with output format specification      |
+    |                                                       |                                                       |
+    |    values=1.5,2.3,4.7&metric=mean&                    |                                                       |
+    |    result[include]=true&                              |                                                       |
+    |    result[mediaType]=application/json                 |                                                       |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | By-reference input with output selection              |
+    |                                                       |                                                       |
+    |    input[href]=http://example.com/data.geojson&       |                                                       |
+    |    input[type]=application/geo%2Bjson&                |                                                       |
+    |    output[include]=true                               |                                                       |
+    +-------------------------------------------------------+-------------------------------------------------------+
+    | .. code-block:: text                                  | Complex execution combining multiple features:        |
+    |                                                       |                                                       |
+    |    bbox=5.8,47.2,15.1,55.1&                           | - Bounding box with CRS                               |
+    |    bbox[crs]=http://www.opengis.net/def/              | - By-reference input                                  |
+    |      crs/OGC/1.3/CRS84&                               | - Literal threshold                                   |
+    |    data[href]=http://example.com/input.nc&            | - Output with format & encoding                       |
+    |    data[type]=application/netcdf&                     | - Response format & async preference                  |
+    |    threshold=0.75&                                    |                                                       |
+    |    result[include]=true&                              |                                                       |
+    |    result[mediaType]=application/json&                |                                                       |
+    |    result[encoding]=gzip&                             |                                                       |
+    |    response[format]=application/json&                 |                                                       |
+    |    response[prefer]=respond-async                     |                                                       |
+    +-------------------------------------------------------+-------------------------------------------------------+
+
+.. seealso::
+    - :ref:`proc_exec_kvp_inputs` for detailed input parameter syntax
+    - :ref:`proc_exec_kvp_outputs` for output parameter options
+    - :ref:`proc_exec_kvp_response` for response control parameters
+
+.. _proc_exec_adhoc:
+
+Execution of Ad-hoc Workflow
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+`Weaver` supports |ogc-api-proc-part3-cwl-ad-hoc-exec|_ from the |ogc-api-proc-part3|_ standard, which allows
+users to deploy and execute a :term:`CWL` workflow in a single request to the ``POST /jobs`` endpoint using
+``multipart/mixed`` or ``multipart/related`` content types. This eliminates the need for separate
+:ref:`deployment <proc_op_deploy>` and :ref:`execution <proc_op_execute>` steps when running one-time workflows
+or testing workflow definitions.
+
+The multipart request must contain:
+
+1. One or more :term:`CWL` parts (workflow and any dependent tools) with ``Content-Type: application/cwl[+json|+yaml]``.
+   Optionally, additional :term:`Process` metadata parts can be provided with
+   ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-process-description``
+   (see `crim-ca/weaver#990 <https://github.com/crim-ca/weaver/issues/990>`_).
+   The example below demonstrates this optional metadata part.
+2. One execution request part with ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-execute-request``
+   containing the job inputs and execution parameters.
+
+The structure follows the same concepts and procedures defined in :ref:`proc_ogc_api_multi_cwl`.
+
+When an ad-hoc execution request is received:
+
+- The workflow (and any dependent tools) are automatically deployed with ``ad-hoc`` tagging
+- The job is immediately submitted for execution using the provided inputs
+- The workflow remains deployed after execution and can be reused or cleaned up later
+
+Example Ad-hoc Execution Request
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/job_execute_adhoc.http
+    :language: http
+    :caption: Ad-hoc workflow execution request with multipart content
+
+The response will be a standard :term:`Job` status document (see :ref:`proc_op_execute`) with the ``jobID``,
+``processID`` (the deployed workflow ID), and execution status. The job can be monitored and results retrieved
+using the standard :term:`Job` endpoints.
+
+.. note::
+    The deployed workflow and tools remain available after ad-hoc execution and are tagged with ``ad-hoc`` for
+    identification. They can be cleaned up using the :ref:`Undeploy <proc_op_undeploy>` operation if no longer needed.
+
+.. seealso::
+    - :ref:`proc_op_execute` for execution request details
+    - :ref:`app_pkg_multipart` for multipart :term:`CWL` packaging
+    - `crim-ca/weaver#834 <https://github.com/crim-ca/weaver/issues/834>`_ for implementation details
 
 .. _proc_exec_steps:
 
@@ -2073,7 +2713,7 @@ the :ref:`proc_exec_results` options. However, an *additional* ``process`` :term
 to indicate which :term:`Process` should be executed by the :term:`Job`.
 
 The |job-exec-req|_ operation allows interoperability alignement with other execution strategies, such as defined
-by the |openeo-api|_ and the |ogc-tb20-gdc|_ *GDC API Profile*. It also opens the door for advanced :term:`Workflow`
+by the |openeo-api-profile|_ and the |ogc-tb20-gdc-profile|_. It also opens the door for advanced :term:`Workflow`
 definitions from a common :term:`Job` endpoint interface, as described by the |ogc-api-proc-part4|_ extension.
 
 Furthermore, an optional ``"status": "create"`` request body parameter can be supplied to indicate to the :term:`Job`
@@ -2184,7 +2824,7 @@ the |status-req|_ request.
 - Specify a ``profile`` parameter within the ``Accept`` header (e.g.: ``Accept: application/json; profile=openeo``).
 
 Using the |openeo|_ profile for example, will allow returning ``status`` values that are appropriate
-as per the |openeo-api|_ definition.
+as per the |openeo-api-profile|_ definition.
 
 When performing :ref:`Job Status <proc_op_job_status>` requests, the received response should
 contain a ``Content-Schema`` header indicating which of the applied ``profile`` is being represented.
@@ -2202,6 +2842,54 @@ All endpoints to retrieve any of the following information about a :term:`Job` c
 if the requested :term:`Job` did refer to those :term:`Provider` and/or :term:`Process`.
 A *local* :term:`Process` would have its :term:`Job` references as ``/processes/{processId}/jobs/{jobID}/...``
 while a :ref:`proc_remote_provider` will use ``/provider/{providerName}/processes/{processId}/jobs/{jobID}/...``.
+
+.. list-table:: Common :term:`Job` detail and metadata endpoints
+    :name: table-job-detail-endpoints
+    :align: center
+    :header-rows: 1
+    :widths: 30,25,45
+
+    * - Endpoint
+      - Documentation
+      - Description
+    * - ``/jobs/{jobID}``
+      - :ref:`proc_op_status`
+      - Obtain latest execution status and monitoring details of a :term:`Job`.
+    * - ``/jobs/{jobID}/outputs``
+      - :ref:`proc_op_job_outputs`
+      - Obtain all outputs under a :term:`JSON` document structure with additional metadata.
+    * - ``/jobs/{jobID}/outputs/{outputID}``
+      - :ref:`proc_op_job_results_single`
+      - Alias to the :term:`OGC API - Processes` compliant ``/jobs/{jobID}/results/{outputID}`` endpoint.
+    * - ``/jobs/{jobID}/results``
+      - :ref:`proc_op_job_results`
+      - Obtain results according to negotiated response and output selection parameters.
+    * - ``/jobs/{jobID}/results/{outputID}``
+      - :ref:`proc_op_job_results_single`
+      - Obtain one selected output from results without retrieving the whole set.
+    * - ``/jobs/{jobID}/results/{outputID}/{index}``
+      - :ref:`proc_op_job_results_single`
+      - Obtain one element from an array-valued output by zero-based index.
+    * - ``/jobs/{jobID}/inputs``
+      - :ref:`proc_op_job_inputs`
+      - Review submitted execution parameters including ``inputs``,
+        *requested* ``outputs`` [#outN]_ and relevant request ``headers``.
+    * - ``/jobs/{jobID}/exceptions``
+      - :ref:`proc_op_job_exceptions`
+      - Inspect reported execution failures.
+    * - ``/jobs/{jobID}/logs``
+      - :ref:`proc_op_job_logs`
+      - Inspect captured runtime logs.
+    * - ``/jobs/{jobID}/prov``
+      - :ref:`proc_op_job_prov`
+      - Retrieve :term:`Provenance` metadata.
+    * - ``/jobs/{jobID}/statistics``
+      - :ref:`proc_op_job_stats`
+      - Retrieve runtime statistics collected from successful executions.
+
+.. note::
+    Corresponding utility operations are provided by the :ref:`cli`.
+
 
 .. _proc_op_job_outputs:
 
@@ -2247,8 +2935,8 @@ On the other hand, a :term:`Job` submitted with ``response=raw``, ``Prefer: retu
 combinations of ``Accept`` headers and ``transmissionMode`` parameters, can produce
 many alternative content variations (see :ref:`proc_exec_results`) to respect :term:`OGC` compliance requirements.
 The structure of contents received from :ref:`proc_op_job_results` responses can also surprisingly vary according to
-the number of requested ``outputs``, the submitted request parameters, and the alternative :term:`Media-Type`, schema
-or literal data supported by each respective output.
+the number of requested ``outputs`` [#outN]_, the submitted request parameters, and the alternative :term:`Media-Type`,
+schema or literal data supported by each respective output.
 For this reason, the :ref:`proc_op_job_outputs` endpoint will **always** provide all data and links in the
 response body using the ``minimal`` representation as shown by above :term:`JSON` examples,
 **no matter which request parameters** where originally submitted to execute the :term:`Job`.
@@ -2368,6 +3056,59 @@ If ``transmissionMode: value`` under ``output-file`` in the *requested* ``output
 the data of the file would be directly included inline within the response instead of using ``Content-Location``,
 similarly to the :ref:`Single Output Value <job-results-raw-single-data>` example,
 but with its contents nested within its respective boundaries for the corresponding ``Content-ID``.
+
+.. _proc_op_job_results_single:
+
+Job Single Output Retrieval
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. versionadded:: 6.12.0
+
+When only one output is needed, and following a successful :term:`Job` execution,
+the desired result can be obtained directly without requesting the whole result set, using:
+
+.. code-block:: http
+
+    GET /jobs/{jobID}/results/{outputID} HTTP/1.1
+    Host: weaver.example.com
+
+Equivalent :term:`Process`-scoped and :term:`Provider`-scoped prefixes can be used in the same way, as described
+in :ref:`proc_op_job_detail`. For convenience, the ``../outputs/{outputID}`` endpoint can also be used as an alias
+to the above ``../results/{outputID}`` endpoint.
+
+When the selected ``{outputID}`` corresponds to an array result, a specific element can be obtained with:
+
+.. code-block:: http
+
+    GET /jobs/{jobID}/results/{outputID}/{index} HTTP/1.1
+    Host: weaver.example.com
+
+This indexed route is therefore the same single-output retrieval strategy, but with an additional selector
+applied on the array value for convenience. It can also be employed to convert only a single element of the array
+to another supported :term:`Media-Type`, without triggering conversion for the entire array.
+Submitting a request to the ``{index}`` endpoint for an ``{outputID}`` that does not correspond to an array will
+return an HTTP error response. Using the endpoint without ``{index}`` will return the whole array as a single output,
+or as the output itself it is not an array.
+
+The representation of returned content for single-output retrieval follows similar
+:ref:`Resolution Resolution <proc_exec_results>` and :ref:`Content Negotiation <proc_content_negotiation>` principles
+and parameters to their multi-output counterparts. However, any indication of ``>1`` considerations are not applicable
+in this case, since only one output is requested. Similarly, the semantics of the negotiated formats apply to the
+specifically requested single output directly, rather than to a response containing multiple outputs with
+different formats. Therefore, certain formats might not be applicable to certain cases.
+
+.. warning::
+    Although ``/jobs/{jobID}/results/{outputID}`` and ``/jobs/{jobID}/results/{outputID}/{index}`` can be
+    used to obtain distinct subsets of "outputs", they all refer to the same :term:`Process` ``outputID``.
+    Therefore, the :ref:`proc_content_negotiation` is performed the same way. For example, requesting a
+    GeoTIFF :term:`Media-Type` for an output that supports it would return either the whole array, each item a
+    distinct GeoTIFF, or only the specific one by ``{index}``. It will **NOT** create a "*container*"-like
+    representation of that GeoTIFF (e.g.: by stacking bands).
+
+    That is different from the :ref:`proc_content_negotiation` performed for the ``/jobs/{jobID}/results`` endpoint
+    itself, which MAY perform some sort of packaging of a :ref:`proc_multi_outputs` representation of the whole result
+    set, for example by returning a ZIP representation instead of the default
+    :ref:`JSON Job Results <job-results-document-minimal>` document.
 
 .. _proc_op_job_inputs:
 
@@ -2545,6 +3286,12 @@ Following is a table of available formats and corresponding endpoints offered by
     This feature is enabled by default. Its functionality and the corresponding :term:`API` endpoints
     can be controlled using :ref:`Configuration Option <weaver-cwl-prov>` ``weaver.cwl_prov``.
 
+.. note::
+    Although not directly encoded within the above :ref:`Provenance Representations <table-job-prov>`, entities
+    that desire to offer additional information and traceability about the underlying :term:`Process` execution
+    should consider including their respective :ref:`Metadata <app_pkg_metadata>`.
+
+
 Resulting metadata that is collected from :term:`Job` :term:`Provenance` will be stored under a similar endpoint
 as the :ref:`exec_output_location`, except with an additional ``-prov`` suffix applied after the :term:`Job` UUID,
 as shown below.
@@ -2588,7 +3335,7 @@ to execute. Content negotiation also happens within the submitted :ref:`proc_exe
 Following is a summary of relevant parameters impacting content negotiation.
 
 .. list-table:: Impact of *Requested Parameters* on *Response Content Negotiation*
-    :name: table-content-negotiation
+    :name: table-content-negotiation-parameters
     :align: center
     :header-rows: 1
     :widths: 10,10,50,15,15
@@ -2603,7 +3350,7 @@ Following is a summary of relevant parameters impacting content negotiation.
       - Requested content :term:`Media-Type` (explicitly or implicitly using a shorthand notation).
         Equivalent to the ``Accept`` header, but with a higher precedence if both are provided.
         This precedence allows ignoring automatically injected :term:`HTML`-like ``Accept`` headers
-        by some :term:`Web` browsers, in order to provide alternate response representations.
+        by some web browsers, in order to provide alternate response representations.
       - |shorthand| or :term:`URI`
       - ``/jobs/{jobID}?f=json``
     * - ``profile``
@@ -2655,7 +3402,7 @@ Following is a summary of relevant parameters impacting content negotiation.
 
 .. rubric:: Notes
 
-.. [#noteEncoding]
+.. [#noteParamEncoding]
     Depending on the location and the specific name of the query parameters or headers, certain encodings are enforced.
     For example, the ``Link`` header is defined by :rfc:`6906`, which **requires** its ``href`` to be an :term:`URI`.
     In such case, shorthand notation like ``rel=profile, href=cloud-optimized`` is **not allowed**.
@@ -2681,7 +3428,7 @@ and their corresponding fully-defined :term:`URI` or :term:`Media-Type` represen
     However, the corresponding :term:`URI` or :term:`Media-Type` representations must match *exactly*.
 
 .. list-table:: Common Shorthand Notations Identifiers for Content Negotiation
-    :name: table-content-negotiation
+    :name: table-content-negotiation-shorthand
     :align: center
     :header-rows: 1
     :widths: 10,30,60
@@ -2719,7 +3466,7 @@ and their corresponding fully-defined :term:`URI` or :term:`Media-Type` represen
       - :term:`Media-Type` ``application/json``
       - Typically employed with ``f`` or ``format`` query parameter to request a :term:`JSON` representation.
     * - ``yaml``/``yml``
-      - :term:`Media-Type` ``application/x-yaml``
+      - :term:`Media-Type` ``application/yaml``, ``application/x-yaml``, ``text/yaml`` or ``text/x-yaml``
       - Typically employed with ``f`` or ``format`` query parameter to request a :term:`YAML` representation.
     * - ``xml``
       - :term:`Media-Type` ``text/xml`` or ``application/xml``
@@ -2743,7 +3490,7 @@ Possible locations where :term:`Profile` can be specified are, in order of prece
 - ``Accept-Profile`` header directly providing the profile :term:`URI`.
 - ``Accept`` :term:`Media-Type` with a ``profile`` parameter.
 - ``Prefer`` header including a ``profile`` parameter.
-- ``Link`` header including a ``profile`` parameter.
+- ``Link`` header including a link relation named ``profile``.
 
 .. seealso::
     - Implementation of the resolution order in `Weaver` is provided in :func:`weaver.utils.get_response_profile`.
@@ -2751,7 +3498,7 @@ Possible locations where :term:`Profile` can be specified are, in order of prece
 .. note::
     The precedence requirement is mostly predominant regarding the use of a ``profile`` query parameter in contrast
     to any other header variant. This is simply due to the fact that inserting a query parameter is the simplest
-    method to provide a :term:`Profile`, especially in the case of :term:`Web` browsers where headers are more
+    method to provide a :term:`Profile`, especially in the case of web browsers where headers are more
     complicated to include in the request. Therefore, combining multiple headers approaches simultaneously with
     distinct :term:`Profile` values is considered *undefined or random behavior* by referenced standards.
 
@@ -2759,15 +3506,47 @@ In `Weaver`, the prioritization strategy is defined in terms of most explicit an
 least probable ones regarding where the :term:`Profile` is potentially located. Another consideration for the order
 is the "*strictness requirement*" aspect of each header. The ``Accept`` header imposes a strict refusal of the
 request (``406 Not Acceptable``) if the :term:`Profile` is not supported for a given endpoint, while the ``Prefer``
-header is more relaxed and fulfillment is optional (the server is allowed to ignore it and respond successfully).
+header is more relaxed and fulfillment is optional. The server is allowed to ignore the failing ``Prefer`` condition
+and respond successfully, unless ``handling=strict`` (:rfc:`7240#section-4.4`) is indicated.
 
 The ``Link`` header is placed last, to potentially allow ``Prefer`` priority if a given :term:`Profile` can be
-respected, and revert back to :term:`Profile` specified by ``Link`` otherwise. This allows the simultaneous
-submission of ``Prefer: profile=...`` and ``Link: profile=...`` headers in a request with flexible outcomes between
-clients and servers supporting different :term:`Profiles` interoperability. In this case, the ``Link`` header can be
+respected, and revert back to :term:`Profile` specified by ``Link`` otherwise. This allows the simultaneous submission
+of ``Prefer: profile="{URI}"`` and ``Link: <{URI}>; rel=profile`` headers in a request with flexible outcomes between
+clients and servers supporting different :term:`Profile` interoperability. In this case, the ``Link`` header can be
 used to provide a fallback if the :term:`Profile` in ``Prefer`` header cannot not be respected or resolved by the server
 for the given request context. Fulfilling the :term:`Profile` in ``Link`` header is "*more important*" in this fallback
-scenario, but still **NOT** mandatory, contrary to the ``Accept`` and ``Accept-Profile`` headers.
+scenario, but still **NOT** mandatory, contrary to the ``Accept`` and ``Accept-Profile`` headers that must be respected
+to fulfill the request successfully.
+
+.. _proc_content_negotiation_transforms:
+
+Transformed Output Considerations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. versionadded:: 6.12.0
+
+From a client perspective, output :ref:`content-negotiation` produced directly by an originally deployed :term:`Process`
+definition or through an alternate format :term:`Transform` uses the same mechanisms. All supported :term:`Media-Types`
+by a given :term:`Process` output are described in the same manner. However, the underlying :term:`Process` definition
+composes that set of supported formats by combining the *native* formats declared in the :term:`Process` definition
+(which may come from the declared :ref:`Deployment Metadata <proc_op_deploy>` and/or :term:`Application Package`)
+and any additional transformation formats builtin within `Weaver`.
+
+Additional :term:`Transform` formats can extend those declared formats for simple result retrieval when a compatible
+conversion is available. If a :term:`Process` already defines support of a given :term:`Media-Types` at deployment time,
+this format should be *natively* managed by the :term:`Process` rather than the :term:`Transform` utilities.
+Retrieval methods remain unchanged, including :ref:`proc_op_job_results` for complete result sets and
+:ref:`proc_op_job_results_single` for direct per-output access, with either variant.
+
+The available alternative :term:`Transform` formats are defined in :mod:`weaver.transform`. They are selected on a
+per-output basis based on the applicable output constrains inherited from the original :term:`Process` definition,
+and by cases where compatible :term:`Transform` combinations can be established, if not already provided.
+For example, a :term:`Process` that produces a :term:`JSON` output may automatically support additional transformations
+to corresponding :term:`CSV`, :term:`XML` and :term:`YAML` representations.
+However, it is to be noted that these transformations are performed *literally* and meant to be relatively low-level
+operations, meaning that advanced semantic interpretation and metadata of the formats will often not be considered.
+For advanced transformations including domain-specific interpretation of the data, it is recommended to implement them
+directly with a dedicated and reusable :term:`Process` definition, which can be chained within a :ref:`proc_workflow`.
 
 .. _vault_upload:
 

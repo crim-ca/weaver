@@ -1,0 +1,11 @@
+{
+   "process" : "https://maps.gnosis.earth/ogcapi/processes/PassThrough",
+   "inputs" : {
+      "data" : [
+         {
+            "collection" : "https://maps.gnosis.earth/ogcapi/collections/SRTM_ViewFinderPanorama",
+            "properties" : [ "10 * Elevation" ]
+         }
+      ]
+   }
+}

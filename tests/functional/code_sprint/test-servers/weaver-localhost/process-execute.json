@@ -1,0 +1,6 @@
+{
+  "process": "http://localhost:4002/processes/echo",
+  "inputs": {
+    "message": "Hello, Weaver!"
+  }
+}

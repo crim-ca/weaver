@@ -1,5 +1,4 @@
 .. include:: references.rst
-.. _package:
 .. _application-package:
 
 .. shortcuts for visualization
@@ -117,7 +116,7 @@ provided to tell :term:`CWL` how to map :term:`Job` input values to the dynamica
 
 .. _app_pkg_python:
 
-Python Applications
+Python CLI Applications
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 When the :term:`Application Package` to be generated consists of a Python script, which happens to make use of
@@ -247,9 +246,12 @@ When advanced processing capabilities and more complicated environment preparati
 to package and push pre-built :term:`Docker` images to a remote registry. In this situation, just like
 for :ref:`app_pkg_script` examples, the |cwl-docker-req|_ is needed. The definitions would also be essentially the
 same as previous examples, but with more complicated operations and possibly larger amount of inputs or outputs.
-
 Whenever a :term:`Docker` image reference is detected, `Weaver` will ensure that the application will be pulled
 using :term:`CWL` capabilities in order to run it.
+
+.. literalinclude:: ../../weaver/wps_restapi/examples/deploy_process_yaml.cwl
+    :caption: Sample CWL definition of a Dockerized Application
+    :language: yaml
 
 Because :term:`Application Package` providers could desire to make use of :term:`Docker` images hosted on private
 registries, `Weaver` offers the capability to specify an authorization token through HTTP request headers during
@@ -299,8 +301,9 @@ whenever required for launching new :term:`Job` executions.
     any retention time of cached :term:`Docker` images on the server. If the cache is cleaned, and the :term:`Docker`
     image is made unavailable, `Weaver` will attempt to authenticate itself again when receiving the new :term:`Job`.
     It is left up to the developer and :term:`Application Package` provider to manage expired tokens in `Weaver`
-    according to their needs. To resolve such cases, the |update-token-req|_ request or an entire re-deployment
-    of the :term:`Process` could be accomplished, whichever is more convenient for them.
+    according to their needs. To resolve such cases, the :ref:`Replace Process <proc_op_replace>` request or an
+    entire re-deployment of the :term:`Process` (:ref:`Undeploy <proc_op_undeploy>` and :ref:`Deploy <proc_op_deploy>`)
+    including the new ``X-Auth-Docker`` header can be employed to update the token used for authentication.
 
 .. versionadded:: 4.5
     Specification and handling of the ``X-Auth-Docker`` header for providing an authentication token.
@@ -424,6 +427,259 @@ Below are examples of the corresponding :term:`CWL` requirements employed for ea
     - :ref:`proc_wps_12`
     - :ref:`proc_ogc_api`
     - :ref:`proc_esgf_cwt`
+
+.. _app_pkg_multipart:
+
+CWL Multipart Content
+------------------------
+
+When deploying multiple related :term:`CWL` definitions (e.g., a :term:`Workflow` with its dependent tools),
+`Weaver` supports ``multipart/related`` content format (:rfc:`2387`) as defined in |ogc-api-proc-part2|_.
+This allows packaging multiple :term:`CWL` documents in a single HTTP request using standard MIME multipart encoding.
+
+Alternatively, the :ref:`cli` provides the :ref:`cli_example_deploy` command which can accept multiple :term:`CWL` file
+paths and automatically handles multipart encoding and deployment order resolution.
+
+Multipart Workflow Definition
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Each part in the multipart body must specify:
+
+- ``Content-Type``: The media type of the part (e.g., ``application/cwl+json``) (:rfc:`2045#section-5`)
+- A unique identifier resolved from one or more of:
+
+  - ``Content-ID``: Part identifier in the format ``<id@domain>`` (:rfc:`2392`)
+  - ``Content-Location``: Process identifier or URL to fetch the :term:`CWL` resource
+  - ``id`` field within the :term:`CWL` body
+
+The multipart content structure follows :rfc:`2387` conventions, with the ``Content-Type`` header
+specifying ``multipart/related`` with a ``boundary`` parameter.
+See :ref:`table below <table-multipart-cwl-identifiers>` for complete identifier resolution details.
+
+Identifier Resolution and Reference Mapping
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The following table describes how various identifiers are resolved and used for :term:`CWL` part identification,
+process deployment, and workflow step references:
+
+.. table:: Multipart CWL Identifier Resolution
+    :name: table-multipart-cwl-identifiers
+    :align: center
+    :widths: 20 25 55
+
+    +----------------------+---------------------------+--------------------------------------------------------------+
+    | Field                | Location                  | Purpose and Behavior                                         |
+    +======================+===========================+==============================================================+
+    | ``Content-ID``       | Part Header               | - **Required** unique identifier for the part                |
+    |                      |                           | - Format: ``<id@domain>`` (:rfc:`2392`)                      |
+    |                      |                           | - Used by ``start`` parameter to reference the main document |
+    +----------------------+---------------------------+--------------------------------------------------------------+
+    | ``Content-Location`` | Part Header (optional)    | Specifies a URI (relative or absolute) for the :term:`CWL`:  |
+    |                      |                           |                                                              |
+    |                      |                           | - Process ID extracted from the URI                          |
+    |                      |                           | - Preferred for ``run`` references                           |
+    |                      |                           | - Overrides ``id`` in :term:`CWL`                            |
+    |                      |                           |                                                              |
+    |                      |                           | **Behavior:**                                                |
+    |                      |                           |                                                              |
+    |                      |                           | - If absolute URL with empty body: fetches :term:`CWL`       |
+    |                      |                           | - If body provided: URI used as ID, body content used        |
+    |                      |                           | - Process ID derived from URI or ``id`` field in content     |
+    +----------------------+---------------------------+--------------------------------------------------------------+
+    | ``id``               | :term:`CWL` body          | - **Required** in each :term:`CWL` document                  |
+    |                      |                           | - Used if no ``Content-Location``                            |
+    |                      |                           | - ``#main`` marks root document                              |
+    |                      |                           |   (see :ref:`Main Tool Selection <main-tool-selection>`)     |
+    |                      |                           | - Must be unique across parts                                |
+    +----------------------+---------------------------+--------------------------------------------------------------+
+    | ``run``              | Workflow step             | References a deployed tool by its process ID:                |
+    |                      | (:term:`CWL` body)        |                                                              |
+    |                      |                           | - Process ID extracted from ``Content-Location`` URI         |
+    |                      |                           | - Value from ``id`` field (with ``#`` prefix removed)        |
+    |                      |                           |                                                              |
+    |                      |                           | During deployment, ``#`` prefixes in ``run`` are             |
+    |                      |                           | automatically stripped to match deployed process IDs.        |
+    +----------------------+---------------------------+--------------------------------------------------------------+
+
+Examples
+~~~~~~~~
+
+.. code-block:: http
+    :caption: Part with identifier Content-Location
+
+    Content-Type: application/cwl+json
+    Content-ID: <tool-1@weaver.example.com>
+    Content-Location: echo-tool
+
+    {
+      "cwlVersion": "v1.2",
+      "class": "CommandLineTool",
+      "id": "echo-tool",  # matches Content-Location
+      ...
+    }
+
+In this case, the process will be deployed as ``echo-tool`` (from ``Content-Location``), and workflow steps
+should reference it as ``run: echo-tool``.
+
+.. code-block:: http
+    :caption: Part with URL Content-Location (external reference)
+
+    Content-Type: application/cwl+json
+    Content-ID: <tool-2@weaver.example.com>
+    Content-Location: https://example.com/tools/cat-tool.cwl
+
+
+When ``Content-Location`` is a URL and the part body is empty, the :term:`CWL` content is fetched from
+that location. The process ID is derived from the ``id`` field in the fetched document. If the body is
+provided explicitly, the ``Content-Location`` URL is treated as an identifier and the body content is used
+directly without fetching.
+
+.. code-block:: http
+    :caption: Part without Content-Location
+
+    Content-Type: application/cwl+json
+    Content-ID: <tool-3@weaver.example.com>
+
+    {
+      "cwlVersion": "v1.2",
+      "class": "CommandLineTool",
+      "id": "grep-tool",
+      ...
+    }
+
+Without ``Content-Location``, the process ID comes from the ``id`` field (``grep-tool``). During deployment,
+any ``#`` prefix is automatically removed, so ``"id": "#grep-tool"`` becomes process ID ``grep-tool``.
+Workflow steps reference deployed tools using their processed ``id`` value: ``run: grep-tool``.
+
+.. note::
+    All dependent tools are automatically deployed before the main workflow to ensure proper resolution
+    of workflow step references.
+
+.. warning::
+
+    Multi-CWL deployment is **not atomic**. If any :term:`CWL` package fails validation or deployment,
+    previously deployed tools remain in the database without rollback. Retrying the deployment will
+    skip already-deployed tools to allow recovery, but manual cleanup may be required after failures.
+
+.. warning::
+
+    When deploying multiple :term:`CWL` tools, it is **strongly recommended** to use consistent and unique
+    prefixes for all process IDs (via ``id`` field or ``Content-Location``) to avoid conflicts with existing
+    processes. If a process with a matching ID already exists in the database, `Weaver` will resolve and use
+    that existing process instead of deploying the one provided in the multipart request. This can lead to
+    unexpected behavior if the existing process has different inputs, outputs, or implementation details than
+    the one intended for the workflow.
+
+    For example, use prefixed IDs like ``myworkflow-echo-tool``, ``myworkflow-cat-tool``, etc., rather than
+    generic names like ``echo-tool`` or ``cat-tool`` that might conflict with other deployed processes.
+
+.. _main-tool-selection:
+
+.. |cwl-main-id| replace:: ``#main``
+.. _cwl-main-id: https://www.commonwl.org/v1.2/Workflow.html#Generic_execution_process
+
+Main Tool Selection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The root :term:`CWL` document to be deployed as the main :term:`Process` is determined by the following priority:
+
+1. The ``start`` parameter in the ``Content-Type`` header, which references a
+   :ref:`resolved identifier <table-multipart-cwl-identifiers>` from multipart definitions
+2. The |cwl-main-id|_ identifier specified by ``Content-ID`` or the ``id`` field within the :term:`CWL` body
+   of the corresponding part
+3. If neither of the above are provided, the first :term:`CWL` part in the multipart body is considered the root
+   (non-CWL parts such as :term:`Process` metadata are ignored when determining the first :term:`CWL` document)
+
+The root document must be a :term:`Workflow` when deploying multiple related :term:`CWL` definitions.
+
+When multiple ``CommandLineTool`` or ``ExpressionTool`` definitions are provided without a ``Workflow``,
+the deployment will be rejected by `Weaver`, even if one of the tools has ``id: "#main"``. While the
+|cwl-spec|_ for `packed documents <https://www.commonwl.org/v1.2/CommandLineTool.html#Packed_documents>`_
+technically allows tools as entry points, `Weaver` requires a ``Workflow`` to establish the execution
+relationship between multiple tools. Without a ``Workflow``, there is no meaningful way to define how the
+tools should be chained or executed together. The main process selection follows the priority order
+described above (``start`` parameter, ``Workflow`` class, ``#main`` identifier, or first document).
+
+Additional Metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. fixme: support process meta multipart (https://github.com/crim-ca/weaver/issues/990)
+.. warning::
+    Process description metadata in multipart requests is not yet implemented
+    (see `crim-ca/weaver#990 <https://github.com/crim-ca/weaver/issues/990>`_).
+
+Example Multipart Request
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Example multipart request structure:
+
+.. code-block:: http
+
+    POST /processes HTTP/1.1
+    Host: weaver.example.com
+    Content-Type: multipart/related; boundary="boundary123"; start="<main-workflow@weaver.example.com>"
+
+    --boundary123
+    Content-Type: application/cwl+json
+    Content-ID: <echo-tool@weaver.example.com>
+    Content-Location: echo-tool
+
+    {
+      "cwlVersion": "v1.2",
+      "class": "CommandLineTool",
+      "id": "echo-tool",
+      "baseCommand": ["echo"],
+      "inputs": {
+        "message": "string"
+      },
+      "outputs": {
+        "output": {
+          "type": "stdout"
+        }
+      },
+      "requirements": {
+        "DockerRequirement": {
+          "dockerPull": "alpine:latest"
+        }
+      },
+      "stdout": "output.txt"
+    }
+
+    --boundary123
+    Content-Type: application/cwl+json
+    Content-ID: <main-workflow@weaver.example.com>
+    Content-Location: main-workflow
+
+    {
+      "cwlVersion": "v1.2",
+      "class": "Workflow",
+      "id": "main-workflow",
+      "inputs": {
+        "input_message": "string"
+      },
+      "outputs": {
+        "result": {
+          "type": "File",
+          "outputSource": "echo_step/output"
+        }
+      },
+      "steps": {
+        "echo_step": {
+          "run": "echo-tool",
+          "in": {
+            "message": "input_message"
+          },
+          "out": ["output"]
+        }
+      }
+    }
+
+    --boundary123--
+
+.. seealso::
+    - :ref:`app_pkg_workflow` for more details on :term:`Workflow` definitions
+    - :ref:`proc_ogc_api_multi_cwl` for deployment request examples
+    - |ogc-api-proc-part2|_ CWL Multipart Content conformance class
 
 .. _app_pkg_workflow:
 
@@ -887,33 +1143,33 @@ Following is an example where input definitions are equivalent in both :term:`CW
     :align: center
     :widths: 50,50
 
-    +-----------------------------------------------+-----------------------------------------------------------------+
-    | .. code-block:: json                          | .. code-block:: json                                            |
-    |    :caption: :term:`WPS` Format with MIME-type|    :caption: :term:`CWL` Format with Namespace                  |
-    |    :linenos:                                  |    :linenos:                                                    |
-    |                                               |                                                                 |
-    |    {                                          |    {                                                            |
-    |      "id": "input",                           |      "inputs": [                                                |
-    |      "formats": [                             |        {                                                        |
-    |        {"mimeType": "application/x-netcdf"},  |          "id": "input",                                         |
-    |        {"mimeType": "application/json"}       |          "format": [                                            |
-    |      ]                                        |            "edam:format_3650",                                  |
-    |    }                                          |            "iana:application/json"                              |
-    |                                               |          ]                                                      |
-    |                                               |        }                                                        |
-    |                                               |      ],                                                         |
-    |                                               |      "$namespaces": {                                           |
-    |                                               |        "edam": "http://edamontology.org/",                      |
-    |                                               |        "iana": "https://www.iana.org/assignments/media-types/"  |
-    |                                               |      }                                                          |
-    |                                               |    }                                                            |
-    +-----------------------------------------------+-----------------------------------------------------------------+
+    +-------------------------------------------------+----------------------------------------------------------------+
+    | .. code-block:: json                            | .. code-block:: json                                           |
+    |    :caption: :term:`WPS` Format with Media-Type |    :caption: :term:`CWL` Format with Namespace                 |
+    |    :linenos:                                    |    :linenos:                                                   |
+    |                                                 |                                                                |
+    |    {                                            |    {                                                           |
+    |      "id": "input",                             |      "inputs": [                                               |
+    |      "formats": [                               |        {                                                       |
+    |        {"mediaType": "application/netcdf"},     |          "id": "input",                                        |
+    |        {"mediaType": "application/json"}        |          "format": [                                           |
+    |      ]                                          |            "edam:format_3650",                                 |
+    |    }                                            |            "iana:application/json"                             |
+    |                                                 |          ]                                                     |
+    |                                                 |        }                                                       |
+    |                                                 |      ],                                                        |
+    |                                                 |      "$namespaces": {                                          |
+    |                                                 |        "edam": "http://edamontology.org/",                     |
+    |                                                 |        "iana": "https://www.iana.org/assignments/media-types/" |
+    |                                                 |      }                                                         |
+    |                                                 |    }                                                           |
+    +-------------------------------------------------+----------------------------------------------------------------+
 
 
 As demonstrated, both contexts accept multiple formats for inputs. These effectively represent *supported formats* by
 the underlying application. The two :term:`Media-Types` selected for this example are chosen specifically to demonstrate
 how :term:`CWL` formats must be specified. More precisely, :term:`CWL` requires a real schema definition referencing to
-an existing ontology to validate formats, specified through the ``$namespaces`` section. Each format entry is then
+an existing ontology to validate formats, specified through the ``$namespaces`` section. Each ``format`` entry is then
 defined as a mapping of the appropriate namespace to the identifier of the ontology. Alternatively, you can also provide
 the full URL of the ontology reference in the format string.
 
@@ -924,17 +1180,19 @@ in the :term:`WPS` portion during process deployment, and `Weaver` will take car
 definition without any user intervention. This makes it also easier for the user to specify supported formats since it
 is generally easier to remember names of :term:`Media-types` than full ontology references. `Weaver` has a large set of
 commonly employed :term:`Media-Types` that it knows how to convert to corresponding ontologies. Also, `Weaver` will look
-for new :term:`Media-Types` it doesn't explicitly know about onto either the :term:`IANA` or the :term:`EDAM` ontologies
+for new :term:`Media-Types` it doesn't explicitly know about into its :ref:`table-known-format-ontologies`
 in order to attempt automatically resolving them.
 
 When formats are resolved between the two contexts, `Weaver` applies information in a complimentary fashion. This means
-for example that if the user provided ``application/x-netcdf`` on the :term:`WPS` side and ``iana:application/json`` on
+for example that if the user provided ``application/netcdf`` on the :term:`WPS` side and ``iana:application/json`` on
 the :term:`CWL` side, both resulting contexts will have both of those formats combined. `Weaver` will not favour one
 location over the other, but will rather merge them if they can be resolved into different and valid entities.
+Note that this merging result could differ depending on the performed resolution of :ref:`cwl-file-format-aliases`.
 
 Since ``formats`` is a required field for :term:`WPS` ``ComplexData`` definitions (see :ref:`cwl-io-types`) and
 that :term:`Media-Types` are easier to provide in this context, it is *recommended* to provide all of them in the
-:term:`WPS` definition. Alternatively, the :ref:`oas_io_schema` representation also located within the
+:term:`WPS` definition, unless the :term:`Process` is :ref:`Deployed Directly with CWL <proc_op_deploy_cwl>`.
+Alternatively, the :ref:`oas_io_schema` representation also located within the
 :term:`WPS` I/O definitions can be used to provide ``contentMediaType``.
 
 Above examples present the minimal content of ``formats`` :term:`JSON` objects
@@ -942,6 +1200,70 @@ Above examples present the minimal content of ``formats`` :term:`JSON` objects
 can be provided as well to further refine the specific format supported by the corresponding :term:`I/O` definition.
 These fields are directly mapped, merged and combined against complementary details provided with ``contentMediaType``,
 and ``contentEncoding`` and ``contentSchema`` within an :term:`OAS` schema (see :ref:`oas_io_schema`).
+
+.. list-table:: Known Format Ontologies
+    :header-rows: 1
+    :widths: 10,20,70
+    :name: table-known-format-ontologies
+
+    * - Ontology Name
+      - Reference
+      - Description
+    * - :term:`IANA`
+      - ``https://www.iana.org/assignments/media-types/``
+      - Common web :term:`Media-Types` defined by :term:`IANA`.
+    * - :term:`EDAM`
+      - ``http://edamontology.org/``
+      - Typically for bioinformatics formats, but also contains mappings for generic and certain geospatial formats.
+    * - :term:`OGC`
+      - ``http://www.opengis.net/def/media-type/ogc/1.0/``
+      - Main ontology for :term:`Media-Types` defined by :term:`OGC`.
+    * - ``opengis``
+      - ``http://www.opengis.net/``
+      - Generic for any :term:`OGC` Naming Authority :term:`URI`.
+
+.. _cwl-file-format-aliases:
+
+File Format Aliases
+~~~~~~~~~~~~~~~~~~~~~~
+
+When resolving formats between :term:`CWL` and :term:`WPS`, `Weaver` also tries to consider aliases for commonly used
+:term:`Media-Types` in order to ensure that the resulting contexts are as complete as possible. When doing so, it might
+also attempt resolving against older or deprecated variants as well to ensure backward compatibility seamlessly.
+It also attempts to resolve :term:`Media-Types` and ontology mappings based on corresponding file extensions if
+they can provide more context for resolution (e.g.: a generic :term:`YAML` vs. a :term:`CWL` encoded as :term:`YAML`).
+However, depending on the employed :ref:`Format Ontologies <table-known-format-ontologies>`, some formats may be
+resolved "*incorrectly*" (not technically invalid references, but as per user expectation).
+
+For example, the following could be considered all equivalent :term:`Media-Types` and :term:`CWL` ``formats``
+for the NetCDF format.
+In the below cases, all formats represent "NetCDF", but some are not yet registered officially (at time of writing),
+or have a long history of older variants employed as workarounds.
+
+- ``application/netcdf``
+- ``application/x-netcdf``
+- ``iana:application/netcdf4``
+- ``edam:format_3650``
+- ``ogc:netcdf``
+
+
+.. seealso::
+    Issue https://github.com/Unidata/netcdf/issues/42 presents the tracking of official :term:`IANA` :term:`Media-Type`
+    registration.
+
+Therefore, if some :term:`Media-Type` and/or ``format`` combinations are not *explicitly* specified in
+a :term:`Process` definition, `Weaver` might fail to "align" :ref:`Execution <proc_op_execute>` inputs/outputs formats
+against the supported ones by the :term:`Process`, and then fail the :term:`Job` execution from input validation.
+`Weaver` might also pick certain preferred mappings (e.g.: ``ogc:netcdf`` over ``edam:format_3650``) when multiple are
+available, which might not be the expected one by the user. For this reason, it is *recommended* to specify additional
+combinations are desired or should be supported by a :term:`Process`. `Weaver` will not automatically include all
+combinations as strict combinations might be desired for better execution replicability.
+
+`Weaver` will respect specified :term:`Process` and :term:`Application Package` format definitions *strictly* to ensure
+operational compatibility, since some variants can embedded incompatible semantics or encoding constraints
+(e.g.: ``application/json`` vs. ``application/geo+json``, NetCDF v3 vs. v4, etc.). Therefore, a :term:`Process` that
+indicates ``application/netcdf`` support would refuse a ``application/x-netcdf`` input, unless it was explicitly mapped
+and resolved when deploying the :term:`CWL` with corresponding ``format`` entries.
 
 .. _cwl-file-format-output:
 
@@ -951,26 +1273,30 @@ Output File Format
 .. warning::
     Format specification differs between :term:`CWL` and :term:`WPS` in the case of outputs.
 
-Although :term:`WPS` definition allows multiple *supported formats* for output that are later resolved to the *applied*
-one onto the produced result of the job, :term:`CWL` only considers the output ``format`` that directly indicates the
-*applied* schema. There is no concept of *supported format* in the :term:`CWL` world. This is simply because :term:`CWL`
+Although :term:`WPS` definition allows multiple *supported formats* for an output that are later resolved to the result
+*applied format* produced by the job, :term:`CWL` only considers the output ``format`` that directly indicates the
+*applied format*. There is no concept of *supported format* in the :term:`CWL` world. This is simply because :term:`CWL`
 cannot predict nor reliably determine which output will be produced by a given application execution without running it,
 and therefore cannot expose consistent output specification before running the process. Because :term:`CWL` requires to
-validate the full process integrity before it can be executed, this means that only a **single** output format is
-permitted in its context (providing many will raise a validation error when parsing the :term:`CWL` definition).
+validate the integrity of the full workflow graph before it can be executed, this means that only a **single** output
+format is permitted in its context (providing many will raise a validation error when parsing the :term:`CWL`
+definition).
 
-To ensure compatibility with multiple *supported formats* outputs of :term:`WPS`, any output that has more that one
+To ensure compatibility with multiple *supported formats* of :term:`WPS` outputs, any output that has more that one
 format will have its ``format`` field dropped in the corresponding :term:`CWL` definition. Without any ``format`` on the
 :term:`CWL` side, the validation process will ignore this specification and will effectively accept any type of file.
 This will not break any execution operation with :term:`CWL`, but it will remove the additional validation layer of the
 format (which especially deteriorates process resolution when chaining processes inside a :ref:`app_pkg_workflow`).
 
-If the :term:`WPS` output only specifies a single MIME-type, then the equivalent format (after being resolved to a valid
-ontology) will be preserved on the :term:`CWL` side since the result is ensured to be the unique one provided. For this
-reason, processes with specific single-format output are be preferred whenever possible. This also removes ambiguity
-in the expected output format, which usually requires a *toggle* input specifying the desired type for processes
-providing a multi-format output. It is instead recommended to produce multiple processes with a fixed output format for
-each case.
+If the :term:`WPS` output only specifies a single :term:`Media-Type`, the equivalent ``format`` (after being resolved to
+a valid ontology) will be preserved on the :term:`CWL` side since the result is ensured to be the unique one provided.
+For this reason, processes with specific single-format outputs are be preferred whenever possible. This also removes
+ambiguity in the expected output format, which usually requires a *toggle* input or other
+:ref:`proc_content_negotiation` strategies to specify the desired type for processes providing a multi-format outputs.
+
+.. seealso::
+    Refer to https://github.com/common-workflow-language/common-workflow-language/issues/901 discussions for more
+    context about the :term:`CWL` output ``format`` limitations and interpretation by the workflow engine.
 
 .. _cwl-allowed-values:
 
@@ -1548,6 +1874,9 @@ schema can be added as well, as presented in :ref:`oas_json_types` section.
     |                                           |      }                                                |
     |                                           |    }                                                  |
     +-------------------------------------------+-------------------------------------------------------+
+
+
+.. _app_pkg_metadata:
 
 Metadata
 -----------------------

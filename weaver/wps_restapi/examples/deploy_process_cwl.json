@@ -3,7 +3,7 @@
     "class": "CommandLineTool",
     "requirements": {
         "DockerRequirement": {
-            "dockerPull": "python:3.7-alpine"
+            "dockerPull": "python:3.12-alpine"
         }
     },
     "baseCommand": ["python3", "-V"],

@@ -1,6 +1,7 @@
 """
 Definitions of types used by tokens.
 """
+
 import abc
 import base64
 import copy
@@ -53,6 +54,7 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_APP_DOCKER_GPU,
     CWL_REQUIREMENT_APP_OGC_API,
     CWL_REQUIREMENT_APP_WPS1,
+    JobProcessingEntityType,
     JobStatusType,
     ProcessSchema
 )
@@ -62,6 +64,8 @@ from weaver.provenance import ProvenanceFormat
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreProcesses
+from weaver.transform.const import EXCLUDED_TYPES
+from weaver.transform.utils import extend_alternate_formats
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
     LoggerHandler,
@@ -100,7 +104,7 @@ if TYPE_CHECKING:
         AnyExecuteTransmissionMode
     )
     from weaver.formats import AnyContentType
-    from weaver.processes.constants import ProcessSchemaType
+    from weaver.processes.constants import AnyJobProcessingEntityType, ProcessSchemaType
     from weaver.processes.types import AnyProcessType
     from weaver.provenance import AnyProvenanceFormat, ProvenancePathType
     from weaver.quotation.status import AnyQuoteStatus
@@ -132,10 +136,11 @@ if TYPE_CHECKING:
     )
     from weaver.visibility import AnyVisibility
 
+    # pylint: disable=C0103  # false-positive invalid name for typing
     AnyParams = Dict[str, Any]
-    _Authentication: TypeAlias = "Authentication"
-    _DockerAuthentication: TypeAlias = "DockerAuthentication"
-    AnyAuthentication = Union[_Authentication, _DockerAuthentication]
+    AuthenticationType: TypeAlias = "Authentication"
+    DockerAuthenticationType: TypeAlias = "DockerAuthentication"
+    AnyAuthentication = Union[AuthenticationType, DockerAuthenticationType]
 
 LOGGER = getLogger(__name__)
 
@@ -484,7 +489,7 @@ class Service(Base):
                 "type": ContentType.APP_JSON,
             },
             {
-                "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
+                "rel": sd.OGC_API_PROC_REL_PROCESSES_URI,
                 "title": "Listing of processes provided by this service.",
                 "href": proc_url,
                 "hreflang": AcceptLanguage.EN_CA,
@@ -932,6 +937,11 @@ class Job(Base, LoggerHandler):
         if not isinstance(process, str) or process is None:
             raise TypeError(f"Type 'str' is required for '{self.__name__}.process'")
         self["process"] = process
+
+    @property
+    def processing_entity_type(self):
+        # type: () -> AnyJobProcessingEntityType
+        return JobProcessingEntityType.OGC_API_PROCESSES
 
     @property
     def type(self):
@@ -1495,6 +1505,33 @@ class Job(Base, LoggerHandler):
         result_job_path = os.path.join(result_job_path, file_name)
         return result_job_path
 
+    def get_all_possible_formats_links(self, url, results):
+        """
+        Get direct links to all outputs in any possible format.
+
+        :param url: The base URL for constructing links.
+        :param results: A list of result dictionaries containing "mimeType" and "identifier".
+        :returns: A list of dictionaries representing the links to all possible output formats.
+        """
+        links = []
+        for result in results:
+            media_type = get_field(result, "mimeType", search_variations=True)
+            if media_type and media_type not in EXCLUDED_TYPES:
+                id = get_field(result, "identifier", search_variations=True)
+                formats = [{"mediaType": media_type}]
+                extended_formats = extend_alternate_formats(formats)
+                links.extend([
+                    {
+                        "href": f"{url}/{id}?f={fmt['mediaType']}",
+                        "rel": "output",
+                        "id": id,
+                        "type": fmt["mediaType"],
+                        "title": f"Link to job {id} result in {fmt['mediaType']}"
+                    }
+                    for fmt in extended_formats
+                ])
+        return links
+
     def prov_url(self, container=None, extra_path=None):
         # type: (Optional[AnySettingsContainer], Optional[ProvenancePathType]) -> str
         extra_path = str(extra_path or "")
@@ -1589,9 +1626,9 @@ class Job(Base, LoggerHandler):
             {"href": job_url, "rel": "monitor", "title": "Job monitoring location."},  # IANA
             {"href": get_path_kvp(job_path, f=OutputFormat.JSON), "type": ContentType.APP_JSON,
              "rel": "alternate", "title": "Job status generic endpoint."},  # IANA
-            {"href": job_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",  # OGC
+            {"href": job_list, "rel": sd.OGC_API_PROC_REL_JOB_LIST_URI,  # OGC
              "title": "List of submitted jobs."},
-            {"href": job_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
+            {"href": job_exec, "rel": sd.OGC_API_PROC_REL_EXECUTE_URI,
              "title": "New job submission endpoint for the corresponding process."},
             {"href": f"{job_url}/inputs", "rel": "inputs",  # unofficial
              "title": "Submitted job inputs for process execution."}
@@ -1606,7 +1643,7 @@ class Job(Base, LoggerHandler):
         if self_link in ["status", None]:
             job_links.extend([
                 {"href": job_list, "rel": "collection", "title": "List of submitted jobs."},  # IANA
-                {"href": sd.OGC_API_PROC_PROFILE_JOB_DESC_URL, "rel": "profile", "title": "Job response profile."},
+                {"href": sd.OGC_API_PROC_PROFILE_JOB_DESC_URI, "rel": "profile", "title": "Job response profile."},
             ])
 
         if self.status in JOB_STATUS_CATEGORIES[StatusCategory.FINISHED]:
@@ -1615,7 +1652,7 @@ class Job(Base, LoggerHandler):
                 job_links.extend([
                     {"href": f"{job_url}/outputs", "rel": "outputs",  # unofficial
                      "title": "Job outputs of successful process execution (extended outputs with metadata)."},
-                    {"href": f"{job_url}/results", "rel": "http://www.opengis.net/def/rel/ogc/1.0/results",
+                    {"href": f"{job_url}/results", "rel": sd.OGC_API_PROC_REL_JOB_RESULTS_URI,
                      "title": "Job results of successful process execution (direct output values mapping)."},
                     {"href": f"{job_url}/statistics", "rel": "statistics",  # unofficial
                      "title": "Job statistics collected following process execution."},
@@ -1624,9 +1661,12 @@ class Job(Base, LoggerHandler):
                     {"href": f"{job_url}/prov", "rel": "https://www.w3.org/ns/prov",  # unofficial
                      "title": "Job provenance collected following process execution."},
                 ])
+                f_links = self.get_all_possible_formats_links(url=job_url, results=self.results)
+                if len(f_links) > 0:
+                    job_links.extend(f_links)
             else:
                 job_links.append({
-                    "href": f"{job_url}/exceptions", "rel": "http://www.opengis.net/def/rel/ogc/1.0/exceptions",
+                    "href": f"{job_url}/exceptions", "rel": sd.OGC_API_PROC_REL_EXCEPTIONS_URI,
                     "title": "List of job exceptions if applicable in case of failing job."
                 })
         job_links.extend([
@@ -1636,7 +1676,7 @@ class Job(Base, LoggerHandler):
             },
             {
                 # official, same as 'rel="[ogc-rel:log]"'
-                "href": f"{job_url}/logs", "rel": "http://www.opengis.net/def/rel/ogc/1.0/log",
+                "href": f"{job_url}/logs", "rel": sd.OGC_API_PROC_REL_JOB_LOG_URI,
                 "title": "List of collected job logs during process execution."
             }
         ])
@@ -1657,6 +1697,20 @@ class Job(Base, LoggerHandler):
                 link.setdefault(meta, param)
         return job_links
 
+    def summary(self, validate=True, **kwargs):
+        # type: (bool, **JSON) -> JSON
+        job_json = {
+            "id": self.id,  # provide both 'id' and 'jobID' for convenience/backward compatibility
+            "jobID": self.id,
+            "processID": self.process,
+            "providerID": self.service,  # dropped by validator if not applicable
+            "type": self.type,
+            "status": map_status(self.status),
+            "processingEntityType": self.processing_entity_type,
+        }
+        job_json.update(**kwargs)
+        return sd.JobSummary().deserialize(job_json) if validate else job_json
+
     def json(self, container=None, **kwargs):  # pylint: disable=W0221,arguments-differ
         # type: (Optional[AnySettingsContainer], **JSON) -> JSON
         """
@@ -1668,9 +1722,11 @@ class Job(Base, LoggerHandler):
         """
         settings = get_settings(container) if container else {}
         job_json = {
+            "id": self.id,  # provide both 'id' and 'jobID' for convenience/backward compatibility
             "jobID": self.id,
             "processID": self.process,
             "providerID": self.service,
+            "processingEntityType": self.processing_entity_type,
             "type": self.type,
             "title": self.title,
             "status": map_status(self.status),
@@ -2033,6 +2089,7 @@ class VaultFile(Authentication):
     """
     Dictionary that contains :term:`Vault` file and its authentication information.
     """
+
     type = AuthenticationTypes.VAULT
     bytes = 32
 
@@ -2745,7 +2802,7 @@ class Process(Base):
         proc_self = f"{proc_list}/{self.tag}" if self.version else proc_desc
         links = [
             {"href": proc_self, "rel": "self", "title": "Current process description."},
-            {"href": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "rel": "profile", "title": "Process response profile."},
+            {"href": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "rel": "profile", "title": "Process response profile."},
             {"href": f"{proc_desc}?f=xml", "rel": "alternate",
              "title": "Alternate process description.", "type": ContentType.APP_XML},
         ]
@@ -2756,15 +2813,17 @@ class Process(Base):
             )
         links.extend([
             {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
-            {"href": proc_exec, "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
+            {"href": proc_exec, "rel": sd.OGC_API_PROC_REL_EXECUTE_URI,
              "title": "Process execution endpoint for job submission."},
-            {"href": proc_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
+            {"href": proc_list, "rel": sd.OGC_API_PROC_REL_PROCESSES_URI,
              "title": "List of registered processes."},
-            {"href": jobs_list, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            {"href": jobs_list, "rel": sd.OGC_API_PROC_REL_JOB_LIST_URI,
              "title": "List of job executions corresponding to this process."},
             {"href": proc_list, "rel": "up", "title": "List of processes registered under the service."},
         ])
         if self.version:
+            # OGC API - Processes - 'Part 5: Versioning' (unofficial)
+            # (see https://github.com/opengeospatial/ogcapi-processes/pull/578)
             proc_tag = f"{proc_list}/{self.tag}"
             proc_hist = f"{proc_list}?detail=false&revisions=true&process={self.id}"
             links.extend([
@@ -2794,7 +2853,7 @@ class Process(Base):
                 {"href": api_base_url, "rel": "service", "title": "Provider service description."},
                 {"href": api_base_url, "rel": "service-meta", "title": "Provider service definition."},
                 {"href": wps_get_caps, "rel": "service-desc", "title": "Remote service description."},
-                {"href": self.processEndpointWPS1, "rel": "http://www.opengis.net/def/rel/ogc/1.0/process-desc",
+                {"href": self.processEndpointWPS1, "rel": sd.OGC_API_PROC_REL_PROCESS_DESC_URI,
                  "title": "Remote process description."},
             ]
             for link in wps_links:
@@ -2866,7 +2925,7 @@ class Process(Base):
         if schema == ProcessSchema.WPS:
             return self.xml(request)
 
-        process = self.dict()
+        process = copy.deepcopy(self.dict())
         links = self.links()
         process.update({
             "deploymentProfile": self.deployment_profile,
@@ -2887,6 +2946,10 @@ class Process(Base):
             # In this situation, the lack of WPS I/O altogether requires to generate OAS from I/O merge/conversion.
             # Deployment with OAS should have generated this field already to save time or for more precise definitions.
             for io_def in process[io_type].values():
+                if io_type == "outputs":
+                    formats = io_def.get("formats", [])
+                    if formats:
+                        io_def["formats"] = extend_alternate_formats(formats)
                 io_schema = get_field(io_def, "schema", search_variations=False)
                 if not isinstance(io_schema, dict):
                     io_def["schema"] = json2oas_io(io_def)
@@ -3100,6 +3163,7 @@ class Quote(PriceMixin, Base):
 
     It always has ``id`` and ``process`` keys.
     """
+
     # pylint: disable=C0103,invalid-name
 
     def __init__(self, *args, **kwargs):

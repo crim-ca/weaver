@@ -12,12 +12,12 @@ definitions generated on the exposed endpoints (JSON and Swagger UI).
 The definitions are also employed to generate the `OpenAPI` definitions reported in the documentation published
 on `Weaver`'s `ReadTheDocs` page.
 """
-
 # pylint: disable=C0103,invalid-name
 # pylint: disable=E0241,duplicate-bases
 
 import datetime
 import inspect
+import json
 import os
 import re
 from copy import copy
@@ -35,7 +35,7 @@ from dateutil import parser as date_parser
 from pygeofilter.backends.cql2_json import to_cql2
 from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, fes, jfe
 
-from weaver import WEAVER_SCHEMA_DIR, __meta__
+from weaver import WEAVER_SCHEMA_DIR, __meta__, ogc_definitions as ogc_def
 from weaver.config import WeaverFeature
 from weaver.execute import (
     ExecuteCollectionFormat,
@@ -111,6 +111,7 @@ from weaver.processes.constants import (
     PACKAGE_TYPE_POSSIBLE_VALUES,
     WPS_LITERAL_DATA_TYPES,
     JobInputsOutputsSchema,
+    JobProcessingEntityType,
     JobStatusProfileSchema,
     JobStatusType,
     ProcessSchema
@@ -127,6 +128,7 @@ from weaver.wps_restapi.colander_extras import (
     AnyOfKeywordSchema,
     BoundedRange,
     CommaSeparated,
+    DelimitedStringOneOf,
     EmptyMappingSchema,
     ExpandStringList,
     ExtendedBoolean as Boolean,
@@ -139,6 +141,7 @@ from weaver.wps_restapi.colander_extras import (
     NoneType,
     NotKeywordSchema,
     OAS3DefinitionHandler,
+    OAS3Parameter,
     OneOfCaseInsensitive,
     OneOfKeywordSchema,
     PermissiveMappingSchema,
@@ -146,7 +149,6 @@ from weaver.wps_restapi.colander_extras import (
     SchemeURL,
     SemanticVersion,
     StrictMappingSchema,
-    StringOneOf,
     StringRange,
     XMLObject
 )
@@ -154,7 +156,7 @@ from weaver.wps_restapi.constants import ConformanceCategory
 from weaver.wps_restapi.patches import WeaverService as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Type, Union
+    from typing import Any, Dict, Iterable, List, Tuple, Type, Union
     from typing_extensions import TypedDict
 
     from pygeofilter.ast import AstType as FilterAstType
@@ -162,7 +164,6 @@ if TYPE_CHECKING:
     from weaver.typedefs import DatetimeIntervalType, JSON
 
     ViewInfo = TypedDict("ViewInfo", {"name": str, "pattern": str})
-
 
 WEAVER_CONFIG_REMOTE_LIST = f"[{', '.join(WeaverFeature.REMOTE)}]"
 
@@ -182,7 +183,8 @@ CWL_REPO_URL = "https://github.com/common-workflow-language"
 CWL_SCHEMA_BRANCH = "v1.2.1"
 CWL_SCHEMA_PATH = "json-schema/cwl.yaml"
 CWL_SCHEMA_REPO = f"https://raw.githubusercontent.com/common-workflow-language/cwl-{CWL_VERSION}"
-CWL_SCHEMA_URL = f"{CWL_SCHEMA_REPO}/{CWL_SCHEMA_BRANCH}/{CWL_SCHEMA_PATH}"
+CWL_SCHEMA_SOURCE_URL = f"{CWL_SCHEMA_REPO}/{CWL_SCHEMA_BRANCH}/{CWL_SCHEMA_PATH}"
+CWL_SCHEMA_URL = f"https://w3id.org/cwl/{CWL_VERSION}/cwl-json-schema.yaml"
 CWL_BASE_URL = "https://www.commonwl.org"
 CWL_SPEC_URL = f"{CWL_BASE_URL}/#Specification"
 CWL_USER_GUIDE_URL = f"{CWL_BASE_URL}/user_guide"
@@ -230,24 +232,56 @@ OGC_WPS_2_SCHEMAS = f"{OGC_API_SCHEMAS_URL}/wps/2.0"
 # Because this type has special handling functionalities to distinguish it from any other usual 'complex' I/O
 # or any generic JSON-object data, define common constants that can be reused across the code.
 # If this changes later on, it will be easier to ensure backward compatibility with explicit references to it.
-OGC_API_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
-OGC_API_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
-OGC_API_BBOX_EPSG = "EPSG:4326"
+OGC_API_PROC_BBOX_SCHEMA = f"{OGC_API_PROC_PART1_SCHEMAS}/bbox.yaml"
+OGC_API_PROC_BBOX_FORMAT = "ogc-bbox"  # equal CRS:84 and EPSG:4326, equivalent to WGS84 with swapped lat-lon order
+OGC_API_PROC_BBOX_CRS = ogc_def.OGC_DEF_CRS_CRS84_URI
 
-OGC_API_PROC_PROFILE_PROC_DESC_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-description"
-OGC_API_PROC_PROFILE_PROC_LIST_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-process-list"
-OGC_API_PROC_PROFILE_EXECUTE_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-execute-request"
-OGC_API_PROC_PROFILE_RESULTS_URL = "https://www.opengis.net/dev/profile/OGC/0/ogc-results"
-OGC_API_PROC_PROFILE_RESULTS_REL = "[ogc-rel:results]"
-OGC_API_PROC_PROFILE_JOB_LOG_REL = "[ogc-rel:log]"
-OGC_API_PROC_PROFILE_JOB_DESC_URL = "https://www.opengis.net/dev/profile/OGC/0/job-description"
-OGC_API_PROC_PROFILE_JOB_LIST_URL = "https://www.opengis.net/dev/profile/OGC/0/jobs-list"
+OGC_API_PROC_PART1_EXC_BASE_URI = "https://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0"
+OGC_API_PROC_PART1_EXC_INVALID_PARAMETER_URI = f"{OGC_API_PROC_PART1_EXC_BASE_URI}/invalid-parameter"
+OGC_API_PROC_PART1_EXC_NO_SUCH_PROCESS_URI = f"{OGC_API_PROC_PART1_EXC_BASE_URI}/no-such-process"
+OGC_API_PROC_PART1_EXC_NO_SUCH_JOB_URI = f"{OGC_API_PROC_PART1_EXC_BASE_URI}/no-such-job"
+OGC_API_PROC_PART1_EXC_NO_SUCH_OUTPUT_URI = f"{OGC_API_PROC_PART1_EXC_BASE_URI}/no-such-output"
+OGC_API_PROC_PART1_EXC_RESULT_NOT_AVAILABLE_URI = f"{OGC_API_PROC_PART1_EXC_BASE_URI}/result-not-available"
+OGC_API_PROC_PART1_EXC_RESULT_NOT_READY_URI = f"{OGC_API_PROC_PART1_EXC_BASE_URI}/result-not-ready"
 
-OGC_API_SCHEMA_JOB_STATUS_URL = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
-OGC_WPS_1_SCHEMA_JOB_STATUS_URL = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
+OGC_API_PROC_PART2_EXC_BASE_URI = "https://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0"
+OGC_API_PROC_PART2_EXC_IMMUTABLE_PROCESS_URI = f"{OGC_API_PROC_PART2_EXC_BASE_URI}/immutable-process"
+OGC_API_PROC_PART2_EXC_DUPLICATED_PROCESS_URI = f"{OGC_API_PROC_PART2_EXC_BASE_URI}/duplicated-process"
+OGC_API_PROC_PART2_EXC_UNSUPPORTED_MEDIA_TYPE_URI = f"{OGC_API_PROC_PART2_EXC_BASE_URI}/unsupported-media-type"
 
-OPENEO_API_SCHEMA_URL = "https://openeo.org/documentation/1.0/developers/api/openapi.yaml"
-OPENEO_API_SCHEMA_JOB_STATUS_URL = f"{OPENEO_API_SCHEMA_URL}#/components/schemas/batch_job"
+OGC_API_PROC_PART4_EXC_BASE_URI = "https://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0"
+OGC_API_PROC_PART4_EXC_LOCKED_URI = f"{OGC_API_PROC_PART4_EXC_BASE_URI}/locked"
+OGC_API_PROC_PART4_EXC_UNSUPPORTED_MEDIA_TYPE_URI = f"{OGC_API_PROC_PART4_EXC_BASE_URI}/unsupported-media-type"
+OGC_API_PROC_PART4_EXC_UNSUPPORTED_SCHEMA_URI = f"{OGC_API_PROC_PART4_EXC_BASE_URI}/unsupported-schema"
+
+OGC_API_PROC_REL_BASE_URI = "https://www.opengis.net/def/rel/ogc/1.0"
+OGC_API_PROC_REL_EXCEPTIONS_URI = f"{OGC_API_PROC_REL_BASE_URI}/exceptions"
+OGC_API_PROC_REL_EXECUTE_URI = f"{OGC_API_PROC_REL_BASE_URI}/execute"
+OGC_API_PROC_REL_PROCESSES_URI = f"{OGC_API_PROC_REL_BASE_URI}/processes"
+OGC_API_PROC_REL_PROCESS_DESC_URI = f"{OGC_API_PROC_REL_BASE_URI}/process-desc"
+OGC_API_PROC_REL_JOB_RESULTS_URI = f"{OGC_API_PROC_REL_BASE_URI}/results"
+OGC_API_PROC_REL_JOB_LIST_URI = f"{OGC_API_PROC_REL_BASE_URI}/job-list"
+OGC_API_PROC_REL_JOB_LOG_URI = f"{OGC_API_PROC_REL_BASE_URI}/log"
+
+OGC_API_PROC_PROFILE_BASE_URI = "https://www.opengis.net/def/profile/OGC/0"
+OGC_API_PROC_PROFILE_PROC_DESC_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-process-description"
+OGC_API_PROC_PROFILE_PROC_LIST_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-process-list"
+OGC_API_PROC_PROFILE_EXECUTE_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-execute-request"
+OGC_API_PROC_PROFILE_RESULTS_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-results"
+OGC_API_PROC_PROFILE_JOB_DESC_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/job-description"
+OGC_API_PROC_PROFILE_JOB_LIST_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/jobs-list"
+OGC_API_PROC_PROFILE_OGC_VALUES_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-values"
+
+# Following are legacy definitions from OGC Testebeds and EO Apps Best Practices.
+# Therefore, leave them in 'http' for any operation relying on them explicitly (no auto https/versionless handling).
+OGC_API_PROC_PROFILE_DOCKER_APP_URI = "http://www.opengis.net/profiles/eoc/dockerizedApplication"
+OGC_API_PROC_PROFILE_WPS_APP_URI = "http://www.opengis.net/profiles/eoc/wpsApplication"
+
+OGC_API_SCHEMA_JOB_STATUS_URI = f"{OGC_API_PROC_PART1_SCHEMAS}/statusInfo.yaml"
+OGC_WPS_1_SCHEMA_JOB_STATUS_URI = f"{OGC_WPS_1_SCHEMAS}/wpsExecute_response.xsd"
+
+OPENEO_API_SCHEMA_URI = "https://openeo.org/documentation/1.0/developers/api/openapi.yaml"
+OPENEO_API_SCHEMA_JOB_STATUS_URI = f"{OPENEO_API_SCHEMA_URI}#/components/schemas/batch_job"
 
 WEAVER_SCHEMA_VERSION = "master"
 WEAVER_SCHEMA_URL = f"https://raw.githubusercontent.com/crim-ca/weaver/{WEAVER_SCHEMA_VERSION}/weaver/schemas"
@@ -301,13 +335,17 @@ PROVIDER_DESCRIPTION_FIELD_FIRST = [
 ]
 PROVIDER_DESCRIPTION_FIELD_AFTER = ["links"]
 
-JOB_STATUS_FIELD_FIRST = ["jobID", "processID", "providerID"]
-JOB_STATUS_FIELD_AFTER = [
+JOB_STATUS_FIELD_FIRST = [
+    "id",
     "jobID",
     "processID",
     "providerID",
+    "processingEntityType",
     "type",
     "status",
+]
+JOB_STATUS_FIELD_AFTER = [
+    "title",
     "message",
     "created",
     "started",
@@ -346,7 +384,6 @@ for _name in os.listdir(SCHEMA_EXAMPLE_DIR):
             EXAMPLES[_name] = yaml.safe_load(f)  # both JSON/YAML
         else:
             EXAMPLES[_name] = f.read()
-
 
 #########################################################
 # API tags
@@ -394,7 +431,15 @@ bill_service = Service(name="bill", path=f"{bills_service.path}/{{bill_id}}")
 jobs_service = Service(name="jobs", path="/jobs")
 job_service = Service(name="job", path=f"{jobs_service.path}/{{job_id}}")
 job_results_service = Service(name="job_results", path=f"{job_service.path}/results")
+job_result_value_service = Service(name="job_result_value", path=f"{job_results_service.path}/{{output_id}}")
+job_exceptions_service = Service(name="job_exceptions", path=f"{job_service.path}/exceptions")
+job_results_index_service = Service(
+    name="job_results_index",
+    path=f"{job_results_service.path}/{{output_id}}/{{index}}"
+)
 job_outputs_service = Service(name="job_outputs", path=f"{job_service.path}/outputs")
+job_output_service = Service(name="job_output", path=f"{job_outputs_service.path}/{{output_id}}")
+
 job_inputs_service = Service(name="job_inputs", path=f"{job_service.path}/inputs")
 job_exceptions_service = Service(name="job_exceptions", path=f"{job_service.path}/exceptions")
 job_logs_service = Service(name="job_logs", path=f"{job_service.path}/logs")
@@ -422,8 +467,15 @@ process_execution_service = Service(name="process_execution", path=f"{process_se
 process_jobs_service = Service(name="process_jobs", path=process_service.path + jobs_service.path)
 process_job_service = Service(name="process_job", path=process_service.path + job_service.path)
 process_results_service = Service(name="process_results", path=process_service.path + job_results_service.path)
+process_result_value_service = Service(name="process_result_value", path=process_service.path +
+                                       job_result_value_service.path)
+process_results_index_service = Service(
+    name="process_results_index",
+    path=process_service.path + job_results_index_service.path
+)
 process_inputs_service = Service(name="process_inputs", path=process_service.path + job_inputs_service.path)
 process_outputs_service = Service(name="process_outputs", path=process_service.path + job_outputs_service.path)
+process_output_service = Service(name="process_output", path=process_service.path + job_output_service.path)
 process_exceptions_service = Service(name="process_exceptions", path=process_service.path + job_exceptions_service.path)
 process_logs_service = Service(name="process_logs", path=process_service.path + job_logs_service.path)
 process_stats_service = Service(name="process_stats", path=process_service.path + job_stats_service.path)
@@ -468,8 +520,15 @@ provider_execution_service = Service(name="provider_execution", path=f"{provider
 provider_jobs_service = Service(name="provider_jobs", path=provider_service.path + process_jobs_service.path)
 provider_job_service = Service(name="provider_job", path=provider_service.path + process_job_service.path)
 provider_results_service = Service(name="provider_results", path=provider_service.path + process_results_service.path)
+provider_result_value_service = Service(name="provider_result_value", path=provider_service.path +
+                                        process_result_value_service.path)
+provider_results_index_service = Service(
+    name="provider_results_index",
+    path=provider_service.path + process_results_index_service.path
+)
 provider_inputs_service = Service(name="provider_inputs", path=provider_service.path + process_inputs_service.path)
 provider_outputs_service = Service(name="provider_outputs", path=provider_service.path + process_outputs_service.path)
+provider_output_service = Service(name="provider_output", path=provider_service.path + process_output_service.path)
 provider_exceptions_service = Service(
     name="provider_exceptions",
     path=provider_service.path + process_exceptions_service.path,
@@ -522,6 +581,7 @@ provider_result_service = Service(name="provider_result", path=provider_service.
 vault_service = Service(name="vault", path="/vault")
 vault_file_service = Service(name="vault_file", path=f"{vault_service.path}/{{file_id}}")
 
+
 #########################################################
 # Generic schemas
 #########################################################
@@ -555,6 +615,14 @@ class URL(ExtendedSchemaNode):
     schema_type = String
     description = "URL reference."
     format = "url"
+
+
+class URN(ExtendedSchemaNode):
+    schema_type = String
+    description = "Universal ressource name."
+    example = "urn:ogc:def:objectType:authority:version:code"
+    pattern = re.compile(r"^urn\:[A-Za-z0-9]+(:[A-Za-z0-9]+)+$")
+    title = "NamespacedRelationshipType"
 
 
 class URI(ExtendedSchemaNode):
@@ -773,6 +841,14 @@ class AcceptHeader(ExtendedSchemaNode):
     default = ContentType.APP_JSON  # defaults to JSON for easy use within browsers
 
 
+class AcceptAnyHeader(ExtendedSchemaNode):
+    # ok to use 'name' in this case because target 'key' in the mapping must
+    # be that specific value but cannot have a field named with this format
+    name = "Accept"
+    schema_type = String
+    missing = drop
+
+
 class AcceptLanguageHeader(ExtendedSchemaNode):
     # ok to use 'name' in this case because target 'key' in the mapping must
     # be that specific value but cannot have a field named with this format
@@ -782,19 +858,51 @@ class AcceptLanguageHeader(ExtendedSchemaNode):
     default = AcceptLanguage.EN_CA  # FIXME: oneOf validator for supported languages (?)
 
 
+class AcceptWithProfileOneOf(OneOfCaseInsensitive):
+    """
+    Defines a ``Accept`` header that embeds a ``profile`` paremeter quoted accordingly (if URI) when provided as tuple.
+    """
+
+    def __init__(self, choices, *args, **kwargs):
+        # type: (Iterable[Union[str, Tuple[str, str]]], *Any, **Any) -> None
+        values = []
+        for choice in choices:
+            if isinstance(choice, tuple):
+                profile = choice[1]
+                profile = f"\"{profile}\"" if profile.split("://")[0] in ["http", "https"] else profile
+                values.append(f"{choice[0]}; profile={profile}")
+            else:
+                values.append(choice)
+        super().__init__(values, *args, **kwargs)
+
+
+class ProfileOneOf(OneOfCaseInsensitive):
+    """
+    Validates allowed values of an ``Accept-Profile`` header, ``profile`` query or other similar parameters.
+    """
+
+    def __call__(self, node, value):
+        value = value.strip("<>").strip("\"")
+        return super().__call__(node, value)
+
+
 class AcceptProfileHeader(URI):
     name = "Accept-Profile"
     default = None
-    validator = OneOf([
-        OGC_API_PROC_PROFILE_PROC_DESC_URL,
-        OGC_API_PROC_PROFILE_PROC_LIST_URL,
-        OGC_API_PROC_PROFILE_EXECUTE_URL,
-        OGC_API_PROC_PROFILE_RESULTS_URL,
-        OGC_API_PROC_PROFILE_JOB_DESC_URL,
-        OGC_API_PROC_PROFILE_JOB_LIST_URL,
-        OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
-        OPENEO_API_SCHEMA_JOB_STATUS_URL,
-    ])
+    missing = drop
+    validator = ProfileOneOf(
+        choices=[
+            OGC_API_PROC_PROFILE_PROC_DESC_URI,
+            OGC_API_PROC_PROFILE_PROC_LIST_URI,
+            OGC_API_PROC_PROFILE_EXECUTE_URI,
+            OGC_API_PROC_PROFILE_RESULTS_URI,
+            OGC_API_PROC_PROFILE_JOB_DESC_URI,
+            OGC_API_PROC_PROFILE_JOB_LIST_URI,
+            OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
+            OPENEO_API_SCHEMA_JOB_STATUS_URI,
+        ],
+        populate_variants=False,
+    )
 
 
 class JsonHeader(ExtendedMappingSchema):
@@ -862,14 +970,28 @@ class PreferHeader(ExtendedSchemaNode):
     schema_type = String
 
 
-class RequestHeaders(ExtendedMappingSchema):
+class RequestHeadersNoBody(ExtendedMappingSchema):
     """
     Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
     """
+    # omits any 'Content-*' headers since no body applicable for OPTIONS,GET,HEAD requests
     accept = AcceptHeader()
     accept_language = AcceptLanguageHeader()
     accept_profile = AcceptProfileHeader(missing=drop)
+
+
+class RequestHeadersBody(RequestHeadersNoBody):
+    """
+    Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
+    """
     content_type = RequestContentTypeHeader()
+
+
+class RequestHeadersAcceptAny(RequestHeadersNoBody):
+    """
+    Headers that can indicate how to adjust the behavior and/or result to be provided in the response.
+    """
+    accept = AcceptAnyHeader()
 
 
 class ResponseHeaders(ExtendedMappingSchema):
@@ -940,7 +1062,7 @@ class NoContent(ExtendedMappingSchema):
     default = {}
 
 
-class FileUploadHeaders(RequestHeaders):
+class FileUploadHeaders(RequestHeadersBody):
     # MUST be multipart for upload
     content_type = ContentTypeHeader(
         example=f"{ContentType.MULTIPART_FORM}; boundary=43003e2f205a180ace9cd34d98f911ff",
@@ -964,8 +1086,9 @@ class FileResponseHeaders(NoContent):
     content_type = ContentTypeHeader(example=ContentType.APP_JSON)
     content_length = ContentLengthHeader()
     content_disposition = ContentDispositionHeader()
-    date = DateHeader()
-    last_modified = LastModifiedHeader()
+    content_location = ReferenceURL()
+    date = DateHeader(missing=drop)
+    last_modified = LastModifiedHeader(missing=drop)
 
 
 class AccessToken(ExtendedSchemaNode):
@@ -1017,8 +1140,14 @@ class LinkRelationshipType(OneOfKeywordSchema):
             "Relationship of the link to the current content. "
             "This should be one item amongst registered relations https://www.iana.org/assignments/link-relations/."
         )),
-        URL(description="Fully qualified extension link relation to the current content.")
+        URL(description="Fully qualified extension link relation to the current content."),
     ]
+
+
+class LinkId(ExtendedMappingSchema):
+    # https://datatracker.ietf.org/doc/html/rfc8288#section-3.4 (Target Attributes)
+    # https://datatracker.ietf.org/doc/html/rfc8288#section-3.4.2 (Extension Attributes)
+    id = SLUG(name="id", missing=drop)
 
 
 class LinkRelationship(ExtendedMappingSchema):
@@ -1030,7 +1159,8 @@ class LinkBase(LinkLanguage, MetadataBase):
     type = MediaType(description="IANA identifier of content-type located at the link.", missing=drop)
 
 
-class Link(LinkRelationship, LinkBase):
+class Link(LinkRelationship, LinkBase, LinkId):
+    # https://datatracker.ietf.org/doc/html/rfc2068#section-19.6.2.4 (Link Header)
     _schema = f"{OGC_API_COMMON_PART1_SCHEMAS}/link.json"
     _schema_include_deserialize = False  # only in OpenAPI otherwise too verbose
 
@@ -1084,6 +1214,167 @@ class LandingPage(ExtendedMappingSchema):
     links = LinkList()
 
 
+class ReferenceOAS(ExtendedMappingSchema):
+    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/reference.yaml"
+    _ref = ReferenceURL(name="$ref", description="External OpenAPI schema reference.")
+
+
+class TypeOAS(ExtendedSchemaNode):
+    name = "type"
+    schema_type = String
+    validator = OneOf(OAS_DATA_TYPES)
+
+
+class EnumItemOAS(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(String()),
+    ]
+
+
+class EnumOAS(ExtendedSequenceSchema):
+    enum = EnumItemOAS()
+
+
+class RequiredOAS(ExtendedSequenceSchema):
+    required_field = ExtendedSchemaNode(String(), description="Name of the field that is required under the object.")
+
+
+class MultipleOfOAS(OneOfKeywordSchema):
+    _one_of = [
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+    ]
+
+
+class PermissiveDefinitionOAS(NotKeywordSchema, PermissiveMappingSchema):
+    _not = [
+        ReferenceOAS
+    ]
+
+
+# cannot make recursive declarative schemas
+# simulate it and assume it is sufficient for validation purposes
+class PseudoObjectOAS(OneOfKeywordSchema):
+    _one_of = [
+        ReferenceOAS(),
+        PermissiveDefinitionOAS(),
+    ]
+
+
+class KeywordObjectOAS(ExtendedSequenceSchema):
+    item = PseudoObjectOAS()
+
+
+class AdditionalPropertiesOAS(OneOfKeywordSchema):
+    _one_of = [
+        ReferenceOAS(),
+        PermissiveDefinitionOAS(),
+        ExtendedSchemaNode(Boolean())
+    ]
+
+
+class AnyValueOAS(AnyOfKeywordSchema):
+    _any_of = [
+        PermissiveMappingSchema(),
+        PermissiveSequenceSchema(),
+        ExtendedSchemaNode(Float()),
+        ExtendedSchemaNode(Integer()),
+        ExtendedSchemaNode(Boolean()),
+        ExtendedSchemaNode(String()),
+    ]
+
+
+# reference:
+#   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/schema.yaml
+# note:
+#   although reference definition provides multiple 'default: 0|false' entries, we omit them since the behaviour
+#   of colander with extended schema nodes is to set this value by default in deserialize result if they were missing,
+#   but reference 'default' correspond more to the default *interpretation* value if none was provided.
+#   It is preferable in our case to omit (i.e.: drop) these defaults to keep obtained/resolved definitions succinct,
+#   since those defaults can be defined (by default...) if needed. No reason to add them explicitly.
+# WARNING:
+#   cannot use any KeywordMapper derived instance here, otherwise conflicts with same OpenAPI keywords as children nodes
+class PropertyOAS(PermissiveMappingSchema):
+    _type = TypeOAS(name="type", missing=drop)  # not present if top-most schema is {allOf,anyOf,oneOf,not}
+    _format = ExtendedSchemaNode(String(), name="format", missing=drop)
+    default = AnyValueOAS(unknown="preserve", missing=drop)
+    example = AnyValueOAS(unknown="preserve", missing=drop)
+    title = ExtendedSchemaNode(String(), missing=drop)
+    description = ExtendedSchemaNode(String(), missing=drop)
+    enum = EnumOAS(missing=drop)
+    items = PseudoObjectOAS(name="items", missing=drop)
+    required = RequiredOAS(missing=drop)
+    nullable = ExtendedSchemaNode(Boolean(), missing=drop)
+    deprecated = ExtendedSchemaNode(Boolean(), missing=drop)
+    read_only = ExtendedSchemaNode(Boolean(), name="readOnly", missing=drop)
+    write_only = ExtendedSchemaNode(Boolean(), name="writeOnly", missing=drop)
+    multiple_of = MultipleOfOAS(name="multipleOf", missing=drop, validator=BoundedRange(min=0, exclusive_min=True))
+    minimum = ExtendedSchemaNode(Integer(), name="minimum", missing=drop, validator=Range(min=0))  # default=0
+    maximum = ExtendedSchemaNode(Integer(), name="maximum", missing=drop, validator=Range(min=0))
+    exclusive_min = ExtendedSchemaNode(Boolean(), name="exclusiveMinimum", missing=drop)  # default=False
+    exclusive_max = ExtendedSchemaNode(Boolean(), name="exclusiveMaximum", missing=drop)  # default=False
+    min_length = ExtendedSchemaNode(Integer(), name="minLength", missing=drop, validator=Range(min=0))  # default=0
+    max_length = ExtendedSchemaNode(Integer(), name="maxLength", missing=drop, validator=Range(min=0))
+    pattern = ExtendedSchemaNode(Integer(), missing=drop)
+    min_items = ExtendedSchemaNode(Integer(), name="minItems", missing=drop, validator=Range(min=0))  # default=0
+    max_items = ExtendedSchemaNode(Integer(), name="maxItems", missing=drop, validator=Range(min=0))
+    unique_items = ExtendedSchemaNode(Boolean(), name="uniqueItems", missing=drop)  # default=False
+    min_prop = ExtendedSchemaNode(Integer(), name="minProperties", missing=drop, validator=Range(min=0))  # default=0
+    max_prop = ExtendedSchemaNode(Integer(), name="maxProperties", missing=drop, validator=Range(min=0))
+    content_type = ExtendedSchemaNode(String(), name="contentMediaType", missing=drop)
+    content_encode = ExtendedSchemaNode(String(), name="contentEncoding", missing=drop)
+    content_schema = ExtendedSchemaNode(String(), name="contentSchema", missing=drop)
+    _not_key = PseudoObjectOAS(name="not", title="not", missing=drop)
+    _all_of = KeywordObjectOAS(name="allOf", missing=drop)
+    _any_of = KeywordObjectOAS(name="anyOf", missing=drop)
+    _one_of = KeywordObjectOAS(name="oneOf", missing=drop)
+    x_props = AdditionalPropertiesOAS(name="additionalProperties", missing=drop)
+    properties = PermissiveMappingSchema(missing=drop)  # cannot do real recursive definitions, simply check mapping
+
+
+# this class is only to avoid conflicting names with keyword mappers
+class AnyPropertyOAS(OneOfKeywordSchema):
+    _one_of = [
+        ReferenceOAS(),
+        PropertyOAS(),
+    ]
+
+
+class ObjectPropertiesOAS(ExtendedMappingSchema):
+    property_name = AnyPropertyOAS(
+        variable="{property-name}",
+        description="Named of the property being defined under the OpenAPI object.",
+    )
+
+
+# would not need this if we could do explicit recursive definitions but at the very least, validate that when an
+# object type is specified, its properties are as well and are slightly more specific than permissive mapping
+class ObjectOAS(NotKeywordSchema, ExtendedMappingSchema):
+    _not = [ReferenceOAS]
+    _type = TypeOAS(name="type", missing=drop, validator=OneOf(OAS_COMPLEX_TYPES))
+    properties = ObjectPropertiesOAS()  # required and more specific contrary to 'properties' in 'PropertyOAS'
+
+
+# since we redefine 'properties', do not cause validation error for 'oneOf'
+class DefinitionOAS(AnyOfKeywordSchema):
+    _any_of = [
+        ObjectOAS(),
+        PropertyOAS(),  # for top-level keyword schemas {allOf, anyOf, oneOf, not}
+    ]
+
+
+class OAS(OneOfKeywordSchema):
+    description = "OpenAPI schema definition."
+    # _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/schema.yaml"  # definition used by OAP, but JSON-schema is more accurate
+    _schema = "http://json-schema.org/draft-07/schema#"
+    _one_of = [
+        ReferenceOAS(),
+        DefinitionOAS(),
+    ]
+
+
 # sub-schema within:
 #   https://github.com/opengeospatial/ogcapi-processes/blob/master/openapi/schemas/processes-core/format.yaml
 class FormatSchema(OneOfKeywordSchema):
@@ -1091,7 +1382,7 @@ class FormatSchema(OneOfKeywordSchema):
         # pointer to a file or JSON schema relative item (as in OpenAPI definitions)
         ReferenceURL(description="Reference where the schema definition can be retrieved to describe referenced data."),
         # literal JSON schema, permissive since it can be anything
-        PermissiveMappingSchema(description="Explicit schema definition of the formatted reference data.")
+        OAS(description="Explicit schema definition of the formatted reference data.")
     ]
 
     # because some pre-existing processes + pywps default schema is ""
@@ -1274,8 +1565,8 @@ class AdditionalParametersList(ExtendedSequenceSchema):
 
 class Content(ExtendedMappingSchema):
     href = ReferenceURL(description="URL to CWL file.", title="OWSContentURL",
-                        default=drop,       # if invalid, drop it completely,
-                        missing=required,   # but still mark as 'required' for parent objects
+                        default=drop,  # if invalid, drop it completely,
+                        missing=required,  # but still mark as 'required' for parent objects
                         example="http://some.host/applications/cwl/multisensor_ndvi.cwl")
 
 
@@ -1349,167 +1640,6 @@ class InputOutputDescriptionMeta(ExtendedMappingSchema):
         for child in self.children:
             if child.name in ["keywords", "metadata"]:
                 child.missing = drop
-
-
-class ReferenceOAS(ExtendedMappingSchema):
-    _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/reference.yaml"
-    _ref = ReferenceURL(name="$ref", description="External OpenAPI schema reference.")
-
-
-class TypeOAS(ExtendedSchemaNode):
-    name = "type"
-    schema_type = String
-    validator = OneOf(OAS_DATA_TYPES)
-
-
-class EnumItemOAS(OneOfKeywordSchema):
-    _one_of = [
-        ExtendedSchemaNode(Float()),
-        ExtendedSchemaNode(Integer()),
-        ExtendedSchemaNode(String()),
-    ]
-
-
-class EnumOAS(ExtendedSequenceSchema):
-    enum = EnumItemOAS()
-
-
-class RequiredOAS(ExtendedSequenceSchema):
-    required_field = ExtendedSchemaNode(String(), description="Name of the field that is required under the object.")
-
-
-class MultipleOfOAS(OneOfKeywordSchema):
-    _one_of = [
-        ExtendedSchemaNode(Float()),
-        ExtendedSchemaNode(Integer()),
-    ]
-
-
-class PermissiveDefinitionOAS(NotKeywordSchema, PermissiveMappingSchema):
-    _not = [
-        ReferenceOAS
-    ]
-
-
-# cannot make recursive declarative schemas
-# simulate it and assume it is sufficient for validation purposes
-class PseudoObjectOAS(OneOfKeywordSchema):
-    _one_of = [
-        ReferenceOAS(),
-        PermissiveDefinitionOAS(),
-    ]
-
-
-class KeywordObjectOAS(ExtendedSequenceSchema):
-    item = PseudoObjectOAS()
-
-
-class AdditionalPropertiesOAS(OneOfKeywordSchema):
-    _one_of = [
-        ReferenceOAS(),
-        PermissiveDefinitionOAS(),
-        ExtendedSchemaNode(Boolean())
-    ]
-
-
-class AnyValueOAS(AnyOfKeywordSchema):
-    _any_of = [
-        PermissiveMappingSchema(),
-        PermissiveSequenceSchema(),
-        ExtendedSchemaNode(Float()),
-        ExtendedSchemaNode(Integer()),
-        ExtendedSchemaNode(Boolean()),
-        ExtendedSchemaNode(String()),
-    ]
-
-
-# reference:
-#   https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/openapi/schemas/schema.yaml
-# note:
-#   although reference definition provides multiple 'default: 0|false' entries, we omit them since the behaviour
-#   of colander with extended schema nodes is to set this value by default in deserialize result if they were missing,
-#   but reference 'default' correspond more to the default *interpretation* value if none was provided.
-#   It is preferable in our case to omit (i.e.: drop) these defaults to keep obtained/resolved definitions succinct,
-#   since those defaults can be defined (by default...) if needed. No reason to add them explicitly.
-# WARNING:
-#   cannot use any KeywordMapper derived instance here, otherwise conflicts with same OpenAPI keywords as children nodes
-class PropertyOAS(PermissiveMappingSchema):
-    _type = TypeOAS(name="type", missing=drop)  # not present if top-most schema is {allOf,anyOf,oneOf,not}
-    _format = ExtendedSchemaNode(String(), name="format", missing=drop)
-    default = AnyValueOAS(unknown="preserve", missing=drop)
-    example = AnyValueOAS(unknown="preserve", missing=drop)
-    title = ExtendedSchemaNode(String(), missing=drop)
-    description = ExtendedSchemaNode(String(), missing=drop)
-    enum = EnumOAS(missing=drop)
-    items = PseudoObjectOAS(name="items", missing=drop)
-    required = RequiredOAS(missing=drop)
-    nullable = ExtendedSchemaNode(Boolean(), missing=drop)
-    deprecated = ExtendedSchemaNode(Boolean(), missing=drop)
-    read_only = ExtendedSchemaNode(Boolean(), name="readOnly", missing=drop)
-    write_only = ExtendedSchemaNode(Boolean(), name="writeOnly", missing=drop)
-    multiple_of = MultipleOfOAS(name="multipleOf", missing=drop, validator=BoundedRange(min=0, exclusive_min=True))
-    minimum = ExtendedSchemaNode(Integer(), name="minimum", missing=drop, validator=Range(min=0))  # default=0
-    maximum = ExtendedSchemaNode(Integer(), name="maximum", missing=drop, validator=Range(min=0))
-    exclusive_min = ExtendedSchemaNode(Boolean(), name="exclusiveMinimum", missing=drop)  # default=False
-    exclusive_max = ExtendedSchemaNode(Boolean(), name="exclusiveMaximum", missing=drop)  # default=False
-    min_length = ExtendedSchemaNode(Integer(), name="minLength", missing=drop, validator=Range(min=0))  # default=0
-    max_length = ExtendedSchemaNode(Integer(), name="maxLength", missing=drop, validator=Range(min=0))
-    pattern = ExtendedSchemaNode(Integer(), missing=drop)
-    min_items = ExtendedSchemaNode(Integer(), name="minItems", missing=drop, validator=Range(min=0))  # default=0
-    max_items = ExtendedSchemaNode(Integer(), name="maxItems", missing=drop, validator=Range(min=0))
-    unique_items = ExtendedSchemaNode(Boolean(), name="uniqueItems", missing=drop)  # default=False
-    min_prop = ExtendedSchemaNode(Integer(), name="minProperties", missing=drop, validator=Range(min=0))  # default=0
-    max_prop = ExtendedSchemaNode(Integer(), name="maxProperties", missing=drop, validator=Range(min=0))
-    content_type = ExtendedSchemaNode(String(), name="contentMediaType", missing=drop)
-    content_encode = ExtendedSchemaNode(String(), name="contentEncoding", missing=drop)
-    content_schema = ExtendedSchemaNode(String(), name="contentSchema", missing=drop)
-    _not_key = PseudoObjectOAS(name="not", title="not", missing=drop)
-    _all_of = KeywordObjectOAS(name="allOf", missing=drop)
-    _any_of = KeywordObjectOAS(name="anyOf", missing=drop)
-    _one_of = KeywordObjectOAS(name="oneOf", missing=drop)
-    x_props = AdditionalPropertiesOAS(name="additionalProperties", missing=drop)
-    properties = PermissiveMappingSchema(missing=drop)  # cannot do real recursive definitions, simply check mapping
-
-
-# this class is only to avoid conflicting names with keyword mappers
-class AnyPropertyOAS(OneOfKeywordSchema):
-    _one_of = [
-        ReferenceOAS(),
-        PropertyOAS(),
-    ]
-
-
-class ObjectPropertiesOAS(ExtendedMappingSchema):
-    property_name = AnyPropertyOAS(
-        variable="{property-name}",
-        description="Named of the property being defined under the OpenAPI object.",
-    )
-
-
-# would not need this if we could do explicit recursive definitions but at the very least, validate that when an
-# object type is specified, its properties are as well and are slightly more specific than permissive mapping
-class ObjectOAS(NotKeywordSchema, ExtendedMappingSchema):
-    _not = [ReferenceOAS]
-    _type = TypeOAS(name="type", missing=drop, validator=OneOf(OAS_COMPLEX_TYPES))
-    properties = ObjectPropertiesOAS()  # required and more specific contrary to 'properties' in 'PropertyOAS'
-
-
-# since we redefine 'properties', do not cause validation error for 'oneOf'
-class DefinitionOAS(AnyOfKeywordSchema):
-    _any_of = [
-        ObjectOAS(),
-        PropertyOAS(),  # for top-level keyword schemas {allOf, anyOf, oneOf, not}
-    ]
-
-
-class OAS(OneOfKeywordSchema):
-    description = "OpenAPI schema definition."
-    # _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/schema.yaml"  # definition used by OAP, but JSON-schema is more accurate
-    _schema = "http://json-schema.org/draft-07/schema#"
-    _one_of = [
-        ReferenceOAS(),
-        DefinitionOAS(),
-    ]
 
 
 class InputOutputDescriptionSchema(ExtendedMappingSchema):
@@ -1603,19 +1733,9 @@ class AnyCRS(AnyOfKeywordSchema):
         ExtendedSchemaNode(String(), pattern=re.compile(r"^urn:ogc:def:crs:EPSG::?[0-9]{4,5}$")),
         ExtendedSchemaNode(String(), pattern=re.compile(r"^\[?EPSG::?[0-9]{4,5}\]?$")),
         ExtendedSchemaNode(String(), pattern=re.compile(r"^https?://www\.opengis\.net/def/crs/EPSG/0/[0-9]{4,5}$")),
-        ExtendedSchemaNode(String(), validator=OneOf([
-            # equivalent forms of EPSG:4326, 2D or 3D
-            "https://www.opengis.net/def/crs/OGC/1.3/CRS84",
-            "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-            "https://www.opengis.net/def/crs/OGC/0/CRS84h",
-            "http://www.opengis.net/def/crs/OGC/0/CRS84h",
-            "https://www.opengis.net/def/crs/OGC/0/CRS84",
-            "http://www.opengis.net/def/crs/OGC/0/CRS84",
-            "urn:ogc:def:crs:OGC:2:84",
-            "WGS84",
-        ])),
+        ExtendedSchemaNode(String(), validator=OneOf(ogc_def.OGC_DEF_CRS_ANY_EPSG4326)),
     ]
-    default = OGC_API_BBOX_EPSG
+    default = ogc_def.OGC_DEF_CRS_EPSG4326_SHORT
 
 
 class AnyFilterExpression(AnyOfKeywordSchema):
@@ -2338,7 +2458,7 @@ class JobStatusSearchEnum(ExtendedSchemaNode):
     title = "JobStatusSearch"
     default = Status.ACCEPTED
     example = Status.ACCEPTED
-    validator = StringOneOf(JOB_STATUS_SEARCH_API, delimiter=",", case_sensitive=False)
+    validator = DelimitedStringOneOf(JOB_STATUS_SEARCH_API, delimiter=",", case_sensitive=False)
 
 
 class JobTypeEnum(ExtendedSchemaNode):
@@ -2348,6 +2468,14 @@ class JobTypeEnum(ExtendedSchemaNode):
     default = null
     example = "process"
     validator = OneOf(JobStatusType.values())
+
+
+class JobProcessingEntityTypeEnum(ExtendedSchemaNode):
+    schema_type = String
+    title = "JobProcessingEntityType"
+    default = null
+    example = JobProcessingEntityType.OGC_API_PROCESSES
+    validator = OneOf(JobProcessingEntityType.values())
 
 
 class JobTitle(ExtendedSchemaNode):
@@ -2397,7 +2525,7 @@ class JobGroupsCommaSeparated(ExpandStringList, ExtendedSchemaNode):
     example = "process,service"
     missing = drop
     description = "Comma-separated list of grouping fields with which to list jobs."
-    validator = StringOneOf(["process", "provider", "service", "status"], delimiter=",", case_sensitive=True)
+    validator = DelimitedStringOneOf(["process", "provider", "service", "status"], delimiter=",", case_sensitive=True)
 
 
 class JobExecuteSubscribers(ExtendedMappingSchema):
@@ -2554,8 +2682,8 @@ class QuotePath(ExtendedMappingSchema):
     quote_id = UUID(description="Quote ID")
 
 
-class ResultPath(ExtendedMappingSchema):
-    result_id = UUID(description="Result ID")
+class OutputPath(ExtendedMappingSchema):
+    output_id = UUID(description="Output ID")
 
 
 #########################################################
@@ -2564,11 +2692,11 @@ class ResultPath(ExtendedMappingSchema):
 
 
 class FrontpageEndpoint(ExtendedMappingSchema):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class VersionsEndpoint(ExtendedMappingSchema):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ConformanceQueries(ExtendedMappingSchema):
@@ -2582,7 +2710,7 @@ class ConformanceQueries(ExtendedMappingSchema):
 
 
 class ConformanceEndpoint(ExtendedMappingSchema):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = ConformanceQueries()
 
 
@@ -2592,7 +2720,7 @@ class OpenAPIAcceptHeader(AcceptHeader):
     validator = OneOf([ContentType.APP_OAS_JSON, ContentType.APP_JSON])
 
 
-class OpenAPIRequestHeaders(RequestHeaders):
+class OpenAPIRequestHeaders(RequestHeadersNoBody):
     accept = OpenAPIAcceptHeader()
 
 
@@ -3279,7 +3407,7 @@ class WPSProcessOutputs(ExtendedSequenceSchema, WPSNamespace):
 
 
 class WPSExecuteResponse(WPSResponseBaseType, WPSProcessVersion):
-    _schema = OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+    _schema = OGC_WPS_1_SCHEMA_JOB_STATUS_URI
     name = "ExecuteResponse"
     title = "ExecuteResponse"  # not to be confused by 'Execute' used for request
     location = WPSStatusLocationAttribute()
@@ -3348,7 +3476,7 @@ class ErrorWPSResponse(ExtendedMappingSchema):
 
 
 class ProviderEndpoint(ProviderPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProcessDescriptionQuery(ExtendedMappingSchema):
@@ -3371,7 +3499,7 @@ class ProcessDescriptionQuery(ExtendedMappingSchema):
 
 
 class ProviderProcessEndpoint(ProviderProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = ProcessDescriptionQuery()
 
 
@@ -3390,17 +3518,495 @@ class LocalProcessDescriptionQuery(ProviderServiceQuery, ProcessDescriptionQuery
     pass
 
 
-class LocalProcessEndpointHeaders(AcceptFormatHeaders, RequestHeaders):  # order important for descriptions to appear
+class LocalProcessEndpointHeadersNoBody(AcceptFormatHeaders, RequestHeadersNoBody):
     pass
 
 
 class ProcessEndpoint(LocalProcessPath):
-    header = LocalProcessEndpointHeaders()
+    header = LocalProcessEndpointHeadersNoBody()
     querystring = LocalProcessDescriptionQuery()
 
 
+class KVPInputLiteralValue(ExtendedSchemaNode):
+    """
+    KVP input parameter for literal value.
+    """
+    schema_type = String
+    name = "{inputID}"
+    variable = "<inputID>"
+    title = "Input Value"
+    description = (
+        "Input parameter value for process execution using KVP encoding. "
+        "The parameter name corresponds to the input identifier defined in the process description. "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "Value can be a simple literal, comma-separated array, or URL-encoded JSON object/array. "
+        "\n\n"
+        "Examples:\n"
+        "- Simple literal: ``message=hello``\n"
+        "- Numeric: ``count=42``\n"
+        "- Array: ``values=a,b,c``"
+    )
+    example = "value1"
+    missing = drop
+
+
+class KVPInputReferenceURI(ExtendedSchemaNode):
+    """
+    KVP input parameter for reference by URL.
+    """
+    schema_type = String
+    name = "{inputID}[href]"
+    variable = "<inputID>[href]"
+    title = "Input Reference URL"
+    description = (
+        "Input parameter reference URL for process execution using KVP encoding with ``deepObject`` style. "
+        "The parameter name uses bracket notation where the input identifier is followed by ``[href]``. "
+        "Replace ``{inputID}`` with the actual input ID (e.g., ``fileInput[href]=http://example.com/file.txt``). "
+        "Use with corresponding ``{inputID}[type]`` to specify the media type. "
+        "\n\n"
+        "Example: ``fileInput[href]=http://example.com/data.txt&fileInput[type]=text/plain``"
+    )
+    example = "http://example.com/input.txt"
+    missing = drop
+
+
+class KVPInputQualifiedValue(ExtendedSchemaNode):
+    """
+    KVP input parameter for qualified value with format specifications.
+
+    Allows providing an input value along with format qualifiers (mediaType, encoding, schema, profile).
+    """
+    schema_type = String
+    name = "{inputID}[value]"
+    variable = "<inputID>[value]"
+    title = "Input Qualified Value"
+    description = (
+        "Input parameter qualified value for process execution using KVP encoding with ``deepObject`` style. "
+        "The parameter name uses bracket notation where the input identifier is followed by ``[value]``. "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "This allows specifying format qualifiers alongside the value. "
+        "\n\n"
+        "**Combinable with:**\n"
+        "- ``{inputID}[mediaType]`` - Media type of the value\n"
+        "- ``{inputID}[encoding]`` - Encoding (e.g., base64, gzip)\n"
+        "- ``{inputID}[schema]`` - Schema or profile URI\n"
+        "- ``{inputID}[profile]`` - Content profile URI\n"
+        "\n\n"
+        "Examples:\n"
+        "- Binary data: ``data[value]=SGVsbG8=&data[mediaType]=text/plain&data[encoding]=base64``\n"
+        "- Structured data: ``geojson[value]={...}&geojson[mediaType]=application/geo+json"
+        "&geojson[profile]=http://www.opengis.net/def/profile/ogc/0/rel-as-uri``"
+    )
+    example = "data_value"
+    missing = drop
+
+
+class KVPInputQualifiedMediaType(ExtendedSchemaNode):
+    """
+    KVP input parameter media type qualifier for qualified value.
+    """
+    schema_type = String
+    name = "{inputID}[mediaType]"
+    variable = "<inputID>[mediaType]"
+    title = "Input Value Media Type"
+    description = (
+        "Media type qualifier for input parameter qualified value using KVP encoding with ``deepObject`` style. "
+        "Used in conjunction with ``{inputID}[value]`` to specify the content type. "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "\n\n"
+        f"Example: ``data[value]={{...}}&data[mediaType]={ContentType.APP_JSON}``"
+    )
+    example = ContentType.APP_JSON
+    missing = drop
+
+
+class KVPInputQualifiedEncoding(ExtendedSchemaNode):
+    """
+    KVP input parameter encoding qualifier for qualified value.
+    """
+    schema_type = String
+    name = "{inputID}[encoding]"
+    variable = "<inputID>[encoding]"
+    title = "Input Value Encoding"
+    description = (
+        "Encoding qualifier for input parameter qualified value using KVP encoding with ``deepObject`` style. "
+        "Used in conjunction with ``{inputID}[value]`` to specify the encoding (e.g., base64, gzip). "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "\n\n"
+        "Example: ``data[value]=SGVsbG8=&data[encoding]=base64``"
+    )
+    example = "base64"
+    missing = drop
+
+
+class KVPInputQualifiedSchema(ExtendedSchemaNode):
+    """
+    KVP input parameter schema qualifier for qualified value.
+    """
+    schema_type = String
+    name = "{inputID}[schema]"
+    variable = "<inputID>[schema]"
+    title = "Input Value Schema"
+    description = (
+        "Schema qualifier for input parameter qualified value using KVP encoding with ``deepObject`` style. "
+        "Used in conjunction with ``{inputID}[value]`` to specify a schema URI or definition. "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "\n\n"
+        "Example: ``data[value]={{...}}&data[schema]=http://example.com/schema.json``"
+    )
+    example = "http://example.com/schema.json"
+    missing = drop
+
+
+class KVPInputQualifiedProfile(ExtendedSchemaNode):
+    """
+    KVP input parameter profile qualifier for qualified value.
+    """
+    schema_type = String
+    name = "{inputID}[profile]"
+    variable = "<inputID>[profile]"
+    title = "Input Value Profile"
+    description = (
+        "Profile qualifier for input parameter qualified value using KVP encoding with ``deepObject`` style. "
+        "Used in conjunction with ``{inputID}[value]`` to specify a content profile URI. "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "\n\n"
+        "Example: ``data[value]={{...}}&data[mediaType]=application/geo+json"
+        "&data[profile]=http://www.opengis.net/def/profile/ogc/0/rel-as-uri``"
+    )
+    example = "http://www.opengis.net/def/profile/ogc/0/rel-as-uri"
+    missing = drop
+
+
+class KVPInputReferenceMediaType(ExtendedSchemaNode):
+    """
+    KVP input parameter media type qualifier for reference.
+    """
+    schema_type = String
+    name = "{inputID}[type]"
+    variable = "<inputID>[type]"
+    title = "Input Reference Media Type"
+    description = (
+        "Media type qualifier for input parameter reference using KVP encoding with ``deepObject`` style. "
+        "Used in conjunction with ``{inputID}[href]`` to specify the content type of the referenced input. "
+        "Replace ``{inputID}`` with the actual input ID. "
+        "\n\n"
+        f"Example: ``fileInput[href]=http://example.com/feature.json&fileInput[type]={ContentType.APP_GEOJSON}``"
+    )
+    example = ContentType.APP_GEOJSON
+    missing = drop
+
+
+class KVPInputBBoxCRS(ExtendedSchemaNode):
+    """
+    KVP input parameter CRS qualifier for bounding box.
+    """
+    schema_type = String
+    name = "{inputID}[crs]"
+    variable = "<inputID>[crs]"
+    title = "Bounding Box CRS"
+    description = (
+        "Coordinate Reference System qualifier for bounding box input using KVP encoding with ``deepObject`` style. "
+        "Used in conjunction with a bbox input parameter to specify the CRS. "
+        "Replace ``{inputID}`` with the actual bbox input ID. "
+        "\n\n"
+        f"Example: ``bbox=5.8,47.2,15.1,55.1&bbox[crs]={OGC_API_PROC_BBOX_CRS}``"
+    )
+    example = OGC_API_PROC_BBOX_CRS
+    missing = drop
+
+
+class KVPOutputInclude(ExtendedSchemaNode):
+    """
+    KVP output parameter to request specific outputs.
+    """
+    schema_type = String
+    name = "{outputID}[include]"
+    variable = "<outputID>[include]"
+    title = "Output Selection"
+    description = (
+        "Output parameter selector for process execution using KVP encoding with ``deepObject`` style. "
+        "Set to ``true`` to request a specific output. "
+        "The parameter name uses bracket notation where the output identifier is followed by ``[include]``. "
+        "Replace ``{outputID}`` with the actual output ID. "
+        "\n\n"
+        "Example: ``output1[include]=true&output2[include]=true``"
+    )
+    example = "true"
+    validator = OneOfCaseInsensitive(["true", "false"])
+    missing = drop
+
+
+class KVPOutputMediaType(ExtendedSchemaNode):
+    """
+    KVP output parameter to request specific output format.
+    """
+    schema_type = String
+    name = "{outputID}[mediaType]"
+    variable = "<outputID>[mediaType]"
+    title = "Output Format"
+    description = (
+        "Output format specification for process execution using KVP encoding with ``deepObject`` style. "
+        "Specifies the desired media type for a specific output. "
+        "Replace ``{outputID}`` with the actual output ID. "
+        "Used in conjunction with ``{outputID}[include]=true``. "
+        "\n\n"
+        f"Example: ``result[include]=true&result[mediaType]={ContentType.APP_JSON}``"
+    )
+    example = ContentType.APP_JSON
+    missing = drop
+
+
+class KVPOutputProfile(ExtendedSchemaNode):
+    """
+    KVP input/output parameter to specify content profile.
+    """
+    schema_type = String
+    name = "{outputID}[profile]"
+    variable = "<outputID>[profile]"
+    title = "Output Profile"
+    description = (
+        "Content profile negotiation for input or output using KVP encoding with ``deepObject`` style. "
+        "Specifies a profile URI or well-known identifier for the format. "
+        "Replace ``{inputID}`` or ``{outputID}`` with the actual identifier. "
+        "\n\n"
+        "Example: ``data[profile]=\"http://www.opengis.net/def/profile/ogc/0/rel-as-uri\"``"
+    )
+    missing = drop
+
+
+class KVPResponseFormat(ExtendedSchemaNode, OAS3Parameter):
+    """
+    KVP response format parameter.
+    """
+    schema_type = String
+    name = "response[f]"
+    title = "Response Format"
+    description = (
+        "Response format specification for process execution using KVP encoding with ``deepObject`` style. "
+        "Behaves in the same way as the HTTP ``Accept`` header and allows certain short name format indicators. "
+        "Specifies the desired media type for the execution response. "
+        "\n\n"
+        f"Example: ``response[f]={ContentType.APP_JSON}``"
+    )
+    missing = drop
+
+
+class KVPResponseFormatAlias(ExtendedSchemaNode, OAS3Parameter):
+    """
+    KVP response format parameter (alias).
+    """
+    schema_type = String
+    name = "response[format]"
+    title = "Response Format (alias)"
+    description = (
+        "Response format specification for process execution using KVP encoding with ``deepObject`` style. "
+        "Alias for ``response[f]``. "
+        "Behaves in the same way as the HTTP ``Accept`` header and allows certain short name format indicators. "
+        "Specifies the desired media type for the execution response. "
+        "\n\n"
+        f"Example: ``response[format]={ContentType.APP_JSON}``"
+    )
+    missing = drop
+
+
+class KVPResponsePrefer(ExtendedSchemaNode, OAS3Parameter):
+    """
+    KVP response preference parameter.
+    """
+    schema_type = String
+    name = "response[prefer]"
+    title = "Response Preference"
+    description = (
+        "Response preference specification for process execution using KVP encoding with ``deepObject`` style. "
+        "Behaves in the same way as the HTTP ``Prefer`` header. "
+        "Specifies execution preferences in terms of "
+        "[Execution Mode](https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-mode) "
+        "such as ``respond-async`` or ``wait=10`` as well as "
+        "[Execution Results](https://pavics-weaver.readthedocs.io/en/latest/processes.html#execution-results) "
+        "control directives. "
+        "\n\n"
+        "Example: ``response[prefer]=respond-async;return=minimal``"
+    )
+    missing = drop
+
+
+class KVPResponseProfile(ExtendedSchemaNode, OAS3Parameter):
+    """
+    KVP response profile parameter.
+    """
+    schema_type = String
+    name = "response[profile]"
+    title = "Response Profile"
+    description = (
+        "Response profile negotiation for process execution using KVP encoding with ``deepObject`` style. "
+        "Specifies the desired profile URI or well-known identifier for the response. "
+        "Behaves like the HTTP ``Accept-Profile`` header or ``profile`` query parameter *depending on context*. "
+        "\n\n"
+        "**Execution Mode Behavior:**\n"
+        "- **Synchronous**: The ``response[profile]`` applies to the immediate"
+        "[*Execution Results*](https://pavics-weaver.readthedocs.io/en/latest/processes.html#proc-exec-results) "
+        "response (same as``Accept-Profile`` header or ``profile`` query)\n"
+        "- **Asynchronous**: The ``response[profile]`` applies to the final "
+        "[*Job Results*](https://pavics-weaver.readthedocs.io/en/latest/processes.html#job-results) profile, "
+        "whereas the ``profile`` query applies to the "
+        "[*Job Status*](https://pavics-weaver.readthedocs.io/en/latest/processes.html#alternate-job-status) response\n"
+        "\n\n"
+        f"Example: ``response[profile]=\"{OGC_API_PROC_PROFILE_JOB_DESC_URI}\"``"
+    )
+    missing = drop
+
+
+class ProcessExecutionKVPInputOutputParameters(AnyOfKeywordSchema):
+    """
+    KVP-encoded inputs and outputs parameters for execution of the process.
+    """
+    _any_of = [
+        KVPInputLiteralValue(),
+        KVPInputBBoxCRS(),
+        KVPInputReferenceURI(),
+        KVPInputReferenceMediaType(),
+        KVPInputQualifiedValue(),
+        KVPInputQualifiedMediaType(),
+        KVPInputQualifiedEncoding(),
+        KVPInputQualifiedSchema(),
+        KVPInputQualifiedProfile(),
+        KVPOutputInclude(),
+        KVPOutputMediaType(),
+        KVPOutputProfile(),
+    ]
+
+
+class ProcessExecutionKVPInputOutputQuery(PermissiveMappingSchema, OAS3Parameter):
+    params = ProcessExecutionKVPInputOutputParameters(variable="<*>")
+    # note:
+    #   the name is arbitrary (https://github.com/OAI/OpenAPI-Specification/issues/2622)
+    #   make it obvious in OpenAPI what its nested 'params' definitions refer to
+    name = "Execution Parameters"
+    required = True
+    explode = True
+    style = "form"
+
+    description = (
+        "KVP-encoded inputs and outputs parameters for execution of the process. "
+        "\n\n"
+        "**Variable Parameters** (replace placeholder with actual ID):\n"
+        "- ``<inputID>=value`` - Simple literal value, array, bbox or URL-encoded object\n"
+        "- ``<inputID>[crs]=crs`` - CRS for bounding box input (URI, CURIE, URN or short code)\n"
+        "- ``<inputID>[value]=value`` - Qualified value representation to allow format specification\n"
+        "- ``<inputID>[mediaType]=type`` - Qualified value desired media-type for the input\n"
+        "- ``<inputID>[encoding]=encode`` - Qualified value encoding to consider (eg: bas64, binary, gzip)\n"
+        "- ``<inputID>[schema]=schema`` - Qualified value schema indication (URL or well-known OGC profile)\n"
+        "- ``<inputID>[profile]=profile`` - Qualified value content profile (URI or well-known identifier)\n"
+        "- ``<inputID>[href]=url`` - Input by reference with URL\n"
+        "- ``<inputID>[type]=mediaType`` - Media type for referenced input\n"
+        "- ``<outputID>[include]=true`` - Request specific output (required)\n"
+        "- ``<outputID>[mediaType]=format`` - Desired output format media-type\n"
+        "- ``<outputID>[encoding]=encode`` - Desired output format encoding\n"
+        "- ``<outputID>[schema]=schema`` - Desired output format schema or profile\n"
+        "- ``<outputID>[profile]=profile`` - Desired output format content profile\n"
+    )
+    examples = {
+        "KVPSimpleInput": {
+            "summary": "Simple literal inputs",
+            "value": {
+                "message": "test",
+                "count": "42",
+            }
+        },
+        "KVPQualifiedInput": {
+            "summary": "Qualified value with format specifications",
+            "value": {
+                # example from https://docs.ogc.org/DRAFTS/23-058r1.html#req_profile-references_rel-as-uri
+                "data[value]": json.dumps(
+                    {
+                        "type": "Feature",
+                        "id": 1,
+                        "geometry": {"type": "Point", "coordinates": [7.2789399, 50.7772485]},
+                        "properties": {
+                            "timeOfAccident": "2019-02-05T07:00:00Z",
+                            "roadSegment": "https://example.com/apis/roads/collections/roads/items/5209062A5209047O",
+                            "distanceFromStart": 851.0
+                        },
+                    },
+                    indent=0,
+                ),
+                "data[mediaType]": ContentType.APP_GEOJSON,
+                "data[profile]": "http://www.opengis.net/def/profile/ogc/0/rel-as-uri",
+            }
+        },
+        "KVPByReference": {
+            "summary": "Input by reference",
+            "value": {
+                "fileInput[href]": "http://example.com/file.txt",
+                "fileInput[type]": ContentType.TEXT_PLAIN,
+            }
+        },
+        "KVPBoundingBoxInput": {
+            "summary": "Bounding box with CRS",
+            "value": {
+                "bbox": "5.8,47.2,15.1,55.1",
+                "bbox[crs]": OGC_API_PROC_BBOX_CRS,
+            }
+        },
+        "KVPWithOutputs": {
+            "summary": "With output selection and format",
+            "value": {
+                "input1": "value1",
+                "output1[include]": "true",
+                "output2[include]": "true",
+                "output2[mediaType]": ContentType.APP_JSON,
+            }
+        },
+        "KVPWithResponse": {
+            "summary": "With response format and preference",
+            "value": {
+                "input1": "value1",
+                "response[f]": ContentType.APP_JSON,
+                "response[prefer]": ExecuteControlOption.ASYNC,
+            }
+        },
+        "KVPWithResponseFormatAlias": {
+            "summary": "With response format using 'format' alias",
+            "value": {
+                "input1": "value1",
+                "response[format]": ContentType.APP_JSON,
+                "response[prefer]": ExecuteControlOption.ASYNC,
+            }
+        },
+        "KVPWithResponseProfile": {
+            "summary": "With response format and profile",
+            "value": {
+                "input1": "value1",
+                "response[f]": ContentType.APP_JSON,
+                "response[prefer]": ExecuteControlOption.ASYNC,
+                "response[profile]": OGC_API_PROC_PROFILE_JOB_DESC_URI,
+            }
+        }
+    }
+
+
+class ProcessExecutionKVPQuery(ExtendedMappingSchema):
+    """
+    Query parameters for KVP-encoded process execution.
+    """
+    execute_params = ProcessExecutionKVPInputOutputQuery()
+    response_format = KVPResponseFormat()
+    response_format_alias = KVPResponseFormatAlias()
+    response_prefer = KVPResponsePrefer()
+    response_profile = KVPResponseProfile()
+
+
+class ProcessExecutionKVPEndpoint(LocalProcessPath):
+    """
+    Endpoint schema for KVP-encoded process execution.
+    """
+    header = LocalProcessEndpointHeadersNoBody()
+    querystring = ProcessExecutionKVPQuery()
+
+
 class ProcessPackageEndpoint(LocalProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
@@ -3409,35 +4015,45 @@ class ProviderProcessPackageEndpoint(ProviderProcessPath, ProcessPackageEndpoint
 
 
 class ProcessPayloadEndpoint(LocalProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
 class ProcessQuoteEstimatorGetEndpoint(LocalProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
 class ProcessQuoteEstimatorPutEndpoint(LocalProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersBody()
     querystring = LocalProcessQuery()
     body = QuoteEstimatorSchema()
 
 
 class ProcessQuoteEstimatorDeleteEndpoint(LocalProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
 class ProcessVisibilityGetEndpoint(LocalProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
 class ProcessVisibilityPutEndpoint(LocalProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersBody()
     querystring = LocalProcessQuery()
     body = VisibilitySchema()
+
+
+class GetJobAcceptProfileHeader(AcceptProfileHeader):
+    validator = ProfileOneOf(
+        choices=[
+            OGC_API_PROC_PROFILE_JOB_DESC_URI,
+            OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
+            OPENEO_API_SCHEMA_JOB_STATUS_URI,
+        ]
+    )
 
 
 class JobStatusQueryProfileSchema(ExtendedSchemaNode):
@@ -3447,30 +4063,88 @@ class JobStatusQueryProfileSchema(ExtendedSchemaNode):
     title = "JobStatusQuerySchema"
     example = JobStatusProfileSchema.OGC
     default = JobStatusProfileSchema.OGC
-    validator = OneOfCaseInsensitive(JobStatusProfileSchema.values())
+    validator = ProfileOneOf(JobStatusProfileSchema.values() + GetJobAcceptProfileHeader.validator.choices)
 
 
 class GetJobQuery(FormatQuery):
-    schema = JobStatusQueryProfileSchema(missing=drop)
+    schema = JobStatusQueryProfileSchema(missing=drop, default=None, deprecated=True)
     profile = JobStatusQueryProfileSchema(missing=drop)
 
 
+class GetJobAcceptHeaderJSON(AcceptHeader):
+    validator = AcceptWithProfileOneOf(
+        choices=(
+            # JSON by itself or embedding a 'profile' as shortcut or full URI
+            [ContentType.APP_JSON] +
+            [
+                # note:
+                #   typically non-JSON like interfacs like WPS (XML) are still allowed
+                #   in the context of Job Status response, it means to get the OGC API JSON with WPS status values
+                #   (i.e.: the 'WPS' portion refers to the 'weaver.status.map_status' resolution)
+                (ContentType.APP_JSON, profile)
+                for profile in JobStatusQueryProfileSchema.validator.choices
+            ]
+        ),
+    )
+
+
+class GetJobHeaders(RequestHeadersNoBody):
+    # This endpoint offers the representations across media-types/profiles.
+    # Therefore, although only certain combinations are allowed, they must all be present to render them in OpenAPI.
+    # Also, because we offer the 'Accept-Profile' header and 'profile' query, we purposely omit (though still allowed)
+    # the variant of 'Accept' with embedded 'profile' to keep definitions more concise and easier to employ by users.
+    accept = AcceptHeader()
+    accept_profile = GetJobAcceptProfileHeader()
+
+
 class GetProviderJobEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
+    header = GetJobHeaders()
     querystring = GetJobQuery()
 
 
 class GetJobEndpoint(JobPath):
-    header = RequestHeaders()
+    header = GetJobHeaders()
     querystring = GetJobQuery()
 
 
+class OutputEndpoint(OutputPath):
+    header = RequestHeadersAcceptAny()
+
+
+class ResultValueEndpoint(OutputEndpoint):
+    pass
+
+
+class JobAnyOutputEndpoint(JobPath, OutputPath):
+    header = RequestHeadersAcceptAny()
+
+
+class JobResultValueEndpoint(JobAnyOutputEndpoint):
+    pass
+
+
+class ProcessAnyOutputEndpoint(LocalProcessPath, JobPath, OutputPath):
+    header = RequestHeadersAcceptAny()
+
+
+class ProcessResultValueEndpoint(ProcessAnyOutputEndpoint):
+    pass
+
+
+class ProviderAnyOutputEndpoint(ProviderProcessPath, LocalProcessPath, JobPath, OutputPath):
+    header = RequestHeadersAcceptAny()
+
+
+class ProviderResultValueEndpoint(ProviderAnyOutputEndpoint):
+    pass
+
+
 class ProcessInputsEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProviderInputsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class JobInputsOutputsQuery(ExtendedMappingSchema):
@@ -3492,7 +4166,7 @@ class JobInputsOutputsQuery(ExtendedMappingSchema):
 
 
 class JobInputsEndpoint(JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = JobInputsOutputsQuery()
 
 
@@ -3522,49 +4196,88 @@ class LocalProcessJobResultsQuery(LocalProcessQuery, JobResultsQuery):
 
 
 class JobOutputsEndpoint(JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
+    querystring = LocalProcessJobResultsQuery()
+
+
+class JobOutputEndpoint(JobPath):
+    header = RequestHeadersNoBody()
     querystring = LocalProcessJobResultsQuery()
 
 
 class ProcessOutputsEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
+    querystring = LocalProcessJobResultsQuery()
+
+
+class ProcessOutputEndpoint(LocalProcessPath, JobPath):
+    header = RequestHeadersNoBody()
     querystring = LocalProcessJobResultsQuery()
 
 
 class ProviderOutputsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
+    querystring = JobResultsQuery()
+
+
+class ProviderOutputEndpoint(ProviderProcessPath, JobPath):
+    header = RequestHeadersNoBody()
     querystring = JobResultsQuery()
 
 
 class ProcessResultEndpoint(ProcessOutputsEndpoint):
     deprecated = True
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProviderResultEndpoint(ProviderOutputsEndpoint):
     deprecated = True
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class JobResultEndpoint(JobPath):
     deprecated = True
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProcessResultsEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProviderResultsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class JobResultsEndpoint(JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
+
+
+class JobResultsIndexPath(JobPath):
+    output_id = AnyIdentifier(
+        description="Output identifier of the process result.",
+        example="output_data"
+    )
+    index = ExtendedSchemaNode(
+        Integer(),
+        description="Zero-based index into the array of output values.",
+        example=0
+    )
+
+
+class JobResultsIndexEndpoint(JobResultsIndexPath):
+    header = RequestHeadersNoBody()
+
+
+class ProcessResultsIndexEndpoint(LocalProcessPath, JobResultsIndexPath):
+    header = RequestHeadersNoBody()
+
+
+class ProviderResultsIndexEndpoint(ProviderProcessPath, JobResultsIndexPath):
+    header = RequestHeadersNoBody()
 
 
 class JobResultsTriggerExecutionEndpoint(JobResultsEndpoint):
-    header = RequestHeaders()
+    header = RequestHeadersBody()
     body = NoContent()
 
 
@@ -3573,42 +4286,42 @@ class ProcessJobResultsTriggerExecutionEndpoint(JobResultsTriggerExecutionEndpoi
 
 
 class ProviderExceptionsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class JobExceptionsEndpoint(JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProcessExceptionsEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
 class ProviderLogsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class JobLogsEndpoint(JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProcessLogsEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
 class JobStatisticsEndpoint(JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProcessJobStatisticsEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
 class ProviderJobStatisticsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 ##################################################################
@@ -3924,19 +4637,25 @@ class JobProcess(AnyOfKeywordSchema):
     ]
 
 
-class JobStatusInfo(ExtendedMappingSchema):
-    _schema = OGC_API_SCHEMA_JOB_STATUS_URL
-    _sort_first = JOB_STATUS_FIELD_FIRST
-    _sort_after = JOB_STATUS_FIELD_AFTER
-
+class JobSummary(ExtendedMappingSchema):
+    id = JobID()
     jobID = JobID()
     processID = ProcessIdentifierTag(missing=None, default=None,
                                      description="Process identifier corresponding to the job execution.")
     providerID = ProcessIdentifier(missing=None, default=None,
                                    description="Provider identifier corresponding to the job execution.")
+    processingEntityType = JobProcessingEntityTypeEnum(missing=None,  # allowed omit for backward compatibility
+                                                       description="Represents the entity that executed the job.")
     type = JobTypeEnum(description="Type of the element associated to the creation of this job.")
     title = JobTitle(missing=drop)
     status = JobStatusEnum(description="Last updated status.")
+
+
+class JobStatusInfo(JobSummary):
+    _schema = OGC_API_SCHEMA_JOB_STATUS_URI
+    _sort_first = JOB_STATUS_FIELD_FIRST
+    _sort_after = JOB_STATUS_FIELD_AFTER
+
     message = ExtendedSchemaNode(String(), missing=drop, description="Information about the last status update.")
     created = ExtendedSchemaNode(DateTime(), missing=drop, default=None,
                                  description="Timestamp when the process execution job was created.")
@@ -3959,9 +4678,9 @@ class JobStatusInfo(ExtendedMappingSchema):
     estimatedCompletion = ExtendedSchemaNode(DateTime(), missing=drop)
     nextPoll = ExtendedSchemaNode(DateTime(), missing=drop,
                                   description="Timestamp when the job will be prompted for updated status details.")
-    percentCompleted = Number(example=0, validator=Range(min=0, max=100),
+    percentCompleted = Number(example=0, validator=Range(min=0, max=100), missing=drop,
                               description="Completion percentage of the job as indicated by the process.")
-    progress = ExtendedSchemaNode(Integer(), example=100, validator=Range(0, 100),
+    progress = ExtendedSchemaNode(Integer(), example=100, validator=Range(0, 100), missing=drop,
                                   description="Completion progress of the job (alias to 'percentCompleted').")
     process = JobProcess(missing=drop, description="Representation or reference of the underlying job process.")
     links = LinkList(missing=drop)
@@ -3981,7 +4700,7 @@ class JobCollection(ExtendedSequenceSchema):
     item = JobEntrySchema()
 
 
-class CreatedJobStatusSchema(DescriptionSchema):
+class CreatedJobStatusSchema(JobSummary, DescriptionSchema):
     jobID = JobID(description="Unique identifier of the created job for execution.")
     processID = ProcessIdentifierTag(description="Identifier of the process that will be executed.")
     providerID = AnyIdentifier(description="Remote provider identifier if applicable.", missing=drop)
@@ -4304,14 +5023,14 @@ class BoundingBoxValue(OneOfKeywordSchema):
 
 
 class BoundingBoxObject(StrictMappingSchema):
-    _schema = OGC_API_BBOX_SCHEMA
+    _schema = OGC_API_PROC_BBOX_SCHEMA
     description = "Execute bounding box value provided inline."
-    format = OGC_API_BBOX_FORMAT
+    format = OGC_API_PROC_BBOX_FORMAT
     bbox = BoundingBoxValue(
         description="Point values of the bounding box."
     )
     crs = AnyCRS(
-        default="http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+        default=OGC_API_PROC_BBOX_CRS,
         description="Coordinate Reference System of the Bounding Box points.",
     )
 
@@ -5850,6 +6569,25 @@ class CWLIdentifier(ProcessIdentifier):
     )
 
 
+class CWLGraphEntryPoint(ExtendedSchemaNode):
+    schema_type = String
+    description = "CWL $graph entry point identifier with # prefix (e.g., '#main')."
+    example = "#main"
+    pattern = r"^#[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*$"
+
+
+class CWLGraphIdentifier(AnyOfKeywordSchema):
+    """
+    Identifier for a CWL item within a $graph.
+    Can be a #-prefixed entry point, a UUID, or a standard process ID.
+    """
+    _any_of = [
+        CWLGraphEntryPoint(),
+        UUID(),
+        SLUG(),
+    ]
+
+
 class CWLIntentURL(URL):
     description = (
         "Identifier URL to a concept for the type of computational operation accomplished by this Process "
@@ -5895,32 +6633,32 @@ class CWLNamespaces(StrictMappingSchema):
     edam = URI(
         missing=drop,
         name=EDAM_NAMESPACE,
-        validator=OneOf([EDAM_NAMESPACE_URL, EDAM_NAMESPACE_URL.rstrip("#")]),
+        validator=OneOf([EDAM_NAMESPACE_URL, EDAM_NAMESPACE_URL.rstrip("/")]),
     )
     iana = URI(
         missing=drop,
         name=IANA_NAMESPACE,
-        validator=OneOf([IANA_NAMESPACE_URL, IANA_NAMESPACE_URL.rstrip("#")]),
+        validator=OneOf([IANA_NAMESPACE_URL, IANA_NAMESPACE_URL.rstrip("/")]),
     )
     ogc = URI(
         missing=drop,
         name=OGC_NAMESPACE,
-        validator=OneOf([OGC_NAMESPACE_URL, OGC_NAMESPACE_URL.rstrip("#")]),
+        validator=OneOf([OGC_NAMESPACE_URL, OGC_NAMESPACE_URL.rstrip("/")]),
     )
     ogc_api_proc_part1 = URI(
         missing=drop,
         name=CWL_NAMESPACE_OGC_API_PROC_PART1_ID,
-        validator=OneOf([CWL_NAMESPACE_OGC_API_PROC_PART1_URL])
+        validator=OneOf([CWL_NAMESPACE_OGC_API_PROC_PART1_URL, CWL_NAMESPACE_OGC_API_PROC_PART1_URL.rstrip("/")]),
     )
     opengis = URI(
         missing=drop,
         name=OPENGIS_NAMESPACE,
-        validator=OneOf([OPENGIS_NAMESPACE_URL, OPENGIS_NAMESPACE_URL.rstrip("#")]),
+        validator=OneOf([OPENGIS_NAMESPACE_URL, OPENGIS_NAMESPACE_URL.rstrip("/")]),
     )
     s = URI(
         missing=drop,
         name=CWL_NAMESPACE_SCHEMA_ID,
-        validator=OneOf([CWL_NAMESPACE_SCHEMA_URL, CWL_NAMESPACE_SCHEMA_URL.rstrip("#")]),
+        validator=OneOf([CWL_NAMESPACE_SCHEMA_URL, CWL_NAMESPACE_SCHEMA_URL.rstrip("/")]),
     )
     weaver = URI(
         missing=drop,
@@ -6662,7 +7400,12 @@ class ExecutionUnit(OneOfKeywordSchema):
 
 class ExecutionUnitList(ExtendedSequenceSchema):
     item = ExecutionUnit(name="ExecutionUnit")
-    validator = Length(min=1, max=1)
+    validator = Length(min=1)
+    description = (
+        "List of execution units to deploy. "
+        "When multiple units are provided, they should represent workflow steps and/or the main workflow. "
+        "Deployment order will be determined automatically based on dependencies."
+    )
 
 
 class ProcessDeploymentWithContext(ProcessDeployment):
@@ -6769,26 +7512,22 @@ class DeployContextDefinition(NotKeywordSchema, DeployParameters):
 
 
 class CWLGraphItem(CWLApp):  # no 'cwlVersion', only one at the top
-    id = CWLIdentifier()  # required in this case
+    id = CWLGraphIdentifier()  # required in this case
 
 
 class CWLGraphList(ExtendedSequenceSchema):
     cwl = CWLGraphItem()
 
 
-# FIXME: supported nested and $graph multi-deployment (https://github.com/crim-ca/weaver/issues/56)
 class CWLGraphBase(ExtendedMappingSchema):
     graph = CWLGraphList(
         name="$graph", description=(
-            "Graph definition that defines *exactly one* CWL Application Package represented as list. "
-            "Multiple definitions simultaneously deployed is NOT supported currently."
-            # "Graph definition that combines one or many CWL Application Packages within a single payload. "
-            # "If a single application is given (list of one item), it will be deployed as normal CWL by itself. "
-            # "If multiple applications are defined, the first MUST be the top-most Workflow process. "
-            # "Deployment of other items will be performed, and the full deployment will be persisted only if all are "
-            # "valid. The resulting Workflow will be registered as a package by itself (i.e: not as a graph)."
+            "Graph definition that combines one or many CWL Application Packages within a single payload. "
+            "If a single application is given (list of one item), it will be deployed as a single process. "
+            "If multiple applications are defined, at least one must be a Workflow. The order does not matter "
+            "as child processes (CommandLineTool) are automatically deployed first, then the parent Workflow."
         ),
-        validator=Length(min=1, max=1)
+        validator=Length(min=1)
     )
 
 
@@ -6837,34 +7576,71 @@ class Deploy(OneOfKeywordSchema):
     ]
 
 
-class DeployContentType(ContentTypeHeader):
+class DeployContentTypeOGC(ContentTypeHeader):
     example = ContentType.APP_JSON
     default = ContentType.APP_JSON
     validator = OneOf([
         ContentType.APP_JSON,
-        ContentType.APP_CWL,
-        ContentType.APP_CWL_JSON,
-        ContentType.APP_CWL_YAML,
-        ContentType.APP_CWL_X,
         ContentType.APP_OGC_PKG_JSON,
         ContentType.APP_OGC_PKG_YAML,
         ContentType.APP_YAML,
     ])
 
 
-class DeployHeaders(RequestHeaders):
+class DeployContentTypeCWL(ContentTypeHeader):
+    example = ContentType.APP_JSON
+    default = ContentType.APP_JSON
+    validator = OneOf([
+        ContentType.APP_CWL,
+        ContentType.APP_CWL_JSON,
+        ContentType.APP_CWL_YAML,
+        ContentType.APP_CWL_X,
+        ContentType.APP_YAML,
+        ContentType.APP_JSON,
+    ])
+
+
+class DeployContentTypeMultipart(ContentTypeHeader):
+    # boundary value aligned with 'DeployBodyMultipart' example
+    # aligned with the documented multipart definition in 'package.rst' (but more complete with entire request)
+    example = f"{ContentType.MULTIPART_RELATED}; boundary=\"boundary123\""
+    default = ContentType.MULTIPART_MIXED
+    # mostly for listing the plain headers via OpenAPI, actual validation needs 'allow_content_type_multipart' callable
+    validator = OneOf(list(ContentType.ANY_MULTIPART))
+
+
+class DeployContentTypeAny(ContentTypeHeader):
+    example = ContentType.APP_JSON
+    default = ContentType.APP_JSON
+    validator = OneOf(sorted(
+        set(DeployContentTypeOGC.validator.choices) |
+        set(DeployContentTypeCWL.validator.choices) |
+        set(DeployContentTypeMultipart.validator.choices)
+    ))
+
+
+class DeployHeadersAny(RequestHeadersBody):
     x_auth_docker = XAuthDockerHeader()
-    content_type = DeployContentType()
+    content_type = DeployContentTypeAny()
 
 
-class PostProcessesEndpoint(ExtendedMappingSchema):
-    header = DeployHeaders(description="Headers employed for process deployment.")
-    querystring = FormatQuery()
-    body = Deploy(title="Deploy", examples={
-        "DeployCWL": {
-            "summary": "Deploy a process from a CWL definition.",
-            "value": EXAMPLES["deploy_process_cwl.json"],
-        },
+class DeployHeadersOGC(RequestHeadersBody):
+    x_auth_docker = XAuthDockerHeader()
+    content_type = DeployContentTypeOGC()
+
+
+class DeployHeadersCWL(RequestHeadersBody):
+    x_auth_docker = XAuthDockerHeader()
+    content_type = DeployContentTypeCWL()
+
+
+class DeployHeadersMultipart(RequestHeadersBody):
+    x_auth_docker = XAuthDockerHeader()
+    content_type = DeployContentTypeMultipart()
+
+
+class DeployBodyOGC(Deploy):
+    examples = {
         "DeployOGC": {
             "summary": "Deploy a process from an OGC Application Package definition.",
             "value": EXAMPLES["deploy_process_ogcapppkg.json"],
@@ -6873,7 +7649,64 @@ class PostProcessesEndpoint(ExtendedMappingSchema):
             "summary": "Deploy a process from a remote WPS-1 reference URL.",
             "value": EXAMPLES["deploy_process_wps1.json"],
         }
-    })
+    }
+
+
+class DeployBodyCWL(Deploy):
+    examples = {
+        "DeployCWLJSON": {
+            "summary": "Deploy a process from a CWL+JSON definition.",
+            "value": EXAMPLES["deploy_process_cwl.json"],
+        },
+        "DeployCWLYAML": {
+            "summary": "Deploy a process from a CWL+YAML definition.",
+            "value": EXAMPLES["deploy_process_yaml.cwl"],
+        },
+    }
+
+
+class DeployBodyMultipart(Deploy):
+    examples = {
+        "DeployMultipartCWL": {
+            "summary": "Deploy a workflow process from multipart CWL definition.",
+            "value": EXAMPLES["deploy_process_multipart_cwl.txt"],
+        },
+    }
+
+
+class PostProcessesEndpoint(ExtendedMappingSchema):
+    # WARNING:
+    #   Although each OGC, CWL, Multipart request/response bodies have their respective content-type values, the
+    #   Cornice Swagger generation employs the 'accept' and 'content_type' view decorator parameters to create a
+    #   distinct toggle menu between them in Swagger UI. The request 'Accept' and 'Content-Type' *global parameters*
+    #   that may be submitted with "Try it out" option must provide all possible combinations. Otherwise, only options
+    #   from the first registered decorator view will be present. However, for Cornice Swagger to detect the views as
+    #   distinct body/content representations (and therefore create the toggle), they need to be registered with
+    #   separate schemas (i.e.: PostProcessesEndpointOGC, PostProcessesEndpointCWL, PostProcessesEndpointMultipart).
+    header = DeployHeadersAny(
+        description=(
+            "Headers employed for process deployment with a single CWL,"
+            "an OGC Application Package, or multipart contents that "
+            "represents multiple CWL applications (forming a workflow) and/or a "
+            "mixture of OGC Application Package and OGC Process Description metadata."
+        ),
+    )
+    querystring = FormatQuery()
+
+
+class PostProcessesEndpointOGC(PostProcessesEndpoint):
+    # header = DeployHeadersOGC()  # see 'PostProcessesEndpoint'
+    body = DeployBodyOGC()
+
+
+class PostProcessesEndpointCWL(PostProcessesEndpoint):
+    # header = DeployHeadersCWL()  # see 'PostProcessesEndpoint'
+    body = DeployBodyCWL()
+
+
+class PostProcessesEndpointMultipart(PostProcessesEndpoint):
+    # header = DeployHeadersMultipart()  # see 'PostProcessesEndpoint'
+    body = DeployBodyMultipart()
 
 
 class UpdateInputOutputBase(DescriptionType, InputOutputDescriptionMeta):
@@ -6963,18 +7796,18 @@ class PutProcessBodySchema(Deploy):
 
 
 class PatchProcessEndpoint(LocalProcessPath):
-    headers = RequestHeaders()
+    headers = RequestHeadersBody()
     querystring = LocalProcessQuery()
     body = PatchProcessBodySchema()
 
 
 class PutProcessEndpoint(LocalProcessPath):
-    headers = RequestHeaders()
+    headers = RequestHeadersBody()
     querystring = LocalProcessQuery()
     body = PutProcessBodySchema()
 
 
-class ExecuteHeadersBase(RequestHeaders):
+class ExecuteHeadersBase(RequestHeadersBody):
     description = "Request headers supported for job execution."
     prefer = PreferHeader(missing=drop)
     x_wps_output_context = WpsOutputContextHeader()
@@ -7025,6 +7858,81 @@ class PostProcessJobsEndpointXML(PostJobsEndpointXML, LocalProcessPath):
     pass
 
 
+class ExecuteHeadersMultipart(ExecuteHeadersBase):
+    # Override content_type to allow multipart types without strict validation
+    # Multipart headers include parameters (e.g., boundary=...) that vary per request
+    content_type = ContentTypeHeader(
+        missing=drop,
+        default=ContentType.MULTIPART_MIXED,
+        example=f"{ContentType.MULTIPART_MIXED}; boundary=\"...\"",
+        description=(
+            "Content-Type for multipart request. Must be one of: "
+            f"'{ContentType.MULTIPART_MIXED}; boundary=\"...\"' or "
+            f"'{ContentType.MULTIPART_RELATED}; boundary=\"...\"'. "
+            "The boundary parameter is required and varies per request."
+        ),
+        # strip boundary and other parameters before validating the media-type
+        preparer=lambda v: v.split(";", 1)[0].strip().lower() if isinstance(v, str) else v,
+        validator=OneOf([ContentType.MULTIPART_MIXED, ContentType.MULTIPART_RELATED])
+    )
+
+
+class DeployCWLPart(AnyOfKeywordSchema):
+    """
+    CWL package part in multipart request.
+
+    Can be either a single CWL definition or a CWL with $graph.
+    """
+    _any_of = [
+        DeployCWL(),
+        DeployCWLGraph(),
+    ]
+
+
+class ExecuteBodyMultipart(ExtendedMappingSchema):
+    """
+    Multipart request body for ad-hoc workflow execution.
+
+    Properties represent the different parts that can be included in the multipart request.
+    Parts are matched by Content-Type and Content-Profile headers, not by property names.
+
+    See: https://swagger.io/docs/specification/v3_0/describing-request-body/multipart-requests/
+    """
+    deploy_cwl = DeployCWLPart(
+        missing=drop,
+        description=(
+            "CWL tools and workflow parts. "
+            "One or more parts with Content-Type: application/cwl+json or application/cwl+yaml."
+        )
+    )
+    process_meta = ProcessDeployment(
+        missing=drop,
+        description=(
+            "Optional process description metadata. "
+            f"Part with Content-Profile: {OGC_API_PROC_PROFILE_PROC_DESC_URI}"
+        )
+    )
+    execute_body = Execute(
+        description=(
+            "Execution request body with inputs and parameters. "
+            f"Part with Content-Profile: {OGC_API_PROC_PROFILE_EXECUTE_URI}"
+        )
+    )
+
+
+class PostJobsEndpointMultipart(ExtendedMappingSchema):
+    header = ExecuteHeadersMultipart()
+    querystring = LocalProcessQuery()
+    body = ExecuteBodyMultipart(
+        examples={
+            "ExecuteAdHoc": {
+                "summary": "Execute an ad-hoc workflow using multipart content.",
+                "value": EXAMPLES["job_execute_adhoc_body.http"],
+            }
+        }
+    )
+
+
 class JobTitleNullable(OneOfKeywordSchema):
     description = "Job title to update, or unset if 'null'."
     _one_of = [
@@ -7069,7 +7977,7 @@ class PatchProcessJobEndpoint(JobPath, ProcessEndpoint):
 
 
 class PatchProviderJobEndpoint(PatchProcessJobEndpoint):
-    header = RequestHeaders()
+    header = RequestHeadersBody()
 
 
 class PagingQueries(ExtendedMappingSchema):
@@ -7125,17 +8033,17 @@ class GetProviderJobsQueries(GetJobsQueries):  # ':version' not allowed for proc
 
 
 class GetJobsEndpoint(ExtendedMappingSchema):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = GetProcessJobsQuery()  # allowed version in this case since can be either local or remote processes
 
 
 class GetProcessJobsEndpoint(LocalProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = GetProcessJobsQuery()
 
 
 class GetProviderJobsEndpoint(ProviderProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = GetProviderJobsQueries()
 
 
@@ -7148,7 +8056,7 @@ class DeleteJobsBodySchema(ExtendedMappingSchema):
 
 
 class DeleteJobsEndpoint(ExtendedMappingSchema):
-    header = RequestHeaders()
+    header = RequestHeadersBody()
     body = DeleteJobsBodySchema()
 
 
@@ -7164,18 +8072,18 @@ class GetProcessJobQuery(LocalProcessQuery, GetJobQuery):
     pass
 
 
-class GetProcessJobEndpoint(LocalProcessPath):
-    header = RequestHeaders()
+class GetProcessJobEndpoint(LocalProcessPath, JobPath):
+    header = RequestHeadersNoBody()
     querystring = GetProcessJobQuery()
 
 
 class DeleteJobEndpoint(JobPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
 class DeleteProcessJobEndpoint(LocalProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class DeleteProviderJobEndpoint(DeleteProcessJobEndpoint, ProviderProcessPath):
@@ -7183,20 +8091,20 @@ class DeleteProviderJobEndpoint(DeleteProcessJobEndpoint, ProviderProcessPath):
 
 
 class BillsEndpoint(ExtendedMappingSchema):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class BillEndpoint(BillPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class ProcessQuotesEndpoint(LocalProcessPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
 class ProcessQuoteEndpoint(LocalProcessPath, QuotePath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = LocalProcessQuery()
 
 
@@ -7206,22 +8114,22 @@ class GetQuotesQueries(PagingQueries):
 
 
 class QuotesEndpoint(ExtendedMappingSchema):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = GetQuotesQueries()
 
 
 class QuoteEndpoint(QuotePath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class PostProcessQuote(LocalProcessPath, QuotePath):
-    header = RequestHeaders()
+    header = RequestHeadersBody()
     querystring = LocalProcessQuery()
     body = NoContent()
 
 
 class PostQuote(QuotePath):
-    header = RequestHeaders()
+    header = RequestHeadersBody()
     body = NoContent()
 
 
@@ -7230,7 +8138,7 @@ class QuoteProcessParametersSchema(ExecuteInputOutputs):
 
 
 class PostProcessQuoteRequestEndpoint(LocalProcessPath, QuotePath):
-    header = RequestHeaders()
+    header = RequestHeadersBody()
     querystring = LocalProcessQuery()
     body = QuoteProcessParametersSchema()
 
@@ -7262,11 +8170,11 @@ class ProvidersQuerySchema(ExtendedMappingSchema):
 
 class GetProviders(ExtendedMappingSchema):
     querystring = ProvidersQuerySchema()
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class PostProvider(ExtendedMappingSchema):
-    header = RequestHeaders()
+    header = RequestHeadersBody()
     body = CreateProviderRequestBody()
 
 
@@ -7304,12 +8212,12 @@ class ProviderProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessLink
 
 
 class ProviderProcessesEndpoint(ProviderPath):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
     querystring = ProviderProcessesQuery()
 
 
 class GetProviderProcess(ExtendedMappingSchema):
-    header = RequestHeaders()
+    header = RequestHeadersNoBody()
 
 
 class PostProviderProcessJobRequest(ExtendedMappingSchema):
@@ -7708,18 +8616,10 @@ class ForbiddenVisibilityUpdateResponseSchema(ExtendedMappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
-class OkDeleteProcessUndeployBodySchema(ExtendedMappingSchema):
-    deploymentDone = ExtendedSchemaNode(Boolean(), default=False, example=True,
-                                        description="Indicates if the process was successfully undeployed.")
-    identifier = ExtendedSchemaNode(String(), example="workflow")
-    failureReason = ExtendedSchemaNode(String(), missing=drop,
-                                       description="Description of undeploy failure if applicable.")
-
-
-class OkDeleteProcessResponse(ExtendedMappingSchema):
+class NoContentDeleteProcessResponse(ExtendedMappingSchema):
     description = "Process successfully undeployed."
     header = ResponseHeaders()
-    body = OkDeleteProcessUndeployBodySchema()
+    body = NoContent()
 
 
 class OkGetProviderProcessDescriptionResponse(ExtendedMappingSchema):
@@ -7867,7 +8767,7 @@ class JobProvAcceptHeader(AcceptHeader):
     validator = OneOf(ProvenanceFormat.media_types())
 
 
-class JobProvRequestHeaders(RequestHeaders):
+class JobProvRequestHeaders(RequestHeadersNoBody):
     accept = JobProvAcceptHeader()
 
 
@@ -7975,6 +8875,11 @@ class NoContentJobResultsResponse(ExtendedMappingSchema):
     body = NoContent(default="")
 
 
+class JobResultContentResponse(ExtendedMappingSchema):
+    header = FileResponseHeaders()
+    body = ResultData(default="")
+
+
 class CreatedQuoteExecuteResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
     body = CreatedQuotedJobStatusSchema()
@@ -8068,10 +8973,6 @@ class VaultAccessToken(UUID):
     example = "30d889cfb7ae3a63229a8de5f91abc1ef5966bb664972f234a4db9d28f8148e0e"  # nosec
 
 
-class VaultEndpoint(ExtendedMappingSchema):
-    header = RequestHeaders()
-
-
 class VaultUploadBody(ExtendedSchemaNode):
     schema_type = String
     description = "Multipart file contents for upload to the vault."
@@ -8139,7 +9040,7 @@ class VaultFileRequestHeaders(ExtendedMappingSchema):
     access_token = XAuthVaultFileHeader()
 
 
-class VaultFileEndpoint(VaultEndpoint):
+class VaultFileEndpoint(ExtendedMappingSchema):
     header = VaultFileRequestHeaders()
     file_id = VaultFileID()
 
@@ -8328,10 +9229,10 @@ put_process_visibility_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 delete_process_responses = {
-    "200": OkDeleteProcessResponse(examples={
+    "204": NoContentDeleteProcessResponse(examples={
         "ProcessUndeployed": {
             "summary": "Process successfully undeployed.",
-            "value": EXAMPLES["local_process_undeploy_success.json"],
+            "value": None,
         }
     }),
     "403": ForbiddenProcessAccessResponseSchema(),
@@ -8433,6 +9334,8 @@ post_process_jobs_responses = {
     "500": InternalServerErrorResponseSchema(),
 }
 post_jobs_responses = copy(post_process_jobs_responses)
+get_process_jobs_kvp_responses = copy(post_process_jobs_responses)
+get_process_jobs_kvp_responses.pop("415")  # unsupported media type not applicable for GET with query params
 post_job_results_responses = copy(post_process_jobs_responses)
 post_job_results_responses.pop("201")   # job already created, therefore invalid
 post_job_results_responses.update({
@@ -8547,16 +9450,42 @@ get_provider_outputs_responses = copy(get_job_outputs_responses)
 get_provider_outputs_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
+
+get_job_output_responses = {
+    "200": OkGetJobOutputsResponse(description="success"),
+    "400": InvalidJobResponseSchema(),
+    "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
+    "410": GoneJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
+}
+get_prov_output_responses = copy(get_job_output_responses)
+get_prov_output_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
+
 get_result_redirect_responses = {
     "308": RedirectResultResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
 }
 get_job_results_responses = {
-    "200": OkGetJobResultsResponse(description="success", examples={
-        "JobResults": {
-            "summary": "Obtained job results.",
-            "value": EXAMPLES["job_results.json"],
+    "200": OkGetJobResultsResponse(
+        description=(
+            "Retrieval of results from a successfully completed job."
+            "\n\n"
+            "For bacward compatibility, nested `format` content details are provided. "
+            "However, implementations should rely on directly provided `mediaType`, `encoding`, etc."
+        ),
+        examples={
+            "JobResultsByReference": {
+                "summary": "Obtained job results by reference.",
+                "value": EXAMPLES["job_results_by_reference.json"],
+            },
+            "JobResultsByValue": {
+                "summary": "Obtained job results by value.",
+                "value": EXAMPLES["job_results_by_value.json"],
+            }
         }
-    }),
+    ),
     "204": NoContentJobResultsResponse(description="success"),
     "400": InvalidJobResponseSchema(),
     "404": NotFoundJobResponseSchema(),
@@ -8567,6 +9496,39 @@ get_job_results_responses = {
 }
 get_provider_results_responses = copy(get_job_results_responses)
 get_provider_results_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
+get_job_result_responses = {
+    "200": JobResultContentResponse(description="success by value"),
+    "204": NoContentJobResultsResponse(description="success by reference"),
+    "404": NotFoundJobResponseSchema(),
+    "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
+    "410": GoneJobResponseSchema(),
+    "500": InternalServerErrorResponseSchema(),
+}
+get_prov_result_responses = copy(get_job_result_responses)
+get_prov_result_responses.update({
+    "403": ForbiddenProviderLocalResponseSchema(),
+})
+get_proc_result_responses = get_job_result_responses
+get_job_results_index_responses = {
+    "200": OkGetJobResultsResponse(description="Retrieved single indexed result value.", examples={
+        "IndexedJobResult": {
+            "summary": "Retrieved indexed result from job output array.",
+            "value": "single-value-at-index",
+        }
+    }),
+    "400": BadRequestResponseSchema(description="Invalid index parameter or index out of range."),
+    "404": NotFoundJobResponseSchema(description="Output ID not found."),
+    "405": MethodNotAllowedErrorResponseSchema(),
+    "406": NotAcceptableErrorResponseSchema(),
+    "410": GoneJobResponseSchema(),
+    "422": UnprocessableEntityResponseSchema(description="Output is not an array."),
+    "500": InternalServerErrorResponseSchema(),
+}
+get_provider_results_index_responses = copy(get_job_results_index_responses)
+get_provider_results_index_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
 get_job_exceptions_responses = {

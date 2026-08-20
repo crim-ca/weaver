@@ -1,0 +1,6 @@
+{
+  "process": "https://hirondelle.crim.ca/weaver/processes/echo",
+  "inputs": {
+    "message": "Hello, Weaver!"
+  }
+}

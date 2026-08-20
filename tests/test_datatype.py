@@ -1,7 +1,9 @@
+import contextlib
 import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta
 
+import mock
 import pytest
 
 from tests import resources
@@ -219,6 +221,48 @@ def test_process_split_version(process_id, result):
 def test_process_cleanup_keywords():
     proc = Process(id="test", type=ProcessType.WPS_REMOTE, keywords=[" PyWPS ", " WPS", " OGC", " demo "], package={})
     assert proc.keywords == ["PyWPS", "WPS", "OGC", "demo", ProcessType.WPS_REMOTE]
+
+
+def test_process_outputs_alt():
+    """
+    Validates handling of additional formats for output transform.
+
+    The output formats provided by transforms are dynamically extended from the original database process to provide
+    alternate results. These should not modify the process definition originally deployed.
+    """
+    # mock functions called by offering
+    with contextlib.ExitStack() as stack:
+        mock_settings = {"weaver.wps_restapi_url": "http://test-weaver.com"}
+        stack.enter_context(mock.patch("weaver.datatype.get_settings", return_value=mock_settings))
+
+        process = Process(id=f"test-{uuid.uuid4()!s}", package={},
+                          outputs=[{"identifier": "output1", "formats": [{"mediaType": ContentType.IMAGE_TIFF}]}],
+                          inputs=[{"identifier": "input_1", "formats": [{"mediaType": ContentType.APP_ZIP}]}])
+        offer = process.offering()
+
+        # Assert that process outputs in offering contains alternate representation dynamically generated
+        assert offer["outputs"]["output1"]["formats"] == [
+            {
+                "mediaType": ContentType.IMAGE_TIFF
+            },
+            {
+                "mediaType": ContentType.IMAGE_PNG
+            },
+            {
+                "mediaType": ContentType.IMAGE_GIF
+            },
+            {
+                "mediaType": ContentType.IMAGE_JPEG
+            },
+            {
+                "mediaType": ContentType.IMAGE_SVG_XML
+            },
+            {
+                "mediaType": ContentType.APP_PDF
+            }]
+
+        # Assert that process outputs are unchanged from the original database definition
+        assert process.outputs[0]["formats"] == [{"mediaType": ContentType.IMAGE_TIFF}]
 
 
 @pytest.mark.parametrize(

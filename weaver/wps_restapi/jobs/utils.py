@@ -17,13 +17,15 @@ from pyramid.httpexceptions import (
     HTTPNoContent,
     HTTPNotAcceptable,
     HTTPNotFound,
-    HTTPOk
+    HTTPOk,
+    HTTPUnprocessableEntity
 )
 from pyramid.response import FileResponse
 from pyramid_celery import celery_app
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from webob.headers import ResponseHeaders
 
+from weaver import ogc_definitions as ogc_def
 from weaver.database import get_db
 from weaver.datatype import Job, Process
 from weaver.exceptions import (
@@ -54,10 +56,15 @@ from weaver.formats import (
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema
 from weaver.processes.convert import any2wps_literal_datatype, convert_output_params_schema, get_field
+from weaver.processes.utils import deploy_process_from_payload, parse_multipart_job_execution
 from weaver.provenance import ProvenanceFormat
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
+from weaver.transform.const import EXCLUDED_TYPES
+from weaver.transform.handlers import Transform
 from weaver.utils import (
+    compute_file_digest_multibase,
+    create_content_id,
     data2str,
     fetch_file,
     get_any_id,
@@ -86,7 +93,7 @@ from weaver.wps_restapi.providers.utils import forbid_local_only
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
+    from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple, Type, Union
 
     from weaver.execute import AnyExecuteResponse, AnyExecuteReturnPreference, AnyExecuteTransmissionMode
     from weaver.formats import AnyContentEncoding, AnyContentType
@@ -106,6 +113,7 @@ if TYPE_CHECKING:
         HeadersType,
         HTTPValid,
         JobValueFormat,
+        JobValueItem,
         JSON,
         Link,
         ProcessExecution,
@@ -125,6 +133,64 @@ if TYPE_CHECKING:
     MultiPartFieldsType = Sequence[Tuple[str, MultiPartFieldsParamsType]]
 
 LOGGER = get_task_logger(__name__)
+
+
+def deploy_multipart_job_workflow(request, ctype_full):
+    # type: (PyramidRequest, str) -> Tuple[str, JSON]
+    """
+    Handle multipart ad-hoc workflow deployment and extract process ID with execution body.
+
+    Parse the multipart request to separate the execution body from CWL packages,
+    deploy the CWL packages as an ad-hoc process, and return the deployed process ID
+    along with the execution body to be used for job submission.
+
+    :param request: Pyramid request containing the multipart content.
+    :param ctype_full: Full Content-Type header including boundary parameter.
+    :return: Tuple of (process_id, execution_body).
+    :raises HTTPBadRequest: If deployment fails or process ID cannot be extracted.
+    """
+    # Parse multipart to separate execution body from CWL packages
+    execution_body, cwl_packages = parse_multipart_job_execution(
+        content=request.body,
+        content_type=ctype_full,
+        request=request
+    )
+
+    # Deploy the CWL packages
+    cwl_to_deploy = cwl_packages[0] if len(cwl_packages) == 1 else cwl_packages
+    deploy_response = deploy_process_from_payload(
+        payload=cwl_to_deploy,
+        container=request,
+        overwrite=False
+    )
+
+    # Guard against an unexpected return value (deploy_process_from_payload normally raises on error,
+    # but defensive check preserves forwards error details if it ever returns one instead)
+    if not isinstance(deploy_response, (HTTPCreated, HTTPOk)):
+        deploy_error = getattr(deploy_response, "json", None)
+        error_json = {
+            "title": "Unexpected deployment response",
+            "description": (
+                "Ad-hoc workflow deployment did not return expected response. "
+                f"Got: {type(deploy_response)}"
+            ),
+        }
+        if deploy_error:
+            error_json["error"] = deploy_error
+        raise HTTPBadRequest(json=error_json)
+
+    # Extract the deployed process ID
+    deploy_body = deploy_response.json if hasattr(deploy_response, "json") else deploy_response
+    proc_id = deploy_body.get("processSummary", {}).get("id")
+    if not proc_id:
+        raise HTTPBadRequest(json={
+            "title": "Missing process ID",
+            "description":
+                "Ad-hoc workflow deployment did not provide a process ID. "
+                f"Response: {deploy_body}",
+        })
+
+    return proc_id, execution_body
 
 
 def get_job(request):
@@ -161,7 +227,7 @@ def get_job(request):
             # new format: https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_job-exception-no-such-job
             json={
                 "title": title,
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
+                "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_JOB_URI,
                 "detail": desc,
                 "status": exception.code,
                 "cause": str(job_id)
@@ -185,7 +251,7 @@ def get_job(request):
             # new format: https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_job-exception-no-such-job
             json={
                 "title": title,
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
+                "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_JOB_URI,
                 "detail": desc,
                 "status": OWSNotFound.code,
                 "cause": str(provider_id)
@@ -202,7 +268,7 @@ def get_job(request):
             # note: although 'no-such-process' error, return 'no-such-job' because process could exist, only mismatches
             json={
                 "title": title,
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-job",
+                "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_JOB_URI,
                 "detail": desc,
                 "status": OWSNotFound.code,
                 "cause": str(process_tag)
@@ -271,7 +337,7 @@ def get_job_list_links(job_total, filters, grouped, request):
 
     if not grouped:
         links.append({
-            "href": sd.OGC_API_PROC_PROFILE_JOB_LIST_URL, "rel": "profile",
+            "href": sd.OGC_API_PROC_PROFILE_JOB_LIST_URI, "rel": "profile",
             "title": "OGC API - Processes - Job List Profile reference."
         })
 
@@ -306,6 +372,7 @@ def get_job_list_links(job_total, filters, grouped, request):
             "href": parent_url, "rel": "up",
             "type": ContentType.APP_JSON, "title": "Parent collection for which listed jobs apply."
         })
+
     return links
 
 
@@ -357,7 +424,7 @@ def get_job_status_schema(request):
             return {"Content-Type": content_type}
         if content_type == ContentType.ANY and resolved_schema != JobStatusProfileSchema.WPS:
             content_type = ContentType.APP_JSON
-        if resolved_profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URL:
+        if resolved_profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URI:
             content_profile = f"{content_type}; profile=\"{resolved_profile}\""
         else:
             content_profile = f"{content_type}; profile={resolved_schema}"
@@ -372,22 +439,24 @@ def get_job_status_schema(request):
                     }
                 )
             content_headers["Content-Type"] = f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}"
-            content_headers["Content-Schema"] = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+            content_headers["Content-Schema"] = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI
         else:
             if resolved_schema == JobStatusProfileSchema.OGC:
-                content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URL
-                content_headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_JOB_DESC_URL
-                content_headers["Link"] = make_link_header(sd.OGC_API_PROC_PROFILE_JOB_DESC_URL, rel="profile")
+                content_headers["Content-Schema"] = sd.OGC_API_SCHEMA_JOB_STATUS_URI
+                content_headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_JOB_DESC_URI
+                content_headers["Link"] = make_link_header(sd.OGC_API_PROC_PROFILE_JOB_DESC_URI, rel="profile")
             elif resolved_schema == JobStatusProfileSchema.OPENEO:
-                content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+                content_headers["Content-Schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URI
         return content_headers
 
     profile = get_response_profile(request)
-    if profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URL:
+    if profile and profile.startswith("http://"):
+        profile = profile.replace("http://", "https://")
+    if profile == sd.OGC_API_PROC_PROFILE_JOB_DESC_URI:
         schema = sd.JobStatusProfileSchema.OGC
-    elif profile == sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL:
+    elif profile == sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI:
         schema = sd.JobStatusProfileSchema.WPS
-    elif profile == sd.OPENEO_API_SCHEMA_JOB_STATUS_URL:
+    elif profile == sd.OPENEO_API_SCHEMA_JOB_STATUS_URI:
         schema = sd.JobStatusProfileSchema.OPENEO
     else:
         params = get_request_args(request)
@@ -423,7 +492,7 @@ def get_job_status_wps_xml_response(job, request):
     If the :term:`XML` file cannot be resolved (e.g.: removed by automatic cleanup or :term:`Job` dismiss),
     an appropriate HTTP error will be raised.
     """
-    schema = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL
+    schema = sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI
     headers = {
         "Content-Type": f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
         "Content-Schema": schema,
@@ -479,8 +548,9 @@ def make_result_link(
         url = headers["Content-Location"]
         typ = headers["Content-Type"]
         enc = headers.get("Content-Encoding", None)
-        link_header = make_link_header(url, rel=result_id, type=typ, charset=enc)
-        links.append(link_header)
+        link_header_result = make_link_header(url, rel=result_id, type=typ, charset=enc)
+        link_header_output = make_link_header(url, rel="output", type=typ, charset=enc, id=result_id)
+        links.extend([link_header_result, link_header_output])
     return links
 
 
@@ -586,6 +656,32 @@ def get_results(  # pylint: disable=R1260
                     for field in ["encoding", "schema"]:
                         if field in result:
                             output["format"][field] = val_item[field]
+
+                # Add digestMultibase for resource integrity verification (W3C VC Data Integrity)
+                # Only compute for local files that can be accessed
+                file_path = cast(str, val_data)
+                try:
+                    if file_path.startswith(wps_url):
+                        file_path = map_wps_output_location(file_path, settings, exists=True, url=False)
+                    elif file_path.startswith("file://"):
+                        file_path = file_path[7:]
+                    elif not file_path.startswith(("/", "http://", "https://", "s3://")):
+                        # relative path, resolve against WPS output directory
+                        wps_dir = get_wps_output_dir(settings)
+                        file_path = os.path.join(wps_dir, str(job.id), file_path)
+
+                    # Only compute digest for local files
+                    if os.path.isfile(file_path):
+                        digest_mb = compute_file_digest_multibase(file_path)
+                        output["digestMultibase"] = digest_mb
+
+                except (OSError, ValueError, ImportError) as exc:
+                    # If file is not accessible or multiformats not available, skip digest
+                    LOGGER.warning(
+                        "Could not compute digestMultibase for output file [%s] of job [%s]: %s",
+                        file_path, job.id, exc
+                    )
+
             elif not is_ref:
                 dtype = result.get("dataType", any2wps_literal_datatype(val_data, is_value=True) or "string")
                 if ogc_api:
@@ -593,7 +689,7 @@ def get_results(  # pylint: disable=R1260
                 else:
                     output["dataType"] = dtype
 
-            if schema == JobInputsOutputsSchema.OGC_STRICT:
+            if ogc_api and strict:
                 out_fmt = output.pop("format", {})
                 for fmt_key, fmt_val in out_fmt.items():
                     output.setdefault(fmt_key, fmt_val)
@@ -618,6 +714,32 @@ def get_results(  # pylint: disable=R1260
     headers = get_job_results_links(job, references, {}, headers=[], settings=settings)
 
     return outputs, headers
+
+
+def get_job_output_transmission(job, output_id, is_reference):
+    # type: (Job, str, bool) -> Tuple[AnyExecuteTransmissionMode, Optional[JobValueFormat]]
+    """
+    Obtain the requested :term:`Job` output ``transmissionMode`` and ``format``.
+    """
+    outputs = job.outputs or {}
+    outputs = convert_output_params_schema(outputs, JobInputsOutputsSchema.OGC)
+    out = outputs.get(output_id) or {}
+    out_mode = cast("AnyExecuteTransmissionMode", out.get("transmissionMode"))
+    out_fmt = cast("JobValueFormat", out.get("format"))
+
+    # raw/representation can change the output transmission mode if they are not overriding it
+    # document/minimal return is not checked, since it is our default, and will resolve as such anyway
+    if (
+        not out_mode and
+        job.execution_return == ExecuteReturnPreference.REPRESENTATION and
+        job.execution_response == ExecuteResponse.RAW
+    ):
+        return ExecuteTransmissionMode.VALUE, out_fmt
+
+    # because mode can be omitted, resolve their default explicitly
+    if not out_mode:
+        out_mode = ExecuteTransmissionMode.REFERENCE if is_reference else ExecuteTransmissionMode.VALUE
+    return out_mode, out_fmt
 
 
 def get_job_return(
@@ -648,30 +770,43 @@ def get_job_return(
     return job.execution_response, job.execution_return
 
 
-def get_job_output_transmission(job, output_id, is_reference):
-    # type: (Job, str, bool) -> Tuple[AnyExecuteTransmissionMode, Optional[JobValueFormat]]
+def resolve_result_single(
+    job,                # type: Job
+    result,             # type: ExecutionResultObject
+    output_id,          # type: str
+    accept_header,      # type: Optional[str]
+    headers,            # type: AnyHeadersContainer
+    *,                  # force named keyword arguments after
+    settings,           # type: AnySettingsContainer
+):                      # type: (...) -> Union[HTTPOk, HTTPNoContent]
     """
-    Obtain the requested :term:`Job` output ``transmissionMode`` and ``format``.
+    Resolves and returns a single job result with appropriate format negotiation.
+
+    This function consolidates the logic for determining the output format based on priority:
+    1. Accept header from request
+    2. Job output transmission format
+    3. Result media type
+
+    :param job: Job definition to obtain relevant path resolution.
+    :param result: Result to be represented.
+    :param output_id: Identifier of the corresponding result output.
+    :param accept_header: Accept header value from request, if any.
+    :param headers: Additional headers to include in the response.
+    :param settings: Application settings to resolve locations.
+    :return: Response with the single result.
     """
-    outputs = job.outputs or {}
-    outputs = convert_output_params_schema(outputs, JobInputsOutputsSchema.OGC)
-    out = outputs.get(output_id) or {}
-    out_mode = cast("AnyExecuteTransmissionMode", out.get("transmissionMode"))
-    out_fmt = cast("JobValueFormat", out.get("format"))
+    is_reference = bool(get_any_value(result, key=True, file=True))
+    _, output_format = get_job_output_transmission(job, output_id, is_reference)
+    result_media_type = get_field(result, "mime_type", search_variations=True, default=None)
 
-    # raw/representation can change the output transmission mode if they are not overriding it
-    # document/minimal return is not checked, since it is our default, and will resolve as such anyway
-    if (
-        not out_mode and
-        job.execution_return == ExecuteReturnPreference.REPRESENTATION and
-        job.execution_response == ExecuteResponse.RAW
-    ):
-        return ExecuteTransmissionMode.VALUE, out_fmt
+    # Resolve format priority: accept header > job transmission > result media type
+    output_format = accept_header or output_format or result_media_type
 
-    # because mode can be omitted, resolve their default explicitly
-    if not out_mode:
-        out_mode = ExecuteTransmissionMode.REFERENCE if is_reference else ExecuteTransmissionMode.VALUE
-    return out_mode, out_fmt
+    # Normalize format to dictionary for consistency
+    if not isinstance(output_format, dict):
+        output_format = {"mime_type": output_format}
+
+    return get_job_results_single(job, result, output_id, output_format, headers=headers, settings=settings)
 
 
 def get_job_results_response(
@@ -767,7 +902,10 @@ def get_job_results_response(
 
     headers = update_preference_applied_return_header(job, request_headers, headers)
     profile = get_response_profile(request, request_headers)
-    is_doc_results = profile == sd.OGC_API_PROC_PROFILE_RESULTS_URL
+    is_doc_results = (
+        profile and
+        ogc_def.normalize(profile, version="0") == sd.OGC_API_PROC_PROFILE_RESULTS_URI
+    )
 
     # document/minimal response, unless explicitly requested by profile content negotiation
     if is_doc_results or (not is_raw and not is_accept_multipart and not is_single_output_minimal):
@@ -799,15 +937,25 @@ def get_job_results_response(
         # (simplify compares, this is assumed by the following call)
         results_json = get_job_results_document(job, results_json, settings=settings)
         headers.extend([
-            ("Content-Profile", sd.OGC_API_PROC_PROFILE_RESULTS_URL),
-            ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_RESULTS_URL, rel="profile")),
+            ("Content-Profile", sd.OGC_API_PROC_PROFILE_RESULTS_URI),
+            ("Link", make_link_header(sd.OGC_API_PROC_PROFILE_RESULTS_URI, rel="profile")),
         ])
         if is_doc_results:
-            # media-type is extended only if explicitly requested to avoid breaking clients relying on plain JSON
-            headers.update([
-                ("Content-Type", f"{ContentType.APP_JSON}; profile=\"{sd.OGC_API_PROC_PROFILE_RESULTS_URL}\"")
-            ])
-        return HTTPOk(json=results_json, headers=headers)
+            # indicate applied preference profile if it was explicitly requested
+            applied = headers.get("Preference-Applied", "")
+            prefer = (
+                get_header("Prefer", request_headers or {}) or
+                get_header("Prefer", request.headers) if request else ""
+            )
+            prefer_profile = get_response_profile(request_headers={"Prefer": prefer})
+            if prefer_profile:
+                applied += "; " if applied else ""
+                applied += f"profile=<{sd.OGC_API_PROC_PROFILE_RESULTS_URI}>"
+                headers["Preference-Applied"] = applied
+
+        # avoid duplicate content-type header due to how pyramid response handles it
+        ctype = get_header("Content-Type", headers, pop=True, default=ContentType.APP_JSON)
+        return HTTPOk(json=results_json, headers=headers, content_type=ctype)
 
     if not results:  # avoid schema validation error if all by reference
         # Status code 204 for empty body
@@ -855,13 +1003,97 @@ def get_job_results_response(
 
     # https://docs.ogc.org/is/18-062r2/18-062r2.html#req_core_process-execute-sync-raw-value-one
     res_id = out_vals[0][0]
-    # FIXME: add transform for requested output format (https://github.com/crim-ca/weaver/pull/548)
-    #   req_fmt = guess_target_format(container)   where container=request
-    #   out_fmt (see above)
-    #   out_type = result.get("type")
-    #   out_select = req_fmt or out_fmt or out_type  (resolution order/precedence)
-    out_fmt = None
-    return get_job_results_single(job, out_info, res_id, out_fmt, headers=headers, settings=settings)
+    req_fmt = (request_headers or {}).get("accept")
+    return resolve_result_single(job, out_info, res_id, req_fmt, headers=headers, settings=settings)
+
+
+def get_job_result_by_index(
+    job,            # type: Job
+    output_id,      # type: str
+    index,          # type: int
+    *,              # force named keyword arguments after
+    request,        # type: AnyRequestType
+):                  # type: (...) -> AnyResponseType
+    """
+    Retrieve a specific indexed value from a job result array.
+
+    Given an output that is an array (or multi-value result), this function retrieves
+    a specific element by its zero-based index. The output format respects content negotiation
+    via Accept headers and follows the same transmission mode and formatting logic as single outputs.
+
+    For Example
+        /jobs/{jobId}/results/output_array/0  -> returns first element
+        /jobs/{jobId}/results/output_array/1  -> returns second element
+
+    :param job: Job from which to retrieve the indexed result.
+    :param output_id: Identifier of the output containing the array.
+    :param index: Zero-based index of the element to retrieve (must be a valid integer).
+    :param request: Request providing access to instance settings and content negotiation context.
+    :return: HTTP response with the indexed element in the appropriate format (raw data, JSON, reference, etc.).
+    :raises HTTPBadRequest: If index is negative or out of range.
+    :raises HTTPNotFound: If the output ID is not found in the job results.
+    :raises HTTPUnprocessableEntity: If the output is not an array.
+    """
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_success(job, request)
+
+    if index < 0:
+        raise HTTPBadRequest(json={
+            "title": "Job Output Invalid Index",
+            "type": sd.OGC_API_PROC_PART1_EXC_INVALID_PARAMETER_URI,
+            "detail": "Index must be non-negative.",
+            "status": HTTPBadRequest.code,
+            "value": index
+        })
+
+    output_result = None
+    for result in job.results:
+        result_id = get_any_id(result)
+        if result_id == output_id:
+            output_result = result
+            break
+
+    if output_result is None:
+        available_ids = [get_any_id(r) for r in job.results]
+        raise HTTPNotFound(json={
+            "title": "Job Output Not Found",
+            "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_OUTPUT_URI,
+            "detail": f"Output '{output_id}' not found in job results.",
+            "status": HTTPNotFound.code,
+            "cause": f"Available outputs: {available_ids}" if available_ids else None,
+            "value": output_id
+        })
+
+    output_value = get_any_value(output_result)
+
+    if not isinstance(output_value, list):
+        raise HTTPUnprocessableEntity(json={
+            "title": "Job Output Not Array",
+            "type": sd.OGC_API_PROC_PART1_EXC_INVALID_PARAMETER_URI,
+            "detail": f"Output '{output_id}' is not an array. Index access only applies to array outputs.",
+            "status": HTTPUnprocessableEntity.code,
+            "cause": {"output": output_id, "type": type(output_value).__name__}
+        })
+
+    if index >= len(output_value):
+        raise HTTPBadRequest(json={
+            "title": "Job Output Index Out of Range",
+            "type": sd.OGC_API_PROC_PART1_EXC_INVALID_PARAMETER_URI,
+            "detail": f"Index {index} is out of range for output '{output_id}' (length: {len(output_value)}).",
+            "status": HTTPBadRequest.code,
+            "cause": {"index": index, "length": len(output_value), "output": output_id}
+        })
+
+    indexed_element = output_value[index]
+
+    if isinstance(indexed_element, dict) and "href" in indexed_element:
+        result = indexed_element
+    else:
+        result = {"value": indexed_element}
+
+    accept = guess_target_format(request, default=None)
+    headers = ResponseHeaders([("OGC-Output-Values-Count", str(len(output_value)))])
+    return resolve_result_single(job, result, output_id, accept, headers=headers, settings=request)
 
 
 def generate_or_resolve_result(
@@ -870,7 +1102,7 @@ def generate_or_resolve_result(
     result_id,      # type: str
     output_id,      # type: str
     output_mode,    # type: AnyExecuteTransmissionMode
-    output_format,  # type: Optional[JobValueFormat]  # FIXME: implement (https://github.com/crim-ca/weaver/pull/548)
+    output_format,  # type: Optional[JobValueFormat]
     settings,       # type: SettingsType
 ):                  # type: (...) -> Tuple[HeadersType, Optional[AnyDataStream]]
     """
@@ -891,7 +1123,7 @@ def generate_or_resolve_result(
     is_val = bool(get_any_value(result, key=True, file=False, data=True))
     is_ref = bool(get_any_value(result, key=True, file=True, data=False))
     val = get_any_value(result)
-    cid = f"{result_id}@{job.id}"
+    cid = create_content_id(result_id, job.id)
     url = None
     loc = None
     res_data = None
@@ -911,11 +1143,27 @@ def generate_or_resolve_result(
             url = os.path.join(wps_out_url, url[1:])
         if url.startswith(wps_out_url):
             loc = map_wps_output_location(url, settings, exists=True, url=False)
+            if not loc:
+                raise_job_result_gone(job, settings)
             loc = get_secure_path(loc)
         else:
             loc = url  # remote storage, S3, etc.
     else:
         typ = get_field(result, "mime_type", search_variations=True, default=ContentType.TEXT_PLAIN)
+
+    # Handle output_format as either string (Accept header) or dict (format spec)
+    if isinstance(output_format, str):
+        out = clean_media_type_format(output_format, strip_parameters=True)
+    else:
+        out = clean_media_type_format(get_field(output_format, "mime_type", search_variations=True, default=None))
+
+    # Apply transform if type is different from desired output and desired output is different from plain
+    if out and out not in EXCLUDED_TYPES and out != typ:
+        file_transform = Transform(file_path=loc, current_media_type=typ, wanted_media_type=out)
+        typ = out
+        file_transform.get()
+        loc = file_transform.output_path
+        url = map_wps_output_location(loc, settings, exists=True, url=True)
 
     if not url:
         out_dir = get_wps_output_dir(settings)
@@ -1083,7 +1331,16 @@ def get_job_results_single(
 
     ctype = out_headers.get("Content-Type")
     if not ctype:
-        ctype = get_field(result, "mediaType", search_variations=True, default=ContentType.TEXT_PLAIN)
+        ctype = get_field(result, "mediaType", search_variations=True, default=None)
+
+    # If no explicit content-type and data is JSON-serializable, return as JSON
+    if not ctype and isinstance(out_data, (dict, list)):
+        return HTTPOk(json=out_data, headers=headers)
+
+    # Default to text/plain if no content-type specified
+    if not ctype:
+        ctype = ContentType.TEXT_PLAIN
+
     c_enc = cast("AnyContentEncoding", headers.get("Content-Encoding") or "UTF-8")  # type: AnyContentEncoding
     out_data = data2str(out_data)
     out_data = ContentEncoding.encode(out_data, c_enc)
@@ -1383,7 +1640,7 @@ def raise_job_bad_status_locked(job, container=None):
             headers=headers,
             json={
                 "title": "Job Locked for Execution",
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/locked",
+                "type": sd.OGC_API_PROC_PART4_EXC_LOCKED_URI,
                 "detail": f"Job cannot be modified.{job_reason}",
                 "status": HTTPLocked.code,
                 "cause": {"status": job.status},
@@ -1431,7 +1688,7 @@ def raise_job_bad_status_success(job, container=None):
                 headers=headers,
                 json={
                     "title": "JobResultsFailed",
-                    "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available",
+                    "type": sd.OGC_API_PROC_PART1_EXC_RESULT_NOT_AVAILABLE_URI,
                     "detail": "Job results not available because execution failed.",
                     "status": HTTPBadRequest.code,
                     "error": err_code,
@@ -1440,20 +1697,42 @@ def raise_job_bad_status_success(job, container=None):
                 }
             )
 
-        # /req/core/job-results-exception/results-not-ready
+        # /req/core/job-results-exception-results-not-ready
         # must use OWS instead of HTTP class to preserve provided JSON body
         # otherwise, pyramid considers it as not found view/path and rewrites contents in append slash handler
         raise OWSNotFound(
             headers=headers,
             json={
                 "title": "JobResultsNotReady",
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-ready",
+                "type": sd.OGC_API_PROC_PART1_EXC_RESULT_NOT_READY_URI,
                 "detail": "Job is not ready to obtain results.",
                 "status": HTTPNotFound.code,
                 "cause": {"status": job.status},
                 "links": links
             }
         )
+
+
+def raise_job_result_gone(job, container=None):
+    # type: (Job, Optional[AnySettingsContainer]) -> NoReturn
+    """
+    Raise a messages indicating that results of an existing and successful :term:`Job` are gone.
+    """
+    settings = get_settings(container)
+    job_links = job.links(settings, self_link="results")
+    job_links = [link for link in job_links if link["rel"] in ["status", "collection", "up", "results"]]
+    headers = [("Link", make_link_header(link)) for link in job_links]
+    raise JobGone(
+        headers=headers,
+        json={
+            "title": "JobResultGone",
+            "type": sd.OGC_API_PROC_PART1_EXC_RESULT_NOT_AVAILABLE_URI,
+            "status": JobGone.code,
+            "detail": "One or more output data references in Job Results cannot be found.",
+            "value": str(job.id),
+            "links": job_links
+        }
+    )
 
 
 def raise_job_dismissed(job, container=None):
@@ -1471,7 +1750,7 @@ def raise_job_dismissed(job, container=None):
             headers=headers,
             json={
                 "title": "JobDismissed",
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available",
+                "type": sd.OGC_API_PROC_PART1_EXC_RESULT_NOT_AVAILABLE_URI,
                 "status": JobGone.code,
                 "detail": "Job was dismissed and artifacts have been removed.",
                 "cause": {"status": job.status},
@@ -1523,7 +1802,7 @@ def dismiss_job_task(job, container):
         except OSError as exc:
             LOGGER.warning("Job [%s] dismiss operation: Failed to delete [%s] due to [%s]", job.id, job_out_xml, exc)
 
-    LOGGER.debug("Job [%s] dismiss operation: Updating job status.")
+    LOGGER.debug("Job [%s] dismiss operation: Updating job status.", job.id)
     store = get_db(container).get_store(StoreJobs)
     job.status_message = f"Job {Status.DISMISSED}."
     job.status = map_status(Status.DISMISSED)

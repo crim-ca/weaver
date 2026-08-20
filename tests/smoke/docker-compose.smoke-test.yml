@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   mongodb:
     image: mongo:5.0
@@ -15,7 +14,8 @@ services:
     ports:
       - "4001:4001"
     volumes:
-      - ../../config/weaver.ini.example:/opt/local/src/weaver/config/weaver.ini
+      # see 'tests/smoke/README.md' for details
+      - ./weaver.ini:/opt/local/src/weaver/config/weaver.ini
       - ./tests:/tests
     networks:
       - default
@@ -27,5 +27,6 @@ services:
     links:
       - mongodb
     volumes:
-      - ../../config/weaver.ini.example:/opt/local/src/weaver/config/weaver.ini
+      # see 'tests/smoke/README.md' for details
+      - ./weaver.ini:/opt/local/src/weaver/config/weaver.ini
     restart: "no"

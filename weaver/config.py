@@ -23,6 +23,7 @@ class WeaverConfiguration(Constants):
     """
     Configuration mode for which the `Weaver` instance should operate to provide different functionalities.
     """
+
     DEFAULT = "DEFAULT"
     ADES = "ADES"
     EMS = "EMS"
@@ -33,6 +34,7 @@ class WeaverFeature(Constants):
     """
     Features enabled accordingly to different combinations of :class:`WeaverConfiguration` modes.
     """
+
     REMOTE = frozenset([
         WeaverConfiguration.EMS,
         WeaverConfiguration.HYBRID,

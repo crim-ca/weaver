@@ -258,9 +258,13 @@
                     )}
                 %endfor
             %elif job.is_finished:
+                <div class="tab-menu-empty">
                 No provenance available. Job did not <abbr title="status = ${job.status}">succeed</abbr>.
+                </div>
             %else:
+                <div class="tab-menu-empty">
                 No provenance available. Job is not <abbr title="status = ${job.status}">finished</abbr>.
+                </div>
             %endif
             </div>
         </div>

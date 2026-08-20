@@ -16,6 +16,11 @@
       "transmissionMode": "reference"
     }
   },
+  "headers": {
+    "Accept-Profile": "<https://www.opengis.net/dev/profile/OGC/0/ogc-results>",
+    "Accept": "application/json",
+    "Prefer": "respond-async"
+  },
   "links": [
     {
       "title": "Job status.",

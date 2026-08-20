@@ -1,0 +1,56 @@
+--boundary123
+Content-Type: application/cwl+json
+Content-ID: <echo-tool@weaver.example.com>
+Content-Location: echo-tool
+
+{
+  "cwlVersion": "v1.2",
+  "class": "CommandLineTool",
+  "id": "echo-tool",
+  "baseCommand": ["echo"],
+  "inputs": {
+    "message": "string"
+  },
+  "outputs": {
+    "output": {
+      "type": "stdout"
+    }
+  },
+  "requirements": {
+    "DockerRequirement": {
+      "dockerPull": "alpine:latest"
+    }
+  },
+  "stdout": "output.txt"
+}
+
+--boundary123
+Content-Type: application/cwl+json
+Content-ID: <main-workflow@weaver.example.com>
+Content-Location: main-workflow
+
+{
+  "cwlVersion": "v1.2",
+  "class": "Workflow",
+  "id": "main-workflow",
+  "inputs": {
+    "input_message": "string"
+  },
+  "outputs": {
+    "result": {
+      "type": "File",
+      "outputSource": "echo_step/output"
+    }
+  },
+  "steps": {
+    "echo_step": {
+      "run": "echo-tool",
+      "in": {
+        "message": "input_message"
+      },
+      "out": ["output"]
+    }
+  }
+}
+
+--boundary123--

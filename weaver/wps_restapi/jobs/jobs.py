@@ -5,7 +5,10 @@ from celery.utils.log import get_task_logger
 from colander import Invalid
 from pyramid.httpexceptions import (
     HTTPBadRequest,
+    HTTPException,
     HTTPNoContent,
+    HTTPNotAcceptable,
+    HTTPNotFound,
     HTTPOk,
     HTTPPermanentRedirect,
     HTTPUnprocessableEntity,
@@ -27,7 +30,7 @@ from weaver.formats import (
     repr_json
 )
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema, JobStatusType
-from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema
+from weaver.processes.convert import convert_input_values_schema, convert_output_params_schema, get_field
 from weaver.processes.execution import (
     submit_job,
     submit_job_dispatch_task,
@@ -38,13 +41,16 @@ from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
+from weaver.transform.const import CONVERSION_DICT
 from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
+    deploy_multipart_job_workflow,
     dismiss_job_task,
     get_job,
     get_job_io_schema_query,
     get_job_list_links,
+    get_job_result_by_index,
     get_job_results_response,
     get_job_status_schema,
     get_job_status_wps_xml_response,
@@ -52,6 +58,7 @@ from weaver.wps_restapi.jobs.utils import (
     raise_job_bad_status_locked,
     raise_job_bad_status_success,
     raise_job_dismissed,
+    resolve_result_single,
     validate_service_process
 )
 from weaver.wps_restapi.providers.utils import get_service
@@ -212,6 +219,14 @@ def get_queried_jobs(request):
 
 
 @sd.jobs_service.post(
+    tags=[sd.TAG_EXECUTE, sd.TAG_JOBS, sd.TAG_PROCESSES],
+    content_type=[ContentType.MULTIPART_MIXED, ContentType.MULTIPART_RELATED],
+    schema=sd.PostJobsEndpointMultipart(),
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas=sd.post_jobs_responses,
+)
+@sd.jobs_service.post(
     tags=[sd.TAG_EXECUTE, sd.TAG_JOBS],
     content_type=list(ContentType.ANY_XML),
     schema=sd.PostJobsEndpointXML(),
@@ -238,8 +253,19 @@ def create_job(request):
     prov_id = None
     try:
         ctype = get_header("Content-Type", request.headers, default=ContentType.APP_JSON)
+        ctype_full = ctype  # Keep full Content-Type with parameters
         ctype = clean_media_type_format(ctype, strip_parameters=True)
-        if ctype == ContentType.APP_JSON and "process" in request.json_body:
+
+        # Handle multipart ad-hoc workflow execution
+        if ctype in ContentType.ANY_MULTIPART:
+            proc_id, execution_body = deploy_multipart_job_workflow(request, ctype_full)
+
+            # Update request to use execution body for normal job submission flow
+            request._json = execution_body
+            request.json_body = execution_body
+            request.content_type = ContentType.APP_JSON
+
+        elif ctype == ContentType.APP_JSON and "process" in request.json_body:
             proc_url = request.json_body["process"]
             proc_url = sd.ProcessURL().deserialize(proc_url)
             prov_url, proc_id = proc_url.rsplit("/processes/", 1)
@@ -249,10 +275,12 @@ def create_job(request):
             proc_key = "ows:Identifier"
             body_xml = xml_util.fromstring(request.text)
             proc_id = body_xml.xpath(proc_key, namespaces=body_xml.getroottree().nsmap)[0].text
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPBadRequest(json={
             "title": "NoSuchProcess",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/no-such-process",
+            "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_PROCESS_URI,
             "detail": "Process URL or identifier reference could not be parsed.",
             "status": HTTPBadRequest.code,
             "cause": {"in": "body", proc_key: repr_json(proc_url, force_string=False)}
@@ -262,11 +290,16 @@ def create_job(request):
         process = get_process(process_id=proc_id)
         return submit_job_dispatch_wps(request, process)
 
+    # Build tags list
+    tags = ["wps-rest", "ogc-api"]
+    if ctype in ContentType.ANY_MULTIPART:
+        tags.append("ad-hoc")
+
     if prov_id:
         ref = get_service(request, provider_id=prov_id)
     else:
         ref = get_process(process_id=proc_id)
-    return submit_job(request, ref, process_id=proc_id, tags=["wps-rest", "ogc-api"])
+    return submit_job(request, ref, process_id=proc_id, tags=tags)
 
 
 @sd.jobs_service.post()
@@ -289,7 +322,7 @@ def create_job_unsupported_media_type(request):
     return HTTPUnsupportedMediaType(
         json={
             "title": "Unsupported Media Type",
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type",
+            "type": sd.OGC_API_PROC_PART4_EXC_UNSUPPORTED_MEDIA_TYPE_URI,
             "detail": "Process URL or identifier reference missing or invalid.",
             "status": HTTPUnsupportedMediaType.code,
             "cause": {"in": "headers", "name": "Content-Type", "value": ctype},
@@ -344,10 +377,7 @@ def trigger_job_execution(request):
 @sd.provider_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROVIDERS],
     schema=sd.GetProviderJobEndpoint(),
-    accept=[ContentType.APP_JSON] + [
-        f"{ContentType.APP_JSON}; profile={profile}"
-        for profile in JobStatusProfileSchema.values()
-    ],
+    accept=sd.GetJobAcceptHeaderJSON().validator.choices,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_provider_single_job_status_responses,
 )
@@ -373,10 +403,7 @@ def trigger_job_execution(request):
 @sd.process_job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS, sd.TAG_PROCESSES],
     schema=sd.GetProcessJobEndpoint(),
-    accept=[ContentType.APP_JSON] + [
-        f"{ContentType.APP_JSON}; profile={profile}"
-        for profile in JobStatusProfileSchema.values()
-    ],
+    accept=sd.GetJobAcceptHeaderJSON().validator.choices,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
 )
@@ -402,10 +429,7 @@ def trigger_job_execution(request):
 @sd.job_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_STATUS],
     schema=sd.GetJobEndpoint(),
-    accept=[ContentType.APP_JSON] + [
-        f"{ContentType.APP_JSON}; profile={profile}"
-        for profile in JobStatusProfileSchema.values()
-    ],
+    accept=sd.GetJobAcceptHeaderJSON().validator.choices,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_single_job_status_responses,
 )
@@ -419,7 +443,7 @@ def get_job_status(request):
     schema, headers = get_job_status_schema(request)
     job = get_job(request)
 
-    content_type = str(headers.get("Content-Type"))
+    content_type = str(get_header("Content-Type", headers, pop=True, default=""))
     media_type = clean_media_type_format(content_type, strip_parameters=True)
     if media_type in ContentType.ANY_XML or (media_type == ContentType.ANY and schema == JobStatusProfileSchema.WPS):
         return get_job_status_wps_xml_response(job, request)
@@ -435,7 +459,7 @@ def get_job_status(request):
         # additional properties that are not validated explicitly, or that contradict the 'OGC-API processes' definition
         # must apply the properties after (not via 'kwargs' to 'job.json()') to avoid JSON validation error
         # (i.e.: 'status' reported in OpenAPI is OGC-only statuses, and '$schema' is set by the class definition)
-        job_body["$schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URL
+        job_body["$schema"] = sd.OPENEO_API_SCHEMA_JOB_STATUS_URI
         job_body["status"] = map_status(job_body["status"], StatusCompliant.OPENEO)
     elif schema == JobStatusProfileSchema.WPS:
         job_body = job.json(
@@ -453,7 +477,7 @@ def get_job_status(request):
     # adjust response contents according to rendering
     # provide 'job' object directly for HTML templating to allow extra operations dynamically
     if ContentType.APP_JSON in content_type:
-        return HTTPOk(json=job_body, headers=headers)
+        return HTTPOk(json=job_body, headers=headers, content_type=content_type)
     return Box(**job_body, job=job, box_intact_types=[Job])
 
 
@@ -689,6 +713,92 @@ def get_job_outputs(request):
     return HTTPOk(json=outputs)
 
 
+@sd.provider_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
+    schema=sd.ProviderResultValueEndpoint(),
+    response_schemas=sd.get_prov_result_responses
+)
+@sd.process_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProcessResultValueEndpoint(),
+    response_schemas=sd.get_proc_result_responses
+)
+@sd.job_result_value_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS],
+    schema=sd.JobResultValueEndpoint(),
+    response_schemas=sd.get_job_result_responses
+)
+@sd.provider_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProviderAnyOutputEndpoint(),
+    response_schemas=sd.get_prov_result_responses
+)
+@sd.process_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProcessAnyOutputEndpoint(),
+    response_schemas=sd.get_proc_result_responses
+)
+@sd.job_output_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.JobAnyOutputEndpoint(),
+    response_schemas=sd.get_job_result_responses
+)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def get_job_output(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Retrieve a specific output from a job execution.
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_success(job, request)
+    settings = get_settings(request)
+    output_id = request.matchdict.get("output_id")
+
+    # Validate that the output ID exists in job results
+    results = [o for o in job.results if str(o["identifier"]) == output_id]
+    if not results:
+        available_ids = [str(o["identifier"]) for o in job.results]
+        raise HTTPNotFound(
+            json={
+                "title": "NoSuchOutput",
+                "type": sd.OGC_API_PROC_PART1_EXC_NO_SUCH_OUTPUT_URI,
+                "detail": "The requested output ID is not available in the job results.",
+                "status": HTTPNotFound.code,
+                "cause": f"Available outputs: {available_ids}" if available_ids else output_id,
+                "value": output_id
+            }
+        )
+
+    result = results[0]
+    mime_type = get_field(result, "mime_type", search_variations=True, default="")
+    possible_media_types = CONVERSION_DICT.get(mime_type, [])
+    possible_media_types.append(mime_type)
+
+    # Get requested media-type. "*/*" if omit
+    accept = str(request.accept) if request.accept else "*/*"
+    headers = request.headers
+    result_media_type = get_field(result, "mimeType", search_variations=True)
+    result_media_type = guess_target_format(request, default=result_media_type)
+
+    if result_media_type not in possible_media_types:
+        raise HTTPNotAcceptable(json={
+            "title": "NotAcceptable",
+            "type": "http://www.opengis.net/def/exceptions/ogcapi-common-1/1.0/not-acceptable",
+            "detail": "The requested output format cannot be generated for this output.",
+            "status": HTTPNotAcceptable.code,
+            "cause": (
+                f"Requested format '{result_media_type}' is not compatible "
+                f"with available formats: {possible_media_types}"
+            ),
+            "value": result_media_type
+        })
+
+    resp = resolve_result_single(job, result, output_id, accept, headers=headers, settings=settings)
+    resp.headers.add("Link", make_link_header(sd.OGC_API_PROC_PROFILE_OGC_VALUES_URI, rel="profile"))
+    return resp
+
+
 @sd.provider_results_service.get(
     tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
     schema=sd.ProviderResultsEndpoint(),
@@ -719,6 +829,53 @@ def get_job_results(request):
     job = get_job(request)
     resp = get_job_results_response(job, container=request)
     return resp
+
+
+@sd.provider_results_index_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROVIDERS],
+    schema=sd.ProviderResultsIndexEndpoint(),
+    response_schemas=sd.get_provider_results_index_responses,
+)
+@sd.process_results_index_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS, sd.TAG_PROCESSES],
+    schema=sd.ProcessResultsIndexEndpoint(),
+    response_schemas=sd.get_job_results_index_responses,
+)
+@sd.job_results_index_service.get(
+    tags=[sd.TAG_JOBS, sd.TAG_RESULTS],
+    schema=sd.JobResultsIndexEndpoint(),
+    response_schemas=sd.get_job_results_index_responses,
+)
+@log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
+def get_job_result_index(request):
+    # type: (PyramidRequest) -> AnyResponseType
+    """
+    Retrieve a specific indexed value from a job result array.
+
+    Given an output that is an array (or multi-value result), this endpoint allows retrieving
+    a specific element by its zero-based index.
+
+    Example:
+        /jobs/{jobId}/results/output_array/0  -> returns first element
+        /jobs/{jobId}/results/output_array/1  -> returns second element
+    """
+    job = get_job(request)
+    raise_job_dismissed(job, request)
+    raise_job_bad_status_success(job, request)
+    output_id = request.matchdict.get("output_id")
+
+    try:
+        index = int(request.matchdict.get("index"))
+    except (ValueError, TypeError):
+        raise HTTPBadRequest(json={
+            "title": "Job Output Invalid Index",
+            "type": sd.OGC_API_PROC_PART1_EXC_INVALID_PARAMETER_URI,
+            "detail": "Index must be a valid integer.",
+            "status": HTTPBadRequest.code,
+            "value": request.matchdict.get("index")
+        })
+
+    return get_job_result_by_index(job, output_id, index, request=request)
 
 
 @sd.provider_exceptions_service.get(
@@ -901,7 +1058,10 @@ def includeme(config):
     config.add_cornice_service(sd.jobs_service)
     config.add_cornice_service(sd.job_service)
     config.add_cornice_service(sd.job_results_service)
+    config.add_cornice_service(sd.job_result_value_service)
+    config.add_cornice_service(sd.job_results_index_service)
     config.add_cornice_service(sd.job_outputs_service)
+    config.add_cornice_service(sd.job_output_service)
     config.add_cornice_service(sd.job_inputs_service)
     config.add_cornice_service(sd.job_exceptions_service)
     config.add_cornice_service(sd.job_logs_service)
@@ -909,7 +1069,10 @@ def includeme(config):
     config.add_cornice_service(sd.process_jobs_service)
     config.add_cornice_service(sd.process_job_service)
     config.add_cornice_service(sd.process_results_service)
+    config.add_cornice_service(sd.process_result_value_service)
+    config.add_cornice_service(sd.process_results_index_service)
     config.add_cornice_service(sd.process_outputs_service)
+    config.add_cornice_service(sd.process_output_service)
     config.add_cornice_service(sd.process_inputs_service)
     config.add_cornice_service(sd.process_exceptions_service)
     config.add_cornice_service(sd.process_logs_service)
@@ -917,7 +1080,10 @@ def includeme(config):
     config.add_cornice_service(sd.provider_job_service)
     config.add_cornice_service(sd.provider_jobs_service)
     config.add_cornice_service(sd.provider_results_service)
+    config.add_cornice_service(sd.provider_result_value_service)
+    config.add_cornice_service(sd.provider_results_index_service)
     config.add_cornice_service(sd.provider_outputs_service)
+    config.add_cornice_service(sd.provider_output_service)
     config.add_cornice_service(sd.provider_inputs_service)
     config.add_cornice_service(sd.provider_exceptions_service)
     config.add_cornice_service(sd.provider_logs_service)

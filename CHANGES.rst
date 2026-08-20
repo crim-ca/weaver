@@ -8,7 +8,7 @@ Changes
 .. _changes_latest:
 
 `Unreleased <https://github.com/crim-ca/weaver/tree/master>`_ (latest)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -19,6 +19,419 @@ Changes:
   as alias to resolve the corresponding ``/providers/{providerID}/processes/{processID}`` resource.
 - Add ``provider`` details embedded within the ``/processes/{processID}`` response if ``?provider={providerID}``
   or ``?service={providerID}`` query parameter is specified and that the `Provider`'s `Process` can be resolved.
+- Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}`` endpoint
+  to align with the latest OGC API - Processes Core specification.
+- Added the N-output response header for N-output retrieval responses.
+- Added the OGC Values profile link to ``/jobs/{jobId}/outputs/{outputId}`` responses:
+  ``Link: <https://www.opengis.net/def/profile/OGC/0/ogc-values>; rel="profile"``
+- Add support for ad-hoc `CWL` workflow execution through the ``POST /jobs`` endpoint using ``multipart/mixed``
+  or ``multipart/related`` content types. Users can now deploy and execute a `Process` in a single request by
+  submitting both the `CWL` workflow definition and execution parameters
+  (with ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-execute-request``)
+  in a multipart request body.
+  The workflow is automatically deployed (with temporary ``ad-hoc`` tagging) before
+  execution, eliminating the need for separate deployment and execution steps for one-time workflow runs
+  (resolves `#834 <https://github.com/crim-ca/weaver/issues/834>`_).
+- Adjust the `CLI` to return the ``OperationResult.message`` when the response body is empty (``HTTP 204 No Content``)
+  to provide a clearer message to the user of what happened and indicate the state of the operation.
+  Previously, the ``None`` content would be reported as is making it ambiguous about what occurred or whether it failed.
+
+Fixes:
+------
+- Fix rendering of `OpenAPI` definitions for ``POST /processes`` deployment such that each indicated ``Content-Type``
+  correctly provides an example for ``multipart/*`` representation of a `Workflow`.
+- Fix rendering of `OpenAPI` definitions for ``POST /processes`` deployment such that each indicated ``Content-Type``
+  correctly provides its corresponding examples for `OGC Application Package` and `CWL` representations in YAML/JSON.
+- Fix `OpenAPI` combination of ``Accept`` and ``Content-Type`` header values from all `OGC Application Package`, `CWL`
+  and ``multipart/*`` schemas when aggregated under the *request parameters* of the `Swagger-UI` representation.
+- Fix the `CLI` documentation about the reported result from ``undeploy`` command. It referred to a missing JSON
+  response file, which is not valid since ``HTTP 204 No Content`` is returned for that successful operation.
+- Adjusted OpenAPI `Job` result examples with by-value/href responses.
+- Adjust OpenAPI ``Accept-Profile`` to report profiles applicable to specific endpoints rather than generic entries.
+- Update OGC profile, exception and link relation URIs to ``https://`` as per corresponding standard updates.
+- Update CWL schema URL to ``https://w3id.org/cwl/v1.2/cwl-json-schema.yaml`` to match the official release instead
+  of its GitHub raw contents copy.
+- Renamed ``StringOneOf`` to ``DelimitedStringOneOf`` to clarify the expected format of the field in contrast to the
+  similar ``OneOfCaseInsensitive`` definition (which ``DelimitedStringOneOf`` relies on), respectively for a single
+  string of allowed values delimited by a given character, and simply a string field validator of enum string values.
+- Added tests for ``DelimitedStringOneOf`` and ``OneOfCaseInsensitive`` to ensure their related case-sensitive value
+  handling remains consistent between them.
+- Fix invalid parsing of ``Link: <{URI}>; rel="profile"`` headers to extract the profile URI.
+
+.. _changes_6.15.0:
+
+`6.15.0 <https://github.com/crim-ca/weaver/tree/6.15.0>`_ (2026-07-03)
+====================================================================================================================
+
+Changes:
+--------
+- Add support for multipart `Process` deployment using ``multipart/related`` or ``multipart/mixed`` content types,
+  allowing simultaneous upload of multiple `CWL` files (e.g.: ``class: Workflow`` and ``class: CommandLineTool``)
+  along with optional `Process` description metadata (relates to `#56 <https://github.com/crim-ca/weaver/issues/56>`_,
+  resolves `#717 <https://github.com/crim-ca/weaver/issues/717>`_,
+  resolves `#874 <https://github.com/crim-ca/weaver/issues/874>`_).
+- Add support for `CWL` ``$graph`` representation with multiple entries, enabling deployment of workflows with
+  embedded step definitions without manual preprocessing
+  (resolves `#56 <https://github.com/crim-ca/weaver/issues/56>`_).
+- Add support for multiple ``executionUnit`` `CWL` entries in deployment payloads. Multiple execution units can now
+  be deployed in a single request using either inline ``unit`` objects or ``href`` URL references, allowing
+  deployment of workflows with multiple step definitions without requiring multipart encoding. This approach only
+  accepts CWL-like media-types to avoid ambiguities with other deployment formats
+  (e.g.: ``application/json`` or ``application/ogcapppkg+json``).
+- Add validation during multipart deployment to ensure at least one ``class: Workflow`` is present and properly
+  identified as the main workflow from media-type hints or ``Content-ID`` references.
+- Add `CLI` support for deploying multiple `CWL` files by repeating ``--cwl`` arguments to automatically generate
+  ``multipart/related`` request payloads, simplifying deployment of workflows with multiple step definitions.
+  The `CLI` accepts a mixture of local `CWL` file paths (as `JSON` or `YAML`) and remote URL references.
+  The server handles ``Content-Type`` media-type detection and ``Content-Location`` header processing for external
+  `CWL` files to fetch during deployment.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.14.0:
+
+`6.14.0 <https://github.com/crim-ca/weaver/tree/6.14.0>`_ (2026-07-03)
+====================================================================================================================
+
+Changes:
+--------
+- Rename Dockerfiles from ``docker/Dockerfile-{base,manager,worker}``
+  to ``docker/{base,manager,worker}.dockerfile`` for a consistent naming and file extension scheme.
+- Refactor ``docker/base.dockerfile`` to a multi-stage build keeping build-only tooling out of runtime
+  while preserving Python app execution and Node.js support for `CWL` JavaScript evaluation.
+- Reduce Docker image sizes compared to ``6.12.0`` by about ``19%`` overall:
+  - ``manager`` image from ~1214 MB to ~976 MB.
+  - ``worker`` image from ~1261 MB to ~1023 MB.
+- Harden Docker images by removing unnecessary package-management tooling and bootstrap packages
+  after install steps (e.g.: ``apt``, ``libapt-pkg``, ``perl-base``, ``curl``, ``gnupg``).
+- Harden Docker runtime by removing ``pip`` and ``ensurepip`` after all required install steps,
+  while keeping ``setuptools``/``pkg_resources`` for ``pyramid`` compatibility.
+- Update Python dependency cleanup logic to recursively remove non-empty directories of unnecessary files
+  (e.g.: ``__pycache__``, ``tests``/``test``) to reduce Docker image size.
+- Switch PDF text generation fallback font in ``weaver/transform/handlers.py`` from ``Arial`` to ``Helvetica``
+  to avoid dependency on system-installed fonts in runtime images, since installed fonts are removed.
+- Update Docker smoke-tests to employ ``unittest`` since ``pytest`` is no longer available as runtime
+  installation and execution, due to installation tooling removal. These tests also validate the tooling removal.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.13.0:
+
+`6.13.0 <https://github.com/crim-ca/weaver/tree/6.13.0>`_ (2026-06-06)
+====================================================================================================================
+
+Changes:
+--------
+- Add documentation details about `Job` single-output and transform formatting features.
+- Add documentation summary of relevant `Job` endpoints for quicker reference of available operations.
+- Set up `Weaver Agent Skills <https://github.com/crim-ca/weaver/agents/skills/>`_ based on
+  the `Agent Skill Specification <https://agentskills.io/specification>`_
+  to help AI agents interact with `Weaver` and its API more seamlessly.
+  - Integrates skills for the `CLI`, the Python ``WeaverClient`` and minimal ``curl`` endpoints for correspond commands.
+  - Integrates skills for common `CWL` design and debugging tasks, with alignment concerns for `Weaver` deployment.
+  - Integrates skills for code management and installation steps, including skills self-validation for extensibility.
+  - See also the configured `Context7 Documentation Updater for Weaver <https://context7.com/crim-ca/weaver>`_.
+- Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded
+  `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification
+  following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification.
+
+Fixes:
+------
+- Update ``cwl-utils>=0.42`` to handle internal ``TypeError`` on ``None`` reference when processing `CWL` definitions
+  with JavaScript parser. This is mostly to avoid sporadic ``check-links`` errors when generating documentation details,
+  which is the only place it has been observed so far, not within in actual `Process` runtimes (relates
+  to `common-workflow-language/cwl-utils#137 <https://github.com/common-workflow-language/cwl-utils/issues/137>`_).
+- Allow ``Accept-Profile`` reporting within `Job Inputs` parameters to contain ``<>`` without failing validation.
+
+.. _changes_6.12.0:
+
+`6.12.0 <https://github.com/crim-ca/weaver/tree/6.12.0>`_ (2026-05-25)
+====================================================================================================================
+
+Changes:
+--------
+- Add support for various GeoTIFF formats, allowing flexible handling and representation of GeoTIFFs in outputs
+  (fixes `#100 <https://github.com/crim-ca/weaver/issues/100>`_).
+- Add support for ``GET /jobs/{jobId}/results/{id}`` and ``GET /jobs/{jobId}/outputs/{id}`` routes to enable direct access to
+  individual `Job` result items by ID. This enhancement includes support alternate representations based on the ``Accept`` header.
+  If an alternate format (e.g., YAML for a JSON source) is requested it will be automatically generated and returned.
+- Return ``Link`` headers with ``rel="alternate"`` containing all possible output formats, allowing retrieval via query parameters
+  (e.g., ``/jobs/{jobId}/outputs/{id}?f=application/x-yaml``) (fixes `#18 <https://github.com/crim-ca/weaver/issues/18>`_).
+- Add ``weaver.formats.OutputFormat.CSV`` format support and extend ``OutputFormat.convert()`` method to handle CSV conversions
+  from JSON data structures.
+- Add ``weaver.transform`` module providing format conversion handlers for `Job` outputs. Output formats are dynamically
+  extended from the original `Process` definition to provide alternate result representations without modifying the deployed
+  `Process` metadata.
+- Add support for `multibase <https://github.com/multiformats/multibase>`_-encoded
+  `multihash <https://github.com/multiformats/multihash>`_ file digests for resource integrity verification
+  following `W3C VC Data Integrity <https://www.w3.org/TR/vc-data-integrity/#resource-integrity>`_ specification.
+  Job outputs now include ``digestMultibase`` for local files (resolves `#898 <https://github.com/crim-ca/weaver/issues/898>`_).
+- Add ``/per/core/process-exception-job-gone`` and ``/per/core/job-results-exception-job-gone``
+  conformance definitions that allow the HTTP 410 status code for dismissed `Job` and their results.
+- Add support for indexed array access to job results via ``/results/{output_id}/{index}`` endpoints
+  (resolves `#759 <https://github.com/crim-ca/weaver/issues/759>`_).
+
+  This allows retrieving individual elements from array-type job outputs using zero-based indexing.
+  Available on job-only, process-scoped, and provider-scoped result endpoints:
+
+  - ``/jobs/{jobID}/results/{output_id}/{index}``
+  - ``/processes/{processID}/jobs/{jobID}/results/{output_id}/{index}``
+  - ``/providers/{providerID}/processes/{processID}/jobs/{jobID}/results/{output_id}/{index}``
+
+  The endpoint returns HTTP 400 for invalid or out-of-range indices, HTTP 404 when the output is not found,
+  and HTTP 422 when attempting to index into non-array outputs.
+
+  Added utility function ``get_job_result_by_index()`` in ``weaver.wps_restapi.jobs.utils`` to handle
+  indexed result retrieval with comprehensive validation and error handling.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.11.0:
+
+`6.11.0 <https://github.com/crim-ca/weaver/tree/6.11.0>`_ (2026-04-24)
+====================================================================================================================
+
+Changes:
+--------
+- Add `OGC API - Processes: Core v2.0` conformance classes corresponding to implemented definitions of `v1.0`.
+- Add `OGC Code Sprint Test Suite <https://github.com/opengeospatial/developer-events/wiki/Test-Suite-Strawman>`_.
+  and run their tests with ``tests/functional/code-sprint/test-servers/weaver-localhost`` definitions in the CI.
+- Add variable HTTP 200/201 OK/Created response for `Process` update (*Replace* of DRU) dynamically selected based on
+  the nature of the upsert operation (update/insert) leading to an in-place replacement or distinct `Process` instance
+  (relates to `opengeospatial/ogcapi-processes#578 <https://github.com/opengeospatial/ogcapi-processes/pull/578>`_).
+- Add `Request Options` support to ``WeaverClient`` and the `CLI` along documentation details about available options.
+- Add support of ``WeaverClient`` and the `CLI` with `Process` and `Provider` IDs provided directly as their full URI.
+- Add support of ``WeaverClient`` and the `CLI` to ``deploy`` a `CWL` definition directly as ``application/cwl+json``.
+- Move literal URI/CURIE definitions and other similar references under a common ``weaver.ogc_definitions`` module.
+  This module also provides utilities to allow conversion between various equivalent representations of the definitions.
+- Add ``processingEntityType`` (always ``ogc-api-processes`` in this case) and ``id`` to `Job` response for conformance.
+- Add ``Content-Profile: http://www.opengis.net/def/profile/OGC/0/ogc-process-list`` to ``/processes`` response headers.
+- Add ``Preference-Applied: profile=<http://www.opengis.net/def/profile/OGC/0/ogc-results>`` header to responses
+  when a corresponding ``Prefer`` header profile is requested for the `Job` results representation as `JSON`
+  (resolves `#853 <https://github.com/crim-ca/weaver/issues/853>`_).
+- Add ``http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/result-not-available`` error with HTTP 410
+  for ``../jobs/{jobID}/results`` responses if one of the `Job` result files has been detected as removed from cleanup.
+  This case happens only if the `Job` itself is still available and successful, but its results have been deleted.
+- Remove embedded ``profile="http://www.opengis.net/def/profile/OGC/0/ogc-results"`` from ``Content-Type`` response
+  of `Job` results requesting this profile to avoid header buffer overflows from server deployments. Instead, clients
+  should rely on the ``Link: rel=profile`` or ``Content-Profile`` header to determine if this profile was applied.
+- Return Bounding Box ``crs`` as URI representation when they can be resolved from an URN or short code identifier.
+  This ensures alignment with the default ``format: ogc-bbox`` representation that defines ``crs`` as an enum of URIs
+  for corresponding ``OGC:CRS84`` and ``OGC:CRS84h`` codes.
+
+Fixes:
+------
+- Fix UI tooltip on landing page not staying visible long enough when hovering over it to allow clicking its link.
+- Fix invalid conformance links with extra ``/`` to align with `OGC API - Processes: Core v2.0` fixed definitions.
+- Fix missing ``Location`` header in ``HTTP 201 Created`` response of `Process` deployment.
+- Fix ``HTTP 204 No Content`` not employed on a ``DELETE`` `Process` operation. An ``HTTP 200 OK`` was returned instead.
+
+.. _changes_6.10.0:
+
+`6.10.0 <https://github.com/crim-ca/weaver/tree/6.10.0>`_ (2026-03-17)
+========================================================================
+
+Changes:
+--------
+- Add support for `Key-Value Pair (KVP)` encoded `Process` execution using
+  HTTP GET requests on ``/processes/{processID}/execution`` endpoint
+  (resolves `#607 <https://github.com/crim-ca/weaver/issues/607>`_
+  and `#445 <https://github.com/crim-ca/weaver/issues/445>`_).
+
+  Supported features include:
+
+  - Simple literal inputs (strings, numbers, booleans) via direct parameter values
+  - Complex inputs via URL-encoded `JSON` objects and arrays
+  - Input arrays using comma-separated values
+  - Input by-reference using ``{inputID}[href]`` and ``{inputID}[type]`` qualifiers
+  - Bounding box inputs with optional ``{inputID}[crs]`` coordinate reference system
+  - Binary inputs with base64 encoding using ``{inputID}[value]`` and format qualifiers
+  - Output selection using ``{outputID}[include]``
+  - Output specification with ``{outputID}[mediaType]``, ``{outputID}[encoding]`` and ``{outputID}[schema]`` qualifiers
+  - Response format control via ``response[f]`` or ``response[format]`` (maps to ``Accept`` header)
+  - Execution preference control via ``response[prefer]`` (maps to ``Prefer`` header)
+  - Case-insensitive parameter qualifiers and reserved parameters
+  - Full `OGC API - Processes` ``kvp-execute`` conformance class support
+
+  The implementation converts `KVP` parameters to equivalent `JSON` execution format internally,
+  ensuring consistent behavior with POST-based executions. All existing validation, execution modes,
+  and result formats are supported identically for both GET and POST methods after query parameter parsing.
+
+- Add documentation for new KVP execution parameters and functionalities.
+- Add conformance classes for KVP execution support.
+- Update ``weaver/wps_restapi/colander_extras.py`` to allow additional parameter options (``style``, ``explode``, etc.)
+  defined by `OpenAPI`. These are employed in this context to support the representation of KVP query parameters.
+- Update ``weaver.utils.parse_kvp`` with additional ``deep_object`` capability required by KVP execution parameters.
+- Update ``swagger-ui@5.32.0`` scripts to handle rendering of advanced KVP query parameter definitions.
+- Replace generic ``PermissiveMappingSchema`` employed under I/O ``schema`` by the more explicit ``OAS`` definition.
+
+Fixes:
+------
+- Fix ``GET`` endpoints documenting a ``Content-Type`` header although no content body applies to them.
+
+.. _changes_6.9.1:
+
+`6.9.1 <https://github.com/crim-ca/weaver/tree/6.9.1>`_ (2026-03-09)
+========================================================================
+
+Changes:
+--------
+- Add ``--inputs-ignore-errors`` option to `CLI` ``execute`` operation and corresponding ``inputs_ignore_errors``
+  parameter to ``WeaverClient.execute()`` method. When enabled, missing or unresolved local file references in
+  input definitions will be skipped with warnings rather than causing immediate failure. By default (when disabled),
+  missing files cause the operation to fail with a detailed error message listing all problematic file references.
+- Improve `CLI` ``execute`` operation error handling for multiple input files. When multiple input JSON/YAML files
+  are provided via multiple ``-I`` options, the operation now fails with a clear error message explaining that only
+  a single input file is supported, rather than producing a cryptic attribute error.
+
+Fixes:
+------
+- Fix multi-token Vault authentication header parsing to support both single and multiple file access tokens.
+  The ``parse_vault_token`` function now handles plain token strings (e.g., from WPS process context) and full
+  header formats (e.g., ``token <value>; id=<uuid>``), and correctly validates token presence for the requested
+  file UUID. The mismatch detection logic was updated to properly check if the requested file ID exists in the
+  parsed tokens rather than only validating against the first token key
+  (fixes `#897 <https://github.com/crim-ca/weaver/issues/897>`_).
+
+.. _changes_6.9.0:
+
+`6.9.0 <https://github.com/crim-ca/weaver/tree/6.9.0>`_ (2026-03-02)
+========================================================================
+
+Changes:
+--------
+- Adjust the resolution order priority of `CWL` ``format`` fields based on preferred ontologies.
+  The `IANA` Media-Types will be considered first if they can be directly mapped, followed by `OGC`-based references
+  that are contextually more relevant and easier to interpret by name, and finally the `EDAM` ontology that offers
+  some additional references, but is harder to interpret due to its unified ``format_####`` naming convention.
+- Add documentation to provide better guidance about installation, configuration and example references.
+- Add ``weaver.cwl_no_match_user`` configuration setting to avoid ``--user`` parameter on Docker-based `CWL` execution.
+  This can be desirable when relying on *docker rootless mode* and/or *user namespaces* to handle the actual user/group
+  ID mapping. The parameter can also be configured using the ``WEAVER_CWL_NO_MATCH_USER`` environment variable.
+- Add ``WEAVER_CWL_EUID`` and ``WEAVER_CWL_EGID`` environment variables to control the `CWL` execution user/group ID
+  as alternative to corresponding configuration options.
+
+Fixes:
+------
+- Fix ``cwltool`` mapping of output files to staging directory of ``pywps`` when multiple nested output directories
+  contain files of matching names leading to conflicting extension errors from flat-list mapping in staging directory.
+  These conflicts are dealt with by ``cwltool`` using ``_<index>``. However, those led to side-effect errors when
+  `Weaver` attempts to enforce strict extension validation between the `CWL` definition and result ``format`` values.
+  A custom ``PathMapper`` is applied to the ``RuntimeContext`` to preserve the original structure of the `CWL` results
+  and avoid these conflicts entirely.
+- Fix `PyWPS` ``("server", "sethomedir", "false")`` configuration to avoid setting ``HOME`` directory within
+  the `Process` worker instance (``weaver.processes.wps_package.WpsPackage``), which causes *docker rootless mode*
+  to fail its docker-daemon context resolution due to the modified location.
+- Fix `CWL` ``euid``/``geid`` resolution using ``0:0`` which can be desired to let *docker rootless mode* and/or
+  *user namespaces* handle the actual user/group ID mapping themselves based on ``/etc/subuid`` and ``/etc/subgid``
+  (depends on `common-workflow-language/cwltool#2207 <https://github.com/common-workflow-language/cwltool/pull/2207>`_).
+- Fix `CWL` ``format`` resolution against multiple ontologies (`IANA`, `OGC`, `EDAM`) referring to equivalent
+  media-type definitions to ensure that resolved `Job` input references match the underlying `CWL` package execution.
+- Fix `CWL` ``format`` resolution against media-types that support alternative extensions,
+  such as ``.yaml`` and ``.yml``. These are cross-resolved against their multiple media-type combinations
+  as ``application/yaml`` (official) and legacy ``application/x-yaml``, ``text/yaml`` and ``text/x-yaml``.
+- Fix ambiguous resolution between ``application/netcdf`` and ``application/x-netcdf`` media-types and their
+  resulting ``ComplexInput``/``ComplexOutput`` validators depending on `Weaver` or ``pywps`` based mapping.
+  The official IANA ``application/netcdf`` variant will now be used by default when auto-resolved by file extension
+  to ensure consistency between the validation methods.
+- Fix `CLI` ``upload`` operation not forwarding the ``type`` media-type property extracted from an input definition.
+  This could occur either when invoking the operation directly, or directly from ``execute`` operation which
+  pre-resolved a local file path subject to the `Vault` upload feature.
+- Fix `CLI` ``execute`` operation not resolving embedded input file references relatively to a specified `Job` file.
+  If a `Job` file is provided this way, paths relative to it will be considered for behaviour alignment with `CWL`.
+  If the files references still cannot be resolved after relative `Job` path lookup, they will fall back to the ``CWD``,
+  as previously done by the `CLI`/``WeaverClient`` (fixes `#879 <https://github.com/crim-ca/weaver/issues/879>`_).
+- Fix `CLI` ``execute`` operation not forwarding ``format.mediaType`` (OLD style) and ``type`` (OGC style) information
+  correctly when parsing input values from a `CWL`-style `Job` structure with ``class`` and ``format`` definitions
+  (fixes `#884 <https://github.com/crim-ca/weaver/issues/884>`_).
+- Fix `CLI` ``execute`` operation not properly handling `CWL`-style `Job` structures with ``File`` array values.
+- Fix missing documentation of the `Vault` volume mount configuration in the *Docker Compose* example.
+- Fix missing documentation of the `CWL+YAML` deployment `Media-Type` support in the `OpenAPI` schema.
+
+.. _changes_6.8.3:
+
+`6.8.3 <https://github.com/crim-ca/weaver/tree/6.8.3>`_ (2026-02-12)
+========================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Remove duplicate ``Content-Type`` header in response of `Job` status endpoint.
+- Pin ``cryptography>=46.0.5`` for security fix.
+
+.. _changes_6.8.2:
+
+`6.8.2 <https://github.com/crim-ca/weaver/tree/6.8.2>`_ (2026-02-11)
+========================================================================
+
+Changes:
+--------
+- Support `CLI` parsing of `CWL` ``Directory`` input value if provided using ``path`` with a remote reference URL.
+  Only remote references are supported since the `Vault` feature cannot be used to upload multiple files in a directory.
+- Emit a ``WeaverConfigurationWarning`` if ``weaver.wps_output_dir`` and ``weaver.wps_output_url`` (or its value
+  resolved from ``weaver.wps_output_path``) are detected to contain unbalanced trailing slashes. If detected, these
+  erroneous values will be automatically adjusted by ``map_wps_output_location`` to avoid invalid reference mapping.
+
+Fixes:
+------
+- Remove duplicate ``Content-Type`` header in response of `Job` results leading to errors on certain clients/proxies.
+- Remove embedded ``profile="http://www.opengis.net/def/profile/OGC/0/ogc-results"`` from ``Content-Type`` header in
+  response of `Job` results to avoid header buffer overflows from server deployments. Instead, clients
+  should rely on the ``Link: rel=profile`` or ``Content-Profile`` headers to determine if this profile was applied.
+- Fix `CLI` using nesting of argument groups deprecated since Python 3.11 and removed in Python 3.14.
+- Pin ``setuptools<82`` to resolve its ``pkg_resources`` dependency still required by ``pyramid``
+  (relates to `Pylons/pyramid#3731 <https://github.com/Pylons/pyramid/issues/3731>`_
+  and `pypa/setuptools#5007 <https://github.com/pypa/setuptools/pull/5007>`_).
+
+.. _changes_6.8.1:
+
+`6.8.1 <https://github.com/crim-ca/weaver/tree/6.8.1>`_ (2026-01-09)
+====================================================================================================================
+
+Changes:
+--------
+- No change.
+
+Fixes:
+------
+- Pin ``urllib3>=2.6.3`` for security fix.
+- Pin ``werkzeug>=3.1.5`` for security fix.
+- Pin ``xmltodict>=1.0.2`` for security fix.
+
+.. _changes_6.8.0:
+
+`6.8.0 <https://github.com/crim-ca/weaver/tree/6.8.0>`_ (2025-12-18)
+====================================================================================================================
+
+Changes:
+--------
+- Update docker with Python 3.13.
+- Add Python 3.13 to CI and project setup. Python 3.14 tentatively added to CI but unsupported from by dependencies.
+- Unpin ``cwltool==3.1.20241217163858`` to provide future Python 3.14 support and adjust ranges for last Python 3.9.
+- Pin ``pywps==4.7.0``.
+- Use Mongo v7 in CI and tests.
+- Update security dependencies for ``pip``, ``pyyaml``, ``requests``, ``urllib`` and ``werkzeug``.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.7.0:
+
+`6.7.0 <https://github.com/crim-ca/weaver/tree/6.7.0>`_ (2025-12-12)
+====================================================================================================================
+
+Changes:
+--------
 - Add links and breadcrumbs including the `Process` ID within `HTML` pages of `Job` responses
   if referenced by the request.
 - Add the full URI definitions for ``Accept-Profile`` header that correspond to equivalent shorthand notation
@@ -67,7 +480,7 @@ Fixes:
 .. _changes_6.6.2:
 
 `6.6.2 <https://github.com/crim-ca/weaver/tree/6.6.2>`_ (2025-06-27)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -84,7 +497,7 @@ Fixes:
 .. _changes_6.6.1:
 
 `6.6.1 <https://github.com/crim-ca/weaver/tree/6.6.1>`_ (2025-06-24)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -114,7 +527,7 @@ Fixes:
 .. _changes_6.6.0:
 
 `6.6.0 <https://github.com/crim-ca/weaver/tree/6.6.0>`_ (2025-05-08)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -145,7 +558,7 @@ Fixes:
 .. _changes_6.5.0:
 
 `6.5.0 <https://github.com/crim-ca/weaver/tree/6.5.0>`_ (2025-05-02)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -169,7 +582,7 @@ Fixes:
 .. _changes_6.4.1:
 
 `6.4.1 <https://github.com/crim-ca/weaver/tree/6.4.1>`_ (2025-03-14)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -189,7 +602,7 @@ Fixes:
 .. _changes_6.4.0:
 
 `6.4.0 <https://github.com/crim-ca/weaver/tree/6.4.0>`_ (2025-03-04)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -211,7 +624,7 @@ Fixes:
 .. _changes_6.3.0:
 
 `6.3.0 <https://github.com/crim-ca/weaver/tree/6.3.0>`_ (2025-02-18)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -228,7 +641,7 @@ Fixes:
 .. _changes_6.2.0:
 
 `6.2.0 <https://github.com/crim-ca/weaver/tree/6.2.0>`_ (2025-02-06)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -247,7 +660,7 @@ Fixes:
 .. _changes_6.1.1:
 
 `6.1.1 <https://github.com/crim-ca/weaver/tree/6.1.1>`_ (2024-12-20)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -262,7 +675,7 @@ Fixes:
 .. _changes_6.1.0:
 
 `6.1.0 <https://github.com/crim-ca/weaver/tree/6.1.0>`_ (2024-12-18)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -298,7 +711,7 @@ Fixes:
 .. _changes_6.0.0:
 
 `6.0.0 <https://github.com/crim-ca/weaver/tree/6.0.0>`_ (2024-12-03)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -410,7 +823,7 @@ Fixes:
 .. _changes_5.9.0:
 
 `5.9.0 <https://github.com/crim-ca/weaver/tree/5.9.0>`_ (2024-09-12)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -453,7 +866,7 @@ Fixes:
 .. _changes_5.8.0:
 
 `5.8.0 <https://github.com/crim-ca/weaver/tree/5.8.0>`_ (2024-09-05)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -487,7 +900,7 @@ Fixes:
 .. _changes_5.7.0:
 
 `5.7.0 <https://github.com/crim-ca/weaver/tree/5.7.0>`_ (2024-07-16)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -523,7 +936,7 @@ Fixes:
 .. _changes_5.6.1:
 
 `5.6.1 <https://github.com/crim-ca/weaver/tree/5.6.1>`_ (2024-06-14)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -539,7 +952,7 @@ Fixes:
 .. _changes_5.6.0:
 
 `5.6.0 <https://github.com/crim-ca/weaver/tree/5.6.0>`_ (2024-06-11)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -562,7 +975,7 @@ Fixes:
 .. _changes_5.5.0:
 
 `5.5.0 <https://github.com/crim-ca/weaver/tree/5.5.0>`_ (2024-06-06)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -578,7 +991,7 @@ Fixes:
 .. _changes_5.4.2:
 
 `5.4.2 <https://github.com/crim-ca/weaver/tree/5.4.2>`_ (2024-06-05)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -595,7 +1008,7 @@ Fixes:
 .. _changes_5.4.1:
 
 `5.4.1 <https://github.com/crim-ca/weaver/tree/5.4.1>`_ (2024-06-03)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -608,7 +1021,7 @@ Fixes:
 .. _changes_5.4.0:
 
 `5.4.0 <https://github.com/crim-ca/weaver/tree/5.4.0>`_ (2024-05-27)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -657,7 +1070,7 @@ Fixes:
 .. _changes_5.3.0:
 
 `5.3.0 <https://github.com/crim-ca/weaver/tree/5.3.0>`_ (2024-05-13)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -671,7 +1084,7 @@ Fixes:
 .. _changes_5.2.0:
 
 `5.2.0 <https://github.com/crim-ca/weaver/tree/5.2.0>`_ (2024-05-08)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -699,7 +1112,7 @@ Fixes:
 .. _changes_5.1.1:
 
 `5.1.1 <https://github.com/crim-ca/weaver/tree/5.1.1>`_ (2024-03-19)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -715,7 +1128,7 @@ Fixes:
 .. _changes_5.1.0:
 
 `5.1.0 <https://github.com/crim-ca/weaver/tree/5.1.0>`_ (2024-03-19)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -732,7 +1145,7 @@ Fixes:
 .. _changes_5.0.0:
 
 `5.0.0 <https://github.com/crim-ca/weaver/tree/5.0.0>`_ (2023-12-12)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -787,7 +1200,7 @@ Fixes:
 .. _changes_4.38.0:
 
 `4.38.0 <https://github.com/crim-ca/weaver/tree/4.38.0>`_ (2023-11-24)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -805,7 +1218,7 @@ Fixes:
 .. _changes_4.37.0:
 
 `4.37.0 <https://github.com/crim-ca/weaver/tree/4.37.0>`_ (2023-11-22)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -822,7 +1235,7 @@ Fixes:
 .. _changes_4.36.0:
 
 `4.36.0 <https://github.com/crim-ca/weaver/tree/4.36.0>`_ (2023-11-06)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -837,7 +1250,7 @@ Fixes:
 .. _changes_4.35.0:
 
 `4.35.0 <https://github.com/crim-ca/weaver/tree/4.35.0>`_ (2023-11-03)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -861,7 +1274,7 @@ Fixes:
 .. _changes_4.34.0:
 
 `4.34.0 <https://github.com/crim-ca/weaver/tree/4.34.0>`_ (2023-10-16)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -907,7 +1320,7 @@ Fixes:
 .. _changes_4.33.0:
 
 `4.33.0 <https://github.com/crim-ca/weaver/tree/4.33.0>`_ (2023-10-06)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -929,7 +1342,7 @@ Fixes:
 .. _changes_4.32.0:
 
 `4.32.0 <https://github.com/crim-ca/weaver/tree/4.32.0>`_ (2023-09-25)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -971,7 +1384,7 @@ Fixes:
 .. _changes_4.31.0:
 
 `4.31.0 <https://github.com/crim-ca/weaver/tree/4.31.0>`_ (2023-09-14)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1009,7 +1422,7 @@ Fixes:
 .. _changes_4.30.1:
 
 `4.30.1 <https://github.com/crim-ca/weaver/tree/4.30.1>`_ (2023-07-07)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1029,7 +1442,7 @@ Fixes:
 .. _changes_4.30.0:
 
 `4.30.0 <https://github.com/crim-ca/weaver/tree/4.30.0>`_ (2023-03-24)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1094,7 +1507,7 @@ Fixes:
 .. _changes_4.29.0:
 
 `4.29.0 <https://github.com/crim-ca/weaver/tree/4.29.0>`_ (2023-03-07)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1127,7 +1540,7 @@ Fixes:
 .. _changes_4.28.0:
 
 `4.28.0 <https://github.com/crim-ca/weaver/tree/4.28.0>`_ (2022-12-06)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1158,7 +1571,7 @@ Fixes:
 .. _changes_4.27.0:
 
 `4.27.0 <https://github.com/crim-ca/weaver/tree/4.27.0>`_ (2022-11-22)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1191,7 +1604,7 @@ Fixes:
 .. _changes_4.26.0:
 
 `4.26.0 <https://github.com/crim-ca/weaver/tree/4.26.0>`_ (2022-10-31)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1231,7 +1644,7 @@ Fixes:
 .. _changes_4.25.0:
 
 `4.25.0 <https://github.com/crim-ca/weaver/tree/4.25.0>`_ (2022-10-05)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1246,7 +1659,7 @@ Fixes:
 .. _changes_4.24.0:
 
 `4.24.0 <https://github.com/crim-ca/weaver/tree/4.24.0>`_ (2022-09-29)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1277,7 +1690,7 @@ Fixes:
 .. _changes_4.23.0:
 
 `4.23.0 <https://github.com/crim-ca/weaver/tree/4.23.0>`_ (2022-09-12)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1299,7 +1712,7 @@ Fixes:
 .. _changes_4.22.0:
 
 `4.22.0 <https://github.com/crim-ca/weaver/tree/4.22.0>`_ (2022-08-18)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1320,7 +1733,7 @@ Fixes:
 .. _changes_4.21.0:
 
 `4.21.0 <https://github.com/crim-ca/weaver/tree/4.21.0>`_ (2022-08-15)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1353,7 +1766,7 @@ Fixes:
 .. _changes_4.20.0:
 
 `4.20.0 <https://github.com/crim-ca/weaver/tree/4.20.0>`_ (2022-07-15)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1383,7 +1796,7 @@ Fixes:
 .. _changes_4.19.0:
 
 `4.19.0 <https://github.com/crim-ca/weaver/tree/4.19.0>`_ (2022-07-05)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1421,7 +1834,7 @@ Fixes:
 .. _changes_4.18.0:
 
 `4.18.0 <https://github.com/crim-ca/weaver/tree/4.18.0>`_ (2022-06-09)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1452,7 +1865,7 @@ Fixes:
 .. _changes_4.17.0:
 
 `4.17.0 <https://github.com/crim-ca/weaver/tree/4.17.0>`_ (2022-05-30)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1472,7 +1885,7 @@ Fixes:
 .. _changes_4.16.1:
 
 `4.16.1 <https://github.com/crim-ca/weaver/tree/4.16.1>`_ (2022-05-12)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1493,7 +1906,7 @@ Fixes:
 .. _changes_4.16.0:
 
 `4.16.0 <https://github.com/crim-ca/weaver/tree/4.16.0>`_ (2022-05-11)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1533,7 +1946,7 @@ Fixes:
 .. _changes_4.15.0:
 
 `4.15.0 <https://github.com/crim-ca/weaver/tree/4.15.0>`_ (2022-04-20)
-========================================================================
+====================================================================================================================
 
 Important:
 ----------
@@ -1622,7 +2035,7 @@ Fixes:
 .. _changes_4.14.0:
 
 `4.14.0 <https://github.com/crim-ca/weaver/tree/4.14.0>`_ (2022-03-14)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1646,7 +2059,7 @@ Fixes:
 .. _changes_4.13.0:
 
 `4.13.0 <https://github.com/crim-ca/weaver/tree/4.13.0>`_ (2022-03-09)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1678,7 +2091,7 @@ Fixes:
 .. _changes_4.12.0:
 
 `4.12.0 <https://github.com/crim-ca/weaver/tree/4.12.0>`_ (2022-02-28)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1702,7 +2115,7 @@ Fixes:
 .. _changes_4.11.0:
 
 `4.11.0 <https://github.com/crim-ca/weaver/tree/4.11.0>`_ (2022-02-24)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1724,7 +2137,7 @@ Fixes:
 .. _changes_4.10.0:
 
 `4.10.0 <https://github.com/crim-ca/weaver/tree/4.10.0>`_ (2022-02-22)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1742,7 +2155,7 @@ Fixes:
 .. _changes_4.9.1:
 
 `4.9.1 <https://github.com/crim-ca/weaver/tree/4.9.1>`_ (2022-02-21)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1755,7 +2168,7 @@ Fixes:
 .. _changes_4.9.0:
 
 `4.9.0 <https://github.com/crim-ca/weaver/tree/4.9.0>`_ (2022-02-17)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1789,7 +2202,7 @@ Fixes:
 .. _changes_4.8.0:
 
 `4.8.0 <https://github.com/crim-ca/weaver/tree/4.8.0>`_ (2022-01-11)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1829,7 +2242,7 @@ Fixes:
 .. _changes_4.7.0:
 
 `4.7.0 <https://github.com/crim-ca/weaver/tree/4.7.0>`_ (2021-12-21)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1844,7 +2257,7 @@ Fixes:
 .. _changes_4.6.0:
 
 `4.6.0 <https://github.com/crim-ca/weaver/tree/4.6.0>`_ (2021-12-15)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1904,7 +2317,7 @@ Fixes:
 .. _changes_4.5.0:
 
 `4.5.0 <https://github.com/crim-ca/weaver/tree/4.5.0>`_ (2021-11-25)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1923,7 +2336,7 @@ Fixes:
 .. _changes_4.4.0:
 
 `4.4.0 <https://github.com/crim-ca/weaver/tree/4.4.0>`_ (2021-11-19)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -1960,7 +2373,7 @@ Fixes:
 .. _changes_4.3.0:
 
 `4.3.0 <https://github.com/crim-ca/weaver/tree/4.3.0>`_ (2021-11-16)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2011,7 +2424,7 @@ Fixes:
 .. _changes_4.2.1:
 
 `4.2.1 <https://github.com/crim-ca/weaver/tree/4.2.1>`_ (2021-10-20)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2031,7 +2444,7 @@ Fixes:
 .. _changes_4.2.0:
 
 `4.2.0 <https://github.com/crim-ca/weaver/tree/4.2.0>`_ (2021-10-19)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2078,7 +2491,7 @@ Fixes:
 .. _changes_4.1.2:
 
 `4.1.2 <https://github.com/crim-ca/weaver/tree/4.1.2>`_ (2021-10-13)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2092,7 +2505,7 @@ Fixes:
 .. _changes_4.1.1:
 
 `4.1.1 <https://github.com/crim-ca/weaver/tree/4.1.1>`_ (2021-10-12)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2116,7 +2529,7 @@ Fixes:
 .. _changes_4.1.0:
 
 `4.1.0 <https://github.com/crim-ca/weaver/tree/4.1.0>`_ (2021-09-29)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2158,7 +2571,7 @@ Fixes:
 .. _changes_4.0.0:
 
 `4.0.0 <https://github.com/crim-ca/weaver/tree/4.0.0>`_ (2021-09-21)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2255,7 +2668,7 @@ Fixes:
 .. _changes_3.5.0:
 
 `3.5.0 <https://github.com/crim-ca/weaver/tree/3.5.0>`_ (2021-08-19)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2274,7 +2687,7 @@ Fixes:
 .. _changes_3.4.0:
 
 `3.4.0 <https://github.com/crim-ca/weaver/tree/3.4.0>`_ (2021-08-11)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2290,7 +2703,7 @@ Fixes:
 .. _changes_3.3.0:
 
 `3.3.0 <https://github.com/crim-ca/weaver/tree/3.3.0>`_ (2021-07-16)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2310,7 +2723,7 @@ Fixes:
 .. _changes_3.2.1:
 
 `3.2.1 <https://github.com/crim-ca/weaver/tree/3.2.1>`_ (2021-06-08)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2324,7 +2737,7 @@ Fixes:
 .. _changes_3.2.0:
 
 `3.2.0 <https://github.com/crim-ca/weaver/tree/3.2.0>`_ (2021-06-08)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2354,7 +2767,7 @@ Fixes:
 .. _changes_3.1.0:
 
 `3.1.0 <https://github.com/crim-ca/weaver/tree/3.1.0>`_ (2021-04-23)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2380,7 +2793,7 @@ Fixes:
 .. _changes_3.0.0:
 
 `3.0.0 <https://github.com/crim-ca/weaver/tree/3.0.0>`_ (2021-03-16)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2437,7 +2850,7 @@ Fixes:
 .. _changes_2.2.0:
 
 `2.2.0 <https://github.com/crim-ca/weaver/tree/2.2.0>`_ (2021-03-03)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2455,7 +2868,7 @@ Fixes:
 .. _changes_2.1.0:
 
 `2.1.0 <https://github.com/crim-ca/weaver/tree/2.1.0>`_ (2021-02-26)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2482,7 +2895,7 @@ Fixes:
 .. _changes_2.0.0:
 
 `2.0.0 <https://github.com/crim-ca/weaver/tree/2.0.0>`_ (2021-02-22)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2522,7 +2935,7 @@ Fixes:
 .. _changes_1.14.0:
 
 `1.14.0 <https://github.com/crim-ca/weaver/tree/1.14.0>`_ (2021-01-11)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2541,7 +2954,7 @@ Fixes:
 .. _changes_1.13.1:
 
 `1.13.1 <https://github.com/crim-ca/weaver/tree/1.13.1>`_ (2020-07-17)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2554,7 +2967,7 @@ Fixes:
 .. _changes_1.13.0:
 
 `1.13.0 <https://github.com/crim-ca/weaver/tree/1.13.0>`_ (2020-07-15)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2576,7 +2989,7 @@ Fixes:
 .. _changes_1.12.0:
 
 `1.12.0 <https://github.com/crim-ca/weaver/tree/1.12.0>`_ (2020-07-03)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2593,7 +3006,7 @@ Fixes:
 .. _changes_1.11.0:
 
 `1.11.0 <https://github.com/crim-ca/weaver/tree/1.11.0>`_ (2020-07-02)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2614,7 +3027,7 @@ Fixes:
 .. _changes_1.10.1:
 
 `1.10.1 <https://github.com/crim-ca/weaver/tree/1.10.1>`_ (2020-06-03)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2627,7 +3040,7 @@ Fixes:
 .. _changes_1.10.0:
 
 `1.10.0 <https://github.com/crim-ca/weaver/tree/1.10.0>`_ (2020-06-03)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2641,7 +3054,7 @@ Fixes:
 .. _changes_1.9.0:
 
 `1.9.0 <https://github.com/crim-ca/weaver/tree/1.9.0>`_ (2020-06-01)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2680,7 +3093,7 @@ Fixes:
 .. _changes_1.8.1:
 
 `1.8.1 <https://github.com/crim-ca/weaver/tree/1.8.1>`_ (2020-05-22)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2704,7 +3117,7 @@ Fixes:
 .. _changes_1.8.0:
 
 `1.8.0 <https://github.com/crim-ca/weaver/tree/1.8.0>`_ (2020-05-21)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2737,7 +3150,7 @@ Fixes:
 .. _changes_1.7.0:
 
 `1.7.0 <https://github.com/crim-ca/weaver/tree/1.7.0>`_ (2020-05-15)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2764,7 +3177,7 @@ Fixes:
 .. _changes_1.6.0:
 
 `1.6.0 <https://github.com/crim-ca/weaver/tree/1.6.0>`_ (2020-05-07)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2797,7 +3210,7 @@ Fixes:
 .. _changes_1.5.1:
 
 `1.5.1 <https://github.com/crim-ca/weaver/tree/1.5.1>`_ (2020-03-26)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2813,7 +3226,7 @@ Fixes:
 .. _changes_1.5.0:
 
 `1.5.0 <https://github.com/crim-ca/weaver/tree/1.5.0>`_ (2020-03-25)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2839,7 +3252,7 @@ Fixes:
 .. _changes_1.4.0:
 
 `1.4.0 <https://github.com/crim-ca/weaver/tree/1.4.0>`_ (2020-03-18)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2850,7 +3263,7 @@ Changes:
 .. _changes_1.3.0:
 
 `1.3.0 <https://github.com/crim-ca/weaver/tree/1.3.0>`_ (2020-03-10)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2861,7 +3274,7 @@ Changes:
 .. _changes_1.2.0:
 
 `1.2.0 <https://github.com/crim-ca/weaver/tree/1.2.0>`_ (2020-03-06)
-========================================================================
+====================================================================================================================
 
 Changes:
 --------
@@ -2876,7 +3289,7 @@ Fixes:
 .. _changes_1.1.0:
 
 `1.1.0 <https://github.com/crim-ca/weaver/tree/1.1.0>`_ (2020-02-17)
-========================================================================
+====================================================================================================================
 
 Changes:
 -------------
@@ -2904,7 +3317,7 @@ Fixes:
 .. _changes_1.0.0:
 
 `1.0.0 <https://github.com/crim-ca/weaver/tree/1.0.0>`_ (2020-01-28)
-========================================================================
+====================================================================================================================
 
 New Features:
 -------------
@@ -2974,21 +3387,21 @@ Fixes:
 .. _changes_0.2.2:
 
 `0.2.2 <https://github.com/crim-ca/weaver/tree/0.2.2>`_ (2019-05-31)
-========================================================================
+====================================================================================================================
 
 - Support notification email subject template.
 
 .. _changes_0.2.1:
 
 `0.2.1 <https://github.com/crim-ca/weaver/tree/0.2.1>`_ (2019-05-29)
-========================================================================
+====================================================================================================================
 
 - Add per-process email notification template.
 
 .. _changes_0.2.0:
 
 `0.2.0 <https://github.com/crim-ca/weaver/tree/0.2.0>`_ (2019-03-26)
-========================================================================
+====================================================================================================================
 
 - Fixes to handle invalid key characters ``"$"`` and ``"."`` during `CWL` package read/write operations to database.
 - Fixes some invalid `CWL` package generation from `WPS-1` references.
@@ -3002,7 +3415,7 @@ Fixes:
 .. _changes_0.1.3:
 
 `0.1.3 <https://github.com/crim-ca/weaver/tree/0.1.3>`_ (2019-03-07)
-=============================================================================
+====================================================================================================================
 
 - Add useful `Makefile` targets for deployment.
 - Add badges indications in ``README.rst`` for tracking from repo landing page.
@@ -3015,7 +3428,7 @@ Fixes:
 .. _changes_0.1.2:
 
 `0.1.2 <https://github.com/crim-ca/weaver/tree/0.1.2>`_ (2019-03-05)
-=============================================================================
+====================================================================================================================
 
 - Introduce ``WPS1Requirement`` and corresponding ``Wps1Process`` to run a `WPS-1` process under `CWL`.
 - Remove `mongodb` requirement, assume it is running on an external service or docker image.
@@ -3026,7 +3439,7 @@ Fixes:
 .. _changes_0.1.1:
 
 `0.1.1 <https://github.com/crim-ca/weaver/tree/0.1.1>`_ (2019-03-04)
-=============================================================================
+====================================================================================================================
 
 - Modify `Dockerfile` to use lighter ``debian:latest`` instead of ``birdhouse/bird-base:latest``.
 - Modify `Dockerfile` to reduce build time by reusing built image layers (requirements installation mostly).
@@ -3036,7 +3449,7 @@ Fixes:
 .. _changes_0.1.0:
 
 `0.1.0 <https://github.com/crim-ca/weaver/tree/0.1.0>`_ (2019-02-26)
-=============================================================================
+====================================================================================================================
 
 - Initial Release. Based off `Twitcher`_ tag `ogc-0.4.7`.
 

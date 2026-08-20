@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import datetime
+import json
 import logging
 import os
 import shutil
@@ -14,7 +15,7 @@ import mock
 import pytest
 from dateutil import parser as date_parser
 from parameterized import parameterized
-from pyramid.httpexceptions import HTTPBadRequest
+from pyramid.httpexceptions import HTTPBadRequest, HTTPCreated, HTTPInternalServerError
 
 from tests.functional.utils import JobUtils
 from tests.resources import load_example
@@ -44,14 +45,15 @@ from weaver.execute import (
 )
 from weaver.formats import ContentType, OutputFormat
 from weaver.notify import decrypt_email
-from weaver.processes.constants import JobStatusProfileSchema, JobStatusType
+from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema, JobStatusType
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import explode_headers, get_path_kvp, now
+from weaver.utils import compute_file_digest_multibase, explode_headers, get_path_kvp, now
 from weaver.visibility import Visibility
 from weaver.warning import TimeZoneInfoAlreadySetWarning
+from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.utils import get_job_results_document, get_job_status_schema
+from weaver.wps_restapi.jobs.utils import get_job_results_document, get_job_status_schema, get_results
 from weaver.wps_restapi.swagger_definitions import (
     DATETIME_INTERVAL_CLOSED_SYMBOL,
     DATETIME_INTERVAL_OPEN_END_SYMBOL,
@@ -66,6 +68,7 @@ if TYPE_CHECKING:
     from weaver.visibility import AnyVisibility
 
 
+@pytest.mark.job
 class WpsRestApiJobsTest(JobUtils):
     settings = {}
     config = None
@@ -465,7 +468,7 @@ class WpsRestApiJobsTest(JobUtils):
         base_url = self.settings["weaver.url"]
         jobs_url = base_url + sd.jobs_service.path
         limit = 2  # expect 11 jobs to be visible, making 6 pages of 2 each (except last that is 1)
-        last = 5   # zero-based index of last page
+        last = 5  # zero-based index of last page
         last_page = f"page={last}"
         prev_last_page = f"page={last - 1}"
         limit_kvp = f"limit={limit}"
@@ -578,12 +581,12 @@ class WpsRestApiJobsTest(JobUtils):
         assert "links" in resp.json
         profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
         assert len(profile) == 1
-        assert profile[0] == sd.OGC_API_PROC_PROFILE_JOB_LIST_URL
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_JOB_LIST_URI
 
         headers = explode_headers(resp.headers)
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
-        assert sd.OGC_API_PROC_PROFILE_JOB_LIST_URL in profile[0]
+        assert sd.OGC_API_PROC_PROFILE_JOB_LIST_URI in profile[0]
 
     @pytest.mark.oap_part1
     def test_get_jobs_page_out_of_range(self):
@@ -928,7 +931,7 @@ class WpsRestApiJobsTest(JobUtils):
                             service=self.service_public.name,
                             process=self.process_private.identifier)
         with contextlib.ExitStack() as stack:
-            for patch in mocked_remote_wps([]):    # process invisible (not returned by remote)
+            for patch in mocked_remote_wps([]):  # process invisible (not returned by remote)
                 stack.enter_context(patch)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 404
@@ -1398,12 +1401,12 @@ class WpsRestApiJobsTest(JobUtils):
         assert "links" in resp.json
         profile = [link["href"] for link in resp.json["links"] if link["rel"] == "profile"]
         assert len(profile) == 1
-        assert profile[0] == sd.OGC_API_PROC_PROFILE_JOB_DESC_URL
+        assert profile[0] == sd.OGC_API_PROC_PROFILE_JOB_DESC_URI
 
         headers = explode_headers(resp.headers)
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
-        assert sd.OGC_API_PROC_PROFILE_JOB_DESC_URL in profile[0]
+        assert sd.OGC_API_PROC_PROFILE_JOB_DESC_URI in profile[0]
 
     @pytest.mark.oap_part1
     def test_get_job_invalid_uuid(self):
@@ -1416,7 +1419,7 @@ class WpsRestApiJobsTest(JobUtils):
         """
         # to make sure UUID is applied, use the "same format" (8-4-4-4-12), but with invalid definitions
         base_path = sd.job_service.path.format(job_id="thisisnt-some-real-uuid-allerrordata")
-        for sub_path in ["", "/inputs", "/outputs", "/results", "/logs", "exceptions"]:
+        for sub_path in ["", "/inputs", "/outputs", "/results", "/logs", "/exceptions"]:
             path = f"{base_path}{sub_path}"
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
@@ -1547,7 +1550,7 @@ class WpsRestApiJobsTest(JobUtils):
             assert resp.json["status"] == Status.DISMISSED, "Job status should have been updated to dismissed."
 
     @parameterized.expand([
-        sd.OGC_API_PROC_PROFILE_JOB_DESC_URL,  # not valid for sync, must be job results
+        sd.OGC_API_PROC_PROFILE_JOB_DESC_URI,  # not valid for sync, must be job results
         "https://example.com/profile/unknown",
     ])
     @pytest.mark.oap_part1
@@ -1565,11 +1568,11 @@ class WpsRestApiJobsTest(JobUtils):
             resp = mocked_sub_requests(self.app, "post_json", path, data=body, headers=headers, only_local=True)
             assert resp.status_code == 406, resp.text
             assert resp.content_type == ContentType.APP_JSON
-            assert sd.OGC_API_PROC_PROFILE_RESULTS_URL in resp.json["cause"]["schema"]["enum"]
+            assert sd.OGC_API_PROC_PROFILE_RESULTS_URI in resp.json["cause"]["schema"]["enum"]
             assert resp.json["cause"]["name"] == "Accept-Profile"
 
     @parameterized.expand([
-        sd.OGC_API_PROC_PROFILE_RESULTS_URL,  # not valid for async, must be job status
+        sd.OGC_API_PROC_PROFILE_RESULTS_URI,  # not valid for async, must be job status
         "https://example.com/profile/unknown",
     ])
     @pytest.mark.oap_part1
@@ -1587,7 +1590,7 @@ class WpsRestApiJobsTest(JobUtils):
             resp = mocked_sub_requests(self.app, "post_json", path, data=body, headers=headers, only_local=True)
             assert resp.status_code == 406, resp.text
             assert resp.content_type == ContentType.APP_JSON
-            assert sd.OGC_API_PROC_PROFILE_JOB_DESC_URL in resp.json["cause"]["schema"]["enum"]
+            assert sd.OGC_API_PROC_PROFILE_JOB_DESC_URI in resp.json["cause"]["schema"]["enum"]
             assert resp.json["cause"]["name"] == "Accept-Profile"
 
     @pytest.mark.oap_part4
@@ -1607,9 +1610,7 @@ class WpsRestApiJobsTest(JobUtils):
             assert resp.content_type == ContentType.APP_JSON
             assert resp.json["cause"]["schema"] == {"const": sd.Execute._schema}
             assert resp.json["cause"]["name"] == "Content-Schema"
-            assert resp.json["type"] == (
-                "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-schema"
-            )
+            assert resp.json["type"] == sd.OGC_API_PROC_PART4_EXC_UNSUPPORTED_SCHEMA_URI
 
     def test_job_results_errors(self):
         """
@@ -1826,7 +1827,7 @@ class WpsRestApiJobsTest(JobUtils):
 
         resp = self.app.get(path, params={"f": "xml"})
         assert resp.status_code == 200
-        assert ContentType.APP_XML in resp.content_type
+        assert ContentType.APP_XML in resp.content_type or ContentType.TEXT_XML in resp.content_type
         assert isinstance(resp.text, str)
         assert resp.text.startswith("<?xml")
         assert "<logs>" in resp.text
@@ -1898,7 +1899,7 @@ class WpsRestApiJobsTest(JobUtils):
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
             status=Status.RUNNING, progress=50, access=Visibility.PRIVATE, context="test/context",
             inputs={"test": "data"}, outputs={"test": {"transmissionMode": ExecuteTransmissionMode.VALUE}},
-            accept_profile=sd.OGC_API_PROC_PROFILE_RESULTS_URL,
+            accept_profile=sd.OGC_API_PROC_PROFILE_RESULTS_URI,
         )
 
         path = f"/jobs/{new_job.id}/inputs"
@@ -1909,7 +1910,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.json["headers"] == {
             "Accept": None,
             "Accept-Language": None,
-            "Accept-Profile": sd.OGC_API_PROC_PROFILE_RESULTS_URL,
+            "Accept-Profile": sd.OGC_API_PROC_PROFILE_RESULTS_URI,
             "Content-Type": None,
             "Prefer": f"return={ExecuteReturnPreference.MINIMAL}",
             "X-WPS-Output-Context": "test/context",
@@ -1932,6 +1933,577 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 200
         assert resp.json["outputs"] == {"test": {"value": "data"}}
 
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_success(self):
+        """
+        Test successful retrieval of indexed values from job result arrays.
+        """
+        # Create job with array results
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[
+                {"id": "array_output", "value": ["first", "second", "third"]},
+                {"id": "single_output", "value": "not_an_array"},
+            ],
+        )
+
+        # Test retrieving first element (index 0)
+        path = f"/jobs/{new_job.id}/results/array_output/0"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.text == "first"
+
+        # Test retrieving second element (index 1)
+        path = f"/jobs/{new_job.id}/results/array_output/1"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.text == "second"
+
+        # Test retrieving third element (index 2)
+        path = f"/jobs/{new_job.id}/results/array_output/2"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.text == "third"
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_invalid_index(self):
+        """
+        Test error when index parameter is not a valid integer.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[{"id": "output", "value": ["a", "b", "c"]}],
+        )
+
+        # Test with non-integer index
+        path = f"/jobs/{new_job.id}/results/output/abc"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["title"] == "Job Output Invalid Index"
+        assert "valid integer" in resp.json["detail"]
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_negative_index(self):
+        """
+        Test error when index is negative.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[{"id": "output", "value": ["a", "b", "c"]}],
+        )
+
+        # Test with negative index
+        path = f"/jobs/{new_job.id}/results/output/-1"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["title"] == "Job Output Invalid Index"
+        assert "non-negative" in resp.json["detail"]
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_out_of_range(self):
+        """
+        Test error when index is out of range for the output array.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[{"id": "output", "value": ["a", "b", "c"]}],  # length 3, valid indices 0-2
+        )
+
+        # Test with index beyond array length
+        path = f"/jobs/{new_job.id}/results/output/5"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["title"] == "Job Output Index Out of Range"
+        assert "out of range" in resp.json["detail"]
+        assert resp.json["cause"]["index"] == 5
+        assert resp.json["cause"]["length"] == 3
+
+        # Test with index exactly at array length (should fail)
+        path = f"/jobs/{new_job.id}/results/output/3"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["title"] == "Job Output Index Out of Range"
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_output_not_found(self):
+        """
+        Test error when requested output ID doesn't exist.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[{"id": "existing_output", "value": ["a", "b"]}],
+        )
+
+        # Test with non-existent output ID
+        path = f"/jobs/{new_job.id}/results/nonexistent_output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 404
+        assert resp.json["title"] == "Job Output Not Found"
+        assert "not found" in resp.json["detail"]
+        assert "nonexistent_output" in resp.json["detail"]
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_output_not_array(self):
+        """
+        Test error when trying to index into a non-array output.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[
+                {"id": "string_output", "value": "just a string"},
+                {"id": "number_output", "value": 42},
+                {"id": "object_output", "value": {"key": "value"}},
+            ],
+        )
+
+        # Test with string output
+        path = f"/jobs/{new_job.id}/results/string_output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+        assert resp.json["title"] == "Job Output Not Array"
+        assert "not an array" in resp.json["detail"]
+        assert resp.json["cause"]["type"] == "str"
+
+        # Test with number output
+        path = f"/jobs/{new_job.id}/results/number_output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+        assert resp.json["title"] == "Job Output Not Array"
+        assert resp.json["cause"]["type"] == "int"
+
+        # Test with object output
+        path = f"/jobs/{new_job.id}/results/object_output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+        assert resp.json["title"] == "Job Output Not Array"
+        assert resp.json["cause"]["type"] == "dict"
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_job_not_successful(self):
+        """
+        Test error when job is not in successful status.
+        """
+        # Test with accepted job
+        job_accepted = self.make_job(
+            task_id=f"{self.fully_qualified_test_name()}_accepted",
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.ACCEPTED,
+            progress=0,
+            access=Visibility.PUBLIC,
+        )
+
+        path = f"/jobs/{job_accepted.id}/results/output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 404
+        assert resp.json["title"] == "JobResultsNotReady"
+
+        # Test with running job
+        job_running = self.make_job(
+            task_id=f"{self.fully_qualified_test_name()}_running",
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.RUNNING,
+            progress=50,
+            access=Visibility.PUBLIC,
+        )
+
+        path = f"/jobs/{job_running.id}/results/output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 404
+        assert resp.json["title"] == "JobResultsNotReady"
+
+        # Test with failed job
+        job_failed = self.make_job(
+            task_id=f"{self.fully_qualified_test_name()}_failed",
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.FAILED,
+            progress=50,
+            access=Visibility.PUBLIC,
+        )
+
+        path = f"/jobs/{job_failed.id}/results/output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["title"] == "JobResultsFailed"
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_job_dismissed(self):
+        """
+        Test error when job has been dismissed.
+        """
+        job_dismissed = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.DISMISSED,
+            progress=0,
+            access=Visibility.PUBLIC,
+        )
+
+        path = f"/jobs/{job_dismissed.id}/results/output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 410
+        assert resp.json["title"] == "JobDismissed"
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_complex_values(self):
+        """
+        Test retrieval of complex values (objects, nested arrays) from indexed arrays.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[
+                {
+                    "id": "complex_array",
+                    "value": [
+                        {"name": "first", "value": 1},
+                        {"name": "second", "value": 2},
+                        ["nested", "array"],
+                    ]
+                },
+            ],
+        )
+
+        # Test retrieving object from array
+        path = f"/jobs/{new_job.id}/results/complex_array/0"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json == {"name": "first", "value": 1}
+
+        # Test retrieving another object
+        path = f"/jobs/{new_job.id}/results/complex_array/1"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json == {"name": "second", "value": 2}
+
+        # Test retrieving nested array
+        path = f"/jobs/{new_job.id}/results/complex_array/2"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json == ["nested", "array"]
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_process_scoped(self):
+        """
+        Test indexed result access through process-scoped endpoint.
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[{"id": "output", "value": ["a", "b", "c"]}],
+        )
+
+        # Test process-scoped endpoint
+        path = f"/processes/{self.process_public.identifier}/jobs/{new_job.id}/results/output/1"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.text == "b"
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_with_file_references(self):
+        """
+        Test indexed result access with file references (href) in an array.
+        """
+        wps_out_dir = self.settings.get("weaver.wps_output_dir")
+        os.makedirs(wps_out_dir, exist_ok=True)
+
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[
+                {
+                    "id": "file_array",
+                    "type": ContentType.APP_RAW_JSON,
+                    "value": [
+                        {"href": f"{wps_out_dir}/file1.txt", "type": ContentType.TEXT_PLAIN},
+                        {"href": f"{wps_out_dir}/file2.json", "type": ContentType.APP_JSON},
+                    ]
+                },
+            ],
+            outputs={
+                "file_array": {"transmissionMode": ExecuteTransmissionMode.VALUE}
+            }
+        )
+
+        job_out_dir = os.path.join(wps_out_dir, str(new_job.id))
+        os.makedirs(job_out_dir, exist_ok=True)
+
+        file1_path = os.path.join(job_out_dir, "file1.json")
+        with open(file1_path, "w", encoding="utf-8") as f:
+            f.write('{"text": "Hello from file1"}')
+
+        file2_path = os.path.join(job_out_dir, "file2.json")
+        with open(file2_path, "w", encoding="utf-8") as f:
+            f.write('{"message": "Hello from file2"}')
+
+        # Update results with correct paths relative to WPS output
+        wps_out_url = get_wps_output_url(self.settings)
+        new_job.results = [
+            {
+                "id": "file_array",
+                "type": ContentType.APP_RAW_JSON,
+                "value": [
+                    {"href": f"{wps_out_url}/{new_job.id}/file1.json", "type": ContentType.APP_JSON},
+                    {"href": f"{wps_out_url}/{new_job.id}/file2.json", "type": ContentType.APP_JSON},
+                ]
+            },
+        ]
+        self.job_store.update_job(new_job)
+
+        # Test retrieving first file reference with JSON Accept header
+        path = f"/jobs/{new_job.id}/results/file_array/0"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        # When requesting with application/json, returns the file content as JSON
+        assert resp.json == {"text": "Hello from file1"}
+
+        # Test retrieving second file reference with JSON Accept header
+        path = f"/jobs/{new_job.id}/results/file_array/1"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        # JSON file content should be parsed
+        assert resp.json == {"message": "Hello from file2"}
+
+        # Test format conversion: request YAML from JSON file
+        # This tests that the Transform handler is invoked with the Accept header
+        path = f"/jobs/{new_job.id}/results/file_array/1"
+        resp = self.app.get(path, headers={"Accept": ContentType.APP_YAML}, expect_errors=True)
+        # Transform should convert JSON to YAML
+        assert resp.status_code == 200
+        assert ContentType.APP_YAML in resp.content_type
+        assert isinstance(resp.text, str)
+
+        shutil.rmtree(job_out_dir, ignore_errors=True)
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_format_negotiation_accept_header(self):
+        """
+        Test that Accept header is properly used for format negotiation with indexed results.
+        """
+        # Create job with array of file references
+        wps_out_dir = self.settings.get("weaver.wps_output_dir")
+        os.makedirs(wps_out_dir, exist_ok=True)
+
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[],
+            outputs={
+                "json_array": {"transmissionMode": ExecuteTransmissionMode.VALUE}
+            }
+        )
+
+        job_out_dir = os.path.join(wps_out_dir, str(new_job.id))
+        os.makedirs(job_out_dir, exist_ok=True)
+
+        json_file = os.path.join(job_out_dir, "data.json")
+        with open(json_file, "w", encoding="utf-8") as f:
+            f.write('{"status": "success", "value": 42}')
+
+        # Update job results with file reference array using proper WPS output URL
+        wps_out_url = get_wps_output_url(self.settings)
+        new_job.results = [
+            {
+                "id": "json_array",
+                "value": [
+                    {"href": f"{wps_out_url}/{new_job.id}/data.json", "type": ContentType.APP_JSON},
+                    {"href": f"{wps_out_url}/{new_job.id}/data.json", "type": ContentType.APP_JSON},
+                ]
+            },
+        ]
+        self.job_store.update_job(new_job)
+
+        # Test with Accept: application/json - returns the file content as JSON
+        path = f"/jobs/{new_job.id}/results/json_array/0"
+        resp = self.app.get(path, headers={"Accept": ContentType.APP_JSON})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        # The indexed endpoint returns the file content as JSON
+        assert resp.json == {"status": "success", "value": 42}
+
+        shutil.rmtree(job_out_dir, ignore_errors=True)
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_mixed_value_and_reference(self):
+        """
+        Test indexed array containing both literal values and file references.
+        """
+        wps_out_dir = self.settings.get("weaver.wps_output_dir")
+        os.makedirs(wps_out_dir, exist_ok=True)
+
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[],
+            outputs={
+                "mixed_array": {"transmissionMode": ExecuteTransmissionMode.VALUE}
+            }
+        )
+
+        # Create files for references
+        job_out_dir = os.path.join(wps_out_dir, str(new_job.id))
+        os.makedirs(job_out_dir, exist_ok=True)
+
+        # Create a JSON file instead of text file for proper JSON response
+        json_file = os.path.join(job_out_dir, "data.json")
+        with open(json_file, "w", encoding="utf-8") as f:
+            f.write('{"file": "reference"}')
+
+        # Array with mixed literal values and file references
+        wps_out_url = get_wps_output_url(self.settings)
+        new_job.results = [
+            {
+                "id": "mixed_array",
+                "value": [
+                    "literal_string",
+                    {"href": f"{wps_out_url}/{new_job.id}/data.json", "type": ContentType.APP_JSON},
+                    123,
+                    {"name": "object", "value": "data"},
+                ]
+            },
+        ]
+        self.job_store.update_job(new_job)
+
+        # Test literal value (index 0)
+        path = f"/jobs/{new_job.id}/results/mixed_array/0"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.text == "literal_string"
+
+        # Test file reference (index 1) - returns the file content as JSON
+        path = f"/jobs/{new_job.id}/results/mixed_array/1"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_JSON
+        # The indexed endpoint returns the file content as JSON when transmissionMode is VALUE
+        assert resp.json == {"file": "reference"}
+
+        # Test numeric literal (index 2)
+        path = f"/jobs/{new_job.id}/results/mixed_array/2"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.text == "123"
+
+        # Test object literal (index 3)
+        path = f"/jobs/{new_job.id}/results/mixed_array/3"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json == {"name": "object", "value": "data"}
+
+        shutil.rmtree(job_out_dir, ignore_errors=True)
+
+    @pytest.mark.job
+    @pytest.mark.oap_part1
+    def test_job_result_index_json_array_as_single_value(self):
+        """
+        Test behavior when a JSON object contains nested data that looks like output structures.
+
+        This tests the edge case where the JSON output's data happens to have nested structures
+        with fields named 'value' or 'href', but these are just plain JSON data fields, not the
+        special output schema fields.
+
+        .. note::
+            The implementation currently allows indexing into any list value,
+            regardless of whether it represents multiple outputs or a single JSON value containing an array.
+            Ideally, only arrays with ContentType.APP_RAW_JSON type should allow indexing.
+            See: https://pavics-weaver.readthedocs.io/en/latest/processes.html#multiple-outputs
+        """
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(),
+            process=self.process_public.identifier,
+            service=None,
+            status=Status.SUCCESSFUL,
+            progress=100,
+            access=Visibility.PUBLIC,
+            results=[
+                {
+                    "id": "json_output",
+                    # The outer "value" is the output schema field (indicates this is by-value, not by-reference)
+                    # The inner fields "value" and "href" are just plain JSON data fields
+                    "value": {
+                        "value": 123,
+                        "href": "https://example.com/data1"
+                    },
+                    "mimeType": ContentType.APP_JSON,
+                },
+            ],
+        )
+
+        path = f"/jobs/{new_job.id}/results/json_output/0"
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 422
+        assert resp.json["title"] == "Job Output Not Array"
+        assert "not an array" in resp.json["detail"]
+        assert resp.json["cause"]["type"] == "dict"
+
     @parameterized.expand([Status.ACCEPTED, Status.RUNNING, Status.FAILED, Status.SUCCESSFUL])
     @pytest.mark.oap_part4
     def test_job_update_locked(self, status):
@@ -1944,7 +2516,7 @@ class WpsRestApiJobsTest(JobUtils):
         body = {"inputs": {"test": 400}}
         resp = self.app.patch_json(path, params=body, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 423
-        assert resp.json["type"] == "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/locked"
+        assert resp.json["type"] == sd.OGC_API_PROC_PART4_EXC_LOCKED_URI
 
     @pytest.mark.oap_part4
     def test_job_update_unsupported_media_type(self):
@@ -1956,9 +2528,7 @@ class WpsRestApiJobsTest(JobUtils):
         resp = self.app.patch(path, params="data", expect_errors=True)
         assert resp.status_code == 415
         assert resp.content_type == ContentType.APP_JSON
-        assert resp.json["type"] == (
-            "http://www.opengis.net/def/exceptions/ogcapi-processes-4/1.0/unsupported-media-type"
-        )
+        assert resp.json["type"] == sd.OGC_API_PROC_PART4_EXC_UNSUPPORTED_MEDIA_TYPE_URI
 
     @pytest.mark.oap_part4
     def test_job_update_response_contents(self):
@@ -2198,8 +2768,8 @@ class WpsRestApiJobsTest(JobUtils):
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.SUCCESSFUL,
             ),
@@ -2209,8 +2779,8 @@ class WpsRestApiJobsTest(JobUtils):
                 2,
                 Status.FAILED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.FAILED,
             ),
@@ -2220,8 +2790,8 @@ class WpsRestApiJobsTest(JobUtils):
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.RUNNING,
             ),
@@ -2231,8 +2801,8 @@ class WpsRestApiJobsTest(JobUtils):
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.ACCEPTED,
             ),
@@ -2243,8 +2813,8 @@ class WpsRestApiJobsTest(JobUtils):
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.SUCCESSFUL,
             ),
@@ -2254,8 +2824,8 @@ class WpsRestApiJobsTest(JobUtils):
                 2,
                 Status.FAILED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.FAILED,
             ),
@@ -2265,8 +2835,8 @@ class WpsRestApiJobsTest(JobUtils):
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.RUNNING,
             ),
@@ -2276,8 +2846,8 @@ class WpsRestApiJobsTest(JobUtils):
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.ACCEPTED,
             ),
@@ -2288,8 +2858,8 @@ class WpsRestApiJobsTest(JobUtils):
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.SUCCESSFUL,
             ),
@@ -2299,8 +2869,8 @@ class WpsRestApiJobsTest(JobUtils):
                 2,
                 Status.FAILED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.FAILED,
             ),
@@ -2310,8 +2880,8 @@ class WpsRestApiJobsTest(JobUtils):
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.RUNNING,
             ),
@@ -2321,8 +2891,8 @@ class WpsRestApiJobsTest(JobUtils):
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.ACCEPTED,
             ),
@@ -2333,8 +2903,8 @@ class WpsRestApiJobsTest(JobUtils):
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.SUCCESSFUL,
             ),
@@ -2344,8 +2914,8 @@ class WpsRestApiJobsTest(JobUtils):
                 2,
                 Status.FAILED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.FAILED,
             ),
@@ -2355,8 +2925,8 @@ class WpsRestApiJobsTest(JobUtils):
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.RUNNING,
             ),
@@ -2366,98 +2936,98 @@ class WpsRestApiJobsTest(JobUtils):
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.ACCEPTED,
             ),
             # using '?profile=...' with fully defined Profile URI explicitly
             (
-                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "f": OutputFormat.JSON},
+                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "f": OutputFormat.JSON},
                 {},
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.SUCCESSFUL,
             ),
             (
-                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "f": OutputFormat.JSON},
+                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "f": OutputFormat.JSON},
                 {},
                 2,
                 Status.FAILED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.FAILED,
             ),
             (
-                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "f": OutputFormat.JSON},
+                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "f": OutputFormat.JSON},
                 {},
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.RUNNING,
             ),
             (
-                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "f": OutputFormat.JSON},
+                {"profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "f": OutputFormat.JSON},
                 {},
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.ACCEPTED,
             ),
             # using 'Accept-Profile' header with fully defined Profile URI explicitly
             (
                 {},
-                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "Accept": ContentType.APP_JSON},
+                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "Accept": ContentType.APP_JSON},
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.SUCCESSFUL,
             ),
             (
                 {},
-                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "Accept": ContentType.APP_JSON},
+                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "Accept": ContentType.APP_JSON},
                 2,
                 Status.FAILED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.FAILED,
             ),
             (
                 {},
-                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "Accept": ContentType.APP_JSON},
+                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "Accept": ContentType.APP_JSON},
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.RUNNING,
             ),
             (
                 {},
-                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URL, "Accept": ContentType.APP_JSON},
+                {"Accept-Profile": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "Accept": ContentType.APP_JSON},
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.ACCEPTED,
             ),
@@ -2468,8 +3038,8 @@ class WpsRestApiJobsTest(JobUtils):
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.SUCCESSFUL,
             ),
@@ -2479,8 +3049,8 @@ class WpsRestApiJobsTest(JobUtils):
                 2,
                 Status.FAILED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROCESS,
                 Status.FAILED,
             ),
@@ -2490,8 +3060,8 @@ class WpsRestApiJobsTest(JobUtils):
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.RUNNING,
             ),
@@ -2501,8 +3071,8 @@ class WpsRestApiJobsTest(JobUtils):
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OGC}",
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
-                sd.OGC_API_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
+                sd.OGC_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.PROVIDER,
                 Status.ACCEPTED,
             ),
@@ -2513,8 +3083,8 @@ class WpsRestApiJobsTest(JobUtils):
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.OPENEO,
                 Status.FINISHED,
             ),
@@ -2524,8 +3094,8 @@ class WpsRestApiJobsTest(JobUtils):
                 1,
                 Status.FAILED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.OPENEO,
                 Status.ERROR,
             ),
@@ -2535,8 +3105,8 @@ class WpsRestApiJobsTest(JobUtils):
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.OPENEO,
                 Status.RUNNING,
             ),
@@ -2546,8 +3116,8 @@ class WpsRestApiJobsTest(JobUtils):
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.OPENEO,
                 Status.QUEUED,
             ),
@@ -2558,8 +3128,8 @@ class WpsRestApiJobsTest(JobUtils):
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.OPENEO,
                 Status.FINISHED,
             ),
@@ -2569,8 +3139,8 @@ class WpsRestApiJobsTest(JobUtils):
                 1,
                 Status.FAILED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.OPENEO,
                 Status.ERROR,
             ),
@@ -2580,8 +3150,8 @@ class WpsRestApiJobsTest(JobUtils):
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.OPENEO,
                 Status.RUNNING,
             ),
@@ -2591,8 +3161,8 @@ class WpsRestApiJobsTest(JobUtils):
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.OPENEO,
                 Status.QUEUED,
             ),
@@ -2603,8 +3173,8 @@ class WpsRestApiJobsTest(JobUtils):
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.OPENEO,
                 Status.FINISHED,
             ),
@@ -2614,8 +3184,8 @@ class WpsRestApiJobsTest(JobUtils):
                 1,
                 Status.FAILED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.OPENEO,
                 Status.ERROR,
             ),
@@ -2625,8 +3195,8 @@ class WpsRestApiJobsTest(JobUtils):
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.OPENEO,
                 Status.RUNNING,
             ),
@@ -2636,8 +3206,8 @@ class WpsRestApiJobsTest(JobUtils):
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_JSON}; profile={JobStatusProfileSchema.OPENEO}",
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
-                sd.OPENEO_API_SCHEMA_JOB_STATUS_URL,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
+                sd.OPENEO_API_SCHEMA_JOB_STATUS_URI,
                 JobStatusType.OPENEO,
                 Status.QUEUED,
             ),
@@ -2787,7 +3357,7 @@ class WpsRestApiJobsTest(JobUtils):
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
-                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,  # schema provided in header
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,  # schema provided in header
                 None,  # however, not returned in "type" property since not JSON
                 JobStatusType.WPS,
                 Status.SUCCEEDED,
@@ -2798,7 +3368,7 @@ class WpsRestApiJobsTest(JobUtils):
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
-                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
                 None,
                 JobStatusType.WPS,
                 Status.SUCCEEDED,
@@ -2809,7 +3379,7 @@ class WpsRestApiJobsTest(JobUtils):
                 1,
                 Status.FAILED,
                 f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
-                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
                 None,
                 JobStatusType.WPS,
                 Status.FAILED,
@@ -2820,7 +3390,7 @@ class WpsRestApiJobsTest(JobUtils):
                 1,
                 Status.FAILED,
                 f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
-                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
                 None,
                 JobStatusType.WPS,
                 Status.FAILED,
@@ -2831,7 +3401,7 @@ class WpsRestApiJobsTest(JobUtils):
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
-                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
                 None,
                 JobStatusType.WPS,
                 Status.STARTED,
@@ -2842,7 +3412,7 @@ class WpsRestApiJobsTest(JobUtils):
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
-                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
                 None,
                 JobStatusType.WPS,
                 Status.STARTED,
@@ -2853,7 +3423,7 @@ class WpsRestApiJobsTest(JobUtils):
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
-                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
                 None,
                 JobStatusType.WPS,
                 Status.ACCEPTED,
@@ -2864,7 +3434,7 @@ class WpsRestApiJobsTest(JobUtils):
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
-                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
                 None,
                 JobStatusType.WPS,
                 Status.ACCEPTED,
@@ -2876,7 +3446,7 @@ class WpsRestApiJobsTest(JobUtils):
                 0,
                 Status.SUCCESSFUL,
                 f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
-                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
                 None,
                 JobStatusType.WPS,
                 Status.SUCCESSFUL,
@@ -2887,7 +3457,7 @@ class WpsRestApiJobsTest(JobUtils):
                 1,
                 Status.FAILED,
                 f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
-                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
                 None,
                 JobStatusType.WPS,
                 Status.FAILED,
@@ -2898,7 +3468,7 @@ class WpsRestApiJobsTest(JobUtils):
                 9,
                 Status.RUNNING,
                 f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
-                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
                 None,
                 JobStatusType.WPS,
                 Status.STARTED,
@@ -2909,7 +3479,7 @@ class WpsRestApiJobsTest(JobUtils):
                 11,
                 Status.ACCEPTED,
                 f"{ContentType.APP_XML}; profile={JobStatusProfileSchema.WPS}",
-                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URL,
+                sd.OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
                 None,
                 JobStatusType.WPS,
                 Status.ACCEPTED,
@@ -3070,7 +3640,7 @@ class WpsRestApiJobsTest(JobUtils):
             expect_job_type in [JobStatusType.PROCESS, JobStatusType.PROVIDER, JobStatusType.SERVICE]
             and ContentType.TEXT_HTML not in expect_content_type  # "JSON" profile not respected, therefore no Link
         ):
-            ogc_profiles = [link for link in job_profiles if sd.OGC_API_PROC_PROFILE_JOB_DESC_URL in link]
+            ogc_profiles = [link for link in job_profiles if sd.OGC_API_PROC_PROFILE_JOB_DESC_URI in link]
             assert len(ogc_profiles) == 1, "Job status with OGC type should have the corresponding Link profile header."
         else:
             assert not job_profiles, "Job status with non-OGC type did not expect any well-defined Link profile header."
@@ -3129,6 +3699,552 @@ class WpsRestApiJobsTest(JobUtils):
         results_divs = list(resp.html.find("h3", id="results").find_next_siblings("div"))
         results_scripts = results_divs[-1].find("script")
         assert not results_scripts, "When job failed, unavailable results causes no fetching button on the HTML page."
+
+    def test_job_results_with_digest_multibase(self):
+        """
+        Test that job results include digestMultibase for file outputs.
+        """
+        # Use the class-level output directory
+        wps_output_dir = self.settings["weaver.wps_output_dir"]
+
+        # Create a test output file
+        job_id = "test-job-digest-123"
+        job_output_dir = os.path.join(wps_output_dir, job_id)
+        os.makedirs(job_output_dir, exist_ok=True)
+
+        test_file = os.path.join(job_output_dir, "output.txt")
+        test_content = b"Test output file for digestMultibase validation"
+        with open(test_file, "wb") as f:
+            f.write(test_content)
+
+        # Create settings with output URL constructed from weaver URL
+        settings = dict(self.settings)
+        settings["weaver.wps_output_url"] = f"{self.settings['weaver.url']}/wps-outputs"
+
+        # Create a job with file results
+        job = self.make_job(
+            task_id=job_id,
+            process="test-process",
+            service=None,
+            status="successful",
+            progress=100,
+            access="public",
+            results=[
+                {
+                    "id": "output",
+                    "href": f"{job_id}/output.txt",
+                    "mimeType": ContentType.TEXT_PLAIN,
+                }
+            ],
+        )
+
+        # Get results with OGC schema (should include digestMultibase)
+        results, _ = get_results(job, settings, schema=JobInputsOutputsSchema.OGC)
+
+        # Verify digestMultibase is included
+        assert "output" in results
+        output_result = results["output"]
+        assert "digestMultibase" in output_result, "digestMultibase should be included for file outputs"
+        assert isinstance(output_result["digestMultibase"], str)
+        assert output_result["digestMultibase"].startswith("m"), "digestMultibase should use base64 encoding"
+
+        # Verify the digest is valid and deterministic
+        expected_digest = compute_file_digest_multibase(test_file)
+        assert output_result["digestMultibase"] == expected_digest
+
+    @pytest.mark.multipart
+    @pytest.mark.job
+    @pytest.mark.functional
+    @pytest.mark.oap_part3
+    def test_job_ad_hoc_workflow_multipart_execution(self):
+        """
+        Test ad-hoc CWL workflow submission via multipart content to ``POST /jobs``.
+
+        This validates that users can submit both the workflow definition (CWL) and
+        execution parameters (inputs/outputs) in a single multipart request to create
+        and execute a job without pre-deploying the process.
+
+        The multipart request contains:
+        - Execution request with ``Content-Profile: ogc-execute-request``
+        """
+
+        # Define a simple CWL CommandLineTool for the workflow
+        echo_tool_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "ad-hoc-echo-tool",
+            "inputs": {
+                "message": "string"
+            },
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {
+                        "glob": "output.txt"
+                    }
+                }
+            },
+            "requirements": {
+                "DockerRequirement": {
+                    "dockerPull": "alpine:latest"
+                }
+            },
+            "baseCommand": ["sh", "-c"],
+            "arguments": [
+                "echo $(inputs.message) > output.txt"
+            ]
+        }
+
+        # Define a simple CWL Workflow
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "ad-hoc-test-workflow",
+            "inputs": {
+                "message": "string"
+            },
+            "outputs": {
+                "result": {
+                    "type": "File",
+                    "outputSource": "echo_step/output"
+                }
+            },
+            "steps": {
+                "echo_step": {
+                    "run": "ad-hoc-echo-tool",
+                    "in": {
+                        "message": "message"
+                    },
+                    "out": ["output"]
+                }
+            }
+        }
+
+        # Define the execution request with input values
+        # Note: inputs must match the CWL workflow definition
+        execution_request = {
+            "inputs": {
+                "message": "Hello from ad-hoc workflow!"
+            },
+            "outputs": {
+                "result": {
+                    "transmissionMode": "reference"
+                }
+            },
+            "mode": "async",
+            "response": "document"
+        }
+
+        # Create multipart content with proper profiles
+        boundary = "----AdHocWorkflowBoundary123"
+        multipart_body = (
+            f"------AdHocWorkflowBoundary123\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-ID: <echo-tool>\r\n"
+            f"\r\n"
+            f"{json.dumps(echo_tool_cwl)}\r\n"
+            f"------AdHocWorkflowBoundary123\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-ID: <workflow>\r\n"
+            f"\r\n"
+            f"{json.dumps(workflow_cwl)}\r\n"
+            f"------AdHocWorkflowBoundary123\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+            f"\r\n"
+            f"{json.dumps(execution_request)}\r\n"
+            f"------AdHocWorkflowBoundary123--\r\n"
+        ).encode('utf-8')
+
+        content_type_header = f"multipart/mixed; boundary={boundary}"
+
+        # Submit the ad-hoc workflow execution request
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery(web_test_app=self.app):
+                stack.enter_context(mock_exec)
+
+            resp = mocked_sub_requests(
+                self.app, "post", "/jobs",
+                data=multipart_body,
+                headers={"Content-Type": content_type_header, "Accept": ContentType.APP_JSON},
+                only_local=True
+            )
+
+            # Verify the response
+            assert resp.status_code == 201, (
+                f"Expected 201 (Created) for async job execution, got {resp.status_code}. "
+                f"Content-Type: {resp.content_type}. "
+                f"Body: {resp.text[:500] if hasattr(resp, 'text') else resp.body[:500]}"
+            )
+
+            result = resp.json
+            assert "jobID" in result, "Response should contain jobID"
+            assert "status" in result, "Response should contain status"
+            assert "processID" in result, "Response should contain processID"
+
+            job_id = result["jobID"]
+            process_id = result["processID"]
+
+            # Verify the process was deployed (it's the workflow ID)
+            assert process_id == "ad-hoc-test-workflow", "Expected workflow to be deployed as process"
+
+            # Verify the job was created in the store
+            job = self.job_store.fetch_by_id(job_id)
+            assert job is not None, "Job should be created in the store"
+            assert job.process == process_id, "Job should reference the deployed workflow"
+            assert "ad-hoc" in job.tags, "Job should be tagged as ad-hoc"
+
+            # Verify the workflow was deployed in the process store
+            process = self.process_store.fetch_by_id(process_id)
+            assert process is not None, "Workflow should be deployed as a process"
+            assert process.identifier == process_id
+
+    @pytest.mark.multipart
+    @pytest.mark.job
+    @pytest.mark.functional
+    @pytest.mark.oap_part3
+    def test_job_ad_hoc_workflow_multipart_missing_execution_request(self):
+        """
+        Test that multipart request without execution request part is rejected.
+
+        Validates that proper error handling occurs when the execution request
+        (with ogc-execute-request profile) is missing from the multipart content.
+        """
+
+        # Define a simple CWL Workflow (without execution request)
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "test-workflow-no-exec",
+            "inputs": {"message": "string"},
+            "outputs": {"result": {"type": "File", "outputSource": "echo_step/output"}},
+            "steps": {
+                "echo_step": {
+                    "run": "#echo-tool",
+                    "in": {"message": "message"},
+                    "out": ["output"]
+                }
+            }
+        }
+
+        # Create multipart content WITHOUT execution request
+        boundary = "----TestBoundary456"
+        multipart_body = (
+            f"------TestBoundary456\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"\r\n"
+            f"{json.dumps(workflow_cwl)}\r\n"
+            f"------TestBoundary456--\r\n"
+        ).encode('utf-8')
+
+        content_type_header = f"multipart/mixed; boundary={boundary}"
+
+        # Submit the request and expect failure
+        resp = mocked_sub_requests(
+            self.app, "post", "/jobs",
+            data=multipart_body,
+            headers={"Content-Type": content_type_header, "Accept": ContentType.APP_JSON},
+            expect_errors=True,
+            only_local=True
+        )
+
+        # Verify error response
+        assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        result = resp.json
+        assert result["title"] == "Missing execution request"
+        assert sd.OGC_API_PROC_PROFILE_EXECUTE_URI in result["description"]
+
+    @pytest.mark.multipart
+    @pytest.mark.job
+    @pytest.mark.functional
+    @pytest.mark.oap_part3
+    def test_job_ad_hoc_workflow_multipart_fallback_detection(self):
+        """
+        Test ad-hoc workflow submission with profile fallback detection.
+
+        When ``Content-Profile`` headers are omitted, the parser should detect:
+        - CWL content by ``class`` field (``Workflow``, ``CommandLineTool``)
+        - Execution request by ``inputs``/``outputs`` fields
+        """
+        # Define a simple CWL CommandLineTool (without Content-Profile header)
+        echo_tool_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "CommandLineTool",
+            "id": "fallback-echo-tool",
+            "inputs": {"message": "string"},
+            "outputs": {
+                "output": {
+                    "type": "File",
+                    "outputBinding": {"glob": "output.txt"}
+                }
+            },
+            "requirements": {"DockerRequirement": {"dockerPull": "alpine:latest"}},
+            "baseCommand": ["sh", "-c"],
+            "arguments": ["echo $(inputs.message) > output.txt"]
+        }
+
+        # Define a CWL Workflow that references the tool (without Content-Profile header)
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "fallback-test-workflow",
+            "inputs": {"message": "string"},
+            "outputs": {
+                "result": {
+                    "type": "File",
+                    "outputSource": "echo_step/output"
+                }
+            },
+            "steps": {
+                "echo_step": {
+                    "run": "fallback-echo-tool",
+                    "in": {"message": "message"},
+                    "out": ["output"]
+                }
+            }
+        }
+
+        # Execution request without explicit profile
+        # Note: inputs must match the CWL workflow definition
+        execution_request = {
+            "inputs": {"message": "Fallback detection test"},
+            "mode": "async"
+        }
+
+        # Create multipart content WITHOUT Content-Profile headers
+        boundary = "----FallbackBoundary789"
+        multipart_body = (
+            f"------FallbackBoundary789\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"\r\n"
+            f"{json.dumps(echo_tool_cwl)}\r\n"
+            f"------FallbackBoundary789\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"\r\n"
+            f"{json.dumps(workflow_cwl)}\r\n"
+            f"------FallbackBoundary789\r\n"
+            f"Content-Type: application/json\r\n"
+            f"\r\n"
+            f"{json.dumps(execution_request)}\r\n"
+            f"------FallbackBoundary789--\r\n"
+        ).encode('utf-8')
+
+        content_type_header = f"multipart/mixed; boundary={boundary}"
+
+        # Submit the request
+        with contextlib.ExitStack() as stack:
+            for mock_exec in mocked_execute_celery(web_test_app=self.app):
+                stack.enter_context(mock_exec)
+
+            resp = mocked_sub_requests(
+                self.app, "post", "/jobs",
+                data=multipart_body,
+                headers={"Content-Type": content_type_header, "Accept": ContentType.APP_JSON},
+                only_local=True
+            )
+
+            # Verify success despite missing profiles
+            assert resp.status_code == 201, (
+                f"Expected 201 (Created) for async job execution with fallback detection, "
+                f"got {resp.status_code}. Body: {resp.text[:500]}"
+            )
+
+            result = resp.json
+            assert "jobID" in result, "Response should contain jobID"
+            assert "status" in result, "Response should contain status"
+            assert "processID" in result, "Response should contain processID"
+            assert result["processID"] == "fallback-test-workflow"
+
+            job_id = result["jobID"]
+            process_id = result["processID"]
+
+            # Verify the job was created in the store
+            job = self.job_store.fetch_by_id(job_id)
+            assert job is not None, "Job should be created in the store"
+            assert job.process == process_id, "Job should reference the deployed workflow"
+            assert "ad-hoc" in job.tags, "Job should be tagged as ad-hoc"
+
+            # Verify the workflow was deployed in the process store
+            process = self.process_store.fetch_by_id(process_id)
+            assert process is not None, "Workflow should be deployed as a process"
+            assert process.identifier == process_id
+
+    @pytest.mark.multipart
+    @pytest.mark.job
+    @pytest.mark.functional
+    @pytest.mark.oap_part3
+    def test_job_ad_hoc_workflow_multipart_unexpected_deployment_response(self):
+        """
+        Test ad-hoc CWL workflow submission when deployment returns an unexpected response type.
+
+        This validates that the system properly handles cases where the deployment operation
+        returns a response that is not :class:`HTTPCreated` or :class:`HTTPOk`.
+        """
+        # Define a simple CWL Workflow
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "ad-hoc-error-workflow",
+            "inputs": {
+                "message": "string"
+            },
+            "outputs": {
+                "result": {
+                    "type": "string"
+                }
+            },
+            "steps": {}
+        }
+
+        # Define the execution request
+        execution_request = {
+            "inputs": {
+                "message": "Test"
+            },
+            "mode": "async",
+            "response": "document"
+        }
+
+        # Create multipart content
+        boundary = "----ErrorWorkflowBoundary456"
+        multipart_body = (
+            f"------ErrorWorkflowBoundary456\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"\r\n"
+            f"{json.dumps(workflow_cwl)}\r\n"
+            f"------ErrorWorkflowBoundary456\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+            f"\r\n"
+            f"{json.dumps(execution_request)}\r\n"
+            f"------ErrorWorkflowBoundary456--\r\n"
+        ).encode('utf-8')
+
+        content_type_header = f"multipart/mixed; boundary={boundary}"
+
+        # Mock deploy_process_from_payload to return an unexpected response type
+        with mock.patch("weaver.wps_restapi.jobs.utils.deploy_process_from_payload") as mock_deploy:
+            # Return HTTPInternalServerError instead of HTTPCreated or HTTPOk
+            # Include error details to simulate a real deployment failure
+            deployment_error = HTTPInternalServerError(json={
+                "title": "Deployment failed",
+                "detail": "Invalid CWL: missing required field 'baseCommand'",
+                "cause": "CWL validation error"
+            })
+            mock_deploy.return_value = deployment_error
+
+            with contextlib.ExitStack() as stack:
+                for mock_exec in mocked_execute_celery(web_test_app=self.app):
+                    stack.enter_context(mock_exec)
+
+                resp = mocked_sub_requests(
+                    self.app, "post", "/jobs",
+                    data=multipart_body,
+                    headers={"Content-Type": content_type_header, "Accept": ContentType.APP_JSON},
+                    only_local=True,
+                    expect_errors=True
+                )
+
+                # Verify that we get a 400 Bad Request with the expected error message
+                assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
+                result = resp.json
+                assert "title" in result
+                assert result["title"] == "Unexpected deployment response"
+                assert "description" in result
+                assert "Ad-hoc workflow deployment did not return expected response" in result["description"]
+                # Verify that deployment error details are forwarded to help users debug
+                assert "error" in result, "Response should include deployment error details"
+                deploy_error = result["error"]
+                assert "title" in deploy_error, "Deployment error should include title"
+                assert deploy_error["title"] == "Deployment failed"
+                assert "detail" in deploy_error, "Deployment error should include detail for debugging"
+                assert "Invalid CWL" in deploy_error["detail"], "Error detail should help identify CWL issue"
+
+    @pytest.mark.multipart
+    @pytest.mark.job
+    @pytest.mark.functional
+    @pytest.mark.oap_part3
+    def test_job_ad_hoc_workflow_multipart_missing_process_id(self):
+        """
+        Test ad-hoc CWL workflow submission when deployment response is missing process ID.
+
+        This validates that the system properly handles cases where the deployment operation
+        succeeds but doesn't return a process ID in the response.
+        """
+        # Define a simple CWL Workflow
+        workflow_cwl = {
+            "cwlVersion": "v1.2",
+            "class": "Workflow",
+            "id": "ad-hoc-missing-id-workflow",
+            "inputs": {
+                "message": "string"
+            },
+            "outputs": {
+                "result": {
+                    "type": "string"
+                }
+            },
+            "steps": {}
+        }
+
+        # Define the execution request
+        execution_request = {
+            "inputs": {
+                "message": "Test"
+            },
+            "mode": "async",
+            "response": "document"
+        }
+
+        # Create multipart content
+        boundary = "----MissingIDWorkflowBoundary789"
+        multipart_body = (
+            f"------MissingIDWorkflowBoundary789\r\n"
+            f"Content-Type: application/cwl+json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}\r\n"
+            f"\r\n"
+            f"{json.dumps(workflow_cwl)}\r\n"
+            f"------MissingIDWorkflowBoundary789\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Profile: {sd.OGC_API_PROC_PROFILE_EXECUTE_URI}\r\n"
+            f"\r\n"
+            f"{json.dumps(execution_request)}\r\n"
+            f"------MissingIDWorkflowBoundary789--\r\n"
+        ).encode('utf-8')
+
+        content_type_header = f"multipart/mixed; boundary={boundary}"
+
+        # Mock deploy_process_from_payload to return a response without a process ID
+        with mock.patch("weaver.wps_restapi.jobs.utils.deploy_process_from_payload") as mock_deploy:
+            # Create a mock HTTPCreated response with empty processSummary
+            mock_response = HTTPCreated()
+            mock_response.json = {
+                "processSummary": {}  # Missing 'id' field
+            }
+            mock_deploy.return_value = mock_response
+
+            with contextlib.ExitStack() as stack:
+                for mock_exec in mocked_execute_celery(web_test_app=self.app):
+                    stack.enter_context(mock_exec)
+
+                resp = mocked_sub_requests(
+                    self.app, "post", "/jobs",
+                    data=multipart_body,
+                    headers={"Content-Type": content_type_header, "Accept": ContentType.APP_JSON},
+                    only_local=True,
+                    expect_errors=True
+                )
+
+                # Verify that we get a 400 Bad Request with the expected error message
+                assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
+                result = resp.json
+                assert "title" in result
+                assert result["title"] == "Missing process ID"
+                assert "description" in result
+                assert "Ad-hoc workflow deployment did not provide a process ID" in result["description"]
 
 
 @pytest.mark.oap_part1
@@ -3192,3 +4308,32 @@ def test_get_job_status_profile_invalid(accept_type, accept_profile):
     request = MockedRequest(headers={"Accept": accept_type, "Accept-Profile": accept_profile})
     with pytest.raises(HTTPBadRequest):
         get_job_status_schema(request)
+
+
+@pytest.mark.parametrize(
+    ["accept_profile", "query_profile", "expected_profile"],
+    [
+        (None, JobStatusProfileSchema.OGC.upper(), JobStatusProfileSchema.OGC),
+        (None, JobStatusProfileSchema.OGC.lower(), JobStatusProfileSchema.OGC),
+        (None, JobStatusProfileSchema.WPS.upper(), JobStatusProfileSchema.WPS),
+        (None, JobStatusProfileSchema.WPS.lower(), JobStatusProfileSchema.WPS),
+        (JobStatusProfileSchema.OGC.upper(), None, JobStatusProfileSchema.OGC),
+        (JobStatusProfileSchema.OGC.lower(), None, JobStatusProfileSchema.OGC),
+        (JobStatusProfileSchema.WPS.upper(), None, JobStatusProfileSchema.WPS),
+        (JobStatusProfileSchema.WPS.lower(), None, JobStatusProfileSchema.WPS),
+        (None, sd.OGC_API_PROC_PROFILE_JOB_DESC_URI.replace("http://", "https://"), JobStatusProfileSchema.OGC),
+        (sd.OGC_API_PROC_PROFILE_JOB_DESC_URI.replace("http://", "https://"), None, JobStatusProfileSchema.OGC),
+        (None, sd.OGC_API_PROC_PROFILE_JOB_DESC_URI.replace("https://", "http://"), JobStatusProfileSchema.OGC),
+        (sd.OGC_API_PROC_PROFILE_JOB_DESC_URI.replace("https://", "http://"), None, JobStatusProfileSchema.OGC),
+    ]
+)
+def test_get_job_status_profile_valid(accept_profile, query_profile, expected_profile):
+    """
+    Test valid combinations of :term:`Job` status :term:`Profile`.
+    """
+    queries = {"profile": query_profile} if query_profile else {}
+    headers = {"Accept": ContentType.APP_JSON}
+    headers.update({"Accept-Profile": accept_profile} if accept_profile else {})
+    request = MockedRequest(params=queries, headers=headers)
+    profile, _ = get_job_status_schema(request)
+    assert profile == expected_profile

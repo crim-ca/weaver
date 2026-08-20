@@ -67,6 +67,10 @@
 .. |cwltool-cwlprov| replace:: CWLProv - Provenance Capture with :mod:`cwltool`
 .. _cwltool-cwlprov: https://cwltool.readthedocs.io/en/latest/CWLProv.html
 .. |docker| replace:: Docker
+.. |docker-rootless| replace:: *docker rootless*
+.. _docker-rootless: https://docs.docker.com/engine/security/rootless/
+.. |docker-userns-remap| replace:: *docker user namespaces*
+.. _docker-userns-remap: https://docs.docker.com/engine/security/userns-remap/
 .. |ems| replace:: Execution Management Service
 .. |esgf| replace:: Earth System Grid Federation
 .. _esgf: https://esgf.github.io/
@@ -84,12 +88,17 @@
 .. _feature-w3c-desc: https://www.w3.org/TR/sdw-bp/#spatial-things-features-and-geometry
 .. |filter-cql-csw| replace:: CQL as defined in CSW 2.0
 .. _filter-cql-csw: https://portal.ogc.org/files/?artifact_id=20555
+.. old CQL (draft v1) document not available directly in portal, use alternate export/backup
+.. export: https://files.ogc.org/external/380746787cd5607e6d10bfb7424ccc174f2d733fd456dd72f6cd5bc056dc28b5
 .. |filter-simple-cql| replace:: Simple CQL
-.. _filter-simple-cql: https://portal.ogc.org/files/96288#cql-core
+.. .. _filter-simple-cql: https://portal.ogc.org/files/96288#cql-core
+.. _filter-simple-cql: https://web.archive.org/web/20260121062313/https://portal.ogc.org/files/96288#cql-core
 .. |filter-cql-json| replace:: CQL-JSON
-.. _filter-cql-json: https://portal.ogc.org/files/96288#cql-json
+.. .. _filter-cql-json: https://portal.ogc.org/files/96288#cql-json
+.. _filter-cql-json: https://web.archive.org/web/20260121062313/https://portal.ogc.org/files/96288#cql-json
 .. |filter-cql-text| replace:: CQL-Text
-.. _filter-cql-text: https://portal.ogc.org/files/96288#cql-text
+.. .. _filter-cql-text: https://portal.ogc.org/files/96288#cql-text
+.. _filter-cql-text: https://web.archive.org/web/20260121062313/https://portal.ogc.org/files/96288#cql-text
 .. |filter-cql2-json| replace:: CQL2-JSON
 .. _filter-cql2-json: https://docs.ogc.org/DRAFTS/21-065r3.html#cql2-json
 .. |filter-cql2-text| replace:: CQL2-Text
@@ -135,6 +144,8 @@
 .. _ogc-api-proc-part1-spec-pdf: https://docs.ogc.org/is/18-062r2/18-062r2.pdf
 .. |ogc-api-proc-part1-spec-json| replace:: *OGC API - Processes* - Part 1: Core JSON schema
 .. _ogc-api-proc-part1-spec-json: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/openapi/ogcapi-processes.bundled.json
+.. |ogc-api-proc-part1-kvp| replace:: *OGC API - Processes* - Part 1: Core KVP-Encoded Execute
+.. _ogc-api-proc-part1-kvp: https://docs.ogc.org/DRAFTS/18-062r3.html#rc_kvp-execute
 .. |ogc-api-proc-exec-mode| replace:: *OGC API - Processes* - Execution Mode
 .. _ogc-api-proc-exec-mode: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_execution_mode
 .. |ogc-api-proc-exec-responses-sync| replace:: *OGC API - Processes* - Execution Responses (sync)
@@ -144,7 +155,7 @@
 .. |ogc-api-proc-exec-outputs| replace:: *OGC API - Processes* - Execution Outputs
 .. _ogc-api-proc-exec-outputs: https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_process_outputs
 .. |ogc-ets-weaver-impl-ref| replace:: Weaver Product Implementation
-.. _ogc-ets-weaver-impl-ref: https://www.ogc.org/resources/product-details/?pid=1767
+.. _ogc-ets-weaver-impl-ref: https://portal.ogc.org/public_ogc/compliance/product.php?pid=1825
 .. |ogc-api-proc-echo| replace:: *OGC API - Processes* - Part 1: Core - Echo Process
 .. _ogc-api-proc-echo: https://raw.githubusercontent.com/opengeospatial/ogcapi-processes/master/core/examples/json/ProcessDescription.json
 .. _ogc-api-proc-profiles: https://docs.ogc.org/DRAFTS/18-062r3.html#profile-uris
@@ -155,10 +166,14 @@
 .. _ogc-api-proc-part3: https://docs.ogc.org/DRAFTS/21-009.html
 .. |ogc-api-proc-part3-collection-input| replace:: *Collection Input*
 .. _ogc-api-proc-part3-collection-input: https://docs.ogc.org/DRAFTS/21-009.html#section_collection_input
+.. |ogc-api-proc-part3-cwl-ad-hoc-exec| replace:: :term:`CWL` *ad-hoc* workflow execution
+.. _ogc-api-proc-part3-cwl-ad-hoc-exec: https://docs.ogc.org/DRAFTS/21-009.html#section_cwl_workflows
 .. |ogc-api-proc-part4| replace:: *OGC API - Processes* - Part 4: Job Management
 .. _ogc-api-proc-part4: https://docs.ogc.org/DRAFTS/24-051.html
-.. |ogc-tb20-gdc| replace:: *OGC Testbed-20 - GeoDataCubes*
+.. |ogc-tb20-gdc| replace:: *OGC Testbed-20* - GeoDataCubes
 .. _ogc-tb20-gdc: https://www.ogc.org/initiatives/ogc-testbed-20/
+.. |ogc-tb20-gdc-profile| replace:: *OGC Testbed-20* - GeoDataCubes (GDC) API Profile
+.. _ogc-tb20-gdc-profile: https://docs.ogc.org/per/24-035.html
 .. |ogc-proc-ext-billing| replace:: *OGC API - Processes* - Billing extension
 .. _ogc-proc-ext-billing: https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/billing
 .. |ogc-proc-ext-quotation| replace:: *OGC API - Processes* - Quotation extension
@@ -175,7 +190,9 @@
 .. |openeo| replace:: openEO
 .. _openeo: https://openeo.org/
 .. |openeo-api| replace:: openEO API
-.. _openeo-api: https://openeo.org/documentation/1.0/developers/api/reference.html
+.. _openeo-api: https://api.openeo.org
+.. |openeo-api-profile| replace:: openEO API Profiles
+.. _openeo-api-profile: https://openeo.org/documentation/1.0/developers/profiles/api.html
 .. |OpenAPI-spec| replace:: OpenAPI Specification
 .. _OpenAPI-spec: https://spec.openapis.org/oas/v3.1.0
 .. |JSON-LD| replace:: JSON Linked Data
@@ -249,11 +266,12 @@
 .. |weaver-config| replace:: ``weaver/config``
 .. _weaver-config: ../../../config
 .. _weaver.ini.example: ../../../config/weaver.ini.example
+.. _Makefile.config.example: ../../../Makefile.config.example
 .. _data_sources.yml.example: ../../../config/data_sources.yml.example
 .. _wps_processes.yml.example: ../../../config/wps_processes.yml.example
 .. _request_options.yml.example: ../../../config/request_options.yml.example
-.. _Dockerfile-manager: ../../../docker/Dockerfile-manager
-.. _Dockerfile-worker: ../../../docker/Dockerfile-worker
+.. _manager.dockerfile: ../../../docker/manager.dockerfile
+.. _worker.dockerfile: ../../../docker/worker.dockerfile
 .. _docker-compose.yml.example: ../../../docker/docker-compose.yml.example
 .. _default-notify-email-template: ../../../weaver/wps_restapi/templates/notification_email_example.mako
 .. |default-notify-email-template| replace:: Default Notification Email Mako Template
@@ -310,8 +328,6 @@
 .. _outputs-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/outputs/paths/~1jobs~1{job_id}~1outputs/get
 .. |results-req| replace:: ``GET {WEAVER_URL}/jobs/{jobID}/results`` (Results)
 .. _results-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Results/paths/~1jobs~1{job_id}~1results/get
-.. |update-token-req| replace:: Update Token
-.. _update-token-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/UpdateToken/paths/~1processes~1{process_id}/put
 .. |vault-upload-req| replace:: Vault File Upload (POST)
 .. _vault-upload-req: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Vault/paths/~1vault/post
 .. |vault-download-req| replace:: Vault File Download (GET)

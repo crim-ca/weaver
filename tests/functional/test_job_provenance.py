@@ -83,6 +83,7 @@ class TestJobProvenanceBase(WpsConfigBase, ResourcesUtil):
         cls.job_id = status_url.rsplit("/", 1)[-1]
 
 
+@pytest.mark.job
 @pytest.mark.prov
 @pytest.mark.oap_part4
 @pytest.mark.functional

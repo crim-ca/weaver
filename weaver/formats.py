@@ -6,10 +6,12 @@ import os
 import re
 import socket
 from functools import cache
+from io import StringIO
 from typing import TYPE_CHECKING, cast, overload
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
+import pandas as pd
 import yaml
 from json2xml.json2xml import Json2xml
 from pyramid.httpexceptions import HTTPNotFound, HTTPOk
@@ -20,7 +22,7 @@ from requests.exceptions import ConnectionError
 from weaver.base import Constants, classproperty
 
 if TYPE_CHECKING:
-    from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, TypeAlias, TypeVar, Union
+    from typing import Any, AnyStr, Callable, Dict, List, Optional, Set, Tuple, TypeAlias, TypeVar, Union
     from typing_extensions import Literal
 
     from weaver.base import PropertyDataTypeT
@@ -53,6 +55,7 @@ if TYPE_CHECKING:
         "TEXT", "text",
         "YML", "yml",
         "YAML", "yaml",
+        "CSV", "csv",
     ]
 
 LOGGER = logging.getLogger(__name__)
@@ -91,8 +94,10 @@ class ContentType(Constants):
     APP_CWL_JSON = "application/cwl+json"
     APP_CWL_YAML = "application/cwl+yaml"
     APP_CWL_X = "application/x-cwl"  # backward compatible format, others are official
+    APP_OWL_XML = "application/owl+xml"
     APP_FORM = "application/x-www-form-urlencoded"
     APP_GEOJSON = "application/geo+json"
+    APP_VDN_GEOJSON = "application/vnd.geo+json"
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
     APP_JSON = "application/json"
@@ -101,28 +106,35 @@ class ContentType(Constants):
     APP_OAS_JSON = "application/vnd.oai.openapi+json; version=3.0"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
     APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"
-    APP_NETCDF = "application/x-netcdf"
+    APP_NETCDF = "application/netcdf"       # official (registered IANA: https://github.com/Unidata/netcdf/issues/42)
+    APP_X_NETCDF = "application/x-netcdf"   # legacy
     APP_NT = "application/n-triples"
     APP_OCTET_STREAM = "application/octet-stream"
     APP_PDF = "application/pdf"
     APP_TAR = "application/x-tar"          # map to existing gzip for CWL
     APP_TAR_GZ = "application/tar+gzip"    # map to existing gzip for CWL
-    APP_VDN_GEOJSON = "application/vnd.geo+json"
     APP_XML = "application/xml"
-    APP_YAML = "application/x-yaml"
+    APP_YAML = "application/yaml"       # official (registered IANA)
+    APP_X_YAML = "application/x-yaml"   # legacy
+    TEXT_X_YAML = "text/x-yaml"         # deprecated
+    TEXT_YAML = "text/yaml"             # deprecated
+    APP_XYZ = "application/x-xyz"       # raw 3D points / LiDAR
     APP_ZIP = "application/zip"
     IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
     IMAGE_OGC_GEOTIFF = "image/tiff; application=geotiff"
     IMAGE_COG = "image/tiff; application=geotiff; profile=cloud-optimized"
+    IMAGE_TIFF = "image/tiff"
     IMAGE_JPEG = "image/jpeg"
+    IMAGE_JPEG2000 = "image/jp2"
     IMAGE_GIF = "image/gif"
     IMAGE_PNG = "image/png"
-    IMAGE_TIFF = "image/tiff"
+    IMAGE_SVG_XML = "image/svg+xml"
     MULTIPART_ANY = "multipart/*"
     MULTIPART_FORM = "multipart/form-data"      # data/file upload
     MULTIPART_MIXED = "multipart/mixed"         # content of various types
     MULTIPART_RELATED = "multipart/related"     # content that contain cross-references with Content-ID (CID)
     TEXT_ENRICHED = "text/enriched"
+    TEXT_CSV = "text/csv"
     TEXT_HTML = "text/html"
     TEXT_PLAIN = "text/plain"
     TEXT_RICHTEXT = "text/richtext"
@@ -132,9 +144,12 @@ class ContentType(Constants):
     VIDEO_MPEG = "video/mpeg"
 
     # special handling
+    ANY_NETCDF = {APP_NETCDF, APP_X_NETCDF}
+    ANY_TIFF = {IMAGE_GEOTIFF, IMAGE_OGC_GEOTIFF, IMAGE_COG, IMAGE_TIFF}
+    ANY_GEOJSON = {APP_GEOJSON, APP_VDN_GEOJSON}
+    ANY_YAML = {APP_YAML, APP_X_YAML, TEXT_YAML, TEXT_X_YAML}
     ANY_JSON = {
-        APP_JSON, APP_YAML,
-        APP_GEOJSON, APP_VDN_GEOJSON,
+        APP_JSON, *ANY_YAML, *ANY_GEOJSON,
         APP_CWL, APP_CWL_JSON, APP_CWL_X, APP_CWL_YAML,
         APP_OAS_JSON,
         APP_OGC_PKG_JSON, APP_OGC_PKG_YAML,
@@ -366,6 +381,10 @@ class OutputFormat(Constants):
     Representation as HTML content formatted as raw string without indentation or newlines.
     """)  # type: Literal["HTML+RAW", "html+raw"]
 
+    CSV = classproperty(fget=lambda self: "csv", doc="""
+    Representation as :term:`CSV` content formatted as string.
+    """)  # type: Literal["CSV", "csv"]
+
     @classmethod
     def get(cls,                    # pylint: disable=W0221,W0237  # arguments differ/renamed
             format_or_version,      # type: Union[str, AnyOutputFormat, AnyContentType, PropertyDataTypeT]
@@ -411,6 +430,7 @@ class OutputFormat(Constants):
             Unused for other representations.
         :return: Formatted output.
         """
+
         from weaver.utils import bytes2str
 
         fmt = cls.get(to)
@@ -436,6 +456,11 @@ class OutputFormat(Constants):
             if yml.endswith("\n...\n"):  # added when data is single literal or None instead of list/object
                 yml = yml[:-4]
             return yml
+        if fmt == OutputFormat.CSV:
+            df = pd.json_normalize(data) if isinstance(data, dict) else pd.DataFrame(data)
+            csv_buffer = StringIO()
+            df.to_csv(csv_buffer, index=False)
+            return csv_buffer.getvalue()
         return data  # pragma: no cover  # last resort if new output format unhandled
 
 
@@ -449,13 +474,20 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_NETCDF: ".nc",
     ContentType.APP_GZIP: ".gz",
     ContentType.APP_TAR_GZ: ".tar.gz",
-    ContentType.APP_YAML: ".yml",
+    ContentType.APP_YAML: ".yaml",
+    ContentType.IMAGE_JPEG2000: ".jp2",
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
+    ContentType.IMAGE_OGC_GEOTIFF: ".tif",
     ContentType.ANY: ".*",      # any for glob
     ContentType.APP_DIR: "/",   # force href to finish with explicit '/' to mark directory
     ContentType.APP_OCTET_STREAM: ".bin",
     ContentType.APP_FORM: "",
     ContentType.MULTIPART_FORM: "",
+    ContentType.IMAGE_SVG_XML: ".svg",
+}
+_CONTENT_TYPE_FORMAT_OVERRIDES = {
+    # align encoding with PyWPS variant
+    ContentType.APP_NETCDF: Format(ContentType.APP_NETCDF, extension=".nc", encoding=ContentEncoding.BASE64),
 }
 _CONTENT_TYPE_EXCLUDE = [
     ContentType.APP_OCTET_STREAM,
@@ -465,7 +497,8 @@ _CONTENT_TYPE_EXCLUDE = [
 _EXTENSION_CONTENT_TYPES_OVERRIDES = {
     ".text": ContentType.TEXT_PLAIN,  # common alias to .txt, especially when using format query
     ".tiff": ContentType.IMAGE_TIFF,  # avoid defaulting to subtype geotiff
-    ".yaml": ContentType.APP_YAML,    # common alternative to .yml
+    ".yml": ContentType.APP_YAML,     # common alternative to .yaml
+    ".yaml": ContentType.APP_YAML,    # official/recommended extension for YAML (RFC 9512)
     ".html": ContentType.TEXT_HTML,   # missing extension, needed for 'f=html' check
     ".xsd": ContentType.APP_XML,
 }
@@ -494,9 +527,8 @@ _CONTENT_TYPE_EXTENSION_MAPPING.update({
 _CONTENT_TYPE_EXT_PATTERN = re.compile(r"^[a-z]+/(x-)?(?P<ext>([a-z]+)).*$")
 _CONTENT_TYPE_LOCALS_MISSING = [
     (ctype, _CONTENT_TYPE_EXT_PATTERN.match(ctype))
-    for name, ctype in locals().items()
-    if name.startswith("ContentType.")
-    and isinstance(ctype, str)
+    for ctype in ContentType.values()
+    if isinstance(ctype, str)
     and ctype not in _CONTENT_TYPE_EXCLUDE
     and ctype not in _CONTENT_TYPE_FORMAT_MAPPING
     and ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
@@ -529,6 +561,7 @@ _CONTENT_TYPE_FORMAT_MAPPING.update({
     if ctype not in _CONTENT_TYPE_EXCLUDE
     and ctype not in _CONTENT_TYPE_FORMAT_MAPPING
 })
+_CONTENT_TYPE_FORMAT_MAPPING.update(_CONTENT_TYPE_FORMAT_OVERRIDES)
 _EXTENSION_CONTENT_TYPES_MAPPING = {
     # because the same extension can represent multiple distinct Content-Types,
     # derive the simplest (shortest) one by default for guessing generic Content-Type
@@ -589,6 +622,13 @@ IANA_MAPPING = {
     ContentType.APP_CWL_JSON: ContentType.APP_CWL,
     ContentType.APP_CWL_YAML: ContentType.APP_CWL,
     ContentType.APP_CWL_X: ContentType.APP_CWL,
+    # following ensure consistent resolution against EDAM alternative match
+    # however, only define the ones that should explicitly be prioritized by IANA instead of OGC/EDAM/etc.
+    # (eg: 'ogc:netcdf' is common, so it should not be set here to allow it / not enforce the IANA variant)
+    ContentType.APP_YAML: ContentType.APP_YAML,
+    ContentType.APP_X_YAML: ContentType.APP_X_YAML,
+    ContentType.TEXT_YAML: ContentType.TEXT_YAML,
+    ContentType.TEXT_X_YAML: ContentType.TEXT_X_YAML,
 }
 EDAM_NAMESPACE = "edam"
 EDAM_NAMESPACE_URL = "http://edamontology.org/"
@@ -600,11 +640,15 @@ EDAM_MAPPING = {
     ContentType.APP_CWL_JSON: "format_3857",
     ContentType.APP_CWL_YAML: "format_3857",
     ContentType.APP_CWL_X: "format_3857",
+    ContentType.APP_OWL_XML: "format_3262",
     ContentType.IMAGE_GIF: "format_3467",
     ContentType.IMAGE_JPEG: "format_3579",
+    ContentType.APP_NETCDF: "format_3650",
+    ContentType.APP_X_NETCDF: "format_3650",
     ContentType.APP_HDF5: "format_3590",
     ContentType.APP_JSON: "format_3464",
     ContentType.APP_YAML: "format_3750",
+    ContentType.APP_XYZ: "format_3877",
     ContentType.TEXT_PLAIN: "format_1964",
 }
 # Official links to be employed in definitions must be formed as:
@@ -626,6 +670,7 @@ OGC_MAPPING = {
     ContentType.IMAGE_OGC_GEOTIFF: "geotiff",
     ContentType.IMAGE_COG: "geotiff",
     ContentType.APP_NETCDF: "netcdf",
+    ContentType.APP_X_NETCDF: "netcdf",
 }
 FORMAT_NAMESPACE_MAPPINGS = {
     IANA_NAMESPACE: IANA_MAPPING,
@@ -637,7 +682,7 @@ FORMAT_NAMESPACE_DEFINITIONS = {
     **IANA_NAMESPACE_DEFINITION,
     **EDAM_NAMESPACE_DEFINITION,
     **OGC_NAMESPACE_DEFINITION,
-    **OPENGIS_NAMESPACE_DEFINITION
+    **OPENGIS_NAMESPACE_DEFINITION,
 }
 FORMAT_NAMESPACE_PREFIXES = [
     f"{_ns}:" for _ns in FORMAT_NAMESPACE_DEFINITIONS
@@ -692,6 +737,12 @@ def get_format(media_type, default=None):
         ctype = clean_media_type_format(media_type, strip_parameters=True)
     if not ctype:
         return None
+    # if the input was not a 'basic' media-type, but a CWL-like format URI resolved by cleanup,
+    # reevaluate the potential media-type match prior to further resolution combinations
+    if ctype != media_type:
+        fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(ctype)
+        if fmt is not None:
+            return fmt
     ext = get_extension(ctype)
     if ctype.startswith("http") and ctype.endswith(ext.strip(".")):
         for uri, typ in _CONTENT_TYPE_SCHEMA_OVERRIDES.items():
@@ -707,31 +758,77 @@ def get_format(media_type, default=None):
     return fmt
 
 
+@overload
+def get_extension(media_type, **__):
+    # type: (str, Any) -> str
+    ...
+
+
+@overload
+def get_extension(media_type, variants=False):
+    # type: (str, Literal[True]) -> List[str]
+    ...
+
+
+@overload
+def get_extension(media_type, dot=True, variants=False):
+    # type: (str, bool, Literal[True]) -> List[str]
+    ...
+
+
 @cache
-def get_extension(media_type, dot=True):
-    # type: (str, bool) -> str
+def get_extension(media_type, dot=True, variants=False):
+    # type: (str, bool, bool) -> Union[str, Set[str]]
     """
     Retrieves the extension corresponding to :paramref:`media_type` if explicitly defined, or by parsing it.
+
+    :param media_type: Media-Type for which to attempt finding a known extension.
+    :param dot: If ``True``, the returned extension will include the leading dot (``.``). Otherwise, it is stripped.
+    :param variants: If ``True``, returns a list of all possible extensions for the media-type. Otherwise, first match.
     """
-    def _handle_dot(_ext):
-        # type: (str) -> str
-        if dot and not _ext.startswith(".") and _ext:  # don't add for empty extension
+    def _handle_dot(_ext, _dot):
+        # type: (str, bool) -> str
+        if _dot and not _ext.startswith(".") and _ext:  # don't add for empty extension
             return f".{_ext}"
-        if not dot and _ext.startswith("."):
+        if not _dot and _ext.startswith("."):
             return _ext[1:]
         return _ext
 
     fmt = _CONTENT_TYPE_FORMAT_MAPPING.get(media_type)
+
+    # special "extensions" or empty-mappings, bypass remaining logic
+    if fmt and not fmt.extension.startswith("."):
+        return fmt.extension
+
     if fmt:
-        if not fmt.extension.startswith("."):
-            return fmt.extension
-        return _handle_dot(fmt.extension)
-    ctype = clean_media_type_format(media_type, strip_parameters=True)
-    if not ctype:
-        return ""
-    ext_default = f"{ctype.split('/')[-1].replace('x-', '')}"
-    ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ext_default)
-    return _handle_dot(ext)
+        ctype = media_type
+        ext = fmt.extension
+    else:
+        ctype = clean_media_type_format(media_type, strip_parameters=True)
+        if not ctype:
+            return "" if not variants else []
+        ext_default = f"{ctype.split('/')[-1].replace('x-', '')}"
+        ext = _CONTENT_TYPE_EXTENSION_MAPPING.get(ctype, ext_default)
+    if not ext:
+        return "" if not variants else []
+    if not variants:
+        return _handle_dot(ext, dot)
+
+    # find all extensions variants that are mapped to the requested media-type
+    ext_var = {
+        _handle_dot(_ext_var, dot)
+        for _ext_var, _ctype in _EXTENSION_CONTENT_TYPES_MAPPING.items()
+        if _ctype == ctype
+    }
+    # also back-propagate the media-types mapping to get relevant extensions
+    # because multiple media-types might map to the same extension->ctype mapping above,
+    # they might not all be detected by dict keys that would stop at the first match
+    ext_typ = _CONTENT_TYPE_FORMAT_MAPPING.get(ctype)
+    if ext_typ and ext_typ.extension.startswith("."):
+        ext_var |= {_handle_dot(ext_typ.extension, dot)}
+    # also apply the pre-resolved media-type extension itself, in case cleanup resolved another variant
+    ext_var |= {_handle_dot(ext, dot)}
+    return ext_var
 
 
 @cache
@@ -780,25 +877,25 @@ def add_content_type_charset(content_type, charset):
 
 @overload
 def get_cwl_file_format(media_type):
-    # type: (str) -> Tuple[Optional[JSON], Optional[str]]
+    # type: (Optional[str]) -> Tuple[Optional[JSON], Optional[str]]
     ...
 
 
 @overload
 def get_cwl_file_format(media_type, make_reference=False, **__):
-    # type: (str, Literal[False], **bool) -> Tuple[Optional[JSON], Optional[str]]
+    # type: (Optional[str], Literal[False], **bool) -> Tuple[Optional[JSON], Optional[str]]
     ...
 
 
 @overload
 def get_cwl_file_format(media_type, make_reference=False, **__):
-    # type: (str, Literal[True], **bool) -> Optional[str]
+    # type: (Optional[str], Literal[True], **bool) -> Optional[str]
     ...
 
 
 @cache
 def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow_synonym=True):  # pylint: disable=R1260
-    # type: (str, bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
+    # type: (Optional[str], bool, bool, bool) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
     """
     Obtains the extended schema reference from the media-type identifier.
 
@@ -852,12 +949,12 @@ def get_cwl_file_format(media_type, make_reference=False, must_exist=True, allow
         # type: (str) -> Union[Tuple[Optional[JSON], Optional[str]], Optional[str]]
         if _media_type in IANA_MAPPING:
             return _make_if_ref(IANA_NAMESPACE_DEFINITION, IANA_NAMESPACE, IANA_MAPPING[_media_type])
-        if _media_type in EDAM_MAPPING:  # prefer real reference if available
-            return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[_media_type])
         if _media_type in OGC_MAPPING:  # prefer real reference if available
             return _make_if_ref(OGC_NAMESPACE_DEFINITION, OGC_NAMESPACE, OGC_MAPPING[_media_type])
         if _media_type in OPENGIS_MAPPING:  # prefer real reference if available
             return _make_if_ref(OPENGIS_NAMESPACE_DEFINITION, OPENGIS_NAMESPACE, OPENGIS_MAPPING[_media_type])
+        if _media_type in EDAM_MAPPING:  # prefer real reference if available
+            return _make_if_ref(EDAM_NAMESPACE_DEFINITION, EDAM_NAMESPACE, EDAM_MAPPING[_media_type])
         return None
 
     def _request_extra_various(_media_type):
@@ -975,7 +1072,7 @@ def map_cwl_media_type(cwl_format):
 def clean_media_type_format(media_type, suffix_subtype=False, strip_parameters=False):
     # type: (str, bool, bool) -> Optional[str]
     """
-    Obtains a generic media-type identifier by cleaning up any additional parameters.
+    Obtains a generic :term:`Media-Type` identifier by cleaning up any additional parameters.
 
     Removes any additional namespace key or URL from :paramref:`media_type` so that it corresponds to the generic
     representation (e.g.: ``application/json``) instead of the ``<namespace-name>:<format>`` mapping variant used
@@ -1180,6 +1277,24 @@ def json_default_handler(obj):
     if isinstance(obj, (datetime.date, datetime.datetime)):
         return obj.isoformat()
     raise TypeError(f"Type {type(obj)} not serializable.")
+
+
+@overload
+def repr_json(data, **__):
+    # type: (None, **Any) -> None
+    ...
+
+
+@overload
+def repr_json(data, **__):
+    # type: (Any, **Any) -> str
+    ...
+
+
+@overload
+def repr_json(data, force_string=True, **__):
+    # type: (Any, Literal[True], **Any) -> str
+    ...
 
 
 def repr_json(data, force_string=True, ensure_ascii=False, indent=2, separators=None, **kwargs):

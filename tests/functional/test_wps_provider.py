@@ -137,7 +137,7 @@ class WpsProviderTest(WpsConfigBase):
         assert len(body["inputs"]["dataset"]["formats"]) == 1
         assert body["inputs"]["dataset"]["formats"][0]["default"] is True
         assert "literalDataDomains" not in body["inputs"]["dataset"]
-        assert body["inputs"]["dataset"]["formats"][0]["mediaType"] == ContentType.APP_NETCDF
+        assert body["inputs"]["dataset"]["formats"][0]["mediaType"] == ContentType.APP_X_NETCDF
         assert body["inputs"]["dataset_opendap"]["minOccurs"] == 0
         assert body["inputs"]["dataset_opendap"]["maxOccurs"] == 100
         assert "formats" not in body["inputs"]["dataset_opendap"]
@@ -150,9 +150,11 @@ class WpsProviderTest(WpsConfigBase):
         assert "outputs" in body and len(body["outputs"]) == 1
         assert "output" in body["outputs"]
         assert "formats" in body["outputs"]["output"]
-        assert len(body["outputs"]["output"]["formats"]) == 1
+        assert len(body["outputs"]["output"]["formats"]) == 3
         assert body["outputs"]["output"]["formats"][0]["default"] is True
         assert body["outputs"]["output"]["formats"][0]["mediaType"] == ContentType.TEXT_PLAIN
+        assert body["outputs"]["output"]["formats"][1]["mediaType"] == ContentType.TEXT_HTML
+        assert body["outputs"]["output"]["formats"][2]["mediaType"] == ContentType.APP_PDF
         assert "literalDataDomains" not in body["outputs"]["output"]
 
         assert body["processDescriptionURL"] == proc_desc_url

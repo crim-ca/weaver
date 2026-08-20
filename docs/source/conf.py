@@ -39,7 +39,7 @@ sys.path.insert(0, os.path.abspath(DOC_DIR_ROOT))
 sys.path.insert(0, os.path.abspath(DOC_PRJ_ROOT))
 
 from weaver import __meta__  # isort:skip # noqa: E402 # pylint: disable=C0413
-from weaver.wps_restapi.api import get_openapi_json  # isort:skip # noqa: E402
+from weaver.wps_restapi.api import get_openapi_json  # isort:skip # noqa: E402 # pylint: disable=C0413
 
 DOC_PKG_ROOT = os.path.join(DOC_PRJ_ROOT, __meta__.__name__)
 
@@ -109,7 +109,7 @@ api_spec_json = get_openapi_json(
 )
 if not os.path.isdir(DOC_BLD_ROOT):
     os.makedirs(DOC_BLD_ROOT)
-with open(api_spec_file, "w") as f:
+with open(api_spec_file, mode="w", encoding="utf-8") as f:
     json.dump(api_spec_json, f, use_decimal=True)
 
 redoc = [{
@@ -123,7 +123,7 @@ redoc = [{
     }
 }]
 # must use next version (2.x-alpha) because default 1.x does not support OpenAPIv3
-redoc_uri = "https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"
+redoc_uri = "https://cdn.jsdelivr.net/npm/redoc@2.5.2/bundles/redoc.standalone.js"
 
 autoapi_type = "python"
 autoapi_dirs = [DOC_PKG_ROOT]
@@ -461,6 +461,8 @@ linkcheck_ignore = [
     # URLs causing 403 (USer-Agent blocked or bot protection)
     "https://www.iso.org/iso-4217-currency-codes.html",
     "https://www.mongodb.com/.*",
+    "https://zenodo.org/.*",
+    "https://prairieclimatecentre.ca/",
     # ignore the various weaver instances that could be down temporarily from the hosting server
     # their corresponding version checks in the readme's shields will indicate if such an error occurs
     "https://hirondelle.crim.ca/weaver",
@@ -468,6 +470,12 @@ linkcheck_ignore = [
     "https://pavics.ouranos.ca/weaver/",
     "https://redoak.cs.toronto.edu/weaver/",
     "https://pavics.climatedata.ca/",
+    # ignore agent skills during docs build,
+    # links will be validated by local markdown checks instead
+    r"./\.agents/.*",
+    # ignore stackoverflow redirects causing failures
+    # https://github.com/orgs/sphinx-doc/discussions/12032
+    r"https://stackoverflow\.com/.*",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md

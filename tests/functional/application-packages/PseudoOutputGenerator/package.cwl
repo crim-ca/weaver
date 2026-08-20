@@ -18,6 +18,7 @@ requirements:
           echo "$(inputs.data)" > "image.png"
           echo "$(inputs.data)" > "data.nc"
           echo "<xml>$(inputs.data)</xml>" > "text.xml"
+          echo "test:\n  value: $(inputs.data)" > "text.yaml"
           echo "$(inputs.data)" > "text.log"
           echo "$(inputs.data)" > "text.txt"
           echo "$(inputs.data)" > "text.abc"
@@ -57,6 +58,12 @@ outputs:
     outputBinding:
       glob: text.xml
 
+  text_yaml:
+    type: File
+    format: "iana:application/yaml"
+    outputBinding:
+      glob: text.yaml
+
   text_log:
     type: File
     format: "iana:text/plain"
@@ -68,7 +75,6 @@ outputs:
     format: "iana:text/plain"
     outputBinding:
       glob: text.txt
-
   no_format:
     type: File
     outputBinding:
