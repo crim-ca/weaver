@@ -18,6 +18,9 @@ Changes:
 
 Fixes:
 ------
+- Fix `Process` listing with revisions where the original version was generated without an explicit ``version`` value.
+  This could lead to a ``null`` version to propagate in a `MongoDB` aggregation pipeline failing following revision
+  listing including it.
 - Fix rendering of `OpenAPI` definitions for ``POST /processes`` deployment such that each indicated ``Content-Type``
   correctly provides an example for ``multipart/*`` representation of a `Workflow`.
 - Fix rendering of `OpenAPI` definitions for ``POST /processes`` deployment such that each indicated ``Content-Type``
