@@ -1409,7 +1409,6 @@ class WeaverClient(object):
                     None
                 )
 
-
     def _parse_file_or_json(self, param, param_name):
         # type: (Union[JSON, str], str) -> Union[JSON, OperationResult]
         """
