@@ -12,8 +12,20 @@ Changes
 
 Changes:
 --------
-- Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}`` endpoint
-  to align with the latest OGC API - Processes Core specification.
+- Add `HTML` shortcut links to easily toggle contextually between full `Provider` or only local `Process` listing.
+- Add `HTML` support of ``/providers/{providerID}/processes/?f=html`` to list all `Process` references of a `Provider`.
+- Add `HTML` support of ``/processes/?providers=true`` to list all `Provider` and local `Process` references.
+- Add `HTML` support of ``/providers?f=html`` with shortcut navigation from the API frontpage.
+- Add `HTML` support of ``/providers/{providerID}?f=html`` with contextual breadcrumbs and links to related listings.
+- Add `Provider`-aware `HTML` links to `Process` and `Job` listings that resolve corresponding descriptions.
+- Add `HTML` auto-detection and link encoding of embedded `URL` to render references in ``description`` fields.
+- Add `XML` support for ``/providers/{providerID}/processes/{processID}?f=xml`` returning `WPS` offering details.
+- Add ``?provider={providerID}`` and ``?service={providerID}`` query parameters to ``/processes/{processID}`` request
+  as alias to resolve the corresponding ``/providers/{providerID}/processes/{processID}`` resource.
+- Add ``provider`` details embedded within the ``/processes/{processID}`` response if ``?provider={providerID}``
+  or ``?service={providerID}`` query parameter is specified and that the `Provider`'s `Process` can be resolved.
+- Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}``
+  endpoint to align with the latest OGC API - Processes Core specification.
 - Added the N-output response header for N-output retrieval responses.
 - Added the OGC Values profile link to ``/jobs/{jobId}/outputs/{outputId}`` responses:
   ``Link: <https://www.opengis.net/def/profile/OGC/0/ogc-values>; rel="profile"``
