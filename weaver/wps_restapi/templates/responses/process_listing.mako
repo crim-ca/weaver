@@ -3,7 +3,15 @@
 
 <%block name="breadcrumbs">
 <li><a href="${weaver.wps_restapi_url}?f=html">Home</a></li>
+%if service:
+<li><a href="${util.get_providers_link(query='f=html')}">Providers</a></li>
+<li><a href="${util.get_provider_link(service, query='f=html')}"><span class="code">${service}</span></a></li>
+<li><a href="${util.get_processes_link(provider_id=service, query='f=html')}">Processes</a></li>
+%elif providers:
+<li><a href="${util.get_processes_link(query='f=html&providers=true')}">Processes</a></li>
+%else:
 <li><a href="${util.get_processes_link(query='f=html')}">Processes</a></li>
+%endif
 </%block>
 
 <h2 id="processes" class="page-title">
@@ -11,7 +19,9 @@
 </h2>
 
 <div class="format-link">
-%if providers:
+%if service:
+(<a href="${util.get_processes_link(provider_id=service, query='f=json')}">JSON</a>)
+%elif providers:
 (<a href="${util.get_processes_link(query='f=json&providers=true')}">JSON</a>)
 %else:
 (<a href="${util.get_processes_link(query='f=json')}">JSON</a>)
@@ -27,9 +37,16 @@
                     Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>
                 </div>
             </li>
-            %if providers:
+            %if service:
                 <li>
-                    List only <a href="${util.get_processes_link(query='f=html&providers=true')}">Local Processes</a>
+                    Return to <a href="${util.get_provider_link(service, query='f=html')}">Provider Description</a>
+                </li>
+                <li>
+                    List all <a href="${util.get_processes_link(query='f=html&providers=true')}">Provider Processes</a>
+                </li>
+            %elif providers:
+                <li>
+                    List only <a href="${util.get_processes_link(query='f=html')}">Local Processes</a>
                 </li>
             %else:
                 <li>
@@ -75,7 +92,7 @@
             %if process.get("description"):
                 <div class="field">
                     <div class="field-key">Description:</div>
-                    <div class="field-description">${process.description}</div>
+                    <div class="field-description">${util.render_description(process.description)}</div>
                 </div>
             %endif
             %if process.version:

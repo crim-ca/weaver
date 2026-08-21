@@ -347,7 +347,7 @@ def get_local_process(request):
             ])
             return Box(offering)
         else:  # HTML
-            offering = process.offering(schema, provider=provider)
+            offering = process.offering(ProcessSchema.OGC, provider=provider)
             request.response.headers.extend([
                 ("Link", make_link_header(f"{proc_url}?f=json", rel="alternate", type=ctype_json)),
                 ("Link", make_link_header(f"{proc_url}?f=yaml", rel="alternate", type=ctype_yaml)),

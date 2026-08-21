@@ -2,6 +2,10 @@
 Utilities for rendering elements in other pages.
 -->
 
+<%def name="get_providers_link(query='')">\
+${weaver.wps_restapi_url}/providers${f"?{query}" if query else ""}\
+</%def>
+
 
 <%def name="get_provider_link(provider_id, query='')">\
 ${weaver.wps_restapi_url}/providers/${provider_id}${f"?{query}" if query else ""}\
@@ -19,9 +23,10 @@ ${_prefix}/processes${f"?{query}" if query else ""}\
 <%def name="get_process_link(process_id, provider_id='', provider_uri=False, query='')">\
 <%
     _prefix = get_processes_link(provider_id=provider_id if provider_id and provider_uri else None)
-    _suffix = f"&provider={provider_id}" if provider_id and not provider_uri else ""
+    if provider_id and not provider_uri:
+        query = f"{query}&provider={provider_id}" if query else f"provider={provider_id}"
 %>
-${_prefix}/${process_id}${f"?{query}{_suffix}" if query or _suffix else ""}\
+${_prefix}/${process_id}${f"?{query}" if query else ""}\
 </%def>
 
 
@@ -206,14 +211,17 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
     <div class="process-provider">
         <dt id="provider-id">
             <div class="field-id inline code">
-                <a href="#provider-id">${provider.id}</a>
+                <a href="${get_provider_link(provider.id, query='f=html')}">${provider.id}</a>
             </div>
             %if "title" in provider:
                 <span class="dash">&#8212;</span>
                 <span class="field-title">${provider.title}</span>
             %endif
+            <div class="format-link">
+                (<a href="${get_provider_link(provider.id, query='f=json')}">JSON</a>)
+            </div>
         </dt>
-        <dd>
+            <dd>
             <div class="field">
                 <div class="field-key">Type:</div>
                 <div class="label label-info">${provider.type}</div>
@@ -225,7 +233,7 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
             %if provider.get("description"):
                 <div class="field">
                     <div class="field-key">Description:</div>
-                    <div class="field-description">${provider.description}</div>
+                    <div class="field-description">${render_description(provider.description)}</div>
                 </div>
             %endif
             %if "version" in provider:
@@ -278,7 +286,7 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
                 %if field in input_data:
                 <div class="field">
                     <div class="field-key field-sub">${field.capitalize()}:</div>
-                    <div class="field-${field}">${input_data[field]}</div>
+                    <div class="field-${field}">${render_description(input_data[field])}</div>
                 </div>
                 %endif
             %endfor
@@ -437,4 +445,72 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
     >
         <pre><code id="job-${type}-code" class="language-${language}"></code></pre>
     </div>
+</%def>
+
+
+<%!
+import html
+import re
+
+_MARKDOWN_LINK_REGEX = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
+_PLAIN_TEXT_URL_REGEX = re.compile(r"https?://[^\s<>()]+")
+
+
+def _linkify_description_text(text):
+    """
+    Convert markdown and plain URLs into HTML anchors while escaping surrounding text.
+    """
+    if not text:
+        return ""
+
+    result = []
+    cursor = 0
+
+    for md_match in _MARKDOWN_LINK_REGEX.finditer(text):
+        start, end = md_match.span()
+        if start > cursor:
+            result.append(("text", text[cursor:start]))
+        result.append(("md", md_match.group(1), md_match.group(2)))
+        cursor = end
+
+    if cursor < len(text):
+        result.append(("text", text[cursor:]))
+
+    content = []
+    for token in result:
+        if token[0] == "md":
+            _, label, url = token
+            label = html.escape(label)
+            href = html.escape(url, quote=True)
+            content.append(f'<a href="{href}">{label}</a>')
+            continue
+
+        segment = token[1]
+        seg_cursor = 0
+        for url_match in _PLAIN_TEXT_URL_REGEX.finditer(segment):
+            url_start, url_end = url_match.span()
+            if url_start > seg_cursor:
+                content.append(html.escape(segment[seg_cursor:url_start]))
+
+            url_value = url_match.group(0)
+            # Keep punctuation outside anchors for cleaner copy/paste and visual flow.
+            suffix = ""
+            while url_value and url_value[-1] in ".,;:!?":
+                suffix = url_value[-1] + suffix
+                url_value = url_value[:-1]
+
+            href = html.escape(url_value, quote=True)
+            label = html.escape(url_value)
+            content.append(f'<a href="{href}">{label}</a>')
+            if suffix:
+                content.append(html.escape(suffix))
+            seg_cursor = url_end
+
+        if seg_cursor < len(segment):
+            content.append(html.escape(segment[seg_cursor:]))
+
+    return "".join(content)
+%>
+<%def name="render_description(text)">
+${_linkify_description_text(text) | n}
 </%def>

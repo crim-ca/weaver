@@ -11,16 +11,18 @@ from pyramid.httpexceptions import (
     HTTPOk,
     HTTPUnprocessableEntity
 )
+from pyramid.response import Response
 from pyramid.settings import asbool
 
 from weaver.database import get_db
 from weaver.datatype import Process, Service
 from weaver.exceptions import ServiceNotFound, ServiceParsingError, log_unhandled_exceptions
-from weaver.formats import ContentType, OutputFormat, guess_target_format
+from weaver.formats import ContentType, OutputFormat, add_content_type_charset, guess_target_format
 from weaver.owsexceptions import OWSMissingParameterValue, OWSNotImplemented
+from weaver.processes.constants import ProcessSchema
 from weaver.processes.execution import submit_job
 from weaver.store.base import StoreServices
-from weaver.utils import get_any_id
+from weaver.utils import get_any_id, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import get_process_list_links
 from weaver.wps_restapi.providers.utils import check_provider_requirements, get_provider_services, get_service
@@ -39,6 +41,16 @@ LOGGER = logging.getLogger(__name__)
 @sd.providers_service.get(
     tags=[sd.TAG_PROVIDERS],
     schema=sd.GetProviders(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/provider_listing.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_providers_list_responses,
+        sd.GenericHTMLResponse(name="HTMLProviderListing", description="Listing of providers.")
+    ),
+)
+@sd.providers_service.get(
+    tags=[sd.TAG_PROVIDERS],
+    schema=sd.GetProviders(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_providers_list_responses,
@@ -53,6 +65,9 @@ def get_providers(request):
     detail = asbool(request.params.get("detail", True))
     check = asbool(request.params.get("check", True))
     ignore = asbool(request.params.get("ignore", True))
+    ctype = guess_target_format(request)
+    if ctype == ContentType.TEXT_HTML:
+        detail = ignore = True
     reachable_services = get_provider_services(request, check=check, ignore=ignore)
     providers = []
     for service in reachable_services:
@@ -60,6 +75,8 @@ def get_providers(request):
         if summary:
             providers.append(summary)
     data = {"checked": check, "providers": providers}
+    if ctype == ContentType.TEXT_HTML:
+        return Box(data)
     return HTTPOk(json=sd.ProvidersBodySchema().deserialize(data))
 
 
@@ -158,6 +175,16 @@ def remove_provider(request):
 @sd.provider_service.get(
     tags=[sd.TAG_PROVIDERS],
     schema=sd.ProviderEndpoint(),
+    accept=ContentType.TEXT_HTML,
+    renderer="weaver.wps_restapi:templates/responses/provider_description.mako",
+    response_schemas=sd.derive_responses(
+        sd.get_provider_responses,
+        sd.GenericHTMLResponse(name="HTMLProviderDescription", description="Provider description.")
+    ),
+)
+@sd.provider_service.get(
+    tags=[sd.TAG_PROVIDERS],
+    schema=sd.ProviderEndpoint(),
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_provider_responses,
@@ -173,6 +200,9 @@ def get_provider(request):
     data = get_schema_ref(sd.ProviderSummarySchema, request, ref_name=False)
     info = service.summary(request)
     data.update(info)
+    ctype = guess_target_format(request)
+    if ctype == ContentType.TEXT_HTML:
+        return Box(data)
     return HTTPOk(json=data)
 
 
@@ -219,6 +249,7 @@ def get_provider_processes(request):
         body["providers"] = [{"id": service.id, "url": service.url, "processes": provider_processes}]
         body["processes"] = []
         body["total"] = len(provider_processes)
+        body["service"] = service.id
         return Box(body)
     return HTTPOk(json=body)
 
@@ -251,6 +282,12 @@ def describe_provider_process(request, provider_id=None):
 )
 @sd.provider_process_service.get(
     tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
+    schema=sd.ProviderProcessEndpoint(),
+    accept=ContentType.ANY_XML,
+    response_schemas=sd.get_provider_process_responses,
+)
+@sd.provider_process_service.get(
+    tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
     schema=sd.ProviderProcessEndpoint(),
@@ -266,9 +303,28 @@ def get_provider_process(request):
     """
     process, service = describe_provider_process(request)
     schema = request.params.get("schema")
-    offering = process.offering(schema)
-    offering["provider"] = service.summary(request)
-    return Box(offering)
+    ctype = guess_target_format(request)
+    if ctype == ContentType.TEXT_HTML:
+        offering = process.offering(ProcessSchema.OGC)
+        offering["provider"] = service.summary(request)
+        return Box(offering)
+    elif ctype in ContentType.ANY_XML:
+        provider = service.summary(request)
+        offering = process.offering(ProcessSchema.WPS, request=request, provider=provider)
+        proc_url = process.href(container=request)
+        ctype_json = add_content_type_charset(ContentType.APP_JSON, "UTF-8")
+        ctype_html = add_content_type_charset(ContentType.TEXT_HTML, "UTF-8")
+        ctype_xml = add_content_type_charset(ContentType.APP_XML, "UTF-8")
+        headers = [
+            ("Link", make_link_header(f"{proc_url}?f=json", rel="alternate", type=ctype_json)),
+            ("Link", make_link_header(f"{proc_url}?f=html", rel="alternate", type=ctype_html)),
+            ("Content-Type", ctype_xml),
+        ]
+        return Response(offering, headerlist=headers)
+    else:
+        offering = process.offering(schema)
+        offering["provider"] = service.summary(request)
+        return Box(offering)
 
 
 @sd.provider_process_package_service.get(

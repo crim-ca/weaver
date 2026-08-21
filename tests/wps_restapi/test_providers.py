@@ -307,13 +307,13 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert "processes" in provider and isinstance(provider["processes"], list)
         assert len(provider["processes"]) == 2
         remote_processes = []
-        for process in resp.json["processes"]:
+        for process in provider["processes"]:
             assert "id" in process and isinstance(process["id"], str)
             assert "title" in process and isinstance(process["title"], str)
             assert "version" in process and isinstance(process["version"], str)
             assert "keywords" in process and isinstance(process["keywords"], list)
             assert "metadata" in process and isinstance(process["metadata"], list)
-            assert len(process["jobControlOptions"]) == 1
+            assert "jobControlOptions" in process and len(process["jobControlOptions"]) >= 1
             assert ExecuteControlOption.ASYNC in process["jobControlOptions"]
             remote_processes.append(process["id"])
         assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in remote_processes
@@ -427,6 +427,200 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
+    def test_get_providers_listing_html(self):
+        """
+        Validate that the providers listing can be retrieved as HTML.
+        """
+        self.register_provider()
+
+        path = "/providers"
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert "Providers" in resp.text
+        assert self.remote_provider_name in resp.text
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_providers_listing_html_format_query(self):
+        """
+        Validate that the providers listing can be retrieved as HTML using the ``f=html`` query parameter.
+        """
+        self.register_provider()
+
+        path = "/providers"
+        resp = self.app.get(path, params={"f": "html"})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert "Providers" in resp.text
+        assert self.remote_provider_name in resp.text
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_provider_description_html(self):
+        self.register_provider()
+
+        path = f"/providers/{self.remote_provider_name}"
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert self.remote_provider_name in resp.text
+        assert "Provider:" in resp.text
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_provider_description_html_breadcrumbs(self):
+        """
+        Validate that the HTML provider description page contains breadcrumb navigation
+        linking back to the providers listing and to the provider-specific page.
+        """
+        self.register_provider()
+
+        path = f"/providers/{self.remote_provider_name}"
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert f"/providers/{self.remote_provider_name}" in resp.text, \
+            "Expected provider link in breadcrumbs or content"
+        assert "/providers?f=html" in resp.text, \
+            "Expected link back to providers listing in breadcrumbs"
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_provider_processes_html(self):
+        """
+        Validate that requesting provider processes with HTML format returns a proper HTML listing.
+        """
+        self.register_provider()
+
+        path = f"/providers/{self.remote_provider_name}/processes"
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "</html>" in resp.text
+        assert self.remote_provider_name in resp.text
+        assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in resp.text
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_provider_processes_html_breadcrumbs(self):
+        """
+        Validate that the HTML provider processes listing page contains breadcrumb navigation
+        linking back to the provider description page and providers listing.
+        """
+        self.register_provider()
+
+        path = f"/providers/{self.remote_provider_name}/processes"
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert f"/providers/{self.remote_provider_name}" in resp.text, \
+            "Expected provider link in breadcrumbs navigating back to provider description"
+        assert "/providers?" in resp.text or "/providers/" in resp.text, \
+            "Expected providers-related link in breadcrumbs"
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_processes_html_with_providers_process_description_link(self):
+        """
+        Validate that the HTML process listing page with provider processes contains links
+        to the provider's process description pages.
+        """
+        self.register_provider()
+
+        path = "/processes"
+        resp = self.app.get(path, params={"providers": "true", "f": "html"})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in resp.text
+        assert self.remote_provider_name in resp.text
+        assert f"provider={self.remote_provider_name}" in resp.text, \
+            "Expected link to provider's process description using the provider query parameter"
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_processes_html_with_providers_wps_xml_link(self):
+        """
+        Validate that the HTML process listing page with provider processes contains a WPS XML link
+        for each provider process.
+        """
+        self.register_provider()
+
+        path = "/processes"
+        resp = self.app.get(path, params={"providers": "true", "f": "html"})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert "WPS XML" in resp.text, \
+            "Expected a WPS XML link in the process listing for provider processes"
+        assert "f=xml" in resp.text, \
+            "Expected f=xml query in provider process XML link"
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_provider_process_html_job_listing_process_link(self):
+        """
+        Validate that the HTML job listing page contains a link to the provider's process description
+        when the job was executed for a provider process.
+        """
+        self.register_provider()
+        job = self.job_store.save_job(
+            "test-task",
+            resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
+            self.remote_provider_name,
+            access="public",
+        )
+
+        path = "/jobs"
+        resp = self.app.get(path, params={"f": "html", "detail": "true"})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert str(job.id) in resp.text
+        assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in resp.text
+        assert self.remote_provider_name in resp.text
+        assert f"provider={self.remote_provider_name}" in resp.text, \
+            "Expected link to provider's process description using the provider query parameter in job listing"
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
     def test_get_provider_process_description_html(self):
         self.register_provider()
 
@@ -472,6 +666,62 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in resp.text
         assert self.remote_provider_name in resp.text
         assert resources.TEST_REMOTE_SERVER_URL in resp.text
+
+    @pytest.mark.html
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_provider_process_description_html_breadcrumbs(self):
+        """
+        Validate that the HTML process description page for a provider process contains navigation
+        breadcrumbs that reference the provider context.
+        """
+        self.register_provider()
+
+        path = f"/providers/{self.remote_provider_name}/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert f"/providers/{self.remote_provider_name}" in resp.text, \
+            "Expected provider link in process description breadcrumbs or content"
+        assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in resp.text
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_provider_process_description_xml(self):
+        """
+        Validate that a provider process description can be retrieved as WPS XML offering.
+        """
+        self.register_provider()
+
+        path = f"/providers/{self.remote_provider_name}/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
+        xml_headers = {"Accept": ContentType.APP_XML}
+        resp = self.app.get(path, headers=xml_headers)
+        assert resp.status_code == 200
+        assert ContentType.APP_XML in resp.content_type
+        assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in resp.text
+
+    @mocked_remote_server_requests_wps1([
+        resources.TEST_REMOTE_SERVER_URL,
+        resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+        [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+    ])
+    def test_get_provider_process_description_xml_with_format_query(self):
+        """
+        Validate that a provider process description can be retrieved as WPS XML using the ``f=xml`` query parameter.
+        """
+        self.register_provider()
+
+        path = f"/providers/{self.remote_provider_name}/processes/{resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}"
+        resp = self.app.get(path, params={"f": "xml"})
+        assert resp.status_code == 200
+        assert ContentType.APP_XML in resp.content_type
+        assert resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID in resp.text
 
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,

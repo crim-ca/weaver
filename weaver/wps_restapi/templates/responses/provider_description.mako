@@ -1,25 +1,16 @@
 <%inherit file="weaver.wps_restapi:templates/responses/base.mako"/>
 <%namespace name="util" file="weaver.wps_restapi:templates/responses/util.mako"/>
 
-<%
-    provider_id = provider.id if provider else None
-%>
-
 <%block name="breadcrumbs">
 <li><a href="${weaver.wps_restapi_url}?f=html">Home</a></li>
-%if provider:
-<li><a href="${util.get_processes_link(query='f=html&providers=true')}">Processes</a></li>
-<li><a href="${util.get_process_link(id, provider_id=provider.id, query='f=html')}"><span class="code">${id}</span></a></li>
-%else:
-<li><a href="${util.get_processes_link(query='f=html')}">Processes</a></li>
-<li><a href="${util.get_process_link(id, query='f=html')}"><span class="code">${id}</span></a></li>
-%endif
+<li><a href="${util.get_providers_link(query='f=html')}">Providers</a></li>
+<li><a href="${util.get_provider_link(id, query='f=html')}"><span class="code">${id}</span></a></li>
 </%block>
 
 <h2 id="id" class="page-title">
-    <div class="process-title inline">
+    <div class="provider-title inline">
         <div>
-            Process:
+            Provider:
             <div class="field-id code inline">
                 <a href="#id">${id}</a>
             </div>
@@ -31,8 +22,7 @@
 </h2>
 
 <div class="format-link">
-    (<a href="${util.get_process_link(id, provider_id=provider_id, query='f=json')}">OGC JSON</a>,
-     <a href="${util.get_process_link(id, provider_id=provider_id, query='f=xml')}">WPS XML</a>)
+    (<a href="${util.get_provider_link(id, query='f=json')}">JSON</a>)
 </div>
 
 <div class="content-section nav-menu">
@@ -44,45 +34,40 @@
         </li>
         <li>
             <div class="nav-link">
+                Return to <a href="${util.get_providers_link(query='f=html')}">Providers Listing</a>
+            </div>
+        </li>
+        <li>
+            <div class="nav-link">
                 Return to <a href="${util.get_processes_link(query='f=html')}">Processes Listing</a>
             </div>
         </li>
         <li>
             <div class="nav-link">
-                Go to <a href="${util.get_jobs_link(query=f'f=html&process={id}')}">Process Jobs</a>
+                Go to <a href="${util.get_processes_link(provider_id=id, query='f=html')}">Provider Processes</a>
             </div>
         </li>
         <li>
             <div class="nav-link">
-                Go to <a href="#metadata">Process Metadata</a>
+                Go to <a href="${util.get_jobs_link(query=f'f=html&provider={id}')}">Provider Jobs</a>
             </div>
         </li>
-        %if provider:
+        %if metadata:
         <li>
             <div class="nav-link">
-                Go to <a href="#provider">Process Provider</a>
+                Go to <a href="#metadata">Provider Metadata</a>
             </div>
         </li>
         %endif
         <li>
             <div class="nav-link">
-                Go to <a href="#inputs">Process Inputs</a>
-            </div>
-        </li>
-        <li>
-            <div class="nav-link">
-                Go to <a href="#outputs">Process Outputs</a>
-            </div>
-        </li>
-        <li>
-            <div class="nav-link">
-                Go to <a href="#links">Process Links</a>
+                Go to <a href="#links">Provider Links</a>
             </div>
         </li>
     </ul>
 </div>
 
-<div class="process-description">
+<div class="provider-description">
 
     <div class="content-section">
     %if title:
@@ -96,6 +81,31 @@
     </div>
 
     <div class="content-section">
+        <div class="field">
+            <div class="field-key">Type:</div>
+            <div class="label label-info">${type}</div>
+        </div>
+        <div class="field">
+            <div class="field-key">Location:</div>
+            <div class="code"><a href="${url}">${url}</a></div>
+        </div>
+        %if version:
+            <div class="field">
+                <div class="field-key">Version:</div>
+                <div class="label label-info version-tag">${version}</div>
+            </div>
+        %endif
+        %if keywords:
+            <div class="field">
+                <div class="field-key">Keywords:</div>
+                %for keyword in keywords:
+                    <div class="label label-note">${keyword}</div>
+                %endfor
+            </div>
+        %endif
+    </div>
+
+    <div class="content-section">
         <h3 id="metadata">
             <a href="#metadata">Metadata</a>
         </h3>
@@ -104,29 +114,6 @@
         %else:
             <span class="undefined">No metadata provided.</span>
         %endif
-    </div>
-
-    %if provider:
-    <div class="content-section">
-        <h3 id="provider">
-            <a href="#provider">Provider</a>
-        </h3>
-        ${util.render_provider(provider)}
-    </div>
-    %endif
-
-    <div class="content-section">
-        <h3 id="inputs">
-            <a href="#inputs">Inputs</a>
-        </h3>
-        ${util.render_inputs(inputs)}
-    </div>
-
-    <div class="content-section">
-        <h3 id="outputs">
-            <a href="#outputs">Outputs</a>
-        </h3>
-        ${util.render_outputs(outputs)}
     </div>
 
     <div class="content-section">

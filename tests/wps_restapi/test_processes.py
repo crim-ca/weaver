@@ -715,6 +715,34 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert self.process_public.identifier in resp.text
 
     @pytest.mark.html
+    @parameterized.expand([
+        (
+            "plain_url",
+            "More information: https://example.com/docs and usage notes.",
+            '<a href="https://example.com/docs">https://example.com/docs</a>',
+        ),
+        (
+            "markdown_url",
+            "See [documentation](https://example.com/docs) for usage notes.",
+            '<a href="https://example.com/docs">documentation</a>',
+        ),
+    ])
+    def test_describe_process_html_description_links(self, _, description_text, expected_anchor):
+        """
+        Test that description URLs provided as plain text or markdown are automatically converted to links in HTML.
+        """
+        process = self.process_store.fetch_by_id(self.process_public.identifier)
+        process["description"] = description_text
+        process["visibility"] = Visibility.PUBLIC
+        self.process_store.save_process(process, overwrite=True)
+
+        path = f"/processes/{self.process_public.identifier}"
+        resp = self.app.get(path, headers=self.html_headers)
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.TEXT_HTML
+        assert expected_anchor in resp.text
+
+    @pytest.mark.html
     def test_get_processes_html_accept_header_user_agent_browser_disabled(self):
         path = "/processes"
         headers = copy.deepcopy(dict(self.html_headers))
@@ -3720,7 +3748,6 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
             }},
             "executionUnit": [{"unit": cwl}],
-            # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
             "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
