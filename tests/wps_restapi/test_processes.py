@@ -501,6 +501,44 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         proc_expect += [(tag, ver) for tag, ver in zip(proc2_tags, proc2_versions)]
         assert proc_result == sorted(proc_expect)
 
+    def test_get_processes_with_tagged_revisions_none_version(self):
+        """
+        Listing of process revisions when the initial revision was deployed without a version.
+
+        The first revision deployed with version ``None`` should be automatically adjusted to ``0.0.0`` by default
+        when a newer revision (e.g.: ``1.0.0``) is deployed. This ensures that the missing version is updated
+        accordingly within the older :term:`Process` reference and that revision listing relying on them works.
+        """
+        proc_id = "test-process-none-revision"
+        cwl, desc = self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=proc_id, version=None)
+        assert desc["process"]["version"] is None
+
+        # deploy '1.0.0' revision for it
+        data = copy.deepcopy(cwl)
+        data.update({"version": "1.0.0", "inputs": {"message": {"type": "string"}}})
+        resp = self.app.put_json(f"/processes/{proc_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 201
+        data = {"value": Visibility.PUBLIC}
+        resp = self.app.put_json(f"/processes/{proc_id}/visibility", params=data, headers=self.json_headers)
+        assert resp.status_code == 200
+
+        proc_versions = ["0.0.0", "1.0.0"]
+        proc_tags = [f"{proc_id}:{ver}" for ver in proc_versions]
+
+        path = get_path_kvp("/processes", process=proc_id, revisions=True, detail=False)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert body["processes"] == proc_tags
+
+        path = get_path_kvp("/processes", process=proc_id, revisions=True, detail=True)
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        result = [(proc["id"], proc["version"]) for proc in body["processes"]]
+        expect = list(zip(proc_tags, proc_versions))
+        assert result == expect
+
     def test_get_processes_with_history_revisions(self):
         """
         When requesting specific process ID with revisions, version history of this process is listed.

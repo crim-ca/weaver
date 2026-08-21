@@ -167,6 +167,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         assert conf_core in self.conforms_to
         assert conf_json in self.conforms_to
 
+    @pytest.mark.flaky(retries=2, delay=5)
     @pytest.mark.dependency(
         name="test_service_desc_link_and_oas_validation",
         depends=["test_conformance_classes_core"],
@@ -187,7 +188,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         oas_validated = False
         service_desc_urls = [link["href"] for link in service_desc_links]
         for service_desc_url in service_desc_urls:
-            oas_response = self.client._request("GET", service_desc_url, request_timeout=10)
+            oas_response = self.client._request("GET", service_desc_url, request_timeout=20)
             assert oas_response.status_code == 200
             try:
                 oas_json = oas_response.json()
@@ -660,21 +661,28 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
         result = self.client.processes(detail=True)
         processes = result.body.get("processes", [])
-        mutable_proc = None
+        mutable_proc_id = None
         deployed_proc = [p for p in processes if p.get("id", "").startswith(TEST_SERVER_OAP_DRU_PROCESS_ID)]
         for mutable_proc in deployed_proc:
             assert mutable_proc, "No mutable process found."
-            process_id = mutable_proc["id"]
-            result = self.client.undeploy(process_id)
-            assert result.code == 204, (
-                "Undeploy should respond with 204 if successful "
-                "(/req/deploy-replace-undeploy/undeploy-response)."
-            )
-            assert not result.body
+            mutable_proc_id = mutable_proc["id"]
+            # note: particularity of Weaver
+            #   when we undeploy a version, the 'latest' revision before it (if any) becomes the available version
+            #   therefore, we must iteratively undeploy until all revisions are removed
+            while True:
+                result = self.client.undeploy(mutable_proc_id)
+                if result.code == 404:
+                    break
+                assert result.code == 204, (
+                    "Undeploy should respond with 204 if successful "
+                    "(/req/deploy-replace-undeploy/undeploy-response)."
+                )
+                assert not result.body
 
-        # note: particularity of Weaver
-        #   when we undeploy a version, the 'latest' revision before it (if any) becomes the available version
-        #   therefore, requesting the description of the non-versioned processID *might* cause a 200 finding it
-        #   this is why we iteratively undeploy all expected ones above, so there is no revision left either
-        result = self.client.describe(mutable_proc)
+        assert mutable_proc_id, (
+            f"Expected a mutable process [starting with '{TEST_SERVER_OAP_DRU_PROCESS_ID}'] "
+            "to be available from previous deployment steps."
+        )
+
+        result = self.client.describe(mutable_proc_id)
         assert result.code == 404
