@@ -12,6 +12,8 @@ Changes
 
 Changes:
 --------
+- Implement the `CLI` ``replace`` operation to update an existing `Process` definition
+  (resolves `#906 <https://github.com/crim-ca/weaver/issues/906>`_).
 - Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}`` endpoint
   to align with the latest OGC API - Processes Core specification.
 - Added the N-output response header for N-output retrieval responses.
@@ -54,7 +56,6 @@ Fixes:
 .. _changes_6.15.0:
 
 `6.15.0 <https://github.com/crim-ca/weaver/tree/6.15.0>`_ (2026-07-03)
-====================================================================================================================
 
 Changes:
 --------
