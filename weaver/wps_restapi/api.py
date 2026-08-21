@@ -94,12 +94,13 @@ def get_conformance(category, settings):
     ] if ows_wps_enabled else []
 
     ogcapi_common = "http://www.opengis.net/spec/ogcapi-common-1/1.0"
-    ogcapi_proc_core1 = "http://www.opengis.net/spec/ogcapi-processes-1/1.0"
-    ogcapi_proc_core2 = "http://www.opengis.net/spec/ogcapi-processes-1/2.0"
-    ogcapi_proc_part2 = "http://www.opengis.net/spec/ogcapi-processes-2/1.0"
-    ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/0.0"
-    ogcapi_proc_part4 = "http://www.opengis.net/spec/ogcapi-processes-4/1.0"
-    ogcapi_proc_part5 = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"  # not yet defined
+    ogcapi_proc_core1 = "http://www.opengis.net/spec/ogcapi-processes-1/1.0"  # core (v1.0)
+    ogcapi_proc_core2 = "http://www.opengis.net/spec/ogcapi-processes-1/2.0"  # core (v2.0)
+    ogcapi_proc_part2 = "http://www.opengis.net/spec/ogcapi-processes-2/1.0"  # deploy, replace, undeploy
+    ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/0.0"  # workflows and chaining
+    ogcapi_proc_part4 = "http://www.opengis.net/spec/ogcapi-processes-4/1.0"  # job management
+    ogcapi_proc_part5 = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"  # provenance
+    ogcapi_proc_part6 = "http://www.opengis.net/spec/ogcapi-processes-6/1.0"  # versioning (proposal, not yet defined)
     ogcapi_proc_apppkg = "http://www.opengis.net/spec/eoap-bp/1.0"
     # FIXME: https://github.com/crim-ca/weaver/issues/412
     # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
@@ -605,6 +606,9 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part4}/req/job-management/create-unsupported-media-type",
         f"{ogcapi_proc_part4}/req/job-management/definition-get-op",
         f"{ogcapi_proc_part4}/req/job-management/definition-response-body",
+        f"{ogcapi_proc_part4}/req/job-management/definition-response-body-ogcapi",
+        # FIXME: support openEO job graph (https://github.com/crim-ca/weaver/issues/564)
+        # f"{ogcapi_proc_part4}/req/job-management/definition-response-body-alternate",
         f"{ogcapi_proc_part4}/req/job-management/definition-response-success",
         f"{ogcapi_proc_part4}/req/job-management/start-post-op",
         f"{ogcapi_proc_part4}/req/job-management/start-response",
@@ -614,16 +618,31 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part4}/req/job-management/update-response",
         f"{ogcapi_proc_part4}/req/job-management/update-response-locked",
     ] + ([
-        f"{ogcapi_proc_part4}/req/provenance",
-        f"{ogcapi_proc_part4}/req/provenance/prov-get-op",
-        f"{ogcapi_proc_part4}/req/provenance/prov-response",
-        f"{ogcapi_proc_part4}/req/provenance/prov-content-negotiation",
-        f"{ogcapi_proc_part4}/req/provenance/inputs-get-op",
-        f"{ogcapi_proc_part4}/req/provenance/inputs-response",
+        f"{ogcapi_proc_part5}/conf/provenance",
+        f"{ogcapi_proc_part5}/req/provenance",
+        f"{ogcapi_proc_part5}/req/provenance/prov-get-op",
+        f"{ogcapi_proc_part5}/req/provenance/prov-response",
+        f"{ogcapi_proc_part5}/req/provenance/prov-missing",
+        f"{ogcapi_proc_part5}/req/provenance/prov-unsupported-format",
+        f"{ogcapi_proc_part5}/req/provenance/prov-content-namespaces",
+        f"{ogcapi_proc_part5}/req/provenance/prov-content-job-entity",
+        f"{ogcapi_proc_part5}/req/provenance/prov-content-process-entity",
+        f"{ogcapi_proc_part5}/req/provenance/prov-content-job-activity",
+        f"{ogcapi_proc_part5}/req/provenance/prov-content-input-entity",
+        f"{ogcapi_proc_part5}/req/provenance/prov-content-result-entity",
+        f"{ogcapi_proc_part5}/req/provenance/prov-content-collection-entity",
+        f"{ogcapi_proc_part5}/req/provenance/prov-content-file-entity",
+        f"{ogcapi_proc_part5}/rec/provenance/prov-job-status-link",
+        f"{ogcapi_proc_part5}/rec/provenance/prov-content-type-json",
+        f"{ogcapi_proc_part5}/rec/provenance/prov-content-data-entity",
+        f"{ogcapi_proc_part5}/rec/provenance/prov-content-timing",
+        f"{ogcapi_proc_part5}/rec/provenance/prov-content-software-agent",
+        f"{ogcapi_proc_part5}/rec/provenance/prov-content-associations",
+        f"{ogcapi_proc_part5}/per/provenance/prov-content-negotiation",
     ] if ogcapi_proc_prov else []) + [
         # OGC API - Processes - 'Part 5: Versioning' (unofficial)
         # (see https://github.com/opengeospatial/ogcapi-processes/pull/578)
-        f"{ogcapi_proc_part5}/rec/versioning/replace-response-links"
+        f"{ogcapi_proc_part6}/rec/versioning/replace-response-links"
     ] + [
         # FIXME: employ 'weaver.wps_restapi.quotation.utils.check_quotation_supported' to add below conditionally
         # FIXME: https://github.com/crim-ca/weaver/issues/156  (billing/quotation)

@@ -12,6 +12,17 @@ Changes
 
 Changes:
 --------
+- Align ``GET /jobs/{jobId}/definition`` (replaces ``GET /jobs/{jobId}/inputs``) with the
+  most recent `OGC API - Processes - Part 4: Job Management` specification,
+  which includes the ``entity`` URI of the appropriate `Process` definition at the root of the `Job`/`Workflow`.
+  To ensure backward compatibility, the ``/inputs`` requests will be redirected to the `Job` definition contents.
+  The `CLI` will keep invoking the ``/inputs`` endpoint if requested directly with the corresponding operation.
+  A ``definition`` operation is added to the `CLI` to directly access the new endpoint.
+- Support ``application/provenance+json`` and  ``application/provenance+xml`` for corresponding provenance media-types
+  (fixes `#987 <https://github.com/crim-ca/weaver/issues/987>`_).
+- Update and add new ``/conformance`` references of `Job` definition and provenance requirements and recommendations.
+- Update `Job` provenance error responses with standard ``type`` URIs.
+- Add ``rel=profile`` link and ``Content-Profile`` header to `Job` provenance responses to indicate the applied profile.
 - Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}`` endpoint
   to align with the latest OGC API - Processes Core specification.
 - Added the N-output response header for N-output retrieval responses.
@@ -34,6 +45,13 @@ Changes:
 
 Fixes:
 ------
+- Fix `Job` provenance to provide `Weaver` and ``weaver-worker`` references as ``SoftwareAgent`` rather than ``Person``
+  (relates to `#965 <https://github.com/crim-ca/weaver/issues/965>`_).
+- Fix URL schema validation error on `Job` links when they include a result with a ``?f={mediaType}`` query parameter.
+  The URL pattern did not correctly provide the anchor and query parameter components. Also, if the media-type had some
+  special characters (e.g., a space between its parameters), it would fail due to the missing URL encoding. Finally, the
+  actual URL returned was missing the ``/results/`` portion of the ``/jobs/{jobId}/results/{outputId}`` endpoint.
+- Fix missing ``unquote`` operation to handle URL encoding for ``?f={mediaType}`` on result endpoint for above change.
 - Fix `Process` listing with revisions where the original version was generated without an explicit ``version`` value.
   This could lead to a ``null`` version to propagate in a `MongoDB` aggregation pipeline failing following revision
   listing including it.

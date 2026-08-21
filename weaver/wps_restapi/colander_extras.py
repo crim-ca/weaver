@@ -205,12 +205,20 @@ LITERAL_SCHEMA_TYPES = frozenset([
 ])
 
 # patch URL with negative look-ahead to invalidate following // after scheme
+# (techically this is allowed, but it is probably not intended from a bad join, so raise it to catch them early)
 NO_DOUBLE_SLASH_PATTERN = r"(?!.*//.*$)"
 URL_REGEX = colander.URL_REGEX.replace(r"://)?", rf"://)?{NO_DOUBLE_SLASH_PATTERN}")
+# avoid over-glob of original regex to allow more controlled query/anchor
+URL_REGEX = URL_REGEX.replace(r"(?:/?|[/?]\S+)", r"(?:/?|[/?][^?#\s]+)")
+# patch URL with missing optional anchor (`#`) and query parameters (`?`)
+# if both query and anchors are provided, anchor must be last since everything after `#` is for client resolution
+URL_REGEX = rf"{URL_REGEX[:-1]}([^\s?#]*)(?:\?(?!\?)[^#\s]*)?(?:#[^\s?#]*)?$"
+# reject malformed localhost forms while preserving known valid localhost query/path use-cases
+URL_REGEX = rf"^(?!https?://localhost(?:$|#[^\s]*|\?[^#=\s]+(?:#|$))){URL_REGEX[1:]}"
 URL = colander.Regex(URL_REGEX, msg=colander._("Must be a URL"), flags=re.IGNORECASE)
 FILE_URL_REGEX = colander.URI_REGEX.replace(r"://", r"://(?!//)")
 FILE_URI = colander.Regex(FILE_URL_REGEX, msg=colander._("Must be a file:// URI scheme"), flags=re.IGNORECASE)
-URI_REGEX = rf"{URL_REGEX[:-1]}(?:#?|[#?]\S+)$"
+URI_REGEX = rf"{URL_REGEX[:-1]}(?:#[^\s?#]*)?$"  # allow URI and optional fragment (e.g.: schema model), but no query
 URI = colander.Regex(URI_REGEX, msg=colander._("Must be a URI"), flags=re.IGNORECASE)
 STRING_FORMATTERS.update({
     # following MUST NOT use the 'StringTypeConverter' or 'ExtendedStringTypeConverter'

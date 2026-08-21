@@ -3446,7 +3446,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
     @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_CUDA_NAME], indirect=True)
-    def test_deploy_process_CWL_CudaRequirement_executionUnit(self):  # noqa
+    def test_deploy_process_CWL_CudaRequirement_executionUnit(self):
         with contextlib.ExitStack() as stack:
             stack.enter_context(mocked_wps_output(self.settings))
             cuda_requirements = {
@@ -3534,7 +3534,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_CWL_WPS1Requirement_executionUnit_requirements(self):  # noqa
+    def test_deploy_process_CWL_WPS1Requirement_executionUnit_requirements(self):
         """
         Ensures that :term:`CWL` ``requirements`` directly resolves with a namespaced ``weaver`` requirement schema.
         """
@@ -3573,7 +3573,6 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         body = {
             "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
             "executionUnit": [{"unit": cwl}],
-            # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
             "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
@@ -3590,7 +3589,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_CWL_WPS1Requirement_href(self):  # noqa
+    def test_deploy_process_CWL_WPS1Requirement_href(self):
         ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
         cwl = {
             "cwlVersion": "v1.0",
@@ -3635,7 +3634,6 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             body = {
                 "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
                 "executionUnit": [{"href": tmp_href}],
-                # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
                 "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             }
             self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
@@ -3651,7 +3649,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_CWL_WPS1Requirement_owsContext(self):  # noqa
+    def test_deploy_process_CWL_WPS1Requirement_owsContext(self):
         ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
         cwl = {
             "cwlVersion": "v1.0",
@@ -3698,7 +3696,6 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                     "id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
                 }},
                 "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}],  # just to fulfill schema validation
-                # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
                 "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             }
             ows_ctx = ows_context_href(tmp_http)
@@ -3716,7 +3713,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):  # noqa
+    def test_deploy_process_CWL_WPS1Requirement_executionUnit(self):
         ns, fmt = get_cwl_file_format(ContentType.APP_JSON)
         cwl = {
             "cwlVersion": "v1.0",
@@ -3752,7 +3749,6 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID,
             }},
             "executionUnit": [{"unit": cwl}],
-            # FIXME: avoid error on omitted deploymentProfileName (https://github.com/crim-ca/weaver/issues/319)
             "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
         }
         self.deploy_process_make_visible_and_fetch_deployed(body, resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID)
@@ -3768,7 +3764,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_WPS1_DescribeProcess_href(self):  # noqa
+    def test_deploy_process_WPS1_DescribeProcess_href(self):
         body = {
             "processDescription": {
                 "href": resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_URL  # this one should be used
@@ -3788,7 +3784,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_WPS1_DescribeProcess_owsContext(self):  # noqa
+    def test_deploy_process_WPS1_DescribeProcess_owsContext(self):
         body = {
             "processDescription": {"process": {"id": resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID}},
             "executionUnit": [{"href": resources.TEST_REMOTE_SERVER_URL}]  # some URL just to fulfill schema validation
@@ -3804,7 +3800,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):  # noqa
+    def test_deploy_process_WPS1_DescribeProcess_executionUnit(self):
         """
         Test process deployment using a WPS-1 DescribeProcess URL specified as an execution unit reference.
         """
@@ -3826,7 +3822,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_WPS1_GetCapabilities_href(self):  # noqa
+    def test_deploy_process_WPS1_GetCapabilities_href(self):
         """
         Test process deployment using a WPS-1 GetCapabilities URL specified as process description reference.
         """
@@ -3846,7 +3842,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_WPS1_GetCapabilities_owsContext(self):  # noqa
+    def test_deploy_process_WPS1_GetCapabilities_owsContext(self):
         """
         Test process deployment using a WPS-1 GetCapabilities URL specified through the OwsContext definition.
         """
@@ -3864,7 +3860,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
         [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
     ])
-    def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):  # noqa
+    def test_deploy_process_WPS1_GetCapabilities_executionUnit(self):
         """
         Test process deployment using a WPS-1 GetCapabilities URL specified through the ExecutionUnit parameter.
         """
@@ -3910,7 +3906,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
     @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_OGC_API], indirect=True)
-    def test_deploy_process_OGC_API_DescribeProcess_href(self):  # noqa
+    def test_deploy_process_OGC_API_DescribeProcess_href(self):
         """
         Use the basic :term:`Process` URL format for referencing remote OGC API definition.
 
@@ -3938,7 +3934,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
     @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_OGC_API], indirect=True)
-    def test_deploy_process_OGC_API_DescribeProcess_owsContext(self):  # noqa
+    def test_deploy_process_OGC_API_DescribeProcess_owsContext(self):
         register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
         remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
         href = f"{self.url}/processes/{remote_process}"
@@ -3953,7 +3949,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
 
     @pytest.mark.usefixtures("assert_cwl_no_warn_unknown_hint")
     @pytest.mark.parametrize("assert_cwl_no_warn_unknown_hint", [CWL_REQUIREMENT_APP_OGC_API], indirect=True)
-    def test_deploy_process_OGC_API_DescribeProcess_executionUnit(self):  # noqa
+    def test_deploy_process_OGC_API_DescribeProcess_executionUnit(self):
         register_builtin_processes(self.app.app.registry)  # must register since collection reset in 'setUp'
         remote_process = "jsonarray2netcdf"  # use builtin, re-deploy as "remote process"
         href = f"{self.url}/processes/{remote_process}"

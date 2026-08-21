@@ -73,6 +73,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union
     from typing_extensions import Annotated, Literal
 
+    from mock.mock import _patch as MockPatch
     from mypy_boto3_s3.client import S3Client
     from mypy_boto3_s3.literals import BucketLocationConstraintType, RegionName
     from mypy_boto3_s3.type_defs import CreateBucketConfigurationTypeDef
@@ -86,6 +87,7 @@ if TYPE_CHECKING:
         AnyRequestMethod,
         AnyRequestType,
         AnyResponseType,
+        AnyResponseWithBodyType,
         EnvContainer,
         HeadersType,
         JSON,
@@ -95,16 +97,13 @@ if TYPE_CHECKING:
 
     S3Scheme = Literal["s3", "https"]
 
-    # pylint: disable=C0103,invalid-name,E1101,no-member
-    MockPatch = mock._patch  # noqa: W0212
-
     # [WPS1-URL, GetCapPathXML, [DescribePathXML]]
     MockConfigCall = Callable[[PreparedRequest], Union[RequestsResponse, Tuple[int, JSON], str, bytes, Exception, None]]
     MockConfigWPS1 = Union[
         Tuple[str, Union[str, MockConfigCall], Union[Sequence[str], Dict[str, Union[str, MockConfigCall]]]],
         Annotated[Sequence[str], 3]
     ]
-    MockReturnType = TypeVar("MockReturnType")
+    MockReturnTypeT = TypeVar("MockReturnTypeT")
     MockHttpMethod = Union[
         responses.HEAD,
         responses.GET,
@@ -117,7 +116,7 @@ if TYPE_CHECKING:
 
     CommandType = Callable[[Union[str, Tuple[str]]], int]
 
-    CompareType = TypeVar("CompareType")
+    CompareTypeT = TypeVar("CompareTypeT")
 
 LOGGER = logging.getLogger(".".join([__package__, __name__]))
 
@@ -477,11 +476,11 @@ def mocked_file_response(path, url):
 
 
 def mocked_sub_requests(app,                # type: TestApp
-                        method_function,    # type: Union[AnyRequestMethod, Callable[[Any, ...], MockReturnType]]
+                        method_function,    # type: Union[AnyRequestMethod, Callable[[Any, ...], MockReturnTypeT]]
                         *args,              # type: Any
                         only_local=False,   # type: bool
                         **kwargs,           # type: Any
-                        ):                  # type: (...) -> Union[AnyResponseType, MockReturnType]
+                        ):                  # type: (...) -> Union[AnyResponseWithBodyType, MockReturnTypeT]
     """
     Mocks request calls targeting a :class:`webTest.TestApp` to avoid sub-request calls to send real requests.
 
@@ -1572,8 +1571,8 @@ def setup_test_file_hierarchy(test_paths, test_root_dir, test_data="data"):
 
 def assert_equal_any_order(result,          # type: Iterable[Any]
                            expect,          # type: Iterable[Any]
-                           comparer=None,   # type: Optional[Callable[[CompareType, CompareType], bool]]
-                           formatter=str,   # type: Optional[Callable[[CompareType], str]]
+                           comparer=None,   # type: Optional[Callable[[CompareTypeT, CompareTypeT], bool]]
+                           formatter=str,   # type: Optional[Callable[[CompareTypeT], str]]
                            diff=False,      # type: bool
                            ):               # type: (...) -> None
     if not callable(comparer):

@@ -22,7 +22,7 @@ from io import BytesIO
 from logging import ERROR, INFO, getLevelName, getLogger
 from secrets import compare_digest, token_hex
 from typing import TYPE_CHECKING, cast
-from urllib.parse import urljoin, urlparse
+from urllib.parse import quote, urljoin, urlparse
 
 import colander
 import pyramid.httpexceptions
@@ -110,6 +110,7 @@ if TYPE_CHECKING:
     from weaver.quotation.status import AnyQuoteStatus
     from weaver.status import AnyStatusType, StatusType
     from weaver.typedefs import (
+        URL,
         AnyLogLevel,
         AnyProcess,
         AnyProcessRef,
@@ -122,6 +123,7 @@ if TYPE_CHECKING:
         ExecutionInputs,
         ExecutionOutputs,
         ExecutionSubscribers,
+        FormatMediaType,
         JobResults,
         JSON,
         Link,
@@ -1504,12 +1506,14 @@ class Job(Base, LoggerHandler):
         result_job_path = os.path.join(result_job_path, file_name)
         return result_job_path
 
-    def get_all_possible_formats_links(self, url, results):
+    @staticmethod
+    def get_all_possible_formats_links(url, results):
+        # type: (URL, JobResults) -> List[Link]
         """
         Get direct links to all outputs in any possible format.
 
         :param url: The base URL for constructing links.
-        :param results: A list of result dictionaries containing "mimeType" and "identifier".
+        :param results: A list of result dictionaries containing an identifier and a media-type.
         :returns: A list of dictionaries representing the links to all possible output formats.
         """
         links = []
@@ -1517,15 +1521,15 @@ class Job(Base, LoggerHandler):
             media_type = get_field(result, "mimeType", search_variations=True)
             if media_type and media_type not in EXCLUDED_TYPES:
                 id = get_field(result, "identifier", search_variations=True)
-                formats = [{"mediaType": media_type}]
+                formats = cast("List[FormatMediaType]", [{"mediaType": media_type}])
                 extended_formats = extend_alternate_formats(formats)
                 links.extend([
                     {
-                        "href": f"{url}/{id}?f={fmt['mediaType']}",
+                        "href": get_path_kvp(f"{url}/results/{id}", f=quote(fmt["mediaType"].replace(" ", ""))),
                         "rel": "output",
                         "id": id,
                         "type": fmt["mediaType"],
-                        "title": f"Link to job {id} result in {fmt['mediaType']}"
+                        "title": f"Link to job '{id}' result in '{fmt['mediaType']}'"
                     }
                     for fmt in extended_formats
                 ])
@@ -1537,24 +1541,31 @@ class Job(Base, LoggerHandler):
         prov_path = f"/prov{extra_path}"
         return self.job_url(container=container, extra_path=prov_path)
 
-    def prov_path(self, container=None, extra_path=None, prov_format=None):
-        # type: (Optional[AnySettingsContainer], Optional[ProvenancePathType], Optional[AnyProvenanceFormat]) -> str
+    def prov_path(
+        self,
+        container=None,     # type: Optional[AnySettingsContainer]
+        extra_path=None,    # type: Optional[ProvenancePathType]
+        prov_format=None,   # type: Optional[AnyProvenanceFormat]
+    ):                      # type: (...) -> Optional[Path]
         """
-        Obtain the relative path of the ``PROV`` contents.
+        Obtain the relative path of the :term:`Provenance` contents.
+
+        :param container: Resolve application settings to obtain the storage root directory of provenance metadata.
+        :param extra_path: URI path of the provenance details to retrieve, or None to obtain the root directory.
+        :param prov_format: Provenance format or supported media-type to retrieve the corresponding contents.
         """
         job_path = self.result_path()
         prov_path = f"{job_path}-prov"
         prov_format = ProvenanceFormat.get(prov_format, allow_media_type=True)
         _prov_path_mapping = {
             (None, None): prov_path,  # the directory itself with all metadata
-            ("/prov", None): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
             ("/prov", ProvenanceFormat.PROV_JSON): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
             ("/prov", ProvenanceFormat.PROV_JSONLD): f"{prov_path}/metadata/provenance/primary.cwlprov.jsonld",
             ("/prov", ProvenanceFormat.PROV_TURTLE): f"{prov_path}/metadata/provenance/primary.cwlprov.ttl",
             ("/prov", ProvenanceFormat.PROV_XML): f"{prov_path}/metadata/provenance/primary.cwlprov.xml",
             ("/prov", ProvenanceFormat.PROV_N): f"{prov_path}/metadata/provenance/primary.cwlprov.provn",
             ("/prov", ProvenanceFormat.PROV_NT): f"{prov_path}/metadata/provenance/primary.cwlprov.nt",
-        }  # type: Dict[Tuple[Optional[ProvenancePathType], ProvenanceFormat], str]
+        }  # type: Dict[Tuple[Optional[ProvenancePathType], Optional[ProvenanceFormat]], Path]
         key = (extra_path, prov_format)
         resolved_path = _prov_path_mapping.get(key)
         if resolved_path:
@@ -1569,7 +1580,7 @@ class Job(Base, LoggerHandler):
         prov_format=None,   # type: AnyContentType
     ):                      # type: (...) -> Tuple[Optional[str], Optional[AnyContentType]]
         """
-        Read or retrieve data from the packaged provenance directory contents associated to the :term:`Job`.
+        Read or retrieve data from the packaged :term:`Provenance` directory contents associated to the :term:`Job`.
         """
         prov_path = self.prov_path(container=container, extra_path=extra_path, prov_format=prov_format)
         if prov_path and os.path.isfile(prov_path):
@@ -1600,6 +1611,11 @@ class Job(Base, LoggerHandler):
         if fmt == ContentType.APP_YAML:
             data = json.loads(data)
             data = OutputFormat.convert(data, to=OutputFormat.YAML)
+        # normalize media-type
+        if fmt == ContentType.APP_JSON:
+            fmt = ContentType.APP_PROV_JSON
+        if fmt in ContentType.ANY_XML:
+            fmt = ContentType.APP_PROV_XML
         return data, fmt
 
     def links(self, container=None, self_link=None):
@@ -1629,8 +1645,8 @@ class Job(Base, LoggerHandler):
              "title": "List of submitted jobs."},
             {"href": job_exec, "rel": sd.OGC_API_PROC_REL_EXECUTE_URI,
              "title": "New job submission endpoint for the corresponding process."},
-            {"href": f"{job_url}/inputs", "rel": "inputs",  # unofficial
-             "title": "Submitted job inputs for process execution."}
+            {"href": f"{job_url}/definition", "rel": "definition",
+             "title": "Submitted job inputs, selected outputs, and parametrization for process execution."}
         ]
         if html_on:
             job_links.append({
@@ -1657,8 +1673,12 @@ class Job(Base, LoggerHandler):
                      "title": "Job statistics collected following process execution."},
                     {"href": f"{job_url}/prov", "rel": "provenance",  # unofficial
                      "title": "Job provenance collected following process execution."},
-                    {"href": f"{job_url}/prov", "rel": "https://www.w3.org/ns/prov",  # unofficial
-                     "title": "Job provenance collected following process execution."},
+                ])
+                job_links.extend([
+                    {"href": get_path_kvp(f"{job_url}/prov", f=alt_prov_format),
+                     "rel": "https://www.w3.org/ns/prov", "type": ProvenanceFormat.as_media_type(alt_prov_format),
+                     "title": "Job provenance collected following process execution."}
+                    for alt_prov_format in ProvenanceFormat.formats()
                 ])
                 f_links = self.get_all_possible_formats_links(url=job_url, results=self.results)
                 if len(f_links) > 0:
@@ -1679,7 +1699,7 @@ class Job(Base, LoggerHandler):
                 "title": "List of collected job logs during process execution."
             }
         ])
-        if self_link in ["status", "inputs", "outputs", "results", "logs", "exceptions", "provenance"]:
+        if self_link in ["status", "definition", "outputs", "results", "logs", "exceptions", "provenance"]:
             self_link_body = list(filter(lambda _link: _link["rel"].endswith(self_link), job_links))[-1]
             self_link_body = copy.deepcopy(self_link_body)
             # back to specific job if we are in one of its sub-endpoints

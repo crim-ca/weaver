@@ -500,6 +500,6 @@ def test_job_inputs_accept_profile_preserved(headers):
         "outputs": {},
         "headers": headers,
     }
-    result = sd.JobInputsBody().deserialize(payload)
+    result = sd.JobDefinitionBody().deserialize(payload)
     profile = headers.get("Accept-Profile") or None
     assert result["headers"]["Accept-Profile"] == profile

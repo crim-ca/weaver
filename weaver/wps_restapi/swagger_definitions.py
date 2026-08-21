@@ -254,6 +254,10 @@ OGC_API_PROC_PART4_EXC_LOCKED_URI = f"{OGC_API_PROC_PART4_EXC_BASE_URI}/locked"
 OGC_API_PROC_PART4_EXC_UNSUPPORTED_MEDIA_TYPE_URI = f"{OGC_API_PROC_PART4_EXC_BASE_URI}/unsupported-media-type"
 OGC_API_PROC_PART4_EXC_UNSUPPORTED_SCHEMA_URI = f"{OGC_API_PROC_PART4_EXC_BASE_URI}/unsupported-schema"
 
+OGC_API_PROC_PART5_EXC_BASE_URI = "https://www.opengis.net/def/exceptions/ogcapi-processes-5/1.0"
+OGC_API_PROC_PART5_EXC_PROV_MISSING_URI = f"{OGC_API_PROC_PART5_EXC_BASE_URI}/prov-missing"
+OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI = f"{OGC_API_PROC_PART5_EXC_BASE_URI}/prov-unsupported-format"
+
 OGC_API_PROC_REL_BASE_URI = "https://www.opengis.net/def/rel/ogc/1.0"
 OGC_API_PROC_REL_EXCEPTIONS_URI = f"{OGC_API_PROC_REL_BASE_URI}/exceptions"
 OGC_API_PROC_REL_EXECUTE_URI = f"{OGC_API_PROC_REL_BASE_URI}/execute"
@@ -431,15 +435,13 @@ jobs_service = Service(name="jobs", path="/jobs")
 job_service = Service(name="job", path=f"{jobs_service.path}/{{job_id}}")
 job_results_service = Service(name="job_results", path=f"{job_service.path}/results")
 job_result_value_service = Service(name="job_result_value", path=f"{job_results_service.path}/{{output_id}}")
-job_exceptions_service = Service(name="job_exceptions", path=f"{job_service.path}/exceptions")
 job_results_index_service = Service(
     name="job_results_index",
     path=f"{job_results_service.path}/{{output_id}}/{{index}}"
 )
 job_outputs_service = Service(name="job_outputs", path=f"{job_service.path}/outputs")
 job_output_service = Service(name="job_output", path=f"{job_outputs_service.path}/{{output_id}}")
-
-job_inputs_service = Service(name="job_inputs", path=f"{job_service.path}/inputs")
+job_definition_service = Service(name="job_definition", path=f"{job_service.path}/definition")
 job_exceptions_service = Service(name="job_exceptions", path=f"{job_service.path}/exceptions")
 job_logs_service = Service(name="job_logs", path=f"{job_service.path}/logs")
 job_stats_service = Service(name="job_stats", path=f"{job_service.path}/statistics")
@@ -466,13 +468,15 @@ process_execution_service = Service(name="process_execution", path=f"{process_se
 process_jobs_service = Service(name="process_jobs", path=process_service.path + jobs_service.path)
 process_job_service = Service(name="process_job", path=process_service.path + job_service.path)
 process_results_service = Service(name="process_results", path=process_service.path + job_results_service.path)
-process_result_value_service = Service(name="process_result_value", path=process_service.path +
-                                       job_result_value_service.path)
+process_result_value_service = Service(
+    name="process_result_value",
+    path=process_service.path + job_result_value_service.path,
+)
 process_results_index_service = Service(
     name="process_results_index",
-    path=process_service.path + job_results_index_service.path
+    path=process_service.path + job_results_index_service.path,
 )
-process_inputs_service = Service(name="process_inputs", path=process_service.path + job_inputs_service.path)
+process_definition_service = Service(name="process_definition", path=process_service.path + job_definition_service.path)
 process_outputs_service = Service(name="process_outputs", path=process_service.path + job_outputs_service.path)
 process_output_service = Service(name="process_output", path=process_service.path + job_output_service.path)
 process_exceptions_service = Service(name="process_exceptions", path=process_service.path + job_exceptions_service.path)
@@ -525,7 +529,10 @@ provider_results_index_service = Service(
     name="provider_results_index",
     path=provider_service.path + process_results_index_service.path
 )
-provider_inputs_service = Service(name="provider_inputs", path=provider_service.path + process_inputs_service.path)
+provider_definition_service = Service(
+    name="provider_definition",
+    path=provider_service.path + process_definition_service.path,
+)
 provider_outputs_service = Service(name="provider_outputs", path=provider_service.path + process_outputs_service.path)
 provider_output_service = Service(name="provider_output", path=provider_service.path + process_output_service.path)
 provider_exceptions_service = Service(
@@ -573,6 +580,9 @@ provider_prov_runs_service = Service(
 )
 
 # backward compatibility deprecated routes
+job_inputs_service = Service(name="job_inputs", path=f"{job_service.path}/inputs")
+process_inputs_service = Service(name="process_inputs", path=process_service.path + job_inputs_service.path)
+provider_inputs_service = Service(name="provider_inputs", path=provider_service.path + process_inputs_service.path)
 job_result_service = Service(name="job_result", path=f"{job_service.path}/result")
 process_result_service = Service(name="process_result", path=process_service.path + job_result_service.path)
 provider_result_service = Service(name="provider_result", path=provider_service.path + process_result_service.path)
@@ -4127,14 +4137,6 @@ class ProviderResultValueEndpoint(ProviderAnyOutputEndpoint):
     pass
 
 
-class ProcessInputsEndpoint(LocalProcessPath, JobPath):
-    header = RequestHeadersNoBody()
-
-
-class ProviderInputsEndpoint(ProviderProcessPath, JobPath):
-    header = RequestHeadersNoBody()
-
-
 class JobInputsOutputsQuery(ExtendedMappingSchema):
     schema = ExtendedSchemaNode(
         String(),
@@ -4153,7 +4155,35 @@ class JobInputsOutputsQuery(ExtendedMappingSchema):
     )
 
 
+class ProcessJobDefinitionEndpoint(LocalProcessPath, JobPath):
+    header = RequestHeadersNoBody()
+    querystring = JobInputsOutputsQuery()
+
+
+class ProviderJobDefinitionEndpoint(ProviderProcessPath, JobPath):
+    header = RequestHeadersNoBody()
+    querystring = JobInputsOutputsQuery()
+
+
+class JobDefinitionEndpoint(JobPath):
+    header = RequestHeadersNoBody()
+    querystring = JobInputsOutputsQuery()
+
+
+class ProcessJobInputsEndpoint(LocalProcessPath, JobPath):
+    deprecated = True
+    header = RequestHeadersNoBody()
+    querystring = JobInputsOutputsQuery()
+
+
+class ProviderJobInputsEndpoint(ProviderProcessPath, JobPath):
+    deprecated = True
+    header = RequestHeadersNoBody()
+    querystring = JobInputsOutputsQuery()
+
+
 class JobInputsEndpoint(JobPath):
+    deprecated = True
     header = RequestHeadersNoBody()
     querystring = JobInputsOutputsQuery()
 
@@ -5006,6 +5036,7 @@ class BoundingBoxValue(OneOfKeywordSchema):
 
 
 class BoundingBoxObject(StrictMappingSchema):
+    _schema_include_deserialize = False
     _schema = OGC_API_PROC_BBOX_SCHEMA
     description = "Execute bounding box value provided inline."
     format = OGC_API_PROC_BBOX_FORMAT
@@ -7205,10 +7236,14 @@ class JobExecuteHeaders(ExtendedMappingSchema):
     x_wps_output_context = WpsOutputContextHeader(missing=None)
 
 
-class JobInputsBody(ExecuteInputOutputs):
+class JobDefinitionBody(ExecuteInputOutputs):
+    _sort_first = ["entity", "mode", "response"]
+    _sort_after = ["headers", "inputs", "outputs", "links"]
+
     # note:
     #  following definitions do not employ 'missing=drop' to explicitly indicate the fields
     #  this makes it easier to consider everything that could be implied when executing the job
+    entity = ProcessURL()
     mode = JobExecuteModeEnum(default=ExecuteMode.AUTO)
     response = JobResponseOptionsEnum(default=None)
     headers = JobExecuteHeaders(missing={}, default={})
@@ -8822,9 +8857,9 @@ class GoneJobProvResponseSchema(ExtendedMappingSchema):
     body = ErrorJsonResponseBodySchema()
 
 
-class OkGetJobInputsResponse(ExtendedMappingSchema):
+class OkGetJobDefinitionResponse(ExtendedMappingSchema):
     header = ResponseHeaders()
-    body = JobInputsBody()
+    body = JobDefinitionBody()
 
 
 class OkGetJobOutputsResponse(ExtendedMappingSchema):
@@ -8832,7 +8867,7 @@ class OkGetJobOutputsResponse(ExtendedMappingSchema):
     body = JobOutputsBody()
 
 
-class RedirectResultResponse(ExtendedMappingSchema):
+class RedirectResponse(ExtendedMappingSchema):
     header = RedirectHeaders()
 
 
@@ -9398,11 +9433,13 @@ delete_provider_job_responses = copy(delete_job_responses)
 delete_provider_job_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
-get_job_inputs_responses = {
-    "200": OkGetJobInputsResponse(description="success", examples={
-        "JobInputs": {
-            "summary": "Submitted job input values at for process execution.",
-            "value": EXAMPLES["job_inputs.json"],
+get_job_definition_responses = {
+    "200": OkGetJobDefinitionResponse(description="success", examples={
+        "JobDefinition": {
+            "summary": (
+                "Submitted job definition with input values, selected outputs and process execution parametrization."
+            ),
+            "value": EXAMPLES["job_definition.json"],
         }
     }),
     "400": InvalidJobResponseSchema(),
@@ -9411,10 +9448,13 @@ get_job_inputs_responses = {
     "406": NotAcceptableErrorResponseSchema(),
     "500": InternalServerErrorResponseSchema(),
 }
-get_provider_inputs_responses = copy(get_job_inputs_responses)
-get_provider_inputs_responses.update({
+get_provider_job_definition_responses = copy(get_job_definition_responses)
+get_provider_job_definition_responses.update({
     "403": ForbiddenProviderLocalResponseSchema(),
 })
+get_job_inputs_redirect_responses = {
+    "308": RedirectResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
+}
 get_job_outputs_responses = {
     "200": OkGetJobOutputsResponse(description="success", examples={
         "JobOutputs": {
@@ -9448,7 +9488,7 @@ get_prov_output_responses.update({
 })
 
 get_result_redirect_responses = {
-    "308": RedirectResultResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
+    "308": RedirectResponse(description="Redirects '/result' (without 's') to corresponding '/results' path."),
 }
 get_job_results_responses = {
     "200": OkGetJobResultsResponse(
@@ -9576,9 +9616,21 @@ get_job_prov_responses = {
                 "summary": "Provenance details returned in PROV-JSON format.",
                 "value": EXAMPLES["job_prov.json"],
             },
+            "PROV-JSONLD": {
+                "summary": "Provenance details returned in PROV-JSONLD format.",
+                "value": EXAMPLES["job_prov.jsonld"],
+            },
             "PROV-N": {
                 "summary": "Provenance details returned in PROV-N format.",
-                "value": EXAMPLES["job_prov.txt"],
+                "value": EXAMPLES["job_prov.provn"],
+            },
+            "PROV-NT": {
+                "summary": "Provenance details returned in PROV-NT (N-Triples RDF) format.",
+                "value": EXAMPLES["job_prov.nt"],
+            },
+            "PROV-TURTLE": {
+                "summary": "Provenance details returned in PROV-TURTLE (Turtle RDF) format.",
+                "value": EXAMPLES["job_prov.ttl"],
             },
             "PROV-XML": {
                 "summary": "Provenance details returned in PROV-XML format.",
