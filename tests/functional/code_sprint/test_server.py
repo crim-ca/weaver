@@ -666,21 +666,23 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         for mutable_proc in deployed_proc:
             assert mutable_proc, "No mutable process found."
             mutable_proc_id = mutable_proc["id"]
-            result = self.client.undeploy(mutable_proc_id)
-            assert result.code == 204, (
-                "Undeploy should respond with 204 if successful "
-                "(/req/deploy-replace-undeploy/undeploy-response)."
-            )
-            assert not result.body
+            # note: particularity of Weaver
+            #   when we undeploy a version, the 'latest' revision before it (if any) becomes the available version
+            #   therefore, we must iteratively undeploy until all revisions are removed
+            while True:
+                result = self.client.undeploy(mutable_proc_id)
+                if result.code == 404:
+                    break
+                assert result.code == 204, (
+                    "Undeploy should respond with 204 if successful "
+                    "(/req/deploy-replace-undeploy/undeploy-response)."
+                )
+                assert not result.body
 
         assert mutable_proc_id, (
             f"Expected a mutable process [starting with '{TEST_SERVER_OAP_DRU_PROCESS_ID}'] "
             "to be available from previous deployment steps."
         )
 
-        # note: particularity of Weaver
-        #   when we undeploy a version, the 'latest' revision before it (if any) becomes the available version
-        #   therefore, requesting the description of the non-versioned processID *might* cause a 200 finding it
-        #   this is why we iteratively undeploy all expected ones above, so there is no revision left either
         result = self.client.describe(mutable_proc_id)
         assert result.code == 404
