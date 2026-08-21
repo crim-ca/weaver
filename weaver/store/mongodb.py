@@ -109,10 +109,15 @@ if TYPE_CHECKING:
     MongodbAggregateFilterExpression = TypedDict("MongodbAggregateFilterExpression", {
         "$match": MongodbAggregateFilterConditions,
     }, total=True)
+    MongodbAggregateSetterExpression = TypedDict("MongodbAggregateSetterExpression", {
+        "$set": MongodbAggregateFilterConditions,
+    }, total=True)
+
     MongodbAggregateExpression = Union[
-        Dict[str, MongodbAggregateValue],
         MongodbAggregateFilterExpression,
         MongodbAggregateSortExpression,
+        MongodbAggregateSetterExpression,
+        Dict[str, MongodbAggregateValue],
     ]
     MongodbAggregateStep = Union[MongodbValue, MongodbAggregateExpression]
     MongodbAggregatePipeline = List[Dict[str, Union[str, Dict[str, MongodbAggregateStep]]]]
@@ -639,13 +644,12 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             # that more recent version would always appear first since alphabetical sort: 'id' (latest) < 'id:version'.
             # Work around this by dynamically reassigning 'id' by itself.
             insert_fields = [
-                {"$set": {"tag": {"$cond": {
-                    "if": {"$regexMatch": {"input": "$identifier", "regex": "^.*:.*$"}},
-                    "then": "$identifier",
-                    "else": {"$concat": ["$identifier", ":", "$version"]},
-                }}}},
-                {"$set": {"id_version": {"$split": ["$tag", ":"]}}},
+                {"$set": {"id_version": {"$split": ["$identifier", ":"]}}},
                 {"$set": {"identifier": {"$arrayElemAt": ["$id_version", 0]}}},
+                # Don't set the 'version' field with index=1 here since an explicit 'null' from parsing 'id_version'
+                # could override the version already set. The 'null' would happen for the case of the 'latest' process
+                # where 'id' does not contain ':' (therefore 'null' result from '$split') although that latest process
+                # is a revision that *should* have the 'version' value provided for the previous version to be created.
             ]
             sort_fields = {"identifier": pymongo.ASCENDING, "version": pymongo.ASCENDING}
         sort_method = [{"$sort": sort_fields}]
