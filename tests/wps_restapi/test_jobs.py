@@ -1941,7 +1941,7 @@ class WpsRestApiJobsTest(JobUtils):
             accept_profile=sd.OGC_API_PROC_PROFILE_RESULTS_URI,
         )
 
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["inputs"] == {"test": "data"}
@@ -2617,7 +2617,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 204
 
         # validate changes applied and resolved accordingly
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["inputs"] == {"test": "modified", "new": 123}
@@ -2678,7 +2678,7 @@ class WpsRestApiJobsTest(JobUtils):
         resp = self.app.patch_json(path, params=body, headers=self.json_headers)
         assert resp.status_code == 204
 
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["mode"] == ExecuteMode.AUTO
@@ -2695,7 +2695,7 @@ class WpsRestApiJobsTest(JobUtils):
         resp = self.app.patch_json(path, params=body, headers=headers)
         assert resp.status_code == 204
 
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["mode"] == ExecuteMode.AUTO
@@ -2709,7 +2709,7 @@ class WpsRestApiJobsTest(JobUtils):
         resp = self.app.patch_json(path, params=body, headers=self.json_headers)
         assert resp.status_code == 204
 
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["mode"] == ExecuteMode.AUTO
