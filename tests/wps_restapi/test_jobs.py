@@ -1932,8 +1932,20 @@ class WpsRestApiJobsTest(JobUtils):
             if job:
                 self.job_store.delete_job(job.id)
 
+    def test_job_inputs_redirect_response(self):
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
+            status=Status.RUNNING, progress=50, access=Visibility.PRIVATE, context="test/context",
+            inputs={"test": "data"}, outputs={"test": {"transmissionMode": ExecuteTransmissionMode.VALUE}},
+            accept_profile=sd.OGC_API_PROC_PROFILE_RESULTS_URI,
+        )
+        path = f"/jobs/{new_job.id}/inputs"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 308
+        assert resp.headers["Location"].endswith("/definition")
+
     @pytest.mark.oap_part4
-    def test_job_inputs_response(self):
+    def test_job_definition_response(self):
         new_job = self.make_job(
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
             status=Status.RUNNING, progress=50, access=Visibility.PRIVATE, context="test/context",
