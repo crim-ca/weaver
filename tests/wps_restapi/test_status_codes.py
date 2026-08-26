@@ -48,7 +48,7 @@ class StatusCodeTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        config = setup_config_with_mongodb()
+        config = setup_config_with_mongodb(settings={"weaver.url": "https://localhost:443"})
         cls.testapp = get_test_weaver_app(config)
 
     @parameterized.expand(TEST_PUBLIC_ROUTES)
