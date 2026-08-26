@@ -496,6 +496,7 @@ def test_nested_process_input(test_value, expect_result):
 )
 def test_job_inputs_accept_profile_preserved(headers):
     payload = {
+        "entity": "https://example.com/processes/test",
         "inputs": {},
         "outputs": {},
         "headers": headers,
