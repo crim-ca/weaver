@@ -23,7 +23,8 @@ refer to the specific skill documentation in respective directories under [`.age
 | Location | Purpose |
 | --- | --- |
 | **[.agents/README.md](.agents/README.md)** | Complete skills reference with full catalog |
-| **[.agents/skills/](.agents/skills/)** | All skill definitions organized by domain as shown below |
+| **[.agents/skills/](.agents/skills/)** | Redirect to all skill definitions organized by domain as shown below |
+| **[.github/skills/](.github/skills/)** | Main location of all agent skills (identical content to the above) |
 
 ## Project Directory Structure
 
