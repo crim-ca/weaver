@@ -45,6 +45,10 @@ Changes:
 
 Fixes:
 ------
+- Fix ``parse_kvp`` (and consequently ``explode_headers``/``parse_link_header``) incorrectly splitting quoted
+  parameter values (e.g.: a ``Link`` header ``title="..."`` containing a comma or semicolon) on their embedded
+  separator characters, which could produce malformed fragments and raise an unhandled error when parsing an
+  otherwise valid ``Link`` header, such as the `Job` ``definition`` link.
 - Fix `Job` provenance to provide `Weaver` and ``weaver-worker`` references as ``SoftwareAgent`` rather than ``Person``
   (relates to `#965 <https://github.com/crim-ca/weaver/issues/965>`_).
 - Fix URL schema validation error on `Job` links when they include a result with a ``?f={mediaType}`` query parameter.
