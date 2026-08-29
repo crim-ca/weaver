@@ -350,7 +350,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         links = get_links(resp.json["links"])
         assert links["collection"] == proc_url
         assert links["search"] == proc_url
-        assert links["up"] == base_url
+        assert links["up"] == f"{base_url}/"
         assert links["current"].startswith(proc_url) and limit_kvp in links["current"] and "page=1" in links["current"]
         assert links["prev"].startswith(proc_url) and limit_kvp in links["prev"] and "page=0" in links["prev"]
         assert links["next"].startswith(proc_url) and limit_kvp in links["next"] and "page=2" in links["next"]
@@ -364,7 +364,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         links = get_links(resp.json["links"])
         assert links["collection"] == proc_url
         assert links["search"] == proc_url
-        assert links["up"] == base_url
+        assert links["up"] == f"{base_url}/"
         assert links["current"].startswith(proc_url) and limit_kvp in links["current"] and "page=0" in links["current"]
         assert links["prev"] is None
         assert links["next"].startswith(proc_url) and limit_kvp in links["next"] and "page=1" in links["next"]
@@ -378,7 +378,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         links = get_links(resp.json["links"])
         assert links["collection"] == proc_url
         assert links["search"] == proc_url
-        assert links["up"] == base_url
+        assert links["up"] == f"{base_url}/"
         assert links["current"].startswith(proc_url) and limit_kvp in links["current"] and "page=2" in links["current"]
         assert links["prev"].startswith(proc_url) and limit_kvp in links["prev"] and "page=1" in links["prev"]
         assert links["next"] is None
