@@ -2580,7 +2580,7 @@ def test_create_metalink():
                     "<https://example.com/test1>; rel=\"test1\"; title=\"Values, comma separated, text\"",
                 ),
                 (
-                    "Link", 
+                    "Link",
                     "<https://example.com/test2>; rel=\"test2\"",
                 ),
             ],
