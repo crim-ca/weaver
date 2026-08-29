@@ -1,3 +1,5 @@
+#-*- mode: yaml -*-
+
 version: "3.4"
 
 x-logging:
