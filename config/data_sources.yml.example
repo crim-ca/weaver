@@ -1,3 +1,4 @@
+#-*- mode: yaml -*-
 # List Data-Source known locations such that Weaver configured in EMS mode can dispatch processes execution to
 # corresponding ADES when input data references match the provided locations.
 #
