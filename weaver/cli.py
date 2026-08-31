@@ -609,14 +609,21 @@ class WeaverClient(object):
         try:
             msg = None
             ctype = headers.get("Content-Type", content_type)
+            ctype_base = clean_media_type_format(ctype, suffix_subtype=True, strip_parameters=True) if ctype else ""
             content = getattr(response, "content", None) or getattr(response, "body", None)
             text = None
             if (
                 not body and content and ctype
-                and "json" in clean_media_type_format(ctype, suffix_subtype=True, strip_parameters=True)
+                and "json" in ctype_base
                 and hasattr(response, "json")
             ):
                 body = response.json()
+            elif not body and content and ctype and "yaml" in ctype_base and response.text:
+                # some representations (e.g.: PROV-JSON obtained as YAML) are equivalent structured data
+                # only reformatted as YAML. Parse it back to retain 'body' as the original JSON-like object,
+                # while 'text' preserves the exact YAML string representation as received from the API.
+                text = response.text
+                body = yaml.safe_load(text)
             elif isinstance(response, OperationResult):
                 body = response.body
             # Don't set text if no-content, since used by jobs header-only response. Explicit null will replace it.
@@ -2356,7 +2363,7 @@ class WeaverClient(object):
         if err_msg:
             return OperationResult(False, message=err_msg)
         if prov_format:
-            prov_ctype = ProvenanceFormat.as_media_type(prov_format)
+            prov_ctype = ProvenanceFormat.as_media_type(prov_format, output_format)
             if prov_ctype:
                 headers = CaseInsensitiveDict(headers or {})
                 headers["Accept"] = prov_ctype

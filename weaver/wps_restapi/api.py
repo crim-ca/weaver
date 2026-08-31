@@ -777,8 +777,11 @@ def api_frontpage_body(settings):
     weaver_vault_url = f"{weaver_api_url}/vault" if weaver_vault else None
     weaver_vault_api = f"{weaver_api_oas_ui}#/Vault" if weaver_vault else None
     weaver_vault_doc = f"{weaver_rtd_url}/processes.html#vault-upload"
+    # bare base URLs (no sub-path) must include a trailing slash to satisfy strict URL schema validation
+    weaver_url_href = f"{weaver_url}/"
+    weaver_api_url_href = f"{weaver_api_url}/"
     weaver_links = [
-        {"href": weaver_url, "rel": "self", "type": ContentType.APP_JSON, "title": "This landing page."},
+        {"href": weaver_url_href, "rel": "self", "type": ContentType.APP_JSON, "title": "This landing page."},
         {"href": weaver_conform_url, "rel": "http://www.opengis.net/def/rel/ogc/1.0/conformance",
          "type": ContentType.APP_JSON, "title": "Conformance classes implemented by this service."},
         {"href": __meta__.__license_url__, "rel": "license",
@@ -786,7 +789,7 @@ def api_frontpage_body(settings):
     ]
     if weaver_api:
         weaver_links.extend([
-            {"href": weaver_api_url,
+            {"href": weaver_api_url_href,
              "rel": "service", "type": ContentType.APP_JSON,
              "title": "WPS REST API endpoint of this service."},
             {"href": weaver_api_spec,
@@ -880,7 +883,7 @@ def api_frontpage_body(settings):
             "description": __meta__.__description__,
             "attribution": __meta__.__author__,
             "parameters": [
-                {"name": "api", "enabled": weaver_api, "url": weaver_api_url,
+                {"name": "api", "enabled": weaver_api, "url": weaver_api_url_href,
                  "doc": weaver_rtd_url, "api": weaver_api_oas_ui},
                 {"name": "html", "enabled": weaver_api_html, "url": weaver_api_html_url, "api": weaver_api_oas_ui},
                 {"name": "prov", "enabled": weaver_api_prov, "doc": weaver_api_prov_doc, "api": weaver_api_prov_oas},

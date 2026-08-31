@@ -60,7 +60,7 @@ from weaver.processes.constants import (
 )
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
-from weaver.provenance import ProvenanceFormat
+from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreProcesses
@@ -106,7 +106,7 @@ if TYPE_CHECKING:
     from weaver.formats import AnyContentType
     from weaver.processes.constants import AnyJobProcessingEntityType, ProcessSchemaType
     from weaver.processes.types import AnyProcessType
-    from weaver.provenance import AnyProvenanceFormat, ProvenancePathType
+    from weaver.provenance import AnyProvenanceFormat
     from weaver.quotation.status import AnyQuoteStatus
     from weaver.status import AnyStatusType, StatusType
     from weaver.typedefs import (
@@ -1551,20 +1551,21 @@ class Job(Base, LoggerHandler):
         Obtain the relative path of the :term:`Provenance` contents.
 
         :param container: Resolve application settings to obtain the storage root directory of provenance metadata.
-        :param extra_path: URI path of the provenance details to retrieve, or None to obtain the root directory.
+        :param extra_path: URI path of the provenance details to retrieve, or ``None`` to obtain the root directory.
         :param prov_format: Provenance format or supported media-type to retrieve the corresponding contents.
         """
         job_path = self.result_path()
         prov_path = f"{job_path}-prov"
+        prov_meta_path = f"{prov_path}/metadata/provenance"
         prov_format = ProvenanceFormat.get(prov_format, allow_media_type=True)
         _prov_path_mapping = {
             (None, None): prov_path,  # the directory itself with all metadata
-            ("/prov", ProvenanceFormat.PROV_JSON): f"{prov_path}/metadata/provenance/primary.cwlprov.json",
-            ("/prov", ProvenanceFormat.PROV_JSONLD): f"{prov_path}/metadata/provenance/primary.cwlprov.jsonld",
-            ("/prov", ProvenanceFormat.PROV_TURTLE): f"{prov_path}/metadata/provenance/primary.cwlprov.ttl",
-            ("/prov", ProvenanceFormat.PROV_XML): f"{prov_path}/metadata/provenance/primary.cwlprov.xml",
-            ("/prov", ProvenanceFormat.PROV_N): f"{prov_path}/metadata/provenance/primary.cwlprov.provn",
-            ("/prov", ProvenanceFormat.PROV_NT): f"{prov_path}/metadata/provenance/primary.cwlprov.nt",
+            (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSON): f"{prov_meta_path}/primary.cwlprov.json",
+            (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSONLD): f"{prov_meta_path}/primary.cwlprov.jsonld",
+            (ProvenancePathType.PROV, ProvenanceFormat.PROV_TURTLE): f"{prov_meta_path}/primary.cwlprov.ttl",
+            (ProvenancePathType.PROV, ProvenanceFormat.PROV_XML): f"{prov_meta_path}/primary.cwlprov.xml",
+            (ProvenancePathType.PROV, ProvenanceFormat.PROV_N): f"{prov_meta_path}/primary.cwlprov.provn",
+            (ProvenancePathType.PROV, ProvenanceFormat.PROV_NT): f"{prov_meta_path}/primary.cwlprov.nt",
         }  # type: Dict[Tuple[Optional[ProvenancePathType], Optional[ProvenanceFormat]], Path]
         key = (extra_path, prov_format)
         resolved_path = _prov_path_mapping.get(key)
@@ -1587,11 +1588,15 @@ class Job(Base, LoggerHandler):
             with open(prov_path, mode="r", encoding="utf-8") as prov_f:
                 data = prov_f.read()
             fmt = prov_format
+        # requested PROV format is unsupported/unresolvable (path was not matched above)
+        elif extra_path in [None, ProvenancePathType.PROV]:
+            return None, None
         else:
+            # dynamic resolution of addition provenance metadata
             prov_path = self.prov_path(container=container)
             if not prov_path or not os.path.isdir(prov_path):
                 return None, None
-            path = str(extra_path).split("/prov/", 1)[-1]
+            path = str(extra_path).split(f"{ProvenancePathType.PROV}/", 1)[-1]
             frag = path.strip("/").split("/")
             oper, params = frag[0], frag[1:]
             args = ["-d", prov_path, oper]

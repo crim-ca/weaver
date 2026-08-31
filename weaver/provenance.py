@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
     from weaver.base import EnumType
     from weaver.datatype import Job
-    from weaver.formats import AnyContentType
+    from weaver.formats import AnyContentType, AnyOutputFormat
     from weaver.typedefs import URL, AnyKey, AnySettingsContainer
 
     AnyProvenanceFormat = Union[AnyContentType, "ProvenanceFormat"]
@@ -134,20 +134,28 @@ class ProvenanceFormat(Constants):
         return cls.values()
 
     @classmethod
-    def as_media_type(cls, prov_format):
-        # type: (Optional[AnyProvenanceFormat]) -> Optional[AnyContentType]
+    def as_media_type(cls, prov_format, output_format=None):
+        # type: (Optional[AnyProvenanceFormat], Optional[AnyOutputFormat]) -> Optional[AnyContentType]
         ctype = cls._rev_path_types.get(prov_format)
         # specialize types when identified with known representations
         if ctype == ContentType.APP_JSON:
             ctype = ContentType.APP_PROV_JSON
         elif ctype in ContentType.ANY_XML:
             ctype = ContentType.APP_PROV_XML
+        # YAML is not a distinct PROV representation on its own, but merely an alternate serialization of PROV-JSON.
+        # When the desired 'output_format' is specifically YAML, request/report that exact media-type instead of the
+        # generic PROV-JSON, such that the API can return the native YAML representation directly.
+        if (
+            ctype == ContentType.APP_PROV_JSON and
+            OutputFormat.get(output_format) in [OutputFormat.YAML, OutputFormat.YML]
+        ):
+            ctype = ContentType.APP_YAML
         return ctype
 
     @classmethod
-    def as_profile(cls, prov_format):
-        # type: (Optional[AnyProvenanceFormat]) -> Optional[URL]
-        ctype = cls.as_media_type(prov_format)
+    def as_profile(cls, prov_format, output_format=None):
+        # type: (Optional[AnyProvenanceFormat], Optional[AnyOutputFormat]) -> Optional[URL]
+        ctype = cls.as_media_type(prov_format, output_format=output_format)
         return cls._profiles.get(ctype)
 
     @classmethod
@@ -169,9 +177,14 @@ class ProvenanceFormat(Constants):
             and the relevant error detail if they are incompatible.
         """
         prov = ProvenancePathType.get(prov, default=ProvenancePathType.PROV)
+        prov_format_requested = prov_format
         prov_format = ProvenanceFormat.get(prov_format, allow_media_type=True)
         default_format = output_format
         output_format = OutputFormat.get(output_format)
+
+        # if an explicit PROV format was requested but could not be resolved, it is unsupported
+        if prov_format_requested and prov_format is None:
+            return None, f"PROV format '{prov_format_requested}' could not be identified or is not supported"
 
         # if default was originally falsy, it would have been replaced by 'JSON'
         # ignore it in this case to resolve any explicitly specified PROV format by itself
