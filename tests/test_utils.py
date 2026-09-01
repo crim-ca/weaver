@@ -85,6 +85,7 @@ from weaver.utils import (
     null,
     parse_content_id,
     parse_kvp,
+    parse_link_header,
     parse_number_with_unit,
     pass_http_error,
     request_extra,
@@ -2209,24 +2210,61 @@ def test_localize_datetime():
 
 
 @pytest.mark.kvp
-@pytest.mark.parametrize(["query", "params", "expected"], [
-    ("key1=val1;key2=val21,val22;key3=val3;key4", {},
-     {"key1": ["val1"], "key2": ["val21", "val22"], "key3": ["val3"], "key4": []}),
-    ("key1='  value 1  '  ; key2 = val2 ", {},
-     {"key1": ["  value 1  "], "key2": ["val2"]}),
-    ("key1='  value 1  '  ; key2 = val2 ", {"unescape_quotes": False},
-     {"key1": ["'  value 1  '"], "key2": ["val2"]}),
-    ("key1='  value 1  '  ; key2 = val2 ", {"unescape_quotes": False, "strip_spaces": False},
-     {"key1": ["'  value 1  '  "], " key2 ": [" val2 "]}),
-    ("key1=val1,val2;key1=val3", {},
-     {"key1": ["val1", "val2", "val3"]}),
-    ("key1=val1,val2;KEY1=val3", {},
-     {"key1": ["val1", "val2", "val3"]}),
-    ("key1=val1,val2;KEY1=val3", {"case_insensitive": False},
-     {"key1": ["val1", "val2"], "KEY1": ["val3"]}),
-    ("format=json&inputs=key1=value1;key2=val2,val3", {"pair_sep": "&", "nested_pair_sep": ";"},
-     {"format": ["json"], "inputs": {"key1": ["value1"], "key2": ["val2", "val3"]}}),
-])
+@pytest.mark.parametrize(
+    ["query", "params", "expected"],
+    [
+        (
+            "key1=val1;key2=val21,val22;key3=val3;key4", {},
+            {"key1": ["val1"], "key2": ["val21", "val22"], "key3": ["val3"], "key4": []},
+        ),
+        (
+            "key1='  value 1  '  ; key2 = val2 ", {},
+            {"key1": ["  value 1  "], "key2": ["val2"]},
+        ),
+        (
+            "key1='  value 1  '  ; key2 = val2 ", {"unescape_quotes": False},
+            {"key1": ["'  value 1  '"], "key2": ["val2"]},
+        ),
+        (
+            "key1='  value 1  '  ; key2 = val2 ", {"unescape_quotes": False, "strip_spaces": False},
+            {"key1": ["'  value 1  '  "], " key2 ": [" val2 "]},
+        ),
+        (
+            "key1=val1,val2;key1=val3", {},
+            {"key1": ["val1", "val2", "val3"]},
+        ),
+        (
+            "key1=val1,val2;KEY1=val3", {},
+            {"key1": ["val1", "val2", "val3"]},
+        ),
+        (
+            "key1=val1,val2;KEY1=val3", {"case_insensitive": False},
+            {"key1": ["val1", "val2"], "KEY1": ["val3"]},
+        ),
+        (
+            "format=json&inputs=key1=value1;key2=val2,val3", {"pair_sep": "&", "nested_pair_sep": ";"},
+            {"format": ["json"], "inputs": {"key1": ["value1"], "key2": ["val2", "val3"]}},
+        ),
+        # quoted values containing the separator characters themselves must not be broken further apart
+        (
+            "key1=\"val1, still-val1\";key2=val2", {},
+            {"key1": ["val1, still-val1"], "key2": ["val2"]},
+        ),
+        (
+            "key1=\"val1; still-val1\";key2=val2", {},
+            {"key1": ["val1; still-val1"], "key2": ["val2"]},
+        ),
+        (
+            "key1=\"val1, still-val1\";key2=valA,valB,\"val, with comma\"", {},
+            {"key1": ["val1, still-val1"], "key2": ["valA", "valB", "val, with comma"]},
+        ),
+        (
+            "<https://example.com>;rel=\"definition\";title=\"Job inputs, outputs, and parameters\"",
+            {"pair_sep": ";", "key_value_sep": "="},
+            {"<https://example.com>": [], "rel": ["definition"], "title": ["Job inputs, outputs, and parameters"]},
+        ),
+    ]
+)
 def test_parse_kvp(query, params, expected):
     result = parse_kvp(query, **params)
     assert result == expected
@@ -2494,6 +2532,11 @@ def test_create_metalink():
 @pytest.mark.parametrize(
     ["test_headers", "expect_headers", "expect_get_all"],
     [
+        (
+            {},
+            [],
+            [],
+        ),
         # NOTE: casing of letters, quotes and parameter ordering are all important! this is being evaluated explicitly
         (
             {
@@ -2524,10 +2567,28 @@ def test_create_metalink():
             ],
         ),
         (
-            {},
-            [],
-            [],
-        )
+            # quoted 'title' parameter containing a comma must not be split into further invalid parts
+            {
+                "Link": (
+                    "<https://example.com/test1>; rel=\"test1\"; title=\"Values, comma separated, text\", "
+                    "<https://example.com/test2>; rel=\"test2\""
+                )
+            },
+            [
+                (
+                    "Link",
+                    "<https://example.com/test1>; rel=\"test1\"; title=\"Values, comma separated, text\"",
+                ),
+                (
+                    "Link",
+                    "<https://example.com/test2>; rel=\"test2\"",
+                ),
+            ],
+            [
+                "<https://example.com/test1>; rel=\"test1\"; title=\"Values, comma separated, text\"",
+                "<https://example.com/test2>; rel=\"test2\"",
+            ],
+        ),
     ]
 )
 def test_explode_headers(test_headers, expect_headers, expect_get_all):
@@ -2561,6 +2622,35 @@ def test_make_link_header():
 
     link = make_link_header("https://example.com/test", type="text/plain", rel="test")
     assert link == "<https://example.com/test>; rel=\"test\"; type=\"text/plain\""
+
+
+@pytest.mark.parametrize(
+    ["link_header", "expect_link"],
+    [
+        (
+            "<https://example.com/test>; rel=\"test\"; type=\"text/plain\"",
+            {"href": "https://example.com/test", "rel": "test", "type": "text/plain"},
+        ),
+        (
+            # comma within the quoted 'title' parameter must not be mistaken for another separator
+            "<https://example.com/jobs/1/definition>; rel=\"definition\"; "
+            "title=\"Submitted job inputs, selected outputs, and parametrization for process execution.\"",
+            {
+                "href": "https://example.com/jobs/1/definition",
+                "rel": "definition",
+                "title": "Submitted job inputs, selected outputs, and parametrization for process execution.",
+            },
+        ),
+        (
+            # semi-colon within the quoted 'title' parameter must not be mistaken for the 'rel'/href' separator
+            "<https://example.com/test>; rel=\"test\"; title=\"a; b\"",
+            {"href": "https://example.com/test", "rel": "test", "title": "a; b"},
+        ),
+    ]
+)
+def test_parse_link_header(link_header, expect_link):
+    link = parse_link_header(link_header)
+    assert link == expect_link
 
 
 @pytest.mark.parametrize(

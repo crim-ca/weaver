@@ -8,7 +8,7 @@ import shutil
 import tempfile
 import warnings
 from datetime import date
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import colander
 import mock
@@ -1419,7 +1419,7 @@ class WpsRestApiJobsTest(JobUtils):
         """
         # to make sure UUID is applied, use the "same format" (8-4-4-4-12), but with invalid definitions
         base_path = sd.job_service.path.format(job_id="thisisnt-some-real-uuid-allerrordata")
-        for sub_path in ["", "/inputs", "/outputs", "/results", "/logs", "/exceptions"]:
+        for sub_path in ["", "/definition", "/outputs", "/results", "/logs", "/exceptions"]:
             path = f"{base_path}{sub_path}"
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
@@ -1679,7 +1679,46 @@ class WpsRestApiJobsTest(JobUtils):
                     assert "error" not in resp.json, case
                 assert "links" in resp.json
 
-    def test_jobs_inputs_outputs_validations(self):
+    def test_job_results_alternate_links_encode_media_type_query(self):
+        """
+        Validate that alternate result format links sanitize problematic media-type characters in query parameters.
+        """
+        job = self.make_job(
+            task_id="1111-0000-0000-6666", process=self.process_public.identifier, service=None,
+            user_id=None, status=Status.SUCCESSFUL, progress=100, access=Visibility.PUBLIC,
+            results=cast(
+                "JobResults",
+                [
+                    {
+                        "id": "image-output",
+                        "value": {"href": "https://example.com/image.tif"},
+                        "mimeType": ContentType.IMAGE_GEOTIFF,
+                    },
+                    {
+                        "id": "image-output",
+                        "value": {"href": "https://example.com/image.tif"},
+                        "mimeType": ContentType.IMAGE_TIFF,
+                    }
+                ],
+            )
+        )
+
+        resp = self.app.get(f"/jobs/{job.id}", headers=self.json_headers)
+        assert resp.status_code == 200
+
+        output_links = [link for link in resp.json.get("links", []) if link.get("rel") == "output"]
+        assert len(output_links) > 2, "Expected alternate output links generated from job results media-type."
+        for link in output_links:
+            href = link.get("href", "")
+            assert "?f=" in href, "Expected alternate output link to expose format query parameter."
+            assert " " not in href, "Alternate output format links must not contain raw spaces in href query."
+            assert "%20" not in href, "Alternate output format links should strip spaces from media-type query."
+        fmt_links = [link["href"].split("?f=", 1)[-1] for link in output_links]
+        assert any(";" in href or "%3B" in href for href in fmt_links), (
+            "At least one problematic media-type URL encoding should have been corrected to ensure functionality."
+        )
+
+    def test_jobs_definition_validations(self):
         """
         Ensure that inputs/outputs submitted or returned can be represented and validated across various formats.
 
@@ -1893,8 +1932,20 @@ class WpsRestApiJobsTest(JobUtils):
             if job:
                 self.job_store.delete_job(job.id)
 
+    def test_job_inputs_redirect_response(self):
+        new_job = self.make_job(
+            task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
+            status=Status.RUNNING, progress=50, access=Visibility.PRIVATE, context="test/context",
+            inputs={"test": "data"}, outputs={"test": {"transmissionMode": ExecuteTransmissionMode.VALUE}},
+            accept_profile=sd.OGC_API_PROC_PROFILE_RESULTS_URI,
+        )
+        path = f"/jobs/{new_job.id}/inputs"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 308
+        assert resp.headers["Location"].endswith("/definition")
+
     @pytest.mark.oap_part4
-    def test_job_inputs_response(self):
+    def test_job_definition_response(self):
         new_job = self.make_job(
             task_id=self.fully_qualified_test_name(), process=self.process_public.identifier, service=None,
             status=Status.RUNNING, progress=50, access=Visibility.PRIVATE, context="test/context",
@@ -1902,7 +1953,7 @@ class WpsRestApiJobsTest(JobUtils):
             accept_profile=sd.OGC_API_PROC_PROFILE_RESULTS_URI,
         )
 
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["inputs"] == {"test": "data"}
@@ -2543,7 +2594,7 @@ class WpsRestApiJobsTest(JobUtils):
         )
 
         # check precondition job setup
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["inputs"] == {"test": "data"}
@@ -2578,7 +2629,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 204
 
         # validate changes applied and resolved accordingly
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["inputs"] == {"test": "modified", "new": 123}
@@ -2625,7 +2676,7 @@ class WpsRestApiJobsTest(JobUtils):
         resp = self.app.patch_json(path, params=body, headers=headers)
         assert resp.status_code == 204
 
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["mode"] == ExecuteMode.AUTO
@@ -2639,7 +2690,7 @@ class WpsRestApiJobsTest(JobUtils):
         resp = self.app.patch_json(path, params=body, headers=self.json_headers)
         assert resp.status_code == 204
 
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["mode"] == ExecuteMode.AUTO
@@ -2656,7 +2707,7 @@ class WpsRestApiJobsTest(JobUtils):
         resp = self.app.patch_json(path, params=body, headers=headers)
         assert resp.status_code == 204
 
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["mode"] == ExecuteMode.AUTO
@@ -2670,7 +2721,7 @@ class WpsRestApiJobsTest(JobUtils):
         resp = self.app.patch_json(path, params=body, headers=self.json_headers)
         assert resp.status_code == 204
 
-        path = f"/jobs/{new_job.id}/inputs"
+        path = f"/jobs/{new_job.id}/definition"
         resp = self.app.get(path, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["mode"] == ExecuteMode.AUTO

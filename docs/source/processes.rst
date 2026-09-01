@@ -3203,6 +3203,7 @@ trustworthiness.
 .. seealso::
     - |PROV-overview|_
     - |cwltool-cwlprov|_
+    - |ogc-api-proc-part5|_
 
 .. figure:: https://www.w3.org/TR/2013/REC-prov-o-20130430/diagrams/starting-points.svg
     :alt: PROV-O Resources
@@ -3213,7 +3214,7 @@ trustworthiness.
     Provenance Resource Relationships [|PROV-O|_]
 
 
-The provenance endpoints are provided in alignment with the |ogc-api-proc-part4|_ provenance class requirement.
+The provenance endpoints are provided in alignment with the |ogc-api-proc-part5|_ provenance class requirement.
 However, `Weaver` also provides additional functionalities in comparison to the minimal requirements from the
 :term:`OGC` specification.
 
