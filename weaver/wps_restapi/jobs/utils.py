@@ -1878,21 +1878,37 @@ def get_job_prov_response(request):
         format_handler=prov_format_handler,
     )
     prov_type = clean_media_type_format(prov_type, strip_parameters=True)
-    prov_data, prov_type = job.prov_data(request, prov_path, prov_type)
+    prov_type_requested = prov_type
+    prov_data, prov_type = job.prov_data(request, prov_path, prov_type_requested)
     if not prov_data:
         prov_dir = job.prov_path(request)
         prov_exists = prov_dir and os.path.isdir(prov_dir)
-        prov_err = HTTPNotAcceptable if prov_exists else JobGone
-        prov_body = {
-            "title": "NoJobProvenance",
-            "type": sd.OGC_API_PROC_PART5_EXC_PROV_MISSING_URI,
-            "detail": "Job provenance could not be retrieved for the specified job.",
-            "cause": "Missing or invalid provenance details."
-        }
-        if prov_exists and "run_id" in request.matchdict:
+        if not prov_exists:
+            prov_err = JobGone
+            prov_body = {
+                "title": "NoJobProvenance",
+                "type": sd.OGC_API_PROC_PART5_EXC_PROV_MISSING_URI,
+                "detail": "Job provenance could not be retrieved for the specified job.",
+                "cause": "Missing or invalid provenance details."
+            }
+        elif "run_id" in request.matchdict:
             prov_err = JobNotFound
-            prov_body["error"] = "No such run ID for specified job provenance."
-            prov_body["value"] = {"run_id": str(request.matchdict["run_id"])}
+            prov_body = {
+                "title": "NoJobProvenance",
+                "type": sd.OGC_API_PROC_PART5_EXC_PROV_MISSING_URI,
+                "detail": "Job provenance could not be retrieved for the specified job.",
+                "error": "No such run ID for specified job provenance.",
+                "value": {"run_id": str(request.matchdict["run_id"])},
+            }
+        else:
+            # provenance exist, but the requested combination of path/format/Accept could not be satisfied
+            prov_err = HTTPNotAcceptable
+            prov_body = {
+                "title": "JobProvenanceUnsupportedFormat",
+                "type": sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI,
+                "detail": "Job provenance format could not be identified or is not supported.",
+                "cause": str(prov_type_requested),
+            }
         prov_body["status"] = prov_err.code
         return prov_err(json=prov_body, content_type=ContentType.APP_JSON)
 
