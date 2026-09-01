@@ -1,3 +1,5 @@
+#-*- mode: makefile -*-
+
 CONDA_HOME ?= /opt/conda
 CONDA_ENV ?= weaver
 CONDA_ENVS_DIR ?= /opt/conda/envs

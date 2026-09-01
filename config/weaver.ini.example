@@ -1,3 +1,4 @@
+#-*- mode: ini -*-
 # NOTE: This configuration file is employed by Docker smoke test to immediately identify any problematic setting.
 
 ###
