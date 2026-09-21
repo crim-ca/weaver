@@ -201,11 +201,6 @@ conda-config: conda-base	## setup configuration of the conda environment
 	@ "$(CONDA_BIN)" config --add channels defaults
 	@ "$(CONDA_BIN)" config --append channels conda-forge
 
-.PHONY: conda-install
-conda-install: conda-env
-	@echo "Updating conda packages..."
-	@bash -c '$(CONDA_CMD) conda install -y -c conda-forge proj'
-
 .PHONY: conda-env
 conda-env: conda-base conda-config	## create the conda environment
 	@test -d "$(CONDA_ENV_PATH)" || \
@@ -229,10 +224,10 @@ conda-env-export:		## export the conda environment
 install: install-all    ## alias for 'install-all' target
 
 .PHONY: install-run
-install-run: conda-install install-sys install-pkg install-raw install-dev ## install requirements and application to run locally
+install-run: install-sys install-pkg install-raw install-dev ## install requirements and application to run locally
 
 .PHONY: install-all
-install-all: conda-install install-sys install-pkg install-pip install-dev ## install application with all dependencies
+install-all: install-sys install-pkg install-pip install-dev ## install application with all dependencies
 
 .PHONY: install-doc
 install-doc: install-pip	## install documentation dependencies
