@@ -343,10 +343,10 @@ be indicated in the logs with the appropriate step and message where the error o
 
 .. note::
 
-    Although chaining sub-workflow(s) within a bigger scoped :term:`Workflow` is technically possible, this have not yet
-    been fully explored (tested) in `Weaver`. There is a chance that |data-source|_ resolution fails to identify where
-    to dispatch the step in this situation. If this impacts you, please vote and indicate your concern on issue
-    `#171 <https://github.com/crim-ca/weaver/issues/171>`_.
+    Although chaining sub-workflow(s) within a bigger scoped :term:`Workflow` is technically possible, complex
+    invocations across multiple servers based on |data-source|_ could require further exploration. If you encounter a
+    situation were a :term:`Workflow` step seems to incorrectly resolve the expected |data-source|_ execution location
+    where it should have been dispatched to, please submit an issue describing the encountered problem.
 
 .. seealso::
     :ref:`proc_workflow_ops` provides more details on each of the internal operations accomplished by
