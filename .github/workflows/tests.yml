@@ -139,14 +139,6 @@ jobs:
         run: |
           echo "::set-output name=major:$(echo ${{ matrix.python-version }} | cut -d '.' -f 1)"
           echo "::set-output name=minor:$(echo ${{ matrix.python-version }} | cut -d '.' -f 2)"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v5.2.2
-        if: ${{ steps.should_skip_test.outputs.skip != 'true' }}
-        name: Check Proj Lib Pre-Built in Cache
-        id: cache-proj
-        with:
-          # note: '22' is v8, '21' is v7
-          path: /tmp/proj-8.2.1/install
-          key: ${{ runner.os }}-python${{ matrix.python-version }}-proj
       - name: Install Dependencies
         # skip python setup if running with docker or if test should be skipped
         if: ${{ steps.should_skip_test.outputs.skip != 'true' && matrix.test-case != 'test-docker' }}
