@@ -83,6 +83,7 @@ class ProvenanceFormat(Constants):
     PROV_TURTLE = "PROV-TURTLE"
     PROV_N = "PROV-N"
     PROV_NT = "PROV-NT"
+    PROV_OGC_JSON = "PROV-OGC-JSON"
 
     _media_types = {
         ContentType.APP_YAML: PROV_JSON,
@@ -95,6 +96,7 @@ class ProvenanceFormat(Constants):
         ContentType.APP_XML: PROV_XML,
         ContentType.APP_PROV_XML: PROV_XML,
         ContentType.APP_NT: PROV_NT,
+        ContentType.APP_PROV_OGC_JSON: PROV_OGC_JSON,
     }
     _rev_path_types = {_prov_type: _ctype for _ctype, _prov_type in _media_types.items()}
     _profiles = {
@@ -108,6 +110,7 @@ class ProvenanceFormat(Constants):
         ContentType.APP_XML: "https://www.w3.org/TR/prov-xml/",
         ContentType.APP_PROV_XML: "https://www.w3.org/TR/prov-xml/",
         ContentType.APP_NT: "https://www.w3.org/TR/prov-o/",
+        ContentType.APP_PROV_OGC_JSON: "https://docs.ogc.org/DRAFTS/26-038.html",
     }
 
     @classmethod
@@ -209,7 +212,12 @@ class ProvenanceFormat(Constants):
             return err_mismatch
 
         if out_fmt in [OutputFormat.JSON, OutputFormat.YAML, OutputFormat.YML]:
-            if prov_format not in [None, ProvenanceFormat.PROV_JSON, ProvenanceFormat.PROV_JSONLD]:
+            if prov_format not in [
+                None,
+                ProvenanceFormat.PROV_JSON,
+                ProvenanceFormat.PROV_JSONLD,
+                ProvenanceFormat.PROV_OGC_JSON,
+            ]:
                 return err_mismatch
             if prov_format is None:
                 prov_format = ProvenanceFormat.PROV_JSON

@@ -1583,11 +1583,20 @@ class Job(Base, LoggerHandler):
         """
         Read or retrieve data from the packaged :term:`Provenance` directory contents associated to the :term:`Job`.
         """
+        resolved_format = ProvenanceFormat.get(prov_format, allow_media_type=True)
         prov_path = self.prov_path(container=container, extra_path=extra_path, prov_format=prov_format)
         if prov_path and os.path.isfile(prov_path):
             with open(prov_path, mode="r", encoding="utf-8") as prov_f:
                 data = prov_f.read()
             fmt = prov_format
+        elif resolved_format == ProvenanceFormat.PROV_OGC_JSON and extra_path in [None, ProvenancePathType.PROV]:
+            # FIXME: placeholder representation until the OGC PROV Chain JSON schema/generation is implemented
+            data = json.dumps({
+                "id": str(self.id),
+                "type": "ProvenanceChain",
+                "description": "Placeholder OGC PROV Chain JSON representation (not yet implemented).",
+            })
+            fmt = ContentType.APP_PROV_OGC_JSON
         # requested PROV format is unsupported/unresolvable (path was not matched above)
         elif extra_path in [None, ProvenancePathType.PROV]:
             return None, None
