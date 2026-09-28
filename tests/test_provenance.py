@@ -58,6 +58,7 @@ def test_provenance_formats():
         ProvenanceFormat.PROV_XML,
         ProvenanceFormat.PROV_XML,
         ProvenanceFormat.PROV_NT,
+        ProvenanceFormat.PROV_OGC_JSON,
     ]
     assert set(result) == set(expect)
 
@@ -76,6 +77,7 @@ def test_provenance_media_types():
         ContentType.APP_XML,
         ContentType.APP_PROV_XML,
         ContentType.APP_NT,
+        ContentType.APP_PROV_OGC_JSON,
     ]
     assert set(result) == set(expect)
 
