@@ -57,8 +57,8 @@ if TYPE_CHECKING:
         JobOutputs,
         JobResults,
         JobValueDataBlob,
-        Path,
         JSON,
+        Path,
         UpdateStatusPartialFunction
     )
     from weaver.wps.service import WorkerRequest
