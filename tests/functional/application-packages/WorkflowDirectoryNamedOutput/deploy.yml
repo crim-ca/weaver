@@ -1,0 +1,6 @@
+processDescription:
+  process:
+    id: WorkflowDirectoryNamedOutput
+executionUnit:
+  - test: "tests/functional/application-packages/WorkflowDirectoryNamedOutput/package.cwl"
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/workflow"

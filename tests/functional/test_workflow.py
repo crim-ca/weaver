@@ -132,12 +132,14 @@ class WorkflowProcesses(enum.Enum):
     APP_DOCKER_NETCDF_2_TEXT = "DockerNetCDF2Text"
     APP_DIRECTORY_LISTING_PROCESS = "DirectoryListingProcess"
     APP_DIRECTORY_MERGING_PROCESS = "DirectoryMergingProcess"
+    APP_DIRECTORY_NAMED_OUTPUT = "DirectoryNamedOutput"
     APP_PASSTHROUGH_EXPRESSIONS = "PassthroughExpressions"
     APP_WPS1_DOCKER_NETCDF_2_TEXT = "WPS1DockerNetCDF2Text"
     APP_WPS1_JSON_ARRAY_2_NETCDF = "WPS1JsonArray2NetCDF"
     WORKFLOW_CHAIN_COPY = "WorkflowChainCopy"
     WORKFLOW_CHAIN_STRINGS = "WorkflowChainStrings"
     WORKFLOW_DIRECTORY_LISTING = "WorkflowDirectoryListing"
+    WORKFLOW_DIRECTORY_NAMED_OUTPUT = "WorkflowDirectoryNamedOutput"
     WORKFLOW_ECHO = "WorkflowEcho"
     WORKFLOW_ECHO_OPTIONAL = "WorkflowEchoOptional"
     WORKFLOW_ECHO_SECRETS = "WorkflowEchoSecrets"
@@ -1091,6 +1093,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.APP_DOCKER_NETCDF_2_TEXT,
         WorkflowProcesses.APP_DIRECTORY_LISTING_PROCESS,
         WorkflowProcesses.APP_DIRECTORY_MERGING_PROCESS,
+        WorkflowProcesses.APP_DIRECTORY_NAMED_OUTPUT,
         WorkflowProcesses.APP_DOCKER_STAGE_IMAGES,
         WorkflowProcesses.APP_ECHO,
         WorkflowProcesses.APP_ECHO_OPTIONAL,
@@ -1105,6 +1108,7 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
         WorkflowProcesses.WORKFLOW_CHAIN_COPY,
         WorkflowProcesses.WORKFLOW_CHAIN_STRINGS,
         WorkflowProcesses.WORKFLOW_DIRECTORY_LISTING,
+        WorkflowProcesses.WORKFLOW_DIRECTORY_NAMED_OUTPUT,
         WorkflowProcesses.WORKFLOW_ECHO,
         WorkflowProcesses.WORKFLOW_ECHO_OPTIONAL,
         WorkflowProcesses.WORKFLOW_ECHO_SECRETS,
@@ -1463,6 +1467,20 @@ class WorkflowTestCase(WorkflowTestRunnerBase):
             self.assert_test(lambda: output_files == expect_files,
                              message="Workflow output file expected to contain single file with raw string listing of "
                                      "input files chained from generated output directory listing of the first step.")
+
+    def test_workflow_named_directory_output(self):
+        """
+        Tests that a workflow preserves a matched directory name below its output identifier.
+        """
+        result = self.workflow_runner(
+            WorkflowProcesses.WORKFLOW_DIRECTORY_NAMED_OUTPUT,
+            [WorkflowProcesses.APP_DIRECTORY_NAMED_OUTPUT],
+            log_full_trace=True,
+        )
+        output_href = result["result"]["href"]
+        assert output_href.endswith("/result/test.zarr/")
+        output_path = map_wps_output_location(output_href, container=self.settings)
+        assert os.path.isfile(os.path.join(output_path, "zarr.json"))
 
     def test_workflow_echo_step_expression(self):
         """

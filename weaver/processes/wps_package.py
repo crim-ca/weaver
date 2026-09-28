@@ -1391,15 +1391,17 @@ class DirectoryNestedStorage(CachedStorage):
     Generates a nested storage for a directory where each contained file will be managed by the storage.
     """
 
-    def __init__(self, storage):
-        # type: (Union[FileStorage, S3Storage]) -> None
+    def __init__(self, storage, preserve_root=False):
+        # type: (Union[FileStorage, S3Storage], bool) -> None
         """
         Initializes the storage.
 
         :param storage: Storage implementation that is employed for storing files in a directory-like structure.
+        :param preserve_root: Preserve the source directory name below the output identifier.
         """
         self.__dict__["_cache"] = {}
         self.__dict__["storage"] = storage
+        self.__dict__["preserve_root"] = preserve_root
         super(DirectoryNestedStorage, self).__init__()
 
     def __getattr__(self, item):
@@ -1442,20 +1444,25 @@ class DirectoryNestedStorage(CachedStorage):
         if not os.path.isdir(root):
             raise ValueError(f"Location is not a directory: [{root}]")
         files = list_directory_recursive(root)
+        root_name = os.path.basename(os.path.normpath(root))
         root = f"{root.rstrip('/')}/"
-        loc_path = f"{self.location(output.identifier)}/"  # local directory or S3 location
-        url_path = f"{self.url(output.identifier)}/"       # HTTP output or same S3 location
+        output_root = os.path.join(output.identifier, root_name) if self.preserve_root else output.identifier
+        loc_path = f"{self.location(output_root)}/"  # local directory or S3 location
+        url_path = f"{self.url(output_root)}/"       # HTTP output or same S3 location
         default_support = [DEFAULT_FORMAT] + [get_format(ctype) for ctype in [ContentType.ANY, ContentType.TEXT_PLAIN]]
         for file in files:
             out_file_path_rel = file.split(root, 1)[-1]
-            out_cache_key = self._patch_destination(os.path.join(str(output.uuid), out_file_path_rel))
+            if self.preserve_root:
+                out_file_path_rel = os.path.join(root_name, out_file_path_rel)
+            out_file_path = os.path.join(str(output.uuid), out_file_path_rel)
+            out_cache_key = self._patch_destination(out_file_path)
             out_ext = os.path.splitext(out_file_path_rel)[-1]
             out_ctype = get_content_type(out_ext)  # attempt guessing more specific format
             out_fmt = get_format(out_ctype)
             out_fmts = default_support + ([out_fmt] if out_fmt else [])
             out_file = ComplexOutput(out_cache_key, title=output.title, data_format=out_fmt, supported_formats=out_fmts)
             out_file.file = file
-            out_file.uuid = output.uuid  # forward base directory auto-generated when storing file
+            out_file.uuid = os.path.dirname(out_file_path)  # forward base directory auto-generated when storing file
             # create a copy in case the storage is used by many dirs, avoid concurrent read/write of distinct prefixes
             dir_storage = copy.copy(self.storage)
             if isinstance(dir_storage, S3Storage):
@@ -2449,9 +2456,7 @@ class WpsPackage(Process):
         if self.remote_execution or self.package_type == ProcessType.WORKFLOW:
             return False
         if self.package_requirement["class"] in CWL_REQUIREMENT_APP_REMOTE:
-            if input_ref.startswith("s3://"):
-                return True
-            return False
+            return input_ref.startswith("s3://")
         if input_type == PACKAGE_FILE_TYPE:
             return not os.path.isfile(input_ref)
         # fetch if destination directory was created in advance but not yet populated with its contents
@@ -3004,10 +3009,20 @@ class WpsPackage(Process):
             storage = FileStorageBuilder().build()
         elif location_type == PACKAGE_FILE_TYPE and storage_type == STORE_TYPE.S3:
             storage = S3StorageBuilder().build()
-        elif location_type == PACKAGE_DIRECTORY_TYPE and storage_type == STORE_TYPE.PATH:
-            storage = DirectoryNestedStorage(FileStorageBuilder().build())
-        elif location_type == PACKAGE_DIRECTORY_TYPE and storage_type == STORE_TYPE.S3:
-            storage = DirectoryNestedStorage(S3StorageBuilder().build())
+        elif location_type == PACKAGE_DIRECTORY_TYPE:
+            package_outputs = normalize_ordered_io(self.package["outputs"])
+            package_output = next(output for output in package_outputs if shortname(output["id"]) == output_id)
+            output_glob = package_output.get("outputBinding", {}).get("glob")
+            output_globs = output_glob if isinstance(output_glob, list) else [output_glob]
+            # An explicit "." denotes the output-ID directory itself
+            # Named or forwarded directories (e.g., glob: output/*) retain their root.
+            preserve_root = output_glob is None or any(
+                os.path.basename(glob.rstrip("/")) != "." for glob in output_globs
+            )
+            if storage_type == STORE_TYPE.PATH:
+                storage = DirectoryNestedStorage(FileStorageBuilder().build(), preserve_root=preserve_root)
+            else:
+                storage = DirectoryNestedStorage(S3StorageBuilder().build(), preserve_root=preserve_root)
         else:
             raise PackageExecutionError(
                 "Cannot resolve unknown location storage for "
