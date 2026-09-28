@@ -1440,11 +1440,11 @@ class DirectoryNestedStorage(CachedStorage):
         .. note::
             This is called from :meth:`CachedStorage.store` only if not already in storage using cached output ID.
         """
-        root = output.file
+        root = os.path.normpath(output.file)
         if not os.path.isdir(root):
             raise ValueError(f"Location is not a directory: [{root}]")
         files = list_directory_recursive(root)
-        root_name = os.path.basename(os.path.normpath(root))
+        root_name = os.path.basename(root)
         root = f"{root.rstrip('/')}/"
         output_root = os.path.join(output.identifier, root_name) if self.preserve_root else output.identifier
         loc_path = f"{self.location(output_root)}/"  # local directory or S3 location

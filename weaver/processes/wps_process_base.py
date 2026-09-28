@@ -4,7 +4,7 @@ import os
 import shutil
 import tempfile
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from werkzeug.datastructures import Headers
 
@@ -56,6 +56,8 @@ if TYPE_CHECKING:
         JobMonitorReference,
         JobOutputs,
         JobResults,
+        JobValueDataBlob,
+        Path,
         JSON,
         UpdateStatusPartialFunction
     )
@@ -372,7 +374,7 @@ class WpsProcessInterface(abc.ABC):
 
             # A "." glob represents the outputID directory itself, so there is no additional nesting required.
             # A named directory should preserve the child root dir name nested under the added outputID directory.
-            cwl_out_dir = "/".join([out_dir.rstrip("/"), res_id])
+            cwl_out_dir = os.path.join(out_dir.rstrip("/"), res_id)
             output_glob = expected_outputs[res_id]["glob"]
             output_globs = output_glob if isinstance(output_glob, (list, set)) else [output_glob]
             preserve_dir_name = (
@@ -382,14 +384,14 @@ class WpsProcessInterface(abc.ABC):
             os.makedirs(cwl_out_dir, mode=0o700, exist_ok=True)
 
             # handle list in case of multiple output values
-            result_values = get_any_value(result)
+            result_values = cast("JobValueDataBlob", get_any_value(result))
             if not isinstance(result_values, list):
                 result_values = [result_values]
             for value in result_values:
                 if isinstance(value, dict):
-                    value = get_any_value(value, file=True, data=False)
-                src_name = value.rstrip("/").rsplit("/", 1)[-1]
-                dst_path = "/".join([cwl_out_dir, src_name])
+                    value = cast("Path", get_any_value(value, file=True, data=False))
+                src_name = os.path.basename(os.path.normpath(value))
+                dst_path = os.path.join(cwl_out_dir, src_name)
                 # performance improvement:
                 #   Bypass download if file can be resolved as local resource (already fetched or same server).
                 #   Because CWL expects the file to be in specified 'out_dir', make a link for it to be found
