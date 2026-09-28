@@ -117,6 +117,28 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert "wfprov" in prov["prefix"]
 
     @parameterized.expand([
+        ({"f": "ogcprov+json"}, {}),
+        ({"f": "ogcprov%2Bjson"}, {}),
+        ({"f": ProvenanceFormat.PROV_OGC_JSON}, {}),
+        ({}, {"Accept": ContentType.APP_PROV_OGC_JSON}),
+        ({}, {"Accept": f"{ContentType.APP_PROV_OGC_JSON}; charset=utf-8"}),
+        ({}, {"Accept": f"{ContentType.APP_PROV_OGC_JSON}; profile=https://docs.ogc.org/DRAFTS/26-038.html"}),
+    ])
+    def test_job_prov_ogc_json(self, queries, headers):
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        assert resp.content_type == ContentType.APP_PROV_OGC_JSON
+        prov = resp.json
+        assert isinstance(prov, list)
+        assert all("id" in obj for obj in prov)
+        objtypes = {}
+        for obj in prov:
+            objtypes.setdefault(obj["provType"], []).append(obj)
+        assert all("wasAssociatedWith" in obj for obj in objtypes["Activity"])
+
+    @parameterized.expand([
         ({"f": "ld+json"}, {}),
         ({"f": "ld%2Bjson"}, {}),
         ({"f": "jsonld"}, {}),

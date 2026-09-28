@@ -2,12 +2,14 @@
 Definitions related to :term:`Provenance` features and the :term:`W3C` ``PROV`` specification.
 """
 import hashlib
+import json
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
 from cwltool.cwlprov import provenance_constants as cwl_prov_const
 from cwltool.cwlprov.ro import ResearchObject
 from prov import constants as prov_const
+from prov.model import ProvDocument, ProvRelation
 
 from weaver.__meta__ import __version__ as weaver_version
 from weaver.base import Constants
@@ -20,7 +22,6 @@ if TYPE_CHECKING:
 
     from cwltool.cwlprov.provenance_profile import ProvenanceProfile
     from cwltool.stdfsaccess import StdFsAccess
-    from prov.model import ProvDocument
 
     from weaver.base import EnumType
     from weaver.datatype import Job
@@ -83,6 +84,7 @@ class ProvenanceFormat(Constants):
     PROV_TURTLE = "PROV-TURTLE"
     PROV_N = "PROV-N"
     PROV_NT = "PROV-NT"
+    PROV_OGC_JSON = "PROV-OGC-JSON"
 
     _media_types = {
         ContentType.APP_YAML: PROV_JSON,
@@ -95,6 +97,7 @@ class ProvenanceFormat(Constants):
         ContentType.APP_XML: PROV_XML,
         ContentType.APP_PROV_XML: PROV_XML,
         ContentType.APP_NT: PROV_NT,
+        ContentType.APP_PROV_OGC_JSON: PROV_OGC_JSON,
     }
     _rev_path_types = {_prov_type: _ctype for _ctype, _prov_type in _media_types.items()}
     _profiles = {
@@ -108,6 +111,7 @@ class ProvenanceFormat(Constants):
         ContentType.APP_XML: "https://www.w3.org/TR/prov-xml/",
         ContentType.APP_PROV_XML: "https://www.w3.org/TR/prov-xml/",
         ContentType.APP_NT: "https://www.w3.org/TR/prov-o/",
+        ContentType.APP_PROV_OGC_JSON: "https://docs.ogc.org/DRAFTS/26-038.html",
     }
 
     @classmethod
@@ -209,7 +213,12 @@ class ProvenanceFormat(Constants):
             return err_mismatch
 
         if out_fmt in [OutputFormat.JSON, OutputFormat.YAML, OutputFormat.YML]:
-            if prov_format not in [None, ProvenanceFormat.PROV_JSON, ProvenanceFormat.PROV_JSONLD]:
+            if prov_format not in [
+                None,
+                ProvenanceFormat.PROV_JSON,
+                ProvenanceFormat.PROV_JSONLD,
+                ProvenanceFormat.PROV_OGC_JSON,
+            ]:
                 return err_mismatch
             if prov_format is None:
                 prov_format = ProvenanceFormat.PROV_JSON
@@ -421,3 +430,83 @@ class WeaverResearchObject(ResearchObject):
         weaver_url = get_weaver_url(self.settings)
         weaver_fqdn = urlparse(weaver_url).hostname
         return weaver_fqdn, weaver_url
+
+
+# Maps a PROV relation type to the (provenance-chain property, subject role, object role)
+# used to fold that relation into the referencing record, e.g. wasGeneratedBy is folded
+# into the Entity that is the relation's "entity".
+_RELATION_HANDLERS = {
+    prov_const.PROV_GENERATION: ("wasGeneratedBy", "entity", "activity"),
+    prov_const.PROV_USAGE: ("used", "activity", "entity"),
+    prov_const.PROV_ASSOCIATION: ("wasAssociatedWith", "activity", "agent"),
+    prov_const.PROV_ATTRIBUTION: ("wasAttributedTo", "entity", "agent"),
+    prov_const.PROV_DERIVATION: ("wasDerivedFrom", "generatedEntity", "usedEntity"),
+    prov_const.PROV_DELEGATION: ("actedOnBehalfOf", "delegate", "responsible"),
+}
+
+
+_RECORD_TYPE_FIELD = {
+    "Entity": "provType",
+    "Activity": "provType",
+    "Agent": "provType",
+}
+
+
+def _iri_str(value):
+    """Render a prov QualifiedName/identifier/literal as a full IRI string ref."""
+    if value is None:
+        return None
+    return value.uri if hasattr(value, "uri") else str(value)
+
+
+def jsonld2ogcprov(input_data):
+    # type: (str) -> str
+    """Convert a PROV-JSONLD document (as text) to OGC Provenance Chain JSON (array form, text)."""
+    document = ProvDocument.deserialize(content=input_data, format="jsonld")
+
+    objects_by_id = {}
+    order = []
+
+    def get_or_create(identifier, prov_type):
+        key = _iri_str(identifier)
+        if key not in objects_by_id:
+            objects_by_id[key] = {"id": key, _RECORD_TYPE_FIELD[prov_type]: prov_type}
+            order.append(key)
+        return objects_by_id[key]
+
+    for record in document.get_records():
+        record_type = record.get_type().localpart if record.get_type() else None
+        if (
+            record_type in ("Entity", "Activity", "Agent")
+            and record.identifier is not None
+        ):
+            get_or_create(record.identifier, record_type)
+
+    for record in document.get_records(ProvRelation):
+        handler = _RELATION_HANDLERS.get(record.get_type())
+        if handler is None:
+            continue
+        prop, subject_role, object_role = handler
+        # formal_attributes keys are QualifiedName objects (e.g. prov:activity); match by localpart.
+        formal = {key.localpart: value for key, value in record.formal_attributes}
+        subject_id = _iri_str(
+            formal.get(subject_role) or formal.get("entity") or formal.get("activity")
+        )
+        object_id = _iri_str(formal.get(object_role))
+        if subject_id is None or object_id is None:
+            continue
+        subject_obj = objects_by_id.get(subject_id)
+        if subject_obj is None:
+            # Relation referencing a record not declared as Entity/Activity/Agent in this
+            # document (e.g. cross-bundle reference) - skip, nothing to attach it to.
+            continue
+        existing = subject_obj.get(prop)
+        if existing is None:
+            subject_obj[prop] = object_id
+        elif isinstance(existing, list):
+            if object_id not in existing:
+                existing.append(object_id)
+        elif existing != object_id:
+            subject_obj[prop] = [existing, object_id]
+
+    return json.dumps([objects_by_id[key] for key in order])
