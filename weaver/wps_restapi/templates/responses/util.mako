@@ -11,7 +11,7 @@ ${weaver.wps_restapi_url}/providers/${provider_id}${f"?{query}" if query else ""
 <%def name="get_processes_link(provider_id='', query='')">\
 <%
     _prefix = get_provider_link(provider_id) if provider_id else weaver.wps_restapi_url
-%>
+%>\
 ${_prefix}/processes${f"?{query}" if query else ""}\
 </%def>
 
@@ -270,27 +270,31 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 
 
 <!--
-    Defines a dynamic 'toggle' button that will show/hide a code block, using the response content of a job sub-path.
+    Template function for button toggles between code blocks from API responses.
+
+    Defines a dynamic 'toggle' button that will show/hide a code block, using the response content of a sub-path
+    relative to the resource referenced by 'url' of a given 'ref' (e.g.: a job or a process ID).
 
     The code-block's and button's display and text are dynamically controlled and populated by state functions.
-    Once the response is fetched, the job 'type' contents are cached into to the code block element to avoid fetching
+    Once the response is fetched, the 'type' contents are cached into to the code block element to avoid fetching
     them again. The click event of that display button is swapped for the toggle event to simply show/hide the cached
     contents from that point on.
 
-    HTML class and function names are dynamically attributed with the corresponding 'type' parameter to allow distinct
-    styling as needed. The 'type' should be unique to avoid duplicate referencing of equally named button operations.
+    HTML class and function names are dynamically attributed with the corresponding 'ref' and 'type' parameters to
+    allow distinct styling as needed. The 'ref' identifies the kind of resource the contents are retrieved from, while
+    the 'type' should be unique within that 'ref' to avoid duplicate referencing of equally named button operations.
 
-    An optional 'btn_tabs' class name can be provided to associate multiple buttons within a common group to act as a
-    tab menu. In such case, because each call of this function is done independently, therefore leading to unordered
+    An optional 'btn_tabs' class name can be provided to associate multiple buttons within a common CSS group to act as
+    a tab menu. In such case, because each call of this function is done independently, therefore leading to unordered
     divs of mixed button/div elements per call, we employ 'flex' display (see CSS 'tab-menu') and 'order' to force
     all 'btn_tabs' buttons to appear first, followed by a breaking "newline" space, and the single code content being
     displayed below them. All calls to this function with the same 'btn_tabs' value should be contained within a div
     with the 'tab-menu' style.
 -->
-<%def name="build_job_toggle_button_code(job, type, path, format, language, queries='', name='', btn_tabs='')">
+<%def name="build_toggle_button_code(ref, url, type, path, format, language, queries='', name='', btn_tabs='')">
     <script>
-        async function fetch_job_${type}(event, format, queries) {
-            const url = "${get_job_link(job.id)}";
+        async function fetch_${ref}_${type}(event, format, queries) {
+            const url = "${url}";
             const qs = queries ? "&" + queries : "";
             const resp = await fetch(url + "${path}?f=" + format + qs);
             let data = "";
@@ -302,17 +306,17 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
                 data = await resp.text();
             }
             let code = hljs.highlight(data, {language: "${language}"}).value;
-            let code_block = document.getElementById("job-${type}-code");
-            toggle_job_${type}(event, true);
+            let code_block = document.getElementById("${ref}-${type}-code");
+            toggle_${ref}_${type}(event, true);
             code_block.innerHTML = code;
-            let btn_show = document.getElementById("job-${type}-button-show");
-            btn_show.onclick = function (ev) { toggle_job_${type}(ev, true) };
+            let btn_show = document.getElementById("${ref}-${type}-button-show");
+            btn_show.onclick = function (ev) { toggle_${ref}_${type}(ev, true) };
         }
 
-        function toggle_job_${type}(event, show) {
-            let content = document.getElementById("job-${type}-content");
-            let btn_show = document.getElementById("job-${type}-button-show");
-            let btn_hide = document.getElementById("job-${type}-button-hide");
+        function toggle_${ref}_${type}(event, show) {
+            let content = document.getElementById("${ref}-${type}-content");
+            let btn_show = document.getElementById("${ref}-${type}-button-show");
+            let btn_hide = document.getElementById("${ref}-${type}-button-hide");
             content.style.display = show ? "unset" : "none";
             btn_hide.style.display = show ? "unset" : "none";
             btn_show.style.display = show ? "none" : "unset";
@@ -347,9 +351,9 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 
     <button
         type="button"
-        id="job-${type}-button-show"
+        id="${ref}-${type}-button-show"
         class="button-show"
-        onclick="fetch_job_${type}(event, '${format}', '${queries}')"
+        onclick="fetch_${ref}_${type}(event, '${format}', '${queries}')"
         style="order: -2;"
     >
         Display ${name or type.capitalize()}
@@ -357,9 +361,9 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 
     <button
         type="button"
-        id="job-${type}-button-hide"
+        id="${ref}-${type}-button-hide"
         class="button-hide"
-        onclick="toggle_job_${type}(event, false)"
+        onclick="toggle_${ref}_${type}(event, false)"
         style="display: none; order: -2;"
     >
         Hide ${name or type.capitalize()}
@@ -368,10 +372,34 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
     <div style="flex-basis: 100%; height: 0; display: none; order: -1;"><!--break--></div>
 
     <div
-        id="job-${type}-content"
+        id="${ref}-${type}-content"
         style="display: none"
         class="${btn_tabs} code-container"
     >
-        <pre><code id="job-${type}-code" class="language-${language}"></code></pre>
+        <pre><code id="${ref}-${type}-code" class="language-${language}"></code></pre>
     </div>
+</%def>
+
+<!--
+    Convenience wrapper of 'build_toggle_button_code' for contents retrieved from a job sub-path.
+-->
+<%def name="build_job_toggle_button_code(job, type, path, format, language, queries='', name='', btn_tabs='')">
+    ${build_toggle_button_code(
+        "job",
+        capture(get_job_link, job.id),
+        type, path, format, language,
+        queries=queries, name=name, btn_tabs=btn_tabs,
+    )}
+</%def>
+
+<!--
+    Convenience wrapper of 'build_toggle_button_code' for contents retrieved from a process sub-path.
+-->
+<%def name="build_process_toggle_button_code(process_id, type, path, format, language, queries='', name='', btn_tabs='')">
+    ${build_toggle_button_code(
+        "process",
+        capture(get_process_link, process_id),
+        type, path, format, language,
+        queries=queries, name=name, btn_tabs=btn_tabs,
+    )}
 </%def>

@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+- Provide the `CWL` `Application Package` in JSON and YAML on the HTML `Process` description page.
 - Align ``GET /jobs/{jobId}/definition`` (replaces ``GET /jobs/{jobId}/inputs``) with the
   most recent `OGC API - Processes - Part 4: Job Management` specification,
   which includes the ``entity`` URI of the appropriate `Process` definition at the root of the `Job`/`Workflow`.

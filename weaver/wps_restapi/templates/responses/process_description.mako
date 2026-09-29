@@ -23,7 +23,9 @@
 
 <div class="format-link">
     (<a href="${util.get_process_link(id, query='f=json')}">OGC JSON</a>,
-     <a href="${util.get_process_link(id, query='f=xml')}">WPS XML</a>)
+     <a href="${util.get_process_link(id, query='f=xml')}">WPS XML</a>,
+     <a href="${util.get_process_link(id)}/package?f=json">CWL JSON</a>,
+     <a href="${util.get_process_link(id)}/package?f=yaml">CWL YAML</a>)
 </div>
 
 <div class="content-section nav-menu">
@@ -56,6 +58,11 @@
         <li>
             <div class="nav-link">
                 Go to <a href="#outputs">Process Outputs</a>
+            </div>
+        </li>
+        <li>
+            <div class="nav-link">
+                Go to <a href="#package">Process Package</a>
             </div>
         </li>
         <li>
@@ -102,6 +109,33 @@
             <a href="#outputs">Outputs</a>
         </h3>
         ${util.render_outputs(outputs)}
+    </div>
+
+    <div class="content-section">
+        <h3 id="package">
+            <a href="#package">Package</a>
+        </h3>
+        <div class="content-section-summary">
+            Application Package definition describing the execution of this process.
+        </div>
+        <div class="content-section-content">
+            <div class="tab-menu">
+                <%
+                    # needs to be separate, because newlines not allowed within '%for ... :'
+                    pkg_variants = [
+                        ("cwl_json", "json", "json", "CWL-JSON"),
+                        ("cwl_yaml", "yaml", "yaml", "CWL-YAML"),
+                    ]
+                %>
+                %for (pkg_type, pkg_fmt, pkg_lang, pkg_name) in pkg_variants:
+                    ${util.build_process_toggle_button_code(
+                        id,
+                        type=pkg_type, path="/package", format=pkg_fmt, language=pkg_lang,
+                        name=pkg_name, btn_tabs="process-package",
+                    )}
+                %endfor
+            </div>
+        </div>
     </div>
 
     <div class="content-section">
