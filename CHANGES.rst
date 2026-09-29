@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+- Provide the `CWL` `Application Package` in JSON and YAML on the HTML `Process` description page.
 - Adjust the output directory resolution to preserve the nested base name of the directory, such that when it has a
   semantic meaning (e.g.: ``output.zarr/``) or when the workflow step rely on their names to operate, it is preserved
   in the output result (i.e.: ``{jobID}/output/output.zarr/`` rather than renamed to ``{jobID}/output/``).
