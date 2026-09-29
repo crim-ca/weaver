@@ -50,6 +50,10 @@ Changes:
 
 Fixes:
 ------
+- Fix invalid convertion to ``array`` within `I/O` ``schema`` for an optional single-value parameter
+  (i.e.: when ``minOccurs=0`` and ``minOccurs=1``). Since any `CWL` `I/O` providing a ``default`` is resolved
+  as optional (i.e.: ``["null", <type>]``), a definition such as ``type: boolean`` with ``default: true`` was
+  incorrectly advertised as ``boolean[]`` instead of ``boolean?``.
 - Fix ``parse_kvp`` (and consequently ``explode_headers``/``parse_link_header``) incorrectly splitting quoted
   parameter values (e.g.: a ``Link`` header ``title="..."`` containing a comma or semicolon) on their embedded
   separator characters, which could produce malformed fragments and raise an unhandled error when parsing an

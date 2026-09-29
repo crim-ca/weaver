@@ -1342,7 +1342,7 @@ Multiple and Optional Values
 Inputs that take *multiple* values or references can be specified using ``minOccurs`` and ``maxOccurs`` in :term:`WPS`
 context, while they are specified using the ``array`` type in `CWL`. While the same ``minOccurs`` parameter with a
 value of zero (``0``) can be employed to indicate an *optional* input, :term:`CWL` requires the type to specify
-``"null"`` or to use the shortcut ``?`` character suffixed to the base type to indicate optional input.
+``"null"`` or to use the shortcut ``<type>?`` notation with ``?`` suffixed to the base type to indicate optional input.
 Resolution between :term:`WPS` and :term:`CWL` for the merging strategy implies all corresponding parameter
 combinations and checks in this case.
 

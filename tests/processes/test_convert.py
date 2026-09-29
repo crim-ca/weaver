@@ -904,13 +904,55 @@ def test_any2cwl_io_enum_validate(test_io, test_input, expect_valid):
                 "max_occurs": 2,
             },
             {
+                "oneOf": [
+                    {
+                        "type": "integer",
+                        "enum": [1, 2, 3],
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "enum": [1, 2, 3],
+                        },
+                        "minItems": 0,
+                        "maxItems": 2,
+                    },
+                ]
+            },
+        ),
+        (
+            # an optional single-value I/O must *not* be represented as an array,
+            # since 'minOccurs=0' already conveys that it can be omitted entirely
+            {
+                "literalDataDomains": [
+                    {"default": True, "defaultValue": True, "dataType": {"name": "boolean"}}
+                ],
+                "any_value": False,
+                "default": True,
+                "min_occurs": 0,
+                "max_occurs": 1,
+            },
+            {
+                "type": "boolean",
+                "default": True,
+            },
+        ),
+        (
+            # multiple values are mandatory in this case, such that an array is required
+            {
+                "literalDataDomains": [
+                    {"default": True, "dataType": {"name": "integer"}}
+                ],
+                "any_value": False,
+                "min_occurs": 2,
+                "max_occurs": 3,
+            },
+            {
                 "type": "array",
-                "items": {
-                    "type": "integer",
-                    "enum": [1, 2, 3],
-                },
-                "minItems": 0,
-                "maxItems": 2,
+                "items": {"type": "integer"},
+                "minItems": 2,
+                "maxItems": 3,
             },
         )
     ]
