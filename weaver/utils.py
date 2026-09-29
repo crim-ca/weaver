@@ -781,6 +781,39 @@ def get_request_args(request):
     return dict(params)
 
 
+def split_unquoted(text, sep, maxsplit=-1):
+    # type: (str, str, int) -> List[str]
+    """
+    Splits :paramref:`text` on every occurrence of :paramref:`sep` located outside of single/double quoted parts.
+
+    This avoids breaking a single value into further invalid parts when quoted contents (e.g.: a ``title="a, b"``
+    parameter) legitimately contain the separator character within their quoted representation.
+
+    :param maxsplit: Maximum number of splits to perform, behaving the same way as :meth:`str.split`.
+    """
+    parts = []
+    chunk = ""
+    quote_char = None  # type: Optional[str]
+    for char in text:
+        if 0 <= maxsplit <= len(parts):
+            chunk += char
+            continue
+        if quote_char:
+            if char == quote_char:
+                quote_char = None
+            chunk += char
+        elif char in ("'", "\""):
+            quote_char = char
+            chunk += char
+        elif char == sep:
+            parts.append(chunk)
+            chunk = ""
+        else:
+            chunk += char
+    parts.append(chunk)
+    return parts
+
+
 def parse_kvp(
     query,                  # type: Union[str, Dict[str, Any]]
     key_value_sep="=",      # type: str
@@ -877,22 +910,22 @@ def parse_kvp(
         kvp = query
     else:
         # Parse query string into KVP dict
-        kvp_items = query.split(pair_sep)
+        kvp_items = split_unquoted(query, pair_sep)
         kvp = {}
         for item in kvp_items:
-            k_v = item.split(key_value_sep, 1)
+            k_v = split_unquoted(item, key_value_sep, maxsplit=1)
             if len(k_v) < 2:
                 key = k_v[0]
                 val = []
             else:
-                key, val = k_v
+                key, val = k_v  # pylint: disable=W0632,unbalanced-tuple-unpacking  # guarded by 'len(k_v) < 2' above
                 if key_value_sep in val and nested_pair_sep:
                     val = parse_kvp(val, key_value_sep=key_value_sep, multi_value_sep=multi_value_sep,
                                     pair_sep=nested_pair_sep, nested_pair_sep=None,
                                     accumulate_keys=accumulate_keys, unescape_quotes=unescape_quotes,
                                     strip_spaces=strip_spaces, case_insensitive=case_insensitive)
             if isinstance(val, str):  # in case nested KVP already processed
-                arr = val.split(multi_value_sep) if multi_value_sep else [val]
+                arr = split_unquoted(val, multi_value_sep) if multi_value_sep else [val]
                 for i, val_item in enumerate(list(arr)):
                     if strip_spaces:
                         val_item = val_item.strip()

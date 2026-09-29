@@ -1,3 +1,5 @@
+#-*- mode: yaml -*-
+
 # Defines a list of WPS-1 processes references from remote service provider to register under Weaver at startup.
 # Can also refer to any other remote WPS using providers.
 

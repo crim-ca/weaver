@@ -194,6 +194,9 @@ LOGGER = logging.getLogger(__name__)
     accept=ContentType.TEXT_PLAIN,
     response_schemas=sd.get_job_prov_metadata_responses,
 )
+@sd.provider_prov_service.get()
+@sd.process_prov_service.get()
+@sd.job_prov_service.get()  # empty 'accept' lets the 406 handler raise expected error 'type'
 @log_unhandled_exceptions(logger=LOGGER, message=sd.InternalServerErrorResponseSchema.description)
 def get_job_prov(request):
     # type: (PyramidRequest) -> AnyResponseType

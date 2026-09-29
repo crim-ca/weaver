@@ -9,6 +9,7 @@ Running Weaver
     :local:
     :depth: 2
 
+.. _running-weaver-service:
 
 Running Weaver Service
 ========================
@@ -35,6 +36,8 @@ Weaver should be running after this operation.
 It will be available under the configured URL endpoint in ``weaver.ini`` (see `weaver.ini.example`_).
 If everything was configured correctly, calling this URL (default: ``http://localhost:4001``) should
 provide a response containing a JSON body with basic information about Weaver.
+
+.. _running-execution-details:
 
 Execution Details
 ----------------------

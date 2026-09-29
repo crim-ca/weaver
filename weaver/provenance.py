@@ -24,8 +24,8 @@ if TYPE_CHECKING:
 
     from weaver.base import EnumType
     from weaver.datatype import Job
-    from weaver.formats import AnyContentType
-    from weaver.typedefs import AnyKey, AnySettingsContainer
+    from weaver.formats import AnyContentType, AnyOutputFormat
+    from weaver.typedefs import URL, AnyKey, AnySettingsContainer
 
     AnyProvenanceFormat = Union[AnyContentType, "ProvenanceFormat"]
 
@@ -87,14 +87,28 @@ class ProvenanceFormat(Constants):
     _media_types = {
         ContentType.APP_YAML: PROV_JSON,
         ContentType.APP_JSON: PROV_JSON,
+        ContentType.APP_PROV_JSON: PROV_JSON,
         ContentType.APP_JSONLD: PROV_JSONLD,
         ContentType.TEXT_TURTLE: PROV_TURTLE,
         ContentType.TEXT_PROVN: PROV_N,
         ContentType.TEXT_XML: PROV_XML,
         ContentType.APP_XML: PROV_XML,
+        ContentType.APP_PROV_XML: PROV_XML,
         ContentType.APP_NT: PROV_NT,
     }
     _rev_path_types = {_prov_type: _ctype for _ctype, _prov_type in _media_types.items()}
+    _profiles = {
+        ContentType.APP_YAML: "https://www.w3.org/submissions/prov-json/",
+        ContentType.APP_JSON: "https://www.w3.org/submissions/prov-json/",
+        ContentType.APP_PROV_JSON: "https://www.w3.org/submissions/prov-json/",
+        ContentType.APP_JSONLD: "https://www.w3.org/submissions/prov-jsonld/",
+        ContentType.TEXT_TURTLE: "https://www.w3.org/TR/prov-o/",
+        ContentType.TEXT_PROVN: "https://www.w3.org/TR/prov-n/",
+        ContentType.TEXT_XML: "https://www.w3.org/TR/prov-xml/",
+        ContentType.APP_XML: "https://www.w3.org/TR/prov-xml/",
+        ContentType.APP_PROV_XML: "https://www.w3.org/TR/prov-xml/",
+        ContentType.APP_NT: "https://www.w3.org/TR/prov-o/",
+    }
 
     @classmethod
     def get(                        # pylint: disable=W0221,W0237  # arguments differ/renamed for clarity
@@ -116,13 +130,33 @@ class ProvenanceFormat(Constants):
 
     @classmethod
     def formats(cls):
-        # type: () -> List["ProvenanceFormat"]
+        # type: () -> List[Union[ProvenanceFormat, str]]
         return cls.values()
 
     @classmethod
-    def as_media_type(cls, prov_format):
-        # type: (Optional[AnyProvenanceFormat]) -> Optional[AnyContentType]
-        return cls._rev_path_types.get(prov_format)
+    def as_media_type(cls, prov_format, output_format=None):
+        # type: (Optional[AnyProvenanceFormat], Optional[AnyOutputFormat]) -> Optional[AnyContentType]
+        ctype = cls._rev_path_types.get(prov_format)
+        # specialize types when identified with known representations
+        if ctype == ContentType.APP_JSON:
+            ctype = ContentType.APP_PROV_JSON
+        elif ctype in ContentType.ANY_XML:
+            ctype = ContentType.APP_PROV_XML
+        # YAML is not a distinct PROV representation on its own, but merely an alternate serialization of PROV-JSON.
+        # When the desired 'output_format' is specifically YAML, request/report that exact media-type instead of the
+        # generic PROV-JSON, such that the API can return the native YAML representation directly.
+        if (
+            ctype == ContentType.APP_PROV_JSON and
+            OutputFormat.get(output_format) in [OutputFormat.YAML, OutputFormat.YML]
+        ):
+            ctype = ContentType.APP_YAML
+        return ctype
+
+    @classmethod
+    def as_profile(cls, prov_format, output_format=None):
+        # type: (Optional[AnyProvenanceFormat], Optional[AnyOutputFormat]) -> Optional[URL]
+        ctype = cls.as_media_type(prov_format, output_format=output_format)
+        return cls._profiles.get(ctype)
 
     @classmethod
     def resolve_compatible_formats(
@@ -143,9 +177,14 @@ class ProvenanceFormat(Constants):
             and the relevant error detail if they are incompatible.
         """
         prov = ProvenancePathType.get(prov, default=ProvenancePathType.PROV)
+        prov_format_requested = prov_format
         prov_format = ProvenanceFormat.get(prov_format, allow_media_type=True)
         default_format = output_format
         output_format = OutputFormat.get(output_format)
+
+        # if an explicit PROV format was requested but could not be resolved, it is unsupported
+        if prov_format_requested and prov_format is None:
+            return None, f"PROV format '{prov_format_requested}' could not be identified or is not supported"
 
         # if default was originally falsy, it would have been replaced by 'JSON'
         # ignore it in this case to resolve any explicitly specified PROV format by itself
@@ -326,8 +365,18 @@ class WeaverResearchObject(ResearchObject):
 
         # following agents are expected to exist (created by inherited class)
         cwltool_agent = document.get_record(cwl_prov_const.ACCOUNT_UUID)[0]
-        user_agent = document.get_record(cwl_prov_const.USER_UUID)[0]
+        user_uuid = self.orcid or cwl_prov_const.USER_UUID
+        user_agent = document.get_record(user_uuid)[0]
         wf_agent = document.get_record(self.engine_uuid)[0]  # current job run aligned with cwl workflow
+
+        # adjust user agent as software rather than person (see 'resolve_user'), and leave any other types untouched
+        user_types = cast(set, user_agent.get_attribute(prov_const.PROV_TYPE))
+        user_types.symmetric_difference_update({
+            prov_const.PROV["Person"],
+            cwl_prov_const.SCHEMA["Person"],
+            prov_const.PROV["SoftwareAgent"],
+            cwl_prov_const.SCHEMA["SoftwareApplication"],
+        })
 
         # define relationships cross-references: https://wf4ever.github.io/ro/wfprov.owl
         document.primary_source(weaver_instance_agent, weaver_code_entity)
@@ -349,10 +398,20 @@ class WeaverResearchObject(ResearchObject):
     def resolve_user(self):
         # type: () -> Tuple[str, str]
         """
-        Override :mod:`cwltool` default machine user.
+        Override :mod:`cwltool.cwlprov` default machine user.
+
+        It is expected that the :term:`CWL` runner will executed by the ``weaver-worker`` (i.e.: via :mod:`celery`).
+        Define a generic user to avoid exposing implementation-specific "OS" user that will not be informative
+        for the generated :term:`Provenance`. Using a distinct name than just "_Weaver_" allows preserving the
+        distinction between the :term:`API` _agent_ and the "user" _agent_ for which :term:`Job` execution is
+        acted on behalf between these _agent_ endoffs.
+
+        .. seealso::
+            :ref:`running-execution-details`
         """
-        weaver_full_name = f"crim-ca/weaver:{weaver_version}"
-        return weaver_full_name, weaver_full_name
+        weaver_short_name = "weaver-worker"
+        weaver_full_name = f"{weaver_short_name}@crim-ca/weaver:{weaver_version}"
+        return weaver_short_name, weaver_full_name
 
     def resolve_host(self):
         # type: () -> Tuple[str, str]

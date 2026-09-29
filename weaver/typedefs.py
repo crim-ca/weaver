@@ -87,7 +87,7 @@ if TYPE_CHECKING:
     from weaver.status import AnyStatusType, StatusType
     from weaver.visibility import AnyVisibility
 
-    Path = Union[os.PathLike[str], str, bytes]
+    Path = Union[os.PathLike[str], str]
     URL = str
 
     Default = TypeVar("Default")  # used for return value that is employed from a provided default value
@@ -385,6 +385,7 @@ if TYPE_CHECKING:
     AnyCookiesContainer = Union[CookiesBaseType, WPSRequest, PyramidRequest, AnyHeadersContainer]
     AnyHeadersCookieContainer = Union[AnyHeadersContainer, AnyCookiesContainer]
     AnyRequestType = Union[PyramidRequest, WerkzeugRequest, PreparedRequest, RequestsRequest, DummyRequest]
+    AnyResponseWithBodyType = Union[PyramidResponse, WebobResponse, TestResponse]  # only 'requests' not using 'webob'
     AnyResponseType = Union[PyramidResponse, WebobResponse, RequestsResponse, TestResponse]
     AnyResponseClass = Union[PyramidResponse, WebobResponse, HTTPException]
     AnyViewResponse = Union[AnyResponseClass, JSON]
@@ -470,16 +471,17 @@ if TYPE_CHECKING:
         "sortBy": Optional[str],  # FIXME: JSON? (https://github.com/opengeospatial/ogcapi-processes/issues/429)
     }, total=False)
     JobValueNestedProcess = "ProcessExecution"  # type: TypeAlias
+    JobValueDataBlob = Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]
     JobValueData = TypedDict("JobValueData", {
-        "data": Required[AnyValueType],
+        "data": Required[JobValueDataBlob],
     }, total=False)
-    JobValueValue = TypedDict("JobValueValue", {
+    JobValueQualified = TypedDict("JobValueQualified", {
         # qualified value allow any object (not list directly though)
-        "value": Required[Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]],
+        "value": Required[JobValueDataBlob],
     }, total=False)
     JobValueObject = Union[
         JobValueData,
-        JobValueValue,
+        JobValueQualified,
         JobValueBbox,
         JobValueFile,
         JobValueCollection,
@@ -495,11 +497,11 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueDataItem = TypedDict("JobValueDataItem", {
         "id": Required[str],
-        "data": Required[AnyValueType],
+        "data": Required[JobValueDataBlob],
     }, total=False)
-    JobValueValueItem = TypedDict("JobValueValueItem", {
+    JobValueQualifiedItem = TypedDict("JobValueQualifiedItem", {
         "id": Required[str],
-        "value": Required[Union[AnyValueType, List[AnyValueType], Dict[str, JSON]]],
+        "value": Required[JobValueDataBlob],
     }, total=False)
     JobValueBboxItem = TypedDict("JobValueBboxItem", {
         "id": Required[str],
@@ -515,7 +517,7 @@ if TYPE_CHECKING:
     }, total=False)
     JobValueItem = Union[
         JobValueDataItem,
-        JobValueValueItem,
+        JobValueQualifiedItem,
         JobValueBboxItem,
         JobValueFileItem,
         JobValueCollectionItem,

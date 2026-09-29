@@ -26,6 +26,25 @@ Changes:
   or ``?service={providerID}`` query parameter is specified and that the `Provider`'s `Process` can be resolved.
 - Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}``
   endpoint to align with the latest OGC API - Processes Core specification.
+- Provide the `CWL` `Application Package` in JSON and YAML on the HTML `Process` description page.
+- Adjust the output directory resolution to preserve the nested base name of the directory, such that when it has a
+  semantic meaning (e.g.: ``output.zarr/``) or when the workflow step rely on their names to operate, it is preserved
+  in the output result (i.e.: ``{jobID}/output/output.zarr/`` rather than renamed to ``{jobID}/output/``).
+  This aligns with the employed strategy for file outputs where the process-level ``{outputID}`` directory name
+  does not impact the original name of the files it contains, which are coming from the `Application Package` logic.
+- Align ``GET /jobs/{jobId}/definition`` (replaces ``GET /jobs/{jobId}/inputs``) with the
+  most recent `OGC API - Processes - Part 4: Job Management` specification,
+  which includes the ``entity`` URI of the appropriate `Process` definition at the root of the `Job`/`Workflow`.
+  To ensure backward compatibility, the ``/inputs`` requests will be redirected to the `Job` definition contents.
+  The `CLI` will keep invoking the ``/inputs`` endpoint if requested directly with the corresponding operation.
+  A ``definition`` operation is added to the `CLI` to directly access the new endpoint.
+- Support ``application/provenance+json`` and  ``application/provenance+xml`` for corresponding provenance media-types
+  (fixes `#987 <https://github.com/crim-ca/weaver/issues/987>`_).
+- Update and add new ``/conformance`` references of `Job` definition and provenance requirements and recommendations.
+- Update `Job` provenance error responses with standard ``type`` URIs.
+- Add ``rel=profile`` link and ``Content-Profile`` header to `Job` provenance responses to indicate the applied profile.
+- Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}`` endpoint
+  to align with the latest OGC API - Processes Core specification.
 - Added the N-output response header for N-output retrieval responses.
 - Added the OGC Values profile link to ``/jobs/{jobId}/outputs/{outputId}`` responses:
   ``Link: <https://www.opengis.net/def/profile/OGC/0/ogc-values>; rel="profile"``
@@ -46,6 +65,21 @@ Changes:
 
 Fixes:
 ------
+- Fix invalid convertion to ``array`` within `I/O` ``schema`` for an optional single-value parameter
+  (i.e.: when ``minOccurs=0`` and ``minOccurs=1``). Since any `CWL` `I/O` providing a ``default`` is resolved
+  as optional (i.e.: ``["null", <type>]``), a definition such as ``type: boolean`` with ``default: true`` was
+  incorrectly advertised as ``boolean[]`` instead of ``boolean?``.
+- Fix ``parse_kvp`` (and consequently ``explode_headers``/``parse_link_header``) incorrectly splitting quoted
+  parameter values (e.g.: a ``Link`` header ``title="..."`` containing a comma or semicolon) on their embedded
+  separator characters, which could produce malformed fragments and raise an unhandled error when parsing an
+  otherwise valid ``Link`` header, such as the `Job` ``definition`` link.
+- Fix `Job` provenance to provide `Weaver` and ``weaver-worker`` references as ``SoftwareAgent`` rather than ``Person``
+  (relates to `#965 <https://github.com/crim-ca/weaver/issues/965>`_).
+- Fix URL schema validation error on `Job` links when they include a result with a ``?f={mediaType}`` query parameter.
+  The URL pattern did not correctly provide the anchor and query parameter components. Also, if the media-type had some
+  special characters (e.g., a space between its parameters), it would fail due to the missing URL encoding. Finally, the
+  actual URL returned was missing the ``/results/`` portion of the ``/jobs/{jobId}/results/{outputId}`` endpoint.
+- Fix missing ``unquote`` operation to handle URL encoding for ``?f={mediaType}`` on result endpoint for above change.
 - Fix `Process` listing with revisions where the original version was generated without an explicit ``version`` value.
   This could lead to a ``null`` version to propagate in a `MongoDB` aggregation pipeline failing following revision
   listing including it.
@@ -764,7 +798,7 @@ Changes:
   to request the ``response: document`` and ``response: raw`` parameters
   (fixes `#414 <https://github.com/crim-ca/weaver/issues/414>`_).
   Minor differences exist according to supplied ``transmissionMode`` and the original data/link results.
-  See `Process Execution <file:///home/francis/dev/weaver/docs/build/html/processes.html#proc-op-execute>`_
+  See `Process Execution <https://pavics-weaver.readthedocs.io/en/latest/processes.html#proc-op-execute>`_
   documentation for details.
 - Add support of ``outputs`` execution request body parameter to filter returned outputs from
   the ``GET /jobs/{jobId}/results`` (async) or returned directly (sync) from ``POST /processes/{processId}/execution``

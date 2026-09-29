@@ -28,6 +28,7 @@ from cwltool.errors import WorkflowException
 from cwltool.factory import Factory as CWLFactory
 from pywps.inout.formats import Format
 from pywps.inout.outputs import ComplexOutput
+from pywps.inout.storage.file import FileStorageBuilder
 from pywps.validator import emptyvalidator, get_validator
 from pywps.validator.mode import MODE
 
@@ -59,6 +60,7 @@ from weaver.processes.constants import (
     PACKAGE_FILE_TYPE
 )
 from weaver.processes.wps_package import (
+    DirectoryNestedStorage,
     WpsPackage,
     _load_package_content,
     _patch_wps_process_description_url,
@@ -209,6 +211,46 @@ class MockProcess(Process):
             "package": cwl
         }
         super(MockProcess, self).__init__(body)
+
+
+def test_directory_nested_storage_preserves_root_name():
+    """
+    Test directory storage retains the matched root name below the output identifier.
+
+    This aligns with file outputs where the output identifier is used to create a directory that will distinguish
+    potentially conflicting file names across result sources, but the matched output files retain their original names.
+    """
+    with contextlib.ExitStack() as stack:
+        source_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        output_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        root_name = "sample.zarr"
+        source_root = os.path.join(source_dir, root_name)
+        source_nested = os.path.join(source_root, "data", "chunks")
+        os.makedirs(source_nested)
+        source_files = [
+            os.path.join(source_root, "zarr.json"),
+            os.path.join(source_nested, "0"),
+        ]
+        for source_file in source_files:
+            with open(source_file, mode="w", encoding="utf-8") as file:
+                file.write("{}")
+
+        file_storage = FileStorageBuilder().build()
+        file_storage.target = output_dir
+        file_storage.output_url = "https://example.com/wps-outputs/job"
+        storage = DirectoryNestedStorage(file_storage, preserve_root=True)
+        output_id = "result"
+        output = ComplexOutput(output_id, "Result", [Format(ContentType.APP_DIR)])
+        output.file = source_root
+        output.uuid = output_id
+
+        _, result_path, result_url = storage.store(output)
+
+        expected_root = os.path.join(output_dir, output_id, root_name)
+        assert result_path == f"{expected_root}/"
+        assert result_url == f"https://example.com/wps-outputs/job/{output_id}/{root_name}/"
+        assert os.path.isfile(os.path.join(expected_root, "zarr.json"))
+        assert os.path.isfile(os.path.join(expected_root, "data", "chunks", "0"))
 
 
 @pytest.mark.flaky(retries=2, delay=1)
