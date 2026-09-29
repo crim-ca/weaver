@@ -6602,9 +6602,10 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
                 assert not os.path.exists(os.path.join(wps_outdir, out_file))
                 assert not os.path.exists(os.path.join(wps_outdir, job_id, out_file))
                 assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_file))
-                assert not os.path.exists(os.path.join(wps_outdir, pkg_out_id, out_file))
-                assert not os.path.exists(os.path.join(wps_outdir, job_id, pkg_out_id, out_file))
-                assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, pkg_out_id, out_file))
+                for out_dir in bad_out_dirs:
+                    assert not os.path.exists(os.path.join(wps_outdir, out_dir, out_file))
+                    assert not os.path.exists(os.path.join(wps_outdir, job_id, out_dir, out_file))
+                    assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_dir, out_file))
             assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))
 
     @mocked_aws_config
