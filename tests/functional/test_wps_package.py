@@ -17,7 +17,7 @@ import os
 import re
 import shutil
 import tempfile
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import boto3
 import colander
@@ -103,8 +103,11 @@ if TYPE_CHECKING:
         CWL_RequirementsDict,
         JSON,
         Number,
+        Path,
+        ProcessDeployment,
         ProcessOfferingListing,
-        ProcessOfferingMapping
+        ProcessOfferingMapping,
+        SettingsType
     )
 
 EDAM_PLAIN = f"{EDAM_NAMESPACE}:{EDAM_MAPPING[ContentType.TEXT_PLAIN]}"
@@ -2342,7 +2345,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             },
             "outputs": [{"id": "output_test", "type": "File", "outputBinding": {"glob": "tmp.txt"}}],
         }
-        body = {
+        body = cast("ProcessDeployment", {
             "processDescription": {
                 "process": {
                     "id": self._testMethodName,
@@ -2352,7 +2355,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             },
             "deploymentProfileName": sd.OGC_API_PROC_PROFILE_WPS_APP_URI,
             "executionUnit": [{"unit": cwl}],
-        }
+        })
         try:
             desc, _ = self.deploy_process(body, describe_schema=ProcessSchema.OLD)
         except colander.Invalid:
@@ -6344,7 +6347,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
     @mocked_aws_config
     @mocked_aws_s3  # avoid error on setup of output S3 bucket under PyWPS config
     def setUpClass(cls):
-        cls.settings = {
+        cls.settings = cast("SettingsType", {
             "weaver.wps": True,
             "weaver.wps_output": True,
             "weaver.wps_output_path": "/wpsoutputs",
@@ -6353,7 +6356,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
             "weaver.wps_output_s3_region": MOCK_AWS_REGION,  # must match exactly, or mock will not work
             "weaver.wps_path": "/ows/wps",
             "weaver.wps_restapi_path": "/",
-        }
+        })
         super(WpsPackageAppWithS3BucketTest, cls).setUpClass()
 
     @mocked_aws_config
@@ -6469,7 +6472,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
 
         # check that outputs are NOT copied locally, but that XML status does exist
         # counter validate path with file always present to ensure outputs are not 'missing' just because of wrong dir
-        wps_outdir = self.settings["weaver.wps_output_dir"]
+        wps_outdir = cast("Path", self.settings["weaver.wps_output_dir"])
         for out_id, out_file in output_files:
             assert not os.path.exists(os.path.join(wps_outdir, out_file))
             assert not os.path.exists(os.path.join(wps_outdir, job_id, out_file))
