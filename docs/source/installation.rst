@@ -38,7 +38,7 @@ configuration because the service must employ a companion `MongoDB`_ container a
 service to run :ref:`app_pkg_docker` per respective :term:`Process`.
 
 .. seealso::
-    - See :ref:`configuration` to modify application behaviour. A custom INI file should be mounted in the container.
+    - See :ref:`configuration` to modify application behaviour. A custom INI file should be mounted in the container. You must also modify ``mongodb.host`` and ``BROKER_URL`` when using ``docker-compose``.
     - `Example Configuration Files <https://github.com/crim-ca/weaver/tree/master/config>`_
     - `Example Docker-Compose YAML <https://github.com/crim-ca/weaver/blob/master/docker/docker-compose.yml.example>`_
 
