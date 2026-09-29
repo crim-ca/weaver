@@ -1,0 +1,22 @@
+processDescription:
+  id: DirectoryNamedOutput
+  title: Generate a named directory output.
+  version: "0.0.1"
+  inputs:
+    - id: marker
+      dataType:
+        name: string
+      minOccurs: 1
+      maxOccurs: 1
+  outputs:
+    - id: result
+      formats:
+        - mimeType: application/directory
+          default: true
+      minOccurs: 1
+      maxOccurs: 1
+  visibility: public
+executionUnit:
+  - test: DirectoryNamedOutput.cwl
+immediateDeployment: true
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/dockerizedApplication"
