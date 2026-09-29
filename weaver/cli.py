@@ -22,14 +22,14 @@ from webob.headers import ResponseHeaders
 from yaml.scanner import ScannerError
 
 from weaver import __meta__
-from weaver.base import Constants
 from weaver.datatype import AutoBase
 from weaver.exceptions import AuthenticationError, PackageRegistrationError
 from weaver.execute import (
+    ExecuteControlOption,
     ExecuteResponse,
     ExecuteReturnPreference,
     ExecuteTransmissionMode,
-    resolve_execution_parameters, ExecuteControlOption
+    resolve_execution_parameters
 )
 from weaver.formats import (
     ContentEncoding,
@@ -1332,7 +1332,7 @@ class WeaverClient(object):
             settings = copy.deepcopy(self._settings)
             settings["weaver.wps_restapi_url"] = base
             data = result.body
-            result = self._parse_deploy_package(data, cwl, None, process_id, req_headers, settings)
+            result = self._parse_deploy_package(base, data, cwl, None, process_id, req_headers, settings)
             if not result.success:
                 return result
             data = result.body
@@ -2812,7 +2812,7 @@ class WeaverClient(object):
                             outputs
                         )
                 # Create array with None placeholders, keeping only requested indices
-                max_idx = max(max(indices), len(out_val) - 1)
+                max_idx = max(indices, len(out_val) - 1)
                 filtered_array = [None] * (max_idx + 1)
                 for idx in indices:
                     filtered_array[idx] = out_val[idx]
