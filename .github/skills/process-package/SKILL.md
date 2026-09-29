@@ -26,12 +26,12 @@ Retrieve the CWL application package definition for a deployed process.
 
 ### Required
 
-- **process_id** (string): Process identifier
+- `process_id` (string): Process identifier
 
 ### Optional
 
-- **provider** (string): Provider for remote processes
-- **output** (file path): Save package to file
+- `provider` (string): Provider for remote processes
+- `output` (file path): Save package to file
 
 ## CLI Usage
 

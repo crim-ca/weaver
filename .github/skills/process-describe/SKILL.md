@@ -26,12 +26,12 @@ Retrieve complete process description including inputs, outputs, and metadata.
 
 ### Required
 
-- **process_id** (string): Process identifier to describe
+- `process_id` (string): Process identifier to describe
 
 ### Optional
 
-- **provider** (string): Provider identifier for remote processes
-- **schema** (string): Schema format ("OGC", "OLD", "WPS")
+- `provider` (string): Provider identifier for remote processes
+- `schema` (string): Schema format ("OGC", "OLD", "WPS")
 
 ## CLI Usage
 

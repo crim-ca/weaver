@@ -26,7 +26,7 @@ Remove a registered remote provider from Weaver.
 
 ### Required
 
-- **provider_id** (string): Provider identifier to remove
+- `provider_id` (string): Provider identifier to remove
 
 ## CLI Usage
 
@@ -130,9 +130,9 @@ weaver unregister -u $WEAVER_URL -n old-provider
 
 ## Error Handling
 
-- **404 Not Found**: Provider does not exist
-- **403 Forbidden**: Insufficient permissions
-- **409 Conflict**: Provider has active jobs
+- `404 Not Found`: Provider does not exist
+- `403 Forbidden`: Insufficient permissions
+- `409 Conflict`: Provider has active jobs
 
 ## Related Skills
 

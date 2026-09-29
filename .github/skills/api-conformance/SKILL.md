@@ -88,27 +88,27 @@ curl -X GET \
 
 ### OGC API - Processes Part 1: Core
 
-- **core**: Basic process execution
-- **ogc-process-description**: Standard process descriptions
-- **json**: JSON encoding support
-- **job-list**: Job listing capability
+- `core`: Basic process execution
+- `ogc-process-description`: Standard process descriptions
+- `json`: JSON encoding support
+- `job-list`: Job listing capability
 
 ### OGC API - Processes Part 2: Deploy, Replace, Undeploy (DRU)
 
-- **deploy-replace-undeploy**: Dynamic process deployment
-- **ogcapppkg**: OGC Application Package support
-- **cwl**: Common Workflow Language support
+- `deploy-replace-undeploy`: Dynamic process deployment
+- `ogcapppkg`: OGC Application Package support
+- `cwl`: Common Workflow Language support
 
 ### OGC API - Processes Part 3: Workflows and Chaining
 
-- **workflows**: Workflow execution support
-- **chaining**: Process chaining capabilities
+- `workflows`: Workflow execution support
+- `chaining`: Process chaining capabilities
 
 ### OGC API - Processes Part 4: Job Management
 
-- **job-management**: Enhanced job operations
-- **job-callback**: Notification callbacks
-- **job-dismiss**: Job cancellation
+- `job-management`: Enhanced job operations
+- `job-callback`: Notification callbacks
+- `job-dismiss`: Job cancellation
 
 ## Feature Detection
 

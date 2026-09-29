@@ -26,7 +26,7 @@ Retrieve detailed exception and error information for failed jobs.
 
 ### Required
 
-- **job_id** (string): Job identifier
+- `job_id` (string): Job identifier
 
 ## CLI Usage
 
@@ -82,19 +82,19 @@ curl -X GET \
 
 Typical exception fields:
 
-- **Code**: Error code (e.g., InvalidParameterValue, ProcessFailed)
-- **Text**: Human-readable error message
-- **Locator**: Which parameter or component caused the error
-- **StackTrace**: Detailed stack trace (if available)
+- `Code`: Error code (e.g., InvalidParameterValue, ProcessFailed)
+- `Text`: Human-readable error message
+- `Locator`: Which parameter or component caused the error
+- `StackTrace`: Detailed stack trace (if available)
 
 ## Common Error Codes
 
-- **InvalidParameterValue**: Invalid input parameter
-- **MissingParameterValue**: Required parameter not provided
-- **ProcessFailed**: Process execution failed
-- **NoApplicableCode**: Generic error
-- **StorageQuotaExceeded**: Insufficient storage space
-- **NetworkError**: Network connectivity issues
+- `InvalidParameterValue`: Invalid input parameter
+- `MissingParameterValue`: Required parameter not provided
+- `ProcessFailed`: Process execution failed
+- `NoApplicableCode`: Generic error
+- `StorageQuotaExceeded`: Insufficient storage space
+- `NetworkError`: Network connectivity issues
 
 ## Related Skills
 

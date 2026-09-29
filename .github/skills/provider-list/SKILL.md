@@ -26,8 +26,8 @@ List all registered remote providers and their capabilities.
 
 ### Optional
 
-- **detail** (boolean): Include detailed provider information
-- **check** (boolean): Verify provider connectivity
+- `detail` (boolean): Include detailed provider information
+- `check` (boolean): Verify provider connectivity
 
 ## CLI Usage
 
@@ -101,12 +101,12 @@ curl -X GET \
 
 Each provider includes:
 
-- **id**: Unique provider identifier
-- **url**: Service endpoint URL
-- **type**: Service type (wps, ogcapi, esgf)
-- **public**: Public accessibility flag
-- **description**: Provider description
-- **status**: Connectivity status (if checked)
+- `id`: Unique provider identifier
+- `url`: Service endpoint URL
+- `type`: Service type (wps, ogcapi, esgf)
+- `public`: Public accessibility flag
+- `description`: Provider description
+- `status`: Connectivity status (if checked)
 
 ## Provider Types
 

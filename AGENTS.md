@@ -20,37 +20,37 @@ Skills are defined in the [`.agents/`](.agents/) directory.
 See [.agents/README.md](.agents/README.md) for general information on the Agent Skills framework, or directly
 refer to the specific skill documentation in respective directories under [`.agents/skills/`](.agents/skills/).
 
-| Location | Purpose |
-| --- | --- |
-| **[.agents/README.md](.agents/README.md)** | Complete skills reference with full catalog |
-| **[.agents/skills/](.agents/skills/)** | Redirect to all skill definitions organized by domain as shown below |
-| **[.github/skills/](.github/skills/)** | Main location of all agent skills (identical content to the above) |
+| Location                                   | Purpose                                                              |
+| ------------------------------------------ | -------------------------------------------------------------------- |
+| **[.agents/README.md](.agents/README.md)** | Complete skills reference with full catalog                          |
+| **[.agents/skills/](.agents/skills/)**     | Redirect to all skill definitions organized by domain as shown below |
+| **[.github/skills/](.github/skills/)**     | Main location of all agent skills (identical content to the above)   |
 
 ## Project Directory Structure
 
-| Directory | Purpose |
-| --- | --- |
-| **[.agents/](.agents/)** | Agent Skills framework and skill definitions |
-| **[weaver/](weaver/)** | Core Python implementation (CLI, API, processes, utilities) |
-| **[docs/](docs/)** | Sphinx documentation source and build |
-| **[tests/](tests/)** | Test suite (pytest) |
-| **[config/](config/)** | Configuration templates and examples |
-| **[docker/](docker/)** | Docker build files and container orchestration |
-| **[.github/](.github/)** | GitHub workflows, issue templates, PR templates |
+| Directory                | Purpose                                                     |
+| ------------------------ | ----------------------------------------------------------- |
+| **[.agents/](.agents/)** | Agent Skills framework and skill definitions                |
+| **[weaver/](weaver/)**   | Core Python implementation (CLI, API, processes, utilities) |
+| **[docs/](docs/)**       | Sphinx documentation source and build                       |
+| **[tests/](tests/)**     | Test suite (pytest)                                         |
+| **[config/](config/)**   | Configuration templates and examples                        |
+| **[docker/](docker/)**   | Docker build files and container orchestration              |
+| **[.github/](.github/)** | GitHub workflows, issue templates, PR templates             |
 
 ### Root-Level Files
 
-| File | Purpose |
-| --- | --- |
-| **[README.rst](README.rst)** | Project overview and quick start |
-| **[AGENTS.md](AGENTS.md)** | This file - Agent Skills navigation |
-| **[setup.py](setup.py)** | Python package configuration |
-| **[Makefile](Makefile)** | Build automation and development tasks |
-| **[setup.cfg](setup.cfg)** | Package metadata and build settings |
-| **[SECURITY.md](SECURITY.md)** | Security policy |
-| **[CHANGES.rst](CHANGES.rst)** | Changelog and release notes |
-| **[AUTHORS.rst](AUTHORS.rst)** | Project contributors |
-| **[LICENSE.txt](LICENSE.txt)** | Apache 2.0 License |
+| File                           | Purpose                                |
+| ------------------------------ | -------------------------------------- |
+| **[README.rst](README.rst)**   | Project overview and quick start       |
+| **[AGENTS.md](AGENTS.md)**     | This file - Agent Skills navigation    |
+| **[setup.py](setup.py)**       | Python package configuration           |
+| **[Makefile](Makefile)**       | Build automation and development tasks |
+| **[setup.cfg](setup.cfg)**     | Package metadata and build settings    |
+| **[SECURITY.md](SECURITY.md)** | Security policy                        |
+| **[CHANGES.rst](CHANGES.rst)** | Changelog and release notes            |
+| **[AUTHORS.rst](AUTHORS.rst)** | Project contributors                   |
+| **[LICENSE.txt](LICENSE.txt)** | Apache 2.0 License                     |
 
 ## Skill Categories
 
@@ -120,16 +120,5 @@ Complete skill catalog organized by domain:
 
 - **Complete Skill Reference**: [.agents/README.md](.agents/README.md)
 - **How to Create Skills**: [weaver-skill-create](.agents/skills/weaver-skill-create/SKILL.md)
-- **Agent Skills Specification**: <https://agentskills.io/specification>
-- **Weaver Documentation**: <https://pavics-weaver.readthedocs.io/>
-
-
-
-
-
-
-
-
-
-
-
+- **Agent Skills Specification**: [https://agentskills.io/specification](https://agentskills.io/specification)
+- **Weaver Documentation**: [https://pavics-weaver.readthedocs.io/](https://pavics-weaver.readthedocs.io/)
