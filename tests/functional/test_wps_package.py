@@ -3082,12 +3082,16 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
         Test that directory complex type is resolved from CWL and produces the expected output files.
 
         .. versionadded:: 4.27
+        .. versionchanged:: 6.16
         """
         proc = "DirectoryMergingProcess"
         body = self.retrieve_payload(proc, "deploy", local=True)
         pkg = self.retrieve_payload(proc, "package", local=True)
         body["executionUnit"] = [{"unit": pkg}]
         self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        pkg_out_id = "output_dir"
+        pkg_out_dir = pkg["outputs"][pkg_out_id]["outputBinding"]["glob"]
+        assert pkg_out_dir == "output/"
 
         with contextlib.ExitStack() as stack:
             tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
@@ -3115,7 +3119,7 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
                     {"id": "files", "href": os.path.join(tmp_host, http_file)} for http_file in input_http_files
                 ],
                 "outputs": [
-                    {"id": "output_dir", "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                    {"id": pkg_out_id, "transmissionMode": ExecuteTransmissionMode.REFERENCE},
                 ]
             }
             for mock_exec in mocked_execute_celery():
@@ -3128,12 +3132,13 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             job_id = resp.json["jobID"]
 
             results = self.monitor_job(status_url)
-            assert "output_dir" in results
+            assert pkg_out_id in results
             wps_dir = get_wps_output_dir(self.settings)
             wps_url = get_wps_output_url(self.settings)
-            out_dir = os.path.join(wps_dir, job_id, "output_dir")
-            out_url = f"{os.path.join(wps_url, job_id, 'output_dir')}/"
-            assert results["output_dir"]["href"] == out_url
+            out_dir = os.path.join(wps_dir, job_id, pkg_out_id, pkg_out_dir)
+            out_url = os.path.join(wps_url, job_id, pkg_out_id, pkg_out_dir)
+            assert out_url.endswith("/"), "Output type Directory must have the final slash for file disambiguation."
+            assert results[pkg_out_id]["href"] == out_url, "Output URL must contain the output ID and oringal dir name."
             assert os.path.isdir(out_dir)
             expect_out_files = {
                 # the process itself makes a flat list of input files, this is not a byproduct of dir-type output
@@ -6489,12 +6494,16 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
         Test that directory complex type is resolved from CWL and produces the expected output files in an AWS bucket.
 
         .. versionadded:: 4.27
+        .. versionchanged:: 6.16
         """
         proc = "DirectoryMergingProcess"
         body = self.retrieve_payload(proc, "deploy", local=True)
         pkg = self.retrieve_payload(proc, "package", local=True)
         body["executionUnit"] = [{"unit": pkg}]
         self.deploy_process(body, describe_schema=ProcessSchema.OGC)
+        pkg_out_id = "output_dir"
+        pkg_out_dir = pkg["outputs"][pkg_out_id]["outputBinding"]["glob"]
+        assert pkg_out_dir == "output/"
 
         with contextlib.ExitStack() as stack:
             tmp_host = "https://mocked-file-server.com"  # must match in 'Execute_WorkflowSelectCopyNestedOutDir.json'
@@ -6523,7 +6532,6 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
                 with open(path, mode="w", encoding="utf-8") as f:
                     f.write("test data")
 
-            output_id = "output_dir"
             exec_body = {
                 "mode": ExecuteMode.ASYNC,
                 "response": ExecuteResponse.DOCUMENT,
@@ -6531,7 +6539,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
                     {"id": "files", "href": os.path.join(tmp_host, http_file)} for http_file in input_http_files
                 ],
                 "outputs": [
-                    {"id": output_id, "transmissionMode": ExecuteTransmissionMode.REFERENCE},
+                    {"id": pkg_out_id, "transmissionMode": ExecuteTransmissionMode.REFERENCE},
                 ]
             }
             for mock_exec in mocked_execute_celery():
@@ -6547,14 +6555,15 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
 
             # check that outputs are S3 bucket references
             output_bucket = self.settings["weaver.wps_output_s3_bucket"]
-            output_loc = results[output_id]["href"]
-            output_ref = f"{output_bucket}/{job_id}/{output_id}/"
-            output_key_base = f"{job_id}/{output_id}/"
+            output_loc = results[pkg_out_id]["href"]
+            output_ref = f"{output_bucket}/{job_id}/{pkg_out_id}/{pkg_out_dir}"
+            output_key_base = f"{job_id}/{pkg_out_id}/{pkg_out_dir}"
             output_ref_abbrev = f"s3://{output_ref}"
             output_ref_full = f"https://s3.{MOCK_AWS_REGION}.amazonaws.com/{output_ref}"
             output_ref_any = [output_ref_abbrev, output_ref_full]  # allow any variant weaver can parse
             # validation on outputs path
             assert output_loc in output_ref_any
+            assert output_loc.endswith("/"), "Output type Directory must have the final slash for file disambiguation."
 
             # check that outputs are indeed stored in S3 buckets
             mocked_s3 = boto3.client("s3", region_name=MOCK_AWS_REGION)
@@ -6583,7 +6592,7 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
             # counter validate path with file always present to ensure outputs are not 'missing' because of wrong dir
             wps_uuid = str(self.job_store.fetch_by_id(job_id).wps_id)
             wps_outdir = self.settings["weaver.wps_output_dir"]
-            bad_out_dirs = {output_id}
+            bad_out_dirs = {pkg_out_id, os.path.join(pkg_out_id, pkg_out_dir)}
             bad_out_files = {os.path.basename(file) for file in input_http_files}
             for out_dir in bad_out_dirs:
                 assert not os.path.exists(os.path.join(wps_outdir, out_dir))
@@ -6593,9 +6602,9 @@ class WpsPackageAppWithS3BucketTest(WpsConfigBase, ResourcesUtil):
                 assert not os.path.exists(os.path.join(wps_outdir, out_file))
                 assert not os.path.exists(os.path.join(wps_outdir, job_id, out_file))
                 assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, out_file))
-                assert not os.path.exists(os.path.join(wps_outdir, output_id, out_file))
-                assert not os.path.exists(os.path.join(wps_outdir, job_id, output_id, out_file))
-                assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, output_id, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, pkg_out_id, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, job_id, pkg_out_id, out_file))
+                assert not os.path.exists(os.path.join(wps_outdir, wps_uuid, pkg_out_id, out_file))
             assert os.path.isfile(os.path.join(wps_outdir, f"{job_id}.xml"))
 
     @mocked_aws_config
