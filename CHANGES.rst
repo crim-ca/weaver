@@ -13,6 +13,11 @@ Changes
 Changes:
 --------
 - Provide the `CWL` `Application Package` in JSON and YAML on the HTML `Process` description page.
+- Adjust the output directory resolution to preserve the nested base name of the directory, such that when it has a
+  semantic meaning (e.g.: ``output.zarr/``) or when the workflow step rely on their names to operate, it is preserved
+  in the output result (i.e.: ``{jobID}/output/output.zarr/`` rather than renamed to ``{jobID}/output/``).
+  This aligns with the employed strategy for file outputs where the process-level ``{outputID}`` directory name
+  does not impact the original name of the files it contains, which are coming from the `Application Package` logic.
 - Align ``GET /jobs/{jobId}/definition`` (replaces ``GET /jobs/{jobId}/inputs``) with the
   most recent `OGC API - Processes - Part 4: Job Management` specification,
   which includes the ``entity`` URI of the appropriate `Process` definition at the root of the `Job`/`Workflow`.
@@ -46,6 +51,10 @@ Changes:
 
 Fixes:
 ------
+- Fix invalid convertion to ``array`` within `I/O` ``schema`` for an optional single-value parameter
+  (i.e.: when ``minOccurs=0`` and ``minOccurs=1``). Since any `CWL` `I/O` providing a ``default`` is resolved
+  as optional (i.e.: ``["null", <type>]``), a definition such as ``type: boolean`` with ``default: true`` was
+  incorrectly advertised as ``boolean[]`` instead of ``boolean?``.
 - Fix ``parse_kvp`` (and consequently ``explode_headers``/``parse_link_header``) incorrectly splitting quoted
   parameter values (e.g.: a ``Link`` header ``title="..."`` containing a comma or semicolon) on their embedded
   separator characters, which could produce malformed fragments and raise an unhandled error when parsing an
@@ -775,7 +784,7 @@ Changes:
   to request the ``response: document`` and ``response: raw`` parameters
   (fixes `#414 <https://github.com/crim-ca/weaver/issues/414>`_).
   Minor differences exist according to supplied ``transmissionMode`` and the original data/link results.
-  See `Process Execution <file:///home/francis/dev/weaver/docs/build/html/processes.html#proc-op-execute>`_
+  See `Process Execution <https://pavics-weaver.readthedocs.io/en/latest/processes.html#proc-op-execute>`_
   documentation for details.
 - Add support of ``outputs`` execution request body parameter to filter returned outputs from
   the ``GET /jobs/{jobId}/results`` (async) or returned directly (sync) from ``POST /processes/{processId}/execution``
