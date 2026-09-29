@@ -1065,7 +1065,7 @@ class WorkflowTestRunnerBase(ResourcesUtil, TestCase):
         """
         proc_url, job_id = job_url.split("/jobs/", 1)
         proc_id = proc_url.rsplit("/", 1)[-1]
-        path = f"{job_url}/inputs"
+        path = f"{job_url}/definition"
         resp = self.request("GET", path, params={"schema": JobInputsOutputsSchema.OGC}, ignore_errors=True)
         job_inputs = cast("ExecutionInputsMap", resp.json["inputs"])
         path = f"{job_url}/outputs"

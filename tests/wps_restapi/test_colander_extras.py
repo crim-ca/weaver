@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from weaver.typedefs import JSON
 
-    TestSchema = Union[colander.SchemaNode, Type[colander.SchemaNode]]
+    TestSchema = Union[colander._SchemaMeta, Type[colander.SchemaNode]]
     TestValue = JSON
     TestExpect = Union[JSON, Type[colander.Invalid]]
 
@@ -1654,3 +1654,56 @@ def test_one_of_string_case_sensitivity():
     assert schema_list_cs_words.deserialize("Abc,XyZ") == "Abc,XyZ"
     with pytest.raises(colander.Invalid):
         schema_list_cs_words.deserialize("aBc,xYz")
+
+
+@pytest.mark.parametrize(
+    ["test_value", "expect_valid"],
+    [
+        ("http://localhost", False),
+        ("http://localhost#bad", False),
+        ("http://localhost?bad", False),
+        ("http://localhost/?ok", True),
+        ("http://localhost/?q=", True),
+        ("http://localhost:1234", True),
+        ("http://localhost:1234/abc", True),
+        ("http://localhost/random", True),
+        ("http://localhost/#ok", True),
+        ("http://localhost?ok=yes#ok", True),
+        ("http://localhost/?ok=yes#ok", True),
+        ("http://localhost/sub/?ok=yes#ok", True),
+        ("http://localhost??a=1", False),
+        ("http://localhost/?", True),
+        ("http://localhost/%20space", True),
+        ("http://localhost/path%2Fsegment", True),
+        ("http://localhost/path?x=1#", True),
+        ("http://localhost/path\\ok", True),
+        ("http://localhost  ", False),
+        ("http://localhost ###", False),
+        ("http://localhost.org  ", False),
+        ("http://localhost.org ###", False),
+        ("http://localhost.org/#ok?not-ok=", False),  # anchor must be after query
+        (" http://localhost/", False),
+        ("https://localhost/processes/PassthroughExpressions", True),
+    ],
+)
+def test_url_regex(test_value, expect_valid):
+    test_schema = ce.ExtendedSchemaNode(colander.String(), validator=ce.URL)
+    if expect_valid:
+        assert test_schema.deserialize(test_value) == test_value
+    else:
+        with pytest.raises(colander.Invalid):
+            test_schema.deserialize(test_value)
+
+
+@pytest.mark.parametrize(
+    "test_value",
+    [
+        "https://localhost/processes/PassthroughExpressions",
+    ]
+)
+def test_process_scheme_url_regex(test_value):
+    test_schema = ce.ExtendedSchemaNode(
+        colander.String(),
+        validator=ce.SchemeURL(schemes=["http", "https"], path_pattern=r"(?:/processes/\S+/?)")
+    )
+    assert test_schema.deserialize(test_value) == test_value

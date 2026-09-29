@@ -1,4 +1,5 @@
 {
+  "entity": "http://schema-example.com/providers/hummingbird/processes/ncdump",
   "inputs": [
     {
       "value": "https://schema-example.com/data/test.nc",

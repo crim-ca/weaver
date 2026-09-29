@@ -68,11 +68,13 @@ def test_provenance_media_types():
     expect = [
         ContentType.APP_JSON,
         ContentType.APP_JSONLD,
+        ContentType.APP_PROV_JSON,
         ContentType.APP_YAML,
         ContentType.TEXT_TURTLE,
         ContentType.TEXT_PROVN,
         ContentType.TEXT_XML,
         ContentType.APP_XML,
+        ContentType.APP_PROV_XML,
         ContentType.APP_NT,
     ]
     assert set(result) == set(expect)
@@ -98,9 +100,9 @@ def test_provenance_format(provenance, expect):
     ["provenance", "expect"],
     [
         (None, None),
-        (ProvenanceFormat.PROV_JSON, ContentType.APP_JSON),
+        (ProvenanceFormat.PROV_JSON, ContentType.APP_PROV_JSON),
         (ProvenanceFormat.PROV_JSONLD, ContentType.APP_JSONLD),
-        (ProvenanceFormat.PROV_XML, ContentType.APP_XML),
+        (ProvenanceFormat.PROV_XML, ContentType.APP_PROV_XML),
         (ProvenanceFormat.PROV_NT, ContentType.APP_NT),
         (ProvenanceFormat.PROV_N, ContentType.TEXT_PROVN),
         (ProvenanceFormat.PROV_TURTLE, ContentType.TEXT_TURTLE),
