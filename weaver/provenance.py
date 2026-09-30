@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 
     from cwltool.cwlprov.provenance_profile import ProvenanceProfile
     from cwltool.stdfsaccess import StdFsAccess
-    from prov.model import ProvDocument
 
     from weaver.base import EnumType
     from weaver.datatype import Job

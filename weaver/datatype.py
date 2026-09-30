@@ -1583,7 +1583,6 @@ class Job(Base, LoggerHandler):
         """
         Read or retrieve data from the packaged :term:`Provenance` directory contents associated to the :term:`Job`.
         """
-        resolved_format = ProvenanceFormat.get(prov_format, allow_media_type=True)
         # For the alternative OGC PROV representation, load the JSON-LD
         # that cwlprov gives us, we will convert it below
         if prov_format == ContentType.APP_PROV_OGC_JSON:
