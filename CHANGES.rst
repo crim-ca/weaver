@@ -48,6 +48,8 @@ Changes:
 - Update all `Builtin Processes` with ``MAJOR.MINOR.PATCH`` versions to ensure consistent reporting and access of
   their `Process` description. The API does not allow fetching a partial ``MAJOR.MINOR`` version, meaning their reported
   revision numbers were automatically invalid and unresolvable.
+- Add ``application/ogcprov+json`` (and associated query parameter ``f=ogcprov+json``) to return provenance in the JSON format defined in the Provenance Chain building block (https://docs.ogc.org/DRAFTS/26-038.html).
+- Update dependencies on cwltool and cwlprov to correct JSON-LD and allow for alternate OGC PROV JSON representation.
 
 Fixes:
 ------
