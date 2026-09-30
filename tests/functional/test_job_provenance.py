@@ -131,7 +131,13 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.APP_PROV_OGC_JSON
         prov = resp.json
-        print(prov)
+        assert isinstance(prov, list)
+        assert all("id" in obj for obj in prov)
+        objtypes = {}
+        for obj in prov:
+            objtypes.setdefault(obj["provType"], []).append(obj)
+        assert all("wasAssociatedWith" in obj for obj in objtypes["Activity"])
+        assert all("actedOnBehalfOf" in obj for obj in objtypes["Agent"])
 
     @parameterized.expand([
         ({"f": "ld+json"}, {}),
