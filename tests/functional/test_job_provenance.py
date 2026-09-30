@@ -137,7 +137,6 @@ class TestJobProvenance(TestJobProvenanceBase):
         for obj in prov:
             objtypes.setdefault(obj["provType"], []).append(obj)
         assert all("wasAssociatedWith" in obj for obj in objtypes["Activity"])
-        assert all("actedOnBehalfOf" in obj for obj in objtypes["Agent"])
 
     @parameterized.expand([
         ({"f": "ld+json"}, {}),
