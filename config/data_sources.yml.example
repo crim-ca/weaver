@@ -19,7 +19,7 @@ localhost:
   # since that default is 'localhost', default in this case will indicate "run it locally"
   # another ADES location could be set as default to dispatch unknown data-source executions to that specific instance
   netloc: "localhost"
-  ades: "https://localhost:4001"
+  ades: "http://localhost:4001"
   default: true
 
 opensearchdefault:
