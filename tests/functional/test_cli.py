@@ -856,6 +856,7 @@ class TestWeaverClient(TestWeaverClientBase):
         """
         test_id = f"{self.test_process_prefix}replace-visibility"
         payload = copy.deepcopy(self.test_payload["Echo"])
+        payload["processDescription"]["process"]["version"] = "1.0.0"
         result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload)
         assert result.success
         assert result.body["processSummary"]["version"] == "1.0.0"
@@ -866,7 +867,7 @@ class TestWeaverClient(TestWeaverClientBase):
             metadata={"visibility": Visibility.PRIVATE}
         )
         assert result.success
-        assert result.body["version"] == "1.1.0", "MINOR-level change should bump minor version"
+        assert result.body["processSummary"]["version"] == "1.1.0", "MINOR-level change should bump minor version"
 
         # Verify visibility was changed (describe should now require auth or fail)
         result = mocked_sub_requests(self.app, self.client.describe, test_id)
