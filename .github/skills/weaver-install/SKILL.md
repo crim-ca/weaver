@@ -77,8 +77,10 @@ docker run -p 4001:4001 \
 # With docker-compose
 cd docker
 cp docker-compose.yml.example docker-compose.yml
-# Edit docker-compose.yml as needed.  You must minimally change
-# the values mongodb.host and BROKER_URL as described in the comments.
+
+# Edit docker-compose.yml as needed.  You must also edit config/weaver.ini.example,
+# changing the values mongodb.host and BROKER_URL to point to the "mongodb"
+# container, as described in the comments.
 docker-compose up -d
 ```
 
