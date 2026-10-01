@@ -1321,7 +1321,7 @@ class WeaverClient(object):
         path = f"{base}/processes/{process_id}"
 
         # Start with body/cwl if provided, then merge additional parameters
-        data = {}
+        process_data = data = {}
         has_body_or_cwl = body is not None or cwl is not None
 
         if has_body_or_cwl:
@@ -1337,27 +1337,34 @@ class WeaverClient(object):
                 return result
             data = result.body
 
+            # define mapping location for following fields to inject
+            # depending on detected backward-compat structures
+            if "processDescription" in data:
+                process_data = data["processDescription"]
+            if "process" in process_data:
+                process_data = process_data["process"]
+
         # Merge additional parameters additively
         if inputs is not None:
             parsed_inputs = self._parse_file_or_json(inputs, "inputs")
             if isinstance(parsed_inputs, OperationResult):
                 return parsed_inputs
-            data["inputs"] = parsed_inputs
+            process_data["inputs"] = parsed_inputs
 
         if outputs is not None:
             parsed_outputs = self._parse_file_or_json(outputs, "outputs")
             if isinstance(parsed_outputs, OperationResult):
                 return parsed_outputs
-            data["outputs"] = parsed_outputs
+            process_data["outputs"] = parsed_outputs
 
         if metadata is not None:
             parsed_metadata = self._parse_metadata_updates(metadata)
             if isinstance(parsed_metadata, OperationResult):
                 return parsed_metadata
-            data.update(parsed_metadata)
+            process_data.update(parsed_metadata)
 
         if version is not None:
-            data["version"] = version
+            process_data["version"] = version
 
         if not data:
             return OperationResult(

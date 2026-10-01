@@ -884,20 +884,31 @@ class TestWeaverClient(TestWeaverClientBase):
         original_title = payload["processDescription"]["process"]["title"]
         result = mocked_sub_requests(self.app, self.client.deploy, test_id, payload)
         assert result.success
+        assert result.body["processSummary"]["version"] == "1.0", "Origial deployment version should be used as is."
 
         # Replace with original body but override title
+        # However, remove the version to verify that auto-bump of version is applied (otherwise it conflicts when equal)
         new_title = "Overridden Title"
+        payload["processDescription"]["process"].pop("version")
+        assert payload["processDescription"]["process"]["title"] == original_title, (
+            "Prerequisite of the field being present to ensure that the "
+            "following 'metadata' argument will override it automatically."
+        )
         result = mocked_sub_requests(
             self.app, self.client.replace, test_id,
             body=payload, metadata={"title": new_title, "keywords": ["override-test"]}
         )
         assert result.success
+        assert result.body["processSummary"]["version"] == "2.0.0", (
+            "Updated version should have been auto-bumped to MAJOR version "
+            "since a PUT operation should have been resolved from deploy request body being present."
+        )
 
         # Verify title was overridden
         result = mocked_sub_requests(self.app, self.client.describe, test_id)
         assert result.success
         assert result.body["title"] == new_title, "Metadata should override body field"
-        assert result.body["title"] != original_title
+        assert result.body["version"] == "2.0.0"
         assert "override-test" in result.body["keywords"]
 
     @pytest.mark.oap_part2
