@@ -14,6 +14,13 @@ Changes:
 --------
 - Implement the `CLI` ``replace`` operation to update an existing `Process` definition
   (resolves `#906 <https://github.com/crim-ca/weaver/issues/906>`_).
+- Add ``--output-id`` option (multiple allowed) to `CLI` ``execute`` and ``update_job`` operations to
+  provide the inverse option from ``--output-filter``, which can be easier when the set of desired outputs is smaller.
+  This also aligns with the "*output selection*" approach defined by `OGC API - Processes`.
+- Add ``--output-id`` option (multiple allowed) to `CLI` ``results`` operation to perform post-execution filtering
+  of `Job` results. This can be used with servers that do not directly support outputs selection at execution time,
+  or simply to retrieve partial results of an existing `Job`. This option also allows the selection of output array
+  elements by index using ``{outputID}/{N}`` and can be combined with ``--download`` to obtain only those results.
 - Provide the `CWL` `Application Package` in JSON and YAML on the HTML `Process` description page.
 - Adjust the output directory resolution to preserve the nested base name of the directory, such that when it has a
   semantic meaning (e.g.: ``output.zarr/``) or when the workflow step rely on their names to operate, it is preserved

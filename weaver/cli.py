@@ -1859,7 +1859,8 @@ class WeaverClient(object):
     def _prepare_outputs(
         self,
         body,                   # type: JSON
-        output_ids,             # type: List[str]
+        process_outputs,        # type: Sequence[str]
+        output_ids=None,        # type: Optional[Sequence[str]]
         output_refs=None,       # type: Optional[Iterable[str]]
         # outputs_types=None,   # FIXME: alternate output media-types (https://github.com/crim-ca/weaver/pull/548)
         output_filter=None,     # type: Optional[Sequence[str]]
@@ -1868,8 +1869,11 @@ class WeaverClient(object):
         Performs inplace replacement or update of :term:`Job` outputs according to predefined and requested conditions.
         """
         LOGGER.debug("Preparing job outputs...")
+        process_outputs = set(process_outputs)
         output_refs = set(output_refs or [])
-        for output_id in output_ids:
+        if output_ids:
+            process_outputs &= set(output_ids)  # ignore unknown
+        for output_id in process_outputs:
             if output_filter and output_id in output_filter:
                 continue
             if output_id in output_refs:
@@ -1909,6 +1913,7 @@ class WeaverClient(object):
         output_format=None,             # type: Optional[AnyOutputFormat]
         output_refs=None,               # type: Optional[Iterable[str]]
         # outputs_types=None,   # FIXME: alternate output media-types (https://github.com/crim-ca/weaver/pull/548)
+        output_ids=None,                # type: Optional[Sequence[str]]
         output_filter=None,             # type: Optional[Sequence[str]]
         output_context=None,            # type: Optional[str]
     ):                                  # type: (...) -> OperationResult
@@ -2007,6 +2012,11 @@ class WeaverClient(object):
             containing the data. outputs that refer to a file reference will simply contain that URL reference as link.
             With value transmission mode (default behavior when outputs are not specified in this list), outputs are
             returned as direct values (literal or href) within the response content body.
+        :param output_ids:
+            Output IDs that will be submitted for execution.
+            If omitted, all available outputs from the Process will be selected.
+            Otherwise, only the specifically indicated outputs will be selected.
+            To exclude only certain outputs while preserving all others, use ``output_filter`` instead.
         :param output_filter:
             Indicates a list of outputs to omit from the results. If unspecified (default), all outputs are returned.
         :param output_context:
@@ -2037,9 +2047,10 @@ class WeaverClient(object):
             return OperationResult(False, "Could not obtain process description for execution.",
                                    body=proc_desc, headers=result.headers, code=result.code, text=result.text)
 
-        output_ids = list(result.body.get("outputs") or {})
+        proc_outputs = list(result.body.get("outputs") or {})
         exec_data = self._prepare_outputs(
             exec_data,
+            proc_outputs,
             output_ids=output_ids,
             output_refs=output_refs,
             # outputs_types=outputs_types,  # FIXME: https://github.com/crim-ca/weaver/pull/548
@@ -2152,6 +2163,7 @@ class WeaverClient(object):
         output_format=None,     # type: Optional[AnyOutputFormat]
         output_refs=None,       # type: Optional[Iterable[str]]
         # outputs_types=None,   # FIXME: alternate output media-types (https://github.com/crim-ca/weaver/pull/548)
+        output_ids=None,        # type: Optional[Sequence[str]]
         output_filter=None,     # type: Optional[Sequence[str]]
         output_context=None,    # type: Optional[str]
     ):                          # type: (...) -> OperationResult
@@ -2197,6 +2209,11 @@ class WeaverClient(object):
             containing the data. outputs that refer to a file reference will simply contain that URL reference as link.
             With value transmission mode (default behavior when outputs are not specified in this list), outputs are
             returned as direct values (literal or href) within the response content body.
+        :param output_ids:
+            Output IDs that will be submitted for execution.
+            If omitted, all available outputs from the Process will be selected.
+            Otherwise, only the specifically indicated outputs will be selected.
+            To exclude only certain outputs while preserving all others, use ``output_filter`` instead.
         :param output_filter:
             Indicates a list of outputs to omit from the results. If unspecified (default), all outputs are returned.
         :param output_context:
@@ -2219,7 +2236,7 @@ class WeaverClient(object):
             values, auth_headers = result
             update_headers.update(auth_headers)
             update_data["inputs"] = values
-        if output_refs or output_filter:
+        if output_refs or output_filter or output_ids:
             LOGGER.debug("Retrieving job details to identify reference process: [%s]", job_id)
             job_result = self.status(job_url, url=url, auth=auth)
             if not job_result.success:
@@ -2229,10 +2246,12 @@ class WeaverClient(object):
             proc_result = self.describe(proc_ref, url=url, auth=auth)
             if not proc_result.success:
                 return proc_result
-            proc_outputs = list(proc_result.body.get("outputs"))
+
+            proc_outputs = set(proc_result.body.get("outputs"))
             update_data = self._prepare_outputs(
                 update_data,
-                output_ids=proc_outputs,
+                proc_outputs,
+                output_ids=output_ids,
                 output_refs=output_refs,
                 output_filter=output_filter,
             )
@@ -2778,6 +2797,9 @@ class WeaverClient(object):
         # Collect requested IDs and their indices in a single pass
         requested_ids = {}  # type: Dict[str, Optional[Set[int]]]
         for out_spec in output_ids:
+            if isinstance(out_spec, str) and "/" in out_spec:
+                out_spec = out_spec.split("/", 1)
+                out_spec = (out_spec[0], int(out_spec[1]))
             if isinstance(out_spec, tuple):
                 out_id, out_idx = out_spec
                 if out_id not in requested_ids:
@@ -2903,7 +2925,11 @@ class WeaverClient(object):
         params = {}
         if output_ids:
             # preemptyively filter outputs IDs if possible/supported by the API to reduce data transfer
-            params["outputs"] = ",".join(out if isinstance(out, str) else out[0] for out in output_ids)
+            params["outputs"] = ",".join(
+                out if isinstance(out, str) else out[0]
+                for out in output_ids
+                if not (isinstance(out, str) and "/" in out)  # index selection
+            )
         resp = self._request("GET", result_url,
                              params=params, headers=self._headers, x_headers=headers,
                              settings=self._settings, auth=auth,
@@ -3336,11 +3362,23 @@ def add_job_exec_param(parser):
         """)
     )
     parser.add_argument(
+        "-oI", "--output-id", metavar="OUTPUT", dest="output_ids",
+        nargs=1, action="append",  # collect max 1 item per '-oI'
+        help=(
+            "Output IDs that will be submitted for execution."
+            "\n\n"
+            "If omitted, all available outputs from the Process will be selected. "
+            "Otherwise, only the specifically indicated outputs will be selected. "
+            "To exclude only certain outputs while preserving all others, use ``--output-filter`` instead. "
+            "The option can be specified multiple times for multiple outputs to be selected."
+        )
+    )
+    parser.add_argument(
         "-oF", "--output-filter", metavar="OUTPUT", dest="output_filter", nargs=1,
         help=(
-            "Output ID to be omitted in the submitted process execution. "
+            "Output IDs to be omitted in the submitted process execution. "
             "Subsequent results of the corresponding job will omit the specified output in the responses. "
-            "The option Can be specified multiple times for multiple outputs to be filtered out."
+            "The option can be specified multiple times for multiple outputs to be filtered out."
         )
     )
     op_execute_output_context = parser.add_mutually_exclusive_group()
@@ -4416,15 +4454,16 @@ def make_parser():
              "(default: ``${CURDIR}/{JobID}/<outputs.files>``)."
     )
     op_results.add_argument(
-        "-oI", "--output-ids", metavar="OUTPUT", dest="output_ids",
+        "-oI", "--output-id", metavar="OUTPUT", dest="output_ids",
         nargs=1, action="append",  # collect max 1 item per '-oI'
         help=(
             "Output IDs that should be collected from the results."
             "\n\n"
             "If omitted, all available outputs from the Job will be retrieved. "
-            "If an output happens to be an array of data/file results, an optional index can also be provided to "
-            "extract only these entries. In such case, the resulting array will only contain the requested elements. "
-            "To ensure index consistency, other outputs will be represented by 'null' instead of the data/file. "
+            "If an output happens to be an array of data/file results, an optional index can also be provided "
+            "using the ``{outputID}/{N}`` format to extract only these entries instead of the entire array. "
+            "To ensure index consistency, omitted outputs from an array will be represented by 'null' instead of "
+            "the data/file at corresponding positions. "
             "If combined with the download option, only the requested outputs will be retrieved and saved locally."
         )
     )
