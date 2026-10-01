@@ -219,9 +219,9 @@ weaver.vault_dir = /tmp/vault
 [celery]
 #USE_CELERYCONFIG = True
 # NOTE:
-#   when using docker-compose, you must set the hostname in BROKER_URL to "mongodb" (or its container name), not "localhost"!
-#   for an example, see the 'tests/smoke/' definitions (it uses the "mongodb" hostname from 'make test-smoke' call)
-#   otherwise, for local environments, it is assumed a "mongodb" service is running on the "localhost" instance
+#   when using docker-compose, you must set the hostname in BROKER_URL to "mongodb" (or its container name), not
+#   "localhost"! for example, see the 'tests/smoke/' definitions (it uses the "mongodb" hostname from 'make test-smoke'
+#   call). otherwise, for local environments, it is assumed a "mongodb" service is running on the "localhost" instance
 #   this broker can be the same or a distinct one from the one used by weaver for process and job management
 # BROKER_URL = mongodb://localhost:27017/celery
 BROKER_URL = mongodb://mongodb:27017/celery
