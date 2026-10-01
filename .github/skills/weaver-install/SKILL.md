@@ -77,7 +77,11 @@ docker run -p 4001:4001 \
 # With docker-compose
 cd docker
 cp docker-compose.yml.example docker-compose.yml
-# Edit docker-compose.yml as needed
+
+# Edit docker-compose.yml as needed.  You must also edit the mounted INI
+# file (../config/weaver.ini.example by default), changing the values
+# mongodb.host and BROKER_URL to point to the "mongodb" container, as
+# described in the comments.
 docker-compose up -d
 ```
 
@@ -305,7 +309,10 @@ pserve config/weaver.ini --reload
 # Using gunicorn
 gunicorn --paste config/weaver.ini -b 0.0.0.0:4001 --workers 4
 
-# Using docker-compose
+# Using docker-compose. Make sure to create or edit an INI file
+# with the correct values for mongodb.host and BROKER_URL, as
+# described in the comments, and mount this INI file in the
+# weaver and worker containers in docker-compose.yml.
 docker-compose -f docker/docker-compose.yml up -d
 ```
 
@@ -540,7 +547,10 @@ make install-pip
 ```bash
 cd docker
 
-# Copy and customize configuration
+# Copy and customize configuration.  Make sure to correct
+# mongodb.host and BROKER_URL in the INI file, as described in
+# the comments, and to modify docker-compose.yml to mount this INI
+# file in the weaver and worker containers.
 cp docker-compose.yml.example docker-compose.yml
 cp ../config/weaver.ini.example ../config/weaver.ini
 

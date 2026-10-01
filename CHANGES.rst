@@ -88,6 +88,7 @@ Fixes:
 - Added tests for ``DelimitedStringOneOf`` and ``OneOfCaseInsensitive`` to ensure their related case-sensitive value
   handling remains consistent between them.
 - Fix invalid parsing of ``Link: <{URI}>; rel="profile"`` headers to extract the profile URI.
+- Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
 
 .. _changes_6.15.0:
 
