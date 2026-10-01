@@ -4096,7 +4096,7 @@ def make_parser():
              "Can be provided as JSON string, or file path containing JSON/YAML."
     )
     op_replace.add_argument(
-        "-v", "--version", dest="version",
+        "--version", dest="version",
         help="Explicit version to assign to the updated process (e.g., '2.0.0'). "
              "If not provided, version will be automatically bumped based on changes."
     )
