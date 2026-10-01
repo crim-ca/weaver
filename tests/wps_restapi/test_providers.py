@@ -17,7 +17,7 @@ from weaver.config import WeaverConfiguration
 from weaver.datatype import Service
 from weaver.execute import ExecuteControlOption, ExecuteTransmissionMode
 from weaver.formats import ContentType, OutputFormat
-from weaver.processes.constants import ProcessSchema
+from weaver.processes.constants import CWL_REQUIREMENT_APP_WPS1, ProcessSchema
 
 
 class WpsProviderBase(GenericUtils):
@@ -420,6 +420,29 @@ class WpsRestApiProvidersTest(WpsProviderBase):
         assert "outputs" in process and isinstance(process["outputs"], dict)
         assert all(isinstance(p_io, str) and isinstance(process["outputs"][p_io], dict) for p_io in process["outputs"])
         assert all("id" not in process["outputs"][p_io] for p_io in process["outputs"])
+
+    @mocked_remote_server_requests_wps1(
+        [
+            resources.TEST_REMOTE_SERVER_URL,
+            resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
+            [resources.TEST_REMOTE_SERVER_WPS1_DESCRIBE_PROCESS_XML],
+        ]
+    )
+    def test_get_provider_process_package(self):
+        self.register_provider()
+
+        p_id = resources.TEST_REMOTE_SERVER_WPS1_PROCESS_ID
+        path = f"/providers/{self.remote_provider_name}/processes/{p_id}/package"
+        resp = self.app.get(path, headers={"Accept": ContentType.APP_CWL_JSON})
+        assert resp.status_code == 200
+        assert resp.content_type == ContentType.APP_CWL_JSON
+        assert "cwlVersion" in resp.json
+        assert "hints" in resp.json
+        assert CWL_REQUIREMENT_APP_WPS1 in resp.json["hints"]
+        assert resp.json["hints"][CWL_REQUIREMENT_APP_WPS1] == {
+            "provider": resources.TEST_REMOTE_SERVER_URL,
+            "process": p_id,
+        }
 
     @pytest.mark.html
     @mocked_remote_server_requests_wps1([

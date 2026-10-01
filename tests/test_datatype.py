@@ -3,6 +3,7 @@ import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta
 
+import colander
 import mock
 import pytest
 
@@ -221,6 +222,21 @@ def test_process_split_version(process_id, result):
 def test_process_cleanup_keywords():
     proc = Process(id="test", type=ProcessType.WPS_REMOTE, keywords=[" PyWPS ", " WPS", " OGC", " demo "], package={})
     assert proc.keywords == ["PyWPS", "WPS", "OGC", "demo", ProcessType.WPS_REMOTE]
+
+
+@pytest.mark.parametrize(
+    "keywords",
+    [
+        [1, 2],
+        [""],
+        [" "],
+        ["ok", " "],
+    ]
+)
+def test_process_invalid_keywords(keywords):
+    proc = Process(id="test", package={})
+    with pytest.raises((AttributeError, ValueError, colander.Invalid)):
+        proc.keywords = keywords
 
 
 def test_process_outputs_alt():

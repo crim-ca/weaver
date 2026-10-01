@@ -35,7 +35,11 @@ from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import clean_json_text_body, fully_qualified_name, get_any_id, get_header, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas
+from weaver.wps_restapi.processes.utils import (
+    get_process_list_links,
+    get_process_package_response,
+    get_processes_filtered_by_valid_schemas
+)
 from weaver.wps_restapi.providers.providers import describe_provider_process
 from weaver.wps_restapi.providers.utils import get_provider_id, get_provider_services
 
@@ -380,22 +384,7 @@ def get_local_process_package(request):
     Get a registered local process package definition.
     """
     process = get_process(request=request)
-    content_type = get_header("Accept", request.headers, default=ContentType.APP_CWL_JSON)
-    # ignore default browser request injecting HTML
-    # ignore 'weaver.wps_restapi_html_override_user_agent' as well since HTML cannot apply here
-    if all(ctype in content_type for ctype in [ContentType.TEXT_HTML, ContentType.ANY]):
-        content_type = ContentType.APP_CWL_JSON
-    headers = {
-        "Link": make_link_header(sd.CWL_SCHEMA_URL, rel="profile", type=ContentType.APP_YAML),
-        "Content-Schema": sd.CWL_SCHEMA_URL,
-        "Content-Profile": sd.CWL_SCHEMA_URL,
-    }
-    yml_fmt = [ContentType.APP_YAML, ContentType.APP_CWL_YAML]
-    cwl_fmt = OutputFormat.YAML if any(ctype in content_type for ctype in yml_fmt) else OutputFormat.JSON
-    package = OutputFormat.convert(process.package, cwl_fmt)
-    content = {"json": package} if cwl_fmt == OutputFormat.JSON else {"body": package}
-    content = content if package else {}
-    return HTTPOk(headers=headers, content_type=content_type, charset="utf-8", **content)
+    return get_process_package_response(request, process)
 
 
 @sd.process_payload_service.get(

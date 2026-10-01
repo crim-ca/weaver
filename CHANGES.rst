@@ -24,6 +24,7 @@ Changes:
   as alias to resolve the corresponding ``/providers/{providerID}/processes/{processID}`` resource.
 - Add ``provider`` details embedded within the ``/processes/{processID}`` response if ``?provider={providerID}``
   or ``?service={providerID}`` query parameter is specified and that the `Provider`'s `Process` can be resolved.
+- Add content negotiation on ``/providers/{providerID}/processes/{processID}/package`` to align with local `Process`.
 - Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}``
   endpoint to align with the latest OGC API - Processes Core specification.
 - Provide the `CWL` `Application Package` in JSON and YAML on the HTML `Process` description page.

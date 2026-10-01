@@ -24,7 +24,7 @@ from weaver.processes.execution import submit_job
 from weaver.store.base import StoreServices
 from weaver.utils import get_any_id, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.processes.utils import get_process_list_links
+from weaver.wps_restapi.processes.utils import get_process_list_links, get_process_package_response
 from weaver.wps_restapi.providers.utils import check_provider_requirements, get_provider_services, get_service
 from weaver.wps_restapi.utils import get_schema_ref, handle_schema_validation
 
@@ -330,7 +330,14 @@ def get_provider_process(request):
 @sd.provider_process_package_service.get(
     tags=[sd.TAG_PROVIDERS, sd.TAG_PROCESSES, sd.TAG_DESCRIBEPROCESS],
     schema=sd.ProviderProcessPackageEndpoint(),
-    accept=ContentType.APP_JSON,
+    accept=[
+        ContentType.APP_JSON,
+        ContentType.APP_YAML,
+        ContentType.APP_CWL,
+        ContentType.APP_CWL_JSON,
+        ContentType.APP_CWL_YAML,
+        ContentType.APP_CWL_X,
+    ],
     renderer=OutputFormat.JSON,
     response_schemas=sd.get_provider_process_package_responses,
 )
@@ -342,7 +349,7 @@ def get_provider_process_package(request):
     Retrieve a remote provider's process Application Package definition.
     """
     process, _ = describe_provider_process(request)
-    return HTTPOk(json=process.package or {})
+    return get_process_package_response(request, process)
 
 
 @sd.provider_execution_service.post(

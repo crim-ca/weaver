@@ -2398,7 +2398,7 @@ class Process(Base):
     @keywords.setter
     def keywords(self, keywords):
         # type: (List[str]) -> None
-        keywords = {key.strip(): None for key in keywords}
+        keywords = {key.strip(): None for key in keywords}  # preserve order
         self["keywords"] = list(sd.KeywordList().deserialize(list(keywords)))
 
     @property
