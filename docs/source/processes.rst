@@ -3536,10 +3536,11 @@ Transformed Output Considerations
 
 .. versionadded:: 6.12.0
 
-From a client perspective, output :ref:`content-negotiation` produced directly by an originally deployed :term:`Process`
-definition or through an alternate format :term:`Transform` uses the same mechanisms. All supported :term:`Media-Types`
-by a given :term:`Process` output are described in the same manner. However, the underlying :term:`Process` definition
-composes that set of supported formats by combining the *native* formats declared in the :term:`Process` definition
+From a client perspective, output :ref:`proc_content_negotiation` produced directly by an originally
+deployed :term:`Process` definition or through an alternate format :term:`Transform` uses the same mechanisms.
+All supported :term:`Media-Types` by a given :term:`Process` output are described in the same manner.
+However, the underlying :term:`Process` definition composes that set of supported formats by combining
+the *native* formats declared in the :term:`Process` definition
 (which may come from the declared :ref:`Deployment Metadata <proc_op_deploy>` and/or :term:`Application Package`)
 and any additional transformation formats builtin within `Weaver`.
 
