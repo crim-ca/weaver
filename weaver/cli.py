@@ -2812,7 +2812,7 @@ class WeaverClient(object):
                             outputs
                         )
                 # Create array with None placeholders, keeping only requested indices
-                max_idx = max(indices, len(out_val) - 1)
+                max_idx = max(*indices, len(out_val) - 1)
                 filtered_array = [None] * (max_idx + 1)
                 for idx in indices:
                     filtered_array[idx] = out_val[idx]
@@ -4415,7 +4415,7 @@ def make_parser():
         help="Output directory where to store downloaded files from job results if requested "
              "(default: ``${CURDIR}/{JobID}/<outputs.files>``)."
     )
-    parser.add_argument(
+    op_results.add_argument(
         "-oI", "--output-ids", metavar="OUTPUT", dest="output_ids",
         nargs=1, action="append",  # collect max 1 item per '-oI'
         help=(
