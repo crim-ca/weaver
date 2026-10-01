@@ -65,7 +65,7 @@ This skill provides three automation scripts to help maintain Agent Skills:
 
 **See**: [Automated Validation](#automated-validation) section for details
 
-### 3. check_frontmatter.py
+### 3. `check_frontmatter.py`
 
 **Purpose**: Verify YAML frontmatter uses proper multiline format
 
@@ -405,7 +405,8 @@ When updating skills, verify:
 - [ ] **Author** in frontmatter `metadata.author` preserves the original skill author
 - [ ] **Contributors** include the committer in `metadata.contributors` when the skill is modified by someone else
 - [ ] **Description** is accurate (1-1024 chars)
-- [ ] **Parameters** remain clearly documented with types
+- [ ] **Parameters** remain clearly documented with types and use code quotes for their name
+- [ ] **Required/Optional** subsections are indicated as applicable for **parameters**
 - [ ] **Return values** remain documented and aligned with expected API behavior
 - [ ] **Scripts** that require large set of commands are placed in dedicated `scripts/` and referenced by the skill
 - [ ] **Returns** section has completeness note

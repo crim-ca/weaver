@@ -328,7 +328,7 @@ Glossary
 
     Transform
         Additional :term:`Media-Type` transformation operations that can augment a native :term:`Process`
-        definition to offer supplementary :ref:`content-negotiation` capabilities of its :term:`Job` results.
+        definition to offer supplementary :ref:`proc_content_negotiation` capabilities of its :term:`Job` results.
 
         .. seealso::
             Refer to :ref:`proc_content_negotiation_transforms` section for more details.

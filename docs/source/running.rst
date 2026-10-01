@@ -24,7 +24,7 @@ specified connection settings in ``weaver/config/weaver.ini``.
 `Gunicorn`_:
 
 .. note::
-    If using ``Windows``, make sure you have read the :ref:`windows_install` section.
+    If using ``Windows``, make sure you have read the :ref:`installation-windows` section.
 
 
 .. code-block:: sh

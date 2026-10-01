@@ -25,12 +25,12 @@ List all available processes with optional filtering and pagination.
 
 ### Optional
 
-- **provider** (string): Filter by provider ID
-- **visibility** (string): Filter by visibility ("public", "private")
-- **limit** (integer): Maximum number of results
-- **page** (integer): Pagination offset
-- **sort** (string): Sort order for results
-- **detail** (boolean): Include detailed descriptions
+- `provider` (string): Filter by provider ID
+- `visibility` (string): Filter by visibility ("public", "private")
+- `limit` (integer): Maximum number of results
+- `page` (integer): Pagination offset
+- `sort` (string): Sort order for results
+- `detail` (boolean): Include detailed descriptions
 
 ## CLI Usage
 

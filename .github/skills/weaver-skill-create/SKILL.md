@@ -7,7 +7,7 @@ license: Apache-2.0
 compatibility: Requires understanding of Weaver architecture and Agent Skills specification.
 metadata:
   category: setup-operations
-  version: "1.0.0"
+  version: 1.0.0
   keywords:
     - skill-development
     - documentation
@@ -58,6 +58,7 @@ the **`weaver-<component>-<action>`** pattern:
 - **action**: The operation (e.g., `create`, `update`)
 
 ✓ Examples:
+
 - `weaver-skill-create` - Create new Agent Skills
 - `weaver-skills-update` - Update skill documentation
 - `weaver-install` - Install Weaver
@@ -74,6 +75,7 @@ Skills that perform operations using Weaver or other tools relevant to it simply
 - **action**: The operation (e.g., `deploy`, `monitor`, `validate`)
 
 ✓ Examples:
+
 - `job-monitor` - Monitor job execution
 - `process-deploy` - Deploy processes
 - `cwl-validate-package` - Validate CWL packages
@@ -112,17 +114,17 @@ metadata:
 
 ### Metadata Fields
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `name` | string | Yes | Unique skill identifier (lowercase, hyphens) |
-| `description` | string | Yes | Clear description with keywords (max 1024 chars) |
-| `license` | string | Yes | License type (e.g., Apache-2.0) |
-| `compatibility` | string | Yes | System/environment requirements |
-| `metadata.category` | string | Yes | Skill category for organization |
-| `metadata.version` | string | Yes | Skill version (semantic versioning) |
-| `metadata.keywords` | array | Yes | Search keywords for discovery |
-| `metadata.author` | string | Yes | Original skill author |
-| `metadata.contributors` | array | No | Contributors who modified the skill after creation |
+| Field                   | Type   | Required | Description                                        |
+| ----------------------- | ------ | -------- | -------------------------------------------------- |
+| `name`                  | string | Yes      | Unique skill identifier (lowercase, hyphens)       |
+| `description`           | string | Yes      | Clear description with keywords (max 1024 chars)   |
+| `license`               | string | Yes      | License type (e.g., Apache-2.0)                    |
+| `compatibility`         | string | Yes      | System/environment requirements                    |
+| `metadata.category`     | string | Yes      | Skill category for organization                    |
+| `metadata.version`      | string | Yes      | Skill version (semantic versioning)                |
+| `metadata.keywords`     | array  | Yes      | Search keywords for discovery                      |
+| `metadata.author`       | string | Yes      | Original skill author                              |
+| `metadata.contributors` | array  | No       | Contributors who modified the skill after creation |
 
 The metadata fields must respect the [Agent Skills Specification](https://agentskills.io/specification).
 
@@ -161,8 +163,13 @@ One-line summary of the capability.
 
 ## Parameters
 
-- **param_name** (type): Description
-- **param_name** (type): Optional description
+### Required
+
+- `param_name` (type): Description
+
+### Optional
+
+- `param_name` (type): Optional description
 
 ## CLI Usage
 
@@ -258,6 +265,7 @@ EOF
 ### 3. Add Usage Examples
 
 Include at least three usage methods:
+
 - CLI examples with commands and flags
 - Python code with imports and method calls
 - Raw API requests with curl or HTTP
@@ -265,6 +273,7 @@ Include at least three usage methods:
 ### 4. Document Parameters
 
 List all inputs with:
+
 - Parameter name and type
 - Description
 - Default value (if applicable)
@@ -273,6 +282,7 @@ List all inputs with:
 ### 5. Document Returns
 
 Show what the skill returns:
+
 - Success response format
 - Error response format
 - Example output
@@ -302,12 +312,14 @@ Before considering a skill complete:
 - [ ] At least 3 usage examples (CLI, Python, API)
 - [ ] All examples are syntactically correct
 - [ ] All code examples tested
-- [ ] Parameters clearly documented with types
-- [ ] Return values documented and match expected API behavior
+- [ ] Parameters clearly documented with types and use code quotes for their name (not \*\*)
+- [ ] Required/Optional subsections are indicated as applicable for **parameters**
+- [ ] Return/errors values or HTTP codes are documented and match expected API behavior
 - [ ] Links to related skills are valid
 - [ ] Metadata keywords enable discovery
 - [ ] Line length ≤ 120 characters
-- [ ] No escaped underscores (`\_` → `_`)
+- [ ] No escaped underscores (`\_` → `_`). This is an indcator of a code element!
+- [ ] Code quotes (i.e.: `var`) are used for fields, properties, constants, variables, parameters, HTTP codes/messages
 - [ ] YAML frontmatter is syntactically valid
 - [ ] Lint checks pass for Markdown formatting, line length and skill code examples
 - [ ] Any lint issues introduced by this skill were fixed and checks rerun until clean
@@ -319,7 +331,6 @@ Before considering a skill complete:
 
 ## References
 
-- **Agent Skills Specification**: <https://agentskills.io/specification>
-- **Weaver Documentation**: <https://pavics-weaver.readthedocs.io/>
-- **Weaver GitHub**: <https://github.com/crim-ca/weaver>
-
+- **Agent Skills Specification**: [https://agentskills.io/specification](https://agentskills.io/specification)
+- **Weaver Documentation**: [https://pavics-weaver.readthedocs.io/](https://pavics-weaver.readthedocs.io/)
+- **Weaver GitHub**: [https://github.com/crim-ca/weaver](https://github.com/crim-ca/weaver)

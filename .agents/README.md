@@ -28,16 +28,17 @@ can easily understand and utilize. Each skill is self-contained with:
 
 ## Project Structure & Skill Integration
 
-For a complete overview of the Weaver project structure and how Agent Skills integrate with the codebase, see [/AGENTS.md](/AGENTS.md).
+For a complete overview of the Weaver project structure and how Agent Skills integrate with the codebase,
+see [/AGENTS.md](/AGENTS.md).
 
 ### Quick Reference: Skills to Code Mapping
 
-| Skill Category                        | Code Location         | Interface          |
-| --------------------------------------- | ----------------------- | -------------------- |
-| **job-**, **process-**, **provider-** | `weaver/cli.py`       | CLI commands       |
-| **API skills**                        | `weaver/wps_restapi/` | REST endpoints     |
-| **process-**                          | `weaver/processes/`   | Process operations |
-| **cwl-**                              | `weaver/`             | CWL support        |
+| Skill Category                     | Code Location                                                       | Interface          |
+| ---------------------------------- | ------------------------------------------------------------------- | ------------------ |
+| `job-*`, `process-*`, `provider-*` | `weaver/cli.py`                                                     | CLI commands       |
+| **API skills**                     | `weaver/wps_restapi/`                                               | REST endpoints     |
+| `process-*`                        | `weaver/processes/`                                                 | Process operations |
+| `cwl-*`                            | `weaver/processes/wps_package.py` and `weaver/processes/convert.py` | CWL support        |
 
 ## Available Skills
 

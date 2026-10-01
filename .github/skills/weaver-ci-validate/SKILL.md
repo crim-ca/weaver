@@ -8,7 +8,7 @@ license: Apache-2.0
 compatibility: Requires Make, Python environment dependencies, and Weaver repository access.
 metadata:
   category: setup-operations
-  version: "1.0.0"
+  version: 1.0.0
   keywords:
     - makefile
     - lint

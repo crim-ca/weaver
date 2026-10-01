@@ -78,7 +78,7 @@ curl -X GET \
 
 ## Version Information
 
-### version
+### `version`
 
 Weaver application version (e.g., "6.8.3")
 
@@ -86,14 +86,14 @@ Weaver application version (e.g., "6.8.3")
 - Minor version: New features
 - Patch version: Bug fixes
 
-### db_version
+### `db_version`
 
 Database schema version
 
 - Used for migration compatibility
 - Important for upgrades
 
-### commit
+### `commit`
 
 Git commit hash of deployed version
 
