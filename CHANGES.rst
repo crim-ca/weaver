@@ -19,7 +19,17 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Update to upcoming version of ``cwlprov`` to produce `PROV-JSONLD <https://www.w3.org/submissions/prov-jsonld/>`_
+  rather than PROV-O as JSON-LD (fixes `#1009 <https://github.com/crim-ca/weaver/issues/1009>`_).
+- Create ``ProcessRun`` as an ``Activity`` rather than an ``Entity`` to satisfy
+  `PROV-CONSTRAINTS <https://www.w3.org/TR/2013/REC-prov-constraints-20130430/#entity-activity-disjoint_text>`_
+  requirement for disjoint activity and entity (as of ``prov>=3.0.0``).
+- Remove relationships in the generated PROV that are inconsistent with the changes to ``ProcessRun``.
+- Remove inconsistent and redundant timestamps from the generated PROV.
+- Ensure that the user agent in the PROV document is created as a ``SoftwareAgent`` not a ``Person`` with recent
+  versions of ``prov`` that more strongly enforce update-only ``ProvRecord``.
+- Add a skill with example data and a script to regenerate the PROV example data for the OpenAPI definition.
+- Correct the command-line and code examples in the ``job-provenance`` skill.
 
 .. _changes_6.17.0:
 
