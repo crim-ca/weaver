@@ -343,11 +343,16 @@ class WeaverResearchObject(ResearchObject):
                 server_provider_meta,
             )
 
+        # NOTE: Since prov 3.0.0 enforces PROV-CONSTRAINTS, this must
+        # not share the same ID as the workflow, because entities and
+        # activities must be disjoint.
+        job_url = self.job.job_url(self.settings)
+        job_sha1 = self.sha1_uuid(document, job_url)
         job_entity = document.entity(
-            self.job.uuid.urn,
+            job_sha1,
             {
                 prov_const.PROV_TYPE: cwl_prov_const.WFDESC["ProcessRun"],
-                prov_const.PROV_LOCATION: self.job.job_url(self.settings),
+                prov_const.PROV_LOCATION: job_url,
                 prov_const.PROV_LABEL: "Job Information",
             }
         )
