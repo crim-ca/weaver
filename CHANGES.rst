@@ -48,8 +48,9 @@ Changes:
 - Update all `Builtin Processes` with ``MAJOR.MINOR.PATCH`` versions to ensure consistent reporting and access of
   their `Process` description. The API does not allow fetching a partial ``MAJOR.MINOR`` version, meaning their reported
   revision numbers were automatically invalid and unresolvable.
-- Update to upcoming version of cwlprov to produce correct JSON-LD.
-- Create a separate UUID for the ProcessRun entity to satisfy
+- Update to upcoming version of cwlprov to produce correct JSON-LD (partially addresses
+  `#1009 <https://github.com/crim-ca/weaver/issues/1009>`_).
+- Create a separate identifier for the ProcessRun entity to satisfy
   PROV-CONSTRAINTS requirement for disjoint activity and entity (as of ``prov`` 3.0.0).
 
 Fixes:
