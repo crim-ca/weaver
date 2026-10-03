@@ -1842,6 +1842,8 @@ def get_job_prov_response(request):
             fmt_unquote = unquote_plus(fmt)
             if fmt_unquote in ["ld+json", "ld json"]:
                 fmt = ProvenanceFormat.PROV_JSONLD
+            elif fmt_unquote in ["ogcprov+json", "ogcprov json"]:
+                fmt = ProvenanceFormat.PROV_OGC_JSON
             elif "/" not in fmt:
                 # Support interchangeable separators for PROV query aliases:
                 # prov+xml/prov-xml and provenance+xml/provenance-xml.
