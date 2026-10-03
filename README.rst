@@ -349,7 +349,7 @@ Installation
 
 Installation of `Weaver` from source can be performed instead of using the Docker containers.
 
-.. code-block:: sh
+.. code-block:: shell
 
     pip install https://github.com/crim.ca/weaver
 

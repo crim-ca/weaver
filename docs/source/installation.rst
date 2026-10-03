@@ -21,7 +21,7 @@ You can obtain the latest images (or a specific version of you choosing) as foll
 The base image contains the source code and all dependencies, while the ``manager`` and ``worker``
 images define the commands used to run the :term:`API` and the `Celery`_ workers respectively.
 
-.. code-block:: sh
+.. code-block:: shell
 
     docker pull pavics/weaver:latest
     docker pull pavics/weaver:latest-manager
@@ -29,7 +29,7 @@ images define the commands used to run the :term:`API` and the `Celery`_ workers
 
 To run :ref:`CLI <cli>` commands, you can run the following.
 
-.. code-block:: sh
+.. code-block:: shell
 
     docker run -it --rm pavics/weaver:latest weaver --help
 
@@ -76,14 +76,14 @@ From GitHub Sources
 
 Install Weaver as normal user from GitHub sources:
 
-.. code-block:: sh
+.. code-block:: shell
 
    pip install https://github.com/crim-ca/weaver
 
 Alternatively, you can also clone the repository and install it from there.
 This is useful if you want to develop the code or contribute to the project.
 
-.. code-block:: sh
+.. code-block:: shell
 
    git clone https://github.com/crim-ca/weaver.git
    cd weaver
@@ -93,14 +93,14 @@ If no ``conda`` environment is activated, the ``install`` process will setup a n
 named ``weaver`` and install all dependency packages. If an environment is activated, `Weaver` will be installed in
 that environment. You can also enforce a specific environment using:
 
-.. code-block:: sh
+.. code-block:: shell
 
    make CONDA_ENV=<my-env> install
 
 You can then run the :term:`API` and worker services using the corresponding commands with
 your custom `weaver.ini.example`_ configuration file (see :ref:`Configuration` section).
 
-.. code-block:: sh
+.. code-block:: shell
 
     # API service
     pserve config/weaver.ini
@@ -112,7 +112,7 @@ your custom `weaver.ini.example`_ configuration file (see :ref:`Configuration` s
     `Weaver` typically relies (or expects) some files to be served online for inputs and outputs staging.
     To run locally, you might want to consider running a file server to make them look like HTTP resources.
 
-    .. code-block:: sh
+    .. code-block:: shell
 
         python -m http.server 8000 -b 127.0.0.1 --directory <weaver.wps_output_dir>
 
