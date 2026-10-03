@@ -744,7 +744,7 @@ class TestWeaverClient(TestWeaverClientBase):
             metadata={"title": "Updated Title", "description": "Updated description"}
         )
         assert result.success
-        assert result.body["version"] == "1.0.1", "PATCH-level change should bump patch version"
+        assert result.body["processSummary"]["version"] == "1.0.1", "PATCH-level change should bump patch version"
 
         # Verify the changes were applied
         result = mocked_sub_requests(self.app, self.client.describe, test_id)
@@ -769,7 +769,7 @@ class TestWeaverClient(TestWeaverClientBase):
             metadata={"keywords": ["climate", "weather"]}
         )
         assert result.success
-        assert result.body["version"] == "1.0.1"
+        assert result.body["processSummary"]["version"] == "1.0.1"
 
         # Verify keywords were appended
         result = mocked_sub_requests(self.app, self.client.describe, test_id)
@@ -800,7 +800,7 @@ class TestWeaverClient(TestWeaverClientBase):
         }
         result = mocked_sub_requests(self.app, self.client.replace, test_id, metadata=metadata_updates)
         assert result.success
-        assert result.body["version"] == "1.0.1"
+        assert result.body["processSummary"]["version"] == "1.0.1"
 
         # Verify metadata was added
         result = mocked_sub_requests(self.app, self.client.describe, test_id)
@@ -829,7 +829,7 @@ class TestWeaverClient(TestWeaverClientBase):
         }
         result = mocked_sub_requests(self.app, self.client.replace, test_id, metadata=metadata_updates)
         assert result.success
-        assert result.body["version"] == "1.0.1"
+        assert result.body["processSummary"]["version"] == "1.0.1"
 
         # Verify metadata was added
         result = mocked_sub_requests(self.app, self.client.describe, test_id)
@@ -950,11 +950,11 @@ class TestWeaverClient(TestWeaverClientBase):
             metadata={"title": "PATCH Test"}, http_method="PATCH"
         )
         assert result.success
-        assert result.body["version"] == "1.0.1"
+        assert result.body["processSummary"]["version"] == "1.0.1"
 
         result = mocked_sub_requests(self.app, self.client.describe, test_id)
         assert result.success
-        assert result.body["title"] == "PATCH Test"
+        assert result.body["processSummary"]["title"] == "PATCH Test"
 
     def test_describe(self):
         result = mocked_sub_requests(self.app, self.client.describe, self.test_process["Echo"])
