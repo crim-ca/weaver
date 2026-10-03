@@ -131,9 +131,12 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.APP_JSONLD
         prov = resp.json
-        assert isinstance(prov, list)
-        assert bool(prov), "Must not be an empty list."
-        assert all(isinstance(obj, object) and "@id" in obj and "@type" in obj for obj in prov)
+        assert isinstance(prov, dict)
+        # NOTE: we always get JSON-LD in "flattened" form, so it contains @context and @graph
+        assert "@context" in prov, "JSON-LD must contain @context"
+        graph = prov["@graph"]
+        assert bool(graph), "JSON-LD @graph not be an empty list."
+        assert all(isinstance(obj, dict) and "@type" in obj for obj in graph)
 
     @parameterized.expand([
         ({"f": OutputFormat.YAML}, {}),
