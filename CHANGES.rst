@@ -66,6 +66,8 @@ Changes:
 
 Fixes:
 ------
+- Fix tutorial examples that used local ``file://`` references rejected by built-in process security validation
+  (resolves `#1033 <https://github.com/crim-ca/weaver/issues/1033>`_).
 - Fix invalid convertion to ``array`` within `I/O` ``schema`` for an optional single-value parameter
   (i.e.: when ``minOccurs=0`` and ``minOccurs=1``). Since any `CWL` `I/O` providing a ``default`` is resolved
   as optional (i.e.: ``["null", <type>]``), a definition such as ``type: boolean`` with ``default: true`` was
