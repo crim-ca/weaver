@@ -50,8 +50,11 @@ Changes:
   revision numbers were automatically invalid and unresolvable.
 - Update to upcoming version of cwlprov to produce correct JSON-LD (fixes
   `#1009 <https://github.com/crim-ca/weaver/issues/1009>`_).
-- Create a separate identifier for the ``ProcessRun`` entity to satisfy
+- Create ``ProcessRun`` as an ``Activity`` rather than an ``Entity`` to satisfy
   `PROV-CONSTRAINTS <https://www.w3.org/TR/2013/REC-prov-constraints-20130430/#entity-activity-disjoint_text>`_ requirement for disjoint activity and entity (as of ``prov`` 3.0.0).
+- Ensure that the user agent in the PROV document is created as a
+  ``SoftwareAgent`` not a ``Person`` with recent versions of ``prov``
+  that more strongly enforce update-only ``ProvRecord``.
 
 Fixes:
 ------
