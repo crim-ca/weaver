@@ -38,7 +38,7 @@
       ],
       "cwlprov:hostname": [
         {
-          "@value": "localhost"
+          "@value": "hirondelle.crim.ca"
         }
       ]
     },
@@ -161,7 +161,7 @@
       ],
       "location": [
         {
-          "@value": "http://localhost:4001"
+          "@value": "https://hirondelle.crim.ca/weaver"
         }
       ],
       "label": [
@@ -237,7 +237,7 @@
       ],
       "location": [
         {
-          "@value": "http://localhost:4001/processes/jsonarray2netcdf/jobs/fd795a91-7bb5-422a-96e2-aeea77ca97b7"
+          "@value": "https://hirondelle.crim.ca/weaver/processes/jsonarray2netcdf/jobs/fd795a91-7bb5-422a-96e2-aeea77ca97b7"
         }
       ],
       "label": [
@@ -254,7 +254,7 @@
       ],
       "location": [
         {
-          "@value": "http://localhost:4001/processes/jsonarray2netcdf"
+          "@value": "https://hirondelle.crim.ca/weaver/processes/jsonarray2netcdf"
         }
       ],
       "label": [

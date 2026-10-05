@@ -17,7 +17,7 @@ document
   prefix wf4ever <http://purl.org/wf4ever/wf4ever#>
   
   agent(id:e1788cea-4965-417d-9cad-faa3a32e7323)
-  agent(id:e1788cea-4965-417d-9cad-faa3a32e7323, [prov:type='foaf:OnlineAccount', prov:location="https://hirondelle.crim.ca/weaver", cwlprov:hostname="localhost"])
+  agent(id:e1788cea-4965-417d-9cad-faa3a32e7323, [prov:type='foaf:OnlineAccount', prov:location="https://hirondelle.crim.ca/weaver", cwlprov:hostname="hirondelle.crim.ca"])
   agent(id:e1788cea-4965-417d-9cad-faa3a32e7323, [prov:type='foaf:OnlineAccount', prov:label="weaver-worker", foaf:accountName="weaver-worker"])
   agent(id:86a8a7d7-8cf0-4f6f-81d7-9f7145ad3463, [prov:type='prov:SoftwareAgent', prov:type='schema:SoftwareApplication', prov:label="weaver-worker@crim-ca/weaver:6.15.0", foaf:name="weaver-worker@crim-ca/weaver:6.15.0", foaf:account='id:e1788cea-4965-417d-9cad-faa3a32e7323', schema:name="weaver-worker@crim-ca/weaver:6.15.0"])
   actedOnBehalfOf(id:e1788cea-4965-417d-9cad-faa3a32e7323, id:86a8a7d7-8cf0-4f6f-81d7-9f7145ad3463, -)

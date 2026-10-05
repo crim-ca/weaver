@@ -148,7 +148,7 @@ id:e1788cea-4965-417d-9cad-faa3a32e7323 a prov:Agent,
     prov:atLocation "https://hirondelle.crim.ca/weaver" ;
     prov:wasDerivedFrom data:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11 ;
     foaf:accountName "weaver-worker" ;
-    cwlprov:hostname "localhost" .
+    cwlprov:hostname "hirondelle.crim.ca" .
 
 id:fd795a91-7bb5-422a-96e2-aeea77ca97b7 a wfdesc:ProcessRun,
         wfprov:WorkflowRun,

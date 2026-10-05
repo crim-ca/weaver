@@ -4,7 +4,7 @@
   <prov:agent prov:id="id:e1788cea-4965-417d-9cad-faa3a32e7323">
     <prov:location xsi:type="xsd:string">https://hirondelle.crim.ca/weaver</prov:location>
     <prov:type xsi:type="xsd:QName">foaf:OnlineAccount</prov:type>
-    <cwlprov:hostname>localhost</cwlprov:hostname>
+    <cwlprov:hostname>hirondelle.crim.ca</cwlprov:hostname>
   </prov:agent>
   <prov:agent prov:id="id:e1788cea-4965-417d-9cad-faa3a32e7323">
     <prov:label>weaver-worker</prov:label>

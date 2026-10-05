@@ -121,7 +121,7 @@ _:N4ede618de5334f4ebe0f174754f609e7 <http://www.w3.org/ns/prov#hadActivity> <urn
 _:Ne0e3f3c481d3417c9a699390df9c5c28 <http://www.w3.org/ns/prov#activity> <urn:uuid:fd795a91-7bb5-422a-96e2-aeea77ca97b7> .
 <urn:hash::sha1:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11:jsonarray2netcdf> <http://www.w3.org/2000/01/rdf-schema#label> "Process Description" .
 _:Ne9b141d2880444768747af95076c3bc1 <http://www.w3.org/ns/prov#agent> <urn:uuid:e1788cea-4965-417d-9cad-faa3a32e7323> .
-<urn:uuid:e1788cea-4965-417d-9cad-faa3a32e7323> <https://w3id.org/cwl/prov#hostname> "localhost" .
+<urn:uuid:e1788cea-4965-417d-9cad-faa3a32e7323> <https://w3id.org/cwl/prov#hostname> "hirondelle.crim.ca" .
 <urn:uuid:fd795a91-7bb5-422a-96e2-aeea77ca97b7> <http://www.w3.org/ns/prov#wasAssociatedWith> <urn:uuid:16023fce-74e6-43a0-8080-6e86b486d7e7> .
 <urn:hash::sha1:3102f6d7a018ebae572f457d711ed7e1e7a11bc2> <http://schema.org/name> "Computer Research Institute of Montréal" .
 <urn:uuid:47996c30-ed6e-4df3-87ff-8dcea877f37e> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/wf4ever/wfprov#Artifact> .

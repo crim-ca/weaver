@@ -26,7 +26,7 @@
           "type": "xsd:QName"
         },
         "prov:location": "https://hirondelle.crim.ca/weaver",
-        "cwlprov:hostname": "localhost"
+        "cwlprov:hostname": "hirondelle.crim.ca"
       },
       {
         "prov:type": {
