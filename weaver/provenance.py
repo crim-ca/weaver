@@ -398,7 +398,7 @@ class WeaverResearchObject(ResearchObject):
         document.wasStartedBy(wf_agent, job_activity, time=self.job.created)
         document.specializationOf(wf_agent, job_activity)
         document.alternateOf(wf_agent, job_activity)
-        document.wasGeneratedBy(job_activity, proc_entity)
+        document.wasGeneratedBy(proc_entity, job_activity)
         if server_provider_entity:
             document.derivation(server_provider_entity, weaver_instance_agent)
             document.attribution(server_provider_entity, weaver_instance_agent)

@@ -134,6 +134,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert isinstance(prov, dict)
         # NOTE: we always get JSON-LD in "flattened" form, so it contains @context and @graph
         assert "@context" in prov, "JSON-LD must contain @context"
+        assert "@graph" in prov, "JSON-LD must contain @graph"
         graph = prov["@graph"]
         assert bool(graph), "JSON-LD @graph not be an empty list."
         assert all(isinstance(obj, dict) and "@type" in obj for obj in graph)
