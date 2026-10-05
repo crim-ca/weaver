@@ -350,7 +350,7 @@ class WeaverResearchObject(ResearchObject):
         # start time is (incorrectly) the moment of creation of the
         # provenance profile, not the job itself.
         job_url = self.job.job_url(self.settings)
-        job_entity = document.activity(
+        job_activity = document.activity(
             self.job.uuid.urn,
             other_attributes={
                 prov_const.PROV_TYPE: cwl_prov_const.WFDESC["ProcessRun"],
@@ -394,11 +394,11 @@ class WeaverResearchObject(ResearchObject):
         document.specializationOf(weaver_instance_agent, cwltool_agent)
         document.attribution(crim_entity, weaver_code_entity)
         document.wasDerivedFrom(cwltool_agent, weaver_instance_agent)
-        document.wasStartedBy(job_entity, weaver_instance_agent)
-        document.wasStartedBy(wf_agent, job_entity, time=self.job.created)
-        document.specializationOf(wf_agent, job_entity)
-        document.alternateOf(wf_agent, job_entity)
-        document.wasGeneratedBy(job_entity, proc_entity)
+        document.wasStartedBy(job_activity, weaver_instance_agent)
+        document.wasStartedBy(wf_agent, job_activity, time=self.job.created)
+        document.specializationOf(wf_agent, job_activity)
+        document.alternateOf(wf_agent, job_activity)
+        document.wasGeneratedBy(job_activity, proc_entity)
         if server_provider_entity:
             document.derivation(server_provider_entity, weaver_instance_agent)
             document.attribution(server_provider_entity, weaver_instance_agent)
