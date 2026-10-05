@@ -262,6 +262,49 @@ class WeaverResearchObject(ResearchObject):
         sha1_id = f"{sha1_ns.prefix}:{hashlib.sha1(identifier.encode(), usedforsecurity=False).hexdigest()}"
         return sha1_id
 
+    def user_provenance(self, document):
+        # type: (ProvDocument) -> None
+        """Add the user provenance."""
+        self.self_check()
+        username, fullname = self.resolve_user()
+
+        if not self.full_name:
+            self.full_name = fullname
+
+        document.add_namespace(cwl_prov_const.UUID)
+        document.add_namespace(cwl_prov_const.ORCID)
+        document.add_namespace(cwl_prov_const.FOAF)
+        account = document.agent(
+            cwl_prov_const.ACCOUNT_UUID,
+            {
+                prov_const.PROV_TYPE: cwl_prov_const.FOAF["OnlineAccount"],
+                prov_const.PROV_LABEL: username,
+                cwl_prov_const.FOAF["accountName"]: username,
+            },
+        )
+
+        user = document.agent(
+            self.orcid or cwl_prov_const.USER_UUID,
+            [
+                (prov_const.PROV_TYPE, prov_const.PROV["SoftwareAgent"]),
+                (prov_const.PROV_TYPE, cwl_prov_const.SCHEMA["SoftwareApplication"]),
+                (prov_const.PROV_LABEL, self.full_name),
+                (cwl_prov_const.FOAF["name"], self.full_name),
+                (cwl_prov_const.FOAF["account"], account),
+                (cwl_prov_const.SCHEMA["name"], self.full_name),
+            ],
+        )
+
+        # cwltool may be started on the shell (directly by user),
+        # by shell script (indirectly by user)
+        # or from a different program
+        #   (which again is launched by any of the above)
+        #
+        # We can't tell in which way, but ultimately we're still
+        # acting in behalf of that user (even if we might
+        # get their name wrong!)
+        document.actedOnBehalfOf(account, user)
+
     def initialize_provenance(self, full_name, host_provenance, user_provenance, orcid, fsaccess, run_uuid=None):
         # type: (str, bool, bool, str, StdFsAccess, Optional[UUID]) -> ProvenanceProfile
         """
@@ -373,15 +416,6 @@ class WeaverResearchObject(ResearchObject):
         user_uuid = self.orcid or cwl_prov_const.USER_UUID
         user_agent = document.get_record(user_uuid)[0]
         wf_agent = document.get_record(self.engine_uuid)[0]  # current job run aligned with cwl workflow
-
-        # adjust user agent as software rather than person (see 'resolve_user'), and leave any other types untouched
-        user_types = cast(set, user_agent.get_attribute(prov_const.PROV_TYPE))
-        user_types.symmetric_difference_update({
-            prov_const.PROV["Person"],
-            cwl_prov_const.SCHEMA["Person"],
-            prov_const.PROV["SoftwareAgent"],
-            cwl_prov_const.SCHEMA["SoftwareApplication"],
-        })
 
         # define relationships cross-references: https://wf4ever.github.io/ro/wfprov.owl
         document.primary_source(weaver_instance_agent, weaver_code_entity)
