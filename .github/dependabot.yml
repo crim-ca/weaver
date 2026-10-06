@@ -45,10 +45,6 @@ updates:
       python-patch-updates:
         update-types:
           - "patch"
-      # Group minor updates together (safer than major)
-      python-minor-updates:
-        update-types:
-          - "minor"
       # Major updates remain ungrouped for individual review
     rebase-strategy: "auto"
     open-pull-requests-limit: 10

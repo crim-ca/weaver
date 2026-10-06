@@ -42,96 +42,91 @@ Specifying the appropriate ``version=<1.0.0|2.0.0>`` parameter in the URL as req
 
 Run a WPS-1/WPS-2 ``GetCapabilities`` request:
 
-.. code-block:: sh
+.. code-block:: shell
 
-    $ curl -k "${WEAVER_URL}/ows/wps?service=wps&request=getcapabilities"
+    curl -k "${WEAVER_URL}/ows/wps?service=wps&request=getcapabilities"
 
 You should receive an XML response listing service details and available processes.
 
 Run a WPS-1/WPS-2 ``DescribeProcess`` request (built-in process ``jsonarray2netcdf``):
 
-.. code-block:: sh
+.. code-block:: shell
 
-    $ curl -k "${WEAVER_URL}/ows/wps?service=wps&request=describeprocess&identifier=jsonarray2netcdf&version=1.0.0"
+    curl -k "${WEAVER_URL}/ows/wps?service=wps&request=describeprocess&identifier=jsonarray2netcdf&version=1.0.0"
 
 This will provide you with an XML response listing the specific process details such and inputs/outputs and description.
 
 We can now use the process to execute a WPS request. To do so, we will need some input data files to call it.
 First, let's create a JSON file with some *dummy* NetCDF file reference for demonstration purpose.
 
-.. code-block:: sh
+The :ref:`Builtin Processes <proc_builtin>` only accept local files from `Weaver` and :term:`CWL` managed temporary
+directories, or files served through a remote URL, for security reasons. Therefore, we will serve the example files
+from a directory that is reachable by the Weaver instance:
 
-    $ echo 'Test WPS' > /tmp/test.nc
-    $ echo '["file:///tmp/test.nc"]' > /tmp/test.json
+.. code-block:: shell
+
+    echo 'Test WPS' > /tmp/test.nc
+    echo '["http://localhost:8000/test.nc"]' > /tmp/test.json
+    python -m http.server 8000 --directory /tmp
+
+The example assumes that `Weaver` can reach the file server at ``http://localhost:8000``. When it is running in a
+container or on another host, replace ``localhost`` with a hostname or IP address reachable from that instance.
 
 Then, run the WPS-1/WPS-2 ``Execute`` request (built-in process ``jsonarray2netcdf``) as follow:
 
-.. code-block:: sh
+.. code-block:: shell
 
-    $ curl -k "${WEAVER_URL}/ows/wps?service=wps&request=execute&identifier=jsonarray2netcdf&version=1.0.0 \
-        &DataInputs=input=file:///tmp/test.json"
+    curl -k "${WEAVER_URL}/ows/wps?service=wps&request=execute&identifier=jsonarray2netcdf&version=1.0.0 \
+        &DataInputs=input=http://localhost:8000/test.json"
 
 The execution of the process should read the JSON list with our dummy NetCDF file and make it available (as a copy)
 on the output parameter named ``output`` with a path matching the configured output WPS path of the application.
 
 .. note::
-    All above WPS-1/2 requests suppose that configuration setting ``weaver.wps_path /ows/wps`` (default value).
+    All above WPS-1/2 requests suppose that configuration setting ``weaver.wps_path = /ows/wps`` (default value).
     The request URL have to be adjusted accordingly if this parameter is modified.
 
-    Also, the provided file reference is relative where `Weaver` application is running. If you want to employ a
-    remote server instance, you will have to either place the file on this server file system at a location `Weaver`
-    has access to, or provide the file through an HTTP URL.
-
-WPS-3 requests
---------------
+OGC API - Processes requests
+----------------------------
 
 All previous operations for listing available processes (``GetCapabilities``), describing or executing a WPS-1/2
-process can also be accomplished using the WPS-3 REST JSON interface. For instance, listing processes is done like so:
+process can also be accomplished using the :term:`OGC API - Processes` REST JSON interface.
 
-.. code-block:: sh
+For instance, listing processes is done like so:
 
-    $ curl -k "${WEAVER_URL}/processes"
+.. code-block:: shell
+
+    curl -k "${WEAVER_URL}/processes"
 
 Individual process details (``DescribeProcess``) can be obtained with the following method
 (e.g.: built-in process ``jsonarray2netcdf`` in this case):
 
-.. code-block:: sh
+.. code-block:: shell
 
-    $ curl -k "${WEAVER_URL}/processes/jsonarray2netcdf"
+    curl -k "${WEAVER_URL}/processes/jsonarray2netcdf"
 
 
 And execution of this process can be accomplished with the following request:
 
-.. code-block:: sh
+.. code-block:: shell
 
-    $ curl -X POST "${WEAVER_URL}/processes/jsonarray2netcdf/jobs" \
+    curl -X POST "${WEAVER_URL}/processes/jsonarray2netcdf/jobs" \
            -H "Content-Type: application/json" \
-           -d '{"inputs": [{"id": "input", "href": "file:///tmp/test.json"}],
+           -d '{"inputs": [{"id": "input", "href": "http://localhost:8000/test.json"}],
                 "outputs": [{"id": "output", "transmissionMode": "reference"}],
                 "response": "document",
                 "mode": "async"}'
-
 
 The JSON response should provide a ``location`` field specifying where the job status can be verified.
 Upon *successful* job completion, an ``output`` reference URL should have been generated just as with
 the WPS-1/2 example.
 
-
-The WPS-3 interface allows further operations such as job monitoring, specific output listing, log reporting, etc.
-For all available operations and specific details about them, please refer to `OpenAPI schemas`_ (they will also be
-rendered on route ``${WEAVER_URL}/api`` when running `Weaver` application).
+The :term:`OGC API - Processes` interface allows further operations such as :term:`Job` monitoring,
+specific output listing, log reporting, etc.
+For all available operations and specific details about them, please refer to `OpenAPI schemas`_
+(they will also be rendered on route ``${WEAVER_URL}/api`` when running `Weaver` application).
 
 .. _`OpenAPI schemas`: https://pavics-weaver.readthedocs.io/en/latest/api.html
-
-Endpoint Content-Type
-------------------------
-
-.. todo:: wps-1/2 xml default, json supported wps-2
-.. todo::
-    wps-rest json only (for now, xml also if implemented)
-    https://github.com/crim-ca/weaver/issues/125
-    https://github.com/crim-ca/weaver/issues/126
-
 
 Next Steps
 ================================

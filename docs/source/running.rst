@@ -27,9 +27,9 @@ specified connection settings in ``weaver/config/weaver.ini``.
     If using ``Windows``, make sure you have read the :ref:`windows_install` section.
 
 
-.. code-block:: sh
+.. code-block:: shell
 
-    $ make start    # start Weaver WSGI application server
+    make start    # start Weaver WSGI application server
 
 
 Weaver should be running after this operation.
@@ -52,7 +52,7 @@ For specific details about configuration of both applications, please refer to :
 The typical commands that need to be executed for the *manager* and *worker* applications should be similar to the
 following calls. Obviously, additional arguments supported by the corresponding applications can be provided.
 
-.. code-block:: sh
+.. code-block:: shell
 
     # manager
     pserve <weaver-root>/config/weaver.ini

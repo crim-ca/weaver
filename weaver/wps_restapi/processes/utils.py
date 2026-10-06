@@ -3,7 +3,7 @@ import math
 from typing import TYPE_CHECKING
 
 import colander
-from pyramid.httpexceptions import HTTPBadRequest
+from pyramid.httpexceptions import HTTPBadRequest, HTTPOk
 from pyramid.settings import asbool
 
 from weaver.compat import InvalidVersion
@@ -11,7 +11,7 @@ from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.formats import ContentType, OutputFormat, clean_media_type_format, guess_target_format
 from weaver.store.base import StoreProcesses
-from weaver.utils import get_path_kvp, get_settings
+from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple
 
     from weaver.datatype import Process, Service
-    from weaver.typedefs import JSON, PyramidRequest
+    from weaver.typedefs import AnyViewResponse, JSON, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -184,3 +184,30 @@ def get_process_list_links(request, paging, total, provider=None):
              "type": ContentType.APP_JSON, "title": "Listing of all revisions of this process."},
         ])
     return links
+
+
+def get_process_package_response(request, process):
+    # type: (PyramidRequest, Process) -> AnyViewResponse
+    """
+    Resolve the specific :term:`Application Package` response representation based on negotiated request contents.
+
+    :param request: Request to resolve negotiated contents.
+    :param process: Specific :term:`Process` reference, either local or via remote :term:`Provider`.
+    :returns: Resolved packaged representation.
+    """
+    content_type = get_header("Accept", request.headers, default=ContentType.APP_CWL_JSON)
+    # ignore default browser request injecting HTML
+    # ignore 'weaver.wps_restapi_html_override_user_agent' as well since HTML cannot apply here
+    if all(ctype in content_type for ctype in [ContentType.TEXT_HTML, ContentType.ANY]):
+        content_type = ContentType.APP_CWL_JSON
+    headers = {
+        "Link": make_link_header(sd.CWL_SCHEMA_URL, rel="profile", type=ContentType.APP_YAML),
+        "Content-Schema": sd.CWL_SCHEMA_URL,
+        "Content-Profile": sd.CWL_SCHEMA_URL,
+    }
+    yml_fmt = [ContentType.APP_YAML, ContentType.APP_CWL_YAML]
+    cwl_fmt = OutputFormat.YAML if any(ctype in content_type for ctype in yml_fmt) else OutputFormat.JSON
+    package = OutputFormat.convert(process.package, cwl_fmt)
+    content = {"json": package} if cwl_fmt == OutputFormat.JSON else {"body": package}
+    content = content if package else {}
+    return HTTPOk(headers=headers, content_type=content_type, charset="utf-8", **content)

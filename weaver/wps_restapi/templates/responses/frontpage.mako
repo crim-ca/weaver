@@ -15,7 +15,7 @@
 
 <div class="content-section nav-menu">
 %if description:
-    <span class="field-description">${description}</span>
+    <span class="field-description">${util.render_description(description)}</span>
 %else:
     <span class="field-description undefined">No description available.</span>
 %endif
@@ -26,6 +26,11 @@
         <li>
             <div class="nav-link">
                 Go to <a href="${util.get_processes_link(query='f=html')}">Processes Listing</a>
+            </div>
+        </li>
+        <li>
+            <div class="nav-link">
+                Go to <a href="${util.get_providers_link(query='f=html')}">Providers Listing</a>
             </div>
         </li>
         <li>

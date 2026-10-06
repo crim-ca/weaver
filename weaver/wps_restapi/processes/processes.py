@@ -35,8 +35,13 @@ from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import clean_json_text_body, fully_qualified_name, get_any_id, get_header, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.processes.utils import get_process_list_links, get_processes_filtered_by_valid_schemas
-from weaver.wps_restapi.providers.utils import get_provider_services
+from weaver.wps_restapi.processes.utils import (
+    get_process_list_links,
+    get_process_package_response,
+    get_processes_filtered_by_valid_schemas
+)
+from weaver.wps_restapi.providers.providers import describe_provider_process
+from weaver.wps_restapi.providers.utils import get_provider_id, get_provider_services
 
 if TYPE_CHECKING:
     from pyramid.config import Configurator
@@ -298,7 +303,13 @@ def get_local_process(request):
     Get a registered local process information (DescribeProcess).
     """
     try:
-        process = get_process(request=request)
+        provider = None
+        provider_id = get_provider_id(request)
+        if provider_id:
+            process, service = describe_provider_process(request, provider_id)
+            provider = service.summary(request, fetch=True, ignore=True)  # fetch is lazy since done during describe
+        else:
+            process = get_process(request=request)
         process["inputs"] = opensearch.replace_inputs_describe_process(process.inputs, process.payload)
         schema = request.params.get("schema")
         ctype = guess_target_format(request)
@@ -308,7 +319,7 @@ def get_local_process(request):
         ctype_xml = add_content_type_charset(ContentType.APP_XML, "UTF-8")
         proc_url = process.href(request)
         if ctype in ContentType.ANY_XML or str(schema).upper() == ProcessSchema.WPS:
-            offering = process.offering(ProcessSchema.WPS, request=request)
+            offering = process.offering(ProcessSchema.WPS, request=request, provider=provider)
             headers = [
                 ("Link", make_link_header(f"{proc_url}?f=json", rel="alternate", type=ctype_json)),
                 ("Link", make_link_header(f"{proc_url}?f=html", rel="alternate", type=ctype_html)),
@@ -317,7 +328,7 @@ def get_local_process(request):
             ]
             return Response(offering, headerlist=headers)
         elif ctype == ContentType.APP_YAML:
-            offering = process.offering(schema)
+            offering = process.offering(schema, provider=provider)
             content = OutputFormat.convert(offering, OutputFormat.YAML)
             headers = [
                 ("Link", make_link_header(f"{proc_url}?f=json", rel="alternate", type=ctype_json)),
@@ -329,7 +340,7 @@ def get_local_process(request):
             ]
             return HTTPOk(headers=headers, content_type=ctype, charset="utf-8", body=content)
         elif ctype == ContentType.APP_JSON:
-            offering = process.offering(schema)
+            offering = process.offering(schema, provider=provider)
             request.response.content_type = ctype_json
             request.response.headers.extend([
                 ("Link", make_link_header(f"{proc_url}?f=xml", rel="alternate", type=ctype_xml)),
@@ -340,7 +351,7 @@ def get_local_process(request):
             ])
             return Box(offering)
         else:  # HTML
-            offering = process.offering(schema)
+            offering = process.offering(ProcessSchema.OGC, provider=provider)
             request.response.headers.extend([
                 ("Link", make_link_header(f"{proc_url}?f=json", rel="alternate", type=ctype_json)),
                 ("Link", make_link_header(f"{proc_url}?f=yaml", rel="alternate", type=ctype_yaml)),
@@ -373,22 +384,7 @@ def get_local_process_package(request):
     Get a registered local process package definition.
     """
     process = get_process(request=request)
-    content_type = get_header("Accept", request.headers, default=ContentType.APP_CWL_JSON)
-    # ignore default browser request injecting HTML
-    # ignore 'weaver.wps_restapi_html_override_user_agent' as well since HTML cannot apply here
-    if all(ctype in content_type for ctype in [ContentType.TEXT_HTML, ContentType.ANY]):
-        content_type = ContentType.APP_CWL_JSON
-    headers = {
-        "Link": make_link_header(sd.CWL_SCHEMA_URL, rel="profile", type=ContentType.APP_YAML),
-        "Content-Schema": sd.CWL_SCHEMA_URL,
-        "Content-Profile": sd.CWL_SCHEMA_URL,
-    }
-    yml_fmt = [ContentType.APP_YAML, ContentType.APP_CWL_YAML]
-    cwl_fmt = OutputFormat.YAML if any(ctype in content_type for ctype in yml_fmt) else OutputFormat.JSON
-    package = OutputFormat.convert(process.package, cwl_fmt)
-    content = {"json": package} if cwl_fmt == OutputFormat.JSON else {"body": package}
-    content = content if package else {}
-    return HTTPOk(headers=headers, content_type=content_type, charset="utf-8", **content)
+    return get_process_package_response(request, process)
 
 
 @sd.process_payload_service.get(
