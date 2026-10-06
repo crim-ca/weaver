@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.16.0:
+
+`6.16.0 <https://github.com/crim-ca/weaver/tree/6.16.0>`_ (2026-10-06)
+====================================================================================================================
+
+Changes:
+--------
 - Add `HTML` shortcut links to easily toggle contextually between full `Provider` or only local `Process` listing.
 - Add `HTML` support of ``/providers/{providerID}/processes/?f=html`` to list all `Process` references of a `Provider`.
 - Add `HTML` support of ``/processes/?providers=true`` to list all `Provider` and local `Process` references.
