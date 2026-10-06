@@ -277,6 +277,12 @@ class WeaverResearchObject(ResearchObject):
         )
         document = prov_profile.document
 
+        # following agents are expected to exist (created by inherited class)
+        cwltool_agent = document.get_record(cwl_prov_const.ACCOUNT_UUID)[0]
+        user_uuid = self.orcid or cwl_prov_const.USER_UUID
+        user_agent = document.get_record(user_uuid)[0]
+        wf_agent = document.get_record(self.engine_uuid)[0]  # current job run aligned with cwl workflow
+
         doi_ns = document.add_namespace("doi", "https://doi.org/")
 
         weaver_full_name = f"crim-ca/weaver:{weaver_version}"
@@ -356,6 +362,7 @@ class WeaverResearchObject(ResearchObject):
                 prov_const.PROV_TYPE: cwl_prov_const.WFDESC["ProcessRun"],
                 prov_const.PROV_LOCATION: job_url,
                 prov_const.PROV_LABEL: "Job Information",
+                cwl_prov_const.WFPROV["wasEnactedBy"]: wf_agent,
             }
         )
         proc_url = self.job.process_url(self.settings)
@@ -369,12 +376,6 @@ class WeaverResearchObject(ResearchObject):
                 prov_const.PROV_LABEL: "Process Description",
             }
         )
-
-        # following agents are expected to exist (created by inherited class)
-        cwltool_agent = document.get_record(cwl_prov_const.ACCOUNT_UUID)[0]
-        user_uuid = self.orcid or cwl_prov_const.USER_UUID
-        user_agent = document.get_record(user_uuid)[0]
-        wf_agent = document.get_record(self.engine_uuid)[0]  # current job run aligned with cwl workflow
 
         # NOTE: This is a somewhat fragile workaround for cwlprov
         # unconditionally creating the user agent as a Person.  The
@@ -394,10 +395,8 @@ class WeaverResearchObject(ResearchObject):
         document.specializationOf(weaver_instance_agent, cwltool_agent)
         document.attribution(crim_entity, weaver_code_entity)
         document.wasDerivedFrom(cwltool_agent, weaver_instance_agent)
-        document.wasStartedBy(job_activity, weaver_instance_agent)
-        document.wasStartedBy(wf_agent, job_activity, time=self.job.created)
-        document.specializationOf(wf_agent, job_activity)
-        document.alternateOf(wf_agent, job_activity)
+        document.specializationOf(wf_agent, weaver_instance_agent)
+        document.wasStartedBy(job_activity, wf_agent, time=self.job.created)
         document.wasGeneratedBy(proc_entity, job_activity)
         if server_provider_entity:
             document.derivation(server_provider_entity, weaver_instance_agent)
