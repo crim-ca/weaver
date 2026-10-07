@@ -16,7 +16,10 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `HTML` rendering of ``get_process_link`` util helper that omitted a line-continuation after a Mako control
+  block, leaking a stray newline into generated `Process` `URL` references. This broke the inline ``<script>``
+  blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
+  section, causing a ``ReferenceError`` when clicking them.
 
 .. _changes_6.16.0:
 
