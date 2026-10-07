@@ -368,12 +368,13 @@ class WeaverResearchObject(ResearchObject):
         proc_url = self.job.process_url(self.settings)
         proc_id = f"{self.job.service}:{self.job.process}" if self.job.service else self.job.process
         proc_uuid = f"{weaver_instance_sha1}:{proc_id}"
-        proc_entity = document.entity(
+        document.entity(
             proc_uuid,
             {
                 prov_const.PROV_TYPE: cwl_prov_const.WFDESC["Process"],
                 prov_const.PROV_LOCATION: proc_url,
                 prov_const.PROV_LABEL: "Process Description",
+                cwl_prov_const.WFPROV["describedByProcess"]: job_activity,
             }
         )
 
@@ -397,7 +398,6 @@ class WeaverResearchObject(ResearchObject):
         document.wasDerivedFrom(cwltool_agent, weaver_instance_agent)
         document.specializationOf(wf_agent, weaver_instance_agent)
         document.wasStartedBy(job_activity, wf_agent, time=self.job.created)
-        document.wasGeneratedBy(proc_entity, job_activity)
         if server_provider_entity:
             document.derivation(server_provider_entity, weaver_instance_agent)
             document.attribution(server_provider_entity, weaver_instance_agent)
