@@ -25,13 +25,19 @@ ${_prefix}/processes${f"?{query}" if query else ""}\
     _prefix = get_processes_link(provider_id=provider_id if provider_id and provider_uri else None)
     if provider_id and not provider_uri:
         query = f"{query}&provider={provider_id}" if query else f"provider={provider_id}"
-%>
+%>\
 ${_prefix}/${process_id}${f"?{query}" if query else ""}\
 </%def>
 
 
 <!--always apply 'detail' query to populate the table in one request-->
-<%def name="get_jobs_link(query='')">\
+<%def name="get_jobs_link(process_id='', provider_id='', query='')">\
+<%
+    if provider_id:
+        query = f"{query}&provider={provider_id}" if query else f"provider={provider_id}"
+    if process_id:
+        query = f"{query}&process={process_id}" if query else f"process={process_id}"
+%>\
 ${weaver.wps_restapi_url}/jobs${f"?{query}&detail=true" if query else "?detail=true"}\
 </%def>
 

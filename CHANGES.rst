@@ -16,7 +16,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `HTML` ``Jobs`` breadcrumb and listing links on a `Job`/`Process`/`Provider`-scoped page that incorrectly
+  redirected to the unfiltered `Job` listing instead of preserving the ``process``/``provider`` filtering context.
 
 .. _changes_6.16.0:
 
