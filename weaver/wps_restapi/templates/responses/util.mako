@@ -25,7 +25,7 @@ ${_prefix}/processes${f"?{query}" if query else ""}\
     _prefix = get_processes_link(provider_id=provider_id if provider_id and provider_uri else None)
     if provider_id and not provider_uri:
         query = f"{query}&provider={provider_id}" if query else f"provider={provider_id}"
-%>
+%>\
 ${_prefix}/${process_id}${f"?{query}" if query else ""}\
 </%def>
 
