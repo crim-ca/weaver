@@ -9,9 +9,9 @@
 <li><a href="${weaver.wps_restapi_url}?f=html">Home</a></li>
 %if provider:
 <li><a href="${util.get_providers_link(query='f=html')}">Providers</a></li>
-<li><a href="${util.get_provider_link(provider_id, query='f=html')}"><span class="code">${provider_id}</span></a></li>
-<li><a href="${util.get_processes_link(provider_id=provider_id, query='f=html')}">Processes</a></li>
-<li><a href="${util.get_process_link(id, provider_id=provider_id, query='f=html')}"><span class="code">${id}</span></a></li>
+<li><a href="${util.get_provider_link(provider.id, query='f=html')}"><span class="code">${provider.id}</span></a></li>
+<li><a href="${util.get_processes_link(provider_id=provider.id, query='f=html')}">Processes</a></li>
+<li><a href="${util.get_process_link(id, provider_id=provider.id, query='f=html')}"><span class="code">${id}</span></a></li>
 %else:
 <li><a href="${util.get_processes_link(query='f=html')}">Processes</a></li>
 <li><a href="${util.get_process_link(id, query='f=html')}"><span class="code">${id}</span></a></li>
