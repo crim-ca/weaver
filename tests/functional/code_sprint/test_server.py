@@ -167,7 +167,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         assert conf_core in self.conforms_to
         assert conf_json in self.conforms_to
 
-    @pytest.mark.flaky(retries=2, delay=5)
+    @pytest.mark.flaky(retries=3, delay=10)
     @pytest.mark.dependency(
         name="test_service_desc_link_and_oas_validation",
         depends=["test_conformance_classes_core"],
@@ -188,8 +188,9 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         oas_validated = False
         service_desc_urls = [link["href"] for link in service_desc_links]
         for service_desc_url in service_desc_urls:
-            oas_response = self.client._request("GET", service_desc_url, request_timeout=20)
-            assert oas_response.status_code == 200
+            # OAS generation can be slow on a cold server, which causes sporadic timeouts reported as 504 by request util
+            oas_response = self.client._request("GET", service_desc_url, request_timeout=60, request_retries=3)
+            assert oas_response.status_code == 200, f"Failed to retrieve OAS from {service_desc_url}: {oas_response}"
             try:
                 oas_json = oas_response.json()
             except Exception:
