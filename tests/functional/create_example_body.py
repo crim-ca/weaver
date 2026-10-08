@@ -14,7 +14,7 @@ def main():
             "mediaType": "application/geo+json",
             "value": json.load(fh),
         }
-        print(json.dumps(body["inputs"], indent=2, ensure_ascii=False))
+        print(json.dumps(body, indent=2, ensure_ascii=False))
 
 
 if __name__ == '__main__':
