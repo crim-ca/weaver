@@ -113,6 +113,7 @@ class ContentType(Constants):
     APP_OCTET_STREAM = "application/octet-stream"
     APP_PROV_JSON = "application/provenance+json"
     APP_PROV_XML = "application/provenance+xml"
+    APP_PROV_OGC_JSON = "application/ogcprov+json"
     APP_PDF = "application/pdf"
     APP_TAR = "application/x-tar"          # map to existing gzip for CWL
     APP_TAR_GZ = "application/tar+gzip"    # map to existing gzip for CWL
