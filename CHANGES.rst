@@ -18,6 +18,12 @@ Fixes:
 ------
 - Fix `HTML` ``Jobs`` breadcrumb and listing links on a `Job`/`Process`/`Provider`-scoped page that incorrectly
   redirected to the unfiltered `Job` listing instead of preserving the ``process``/``provider`` filtering context.
+- Remove `HTML` duplicate rendering of alternate OGC/WPS/CWL JSON/YAML/XML content negotiation links.
+- Fix `HTML` missing `Provider`-scoped links in corresponding pages when navigating their contents.
+- Fix `HTML` rendering of ``get_process_link`` util helper that omitted a line-continuation after a Mako control
+  block, leaking a stray newline into generated `Process` `URL` references. This broke the inline ``<script>``
+  blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
+  section, causing a ``ReferenceError`` when clicking them.
 
 .. _changes_6.16.0:
 
