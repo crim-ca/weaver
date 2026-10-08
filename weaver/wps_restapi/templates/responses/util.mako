@@ -31,7 +31,13 @@ ${_prefix}/${process_id}${f"?{query}" if query else ""}\
 
 
 <!--always apply 'detail' query to populate the table in one request-->
-<%def name="get_jobs_link(query='')">\
+<%def name="get_jobs_link(process_id='', provider_id='', query='')">\
+<%
+    if provider_id:
+        query = f"{query}&provider={provider_id}" if query else f"provider={provider_id}"
+    if process_id:
+        query = f"{query}&process={process_id}" if query else f"process={process_id}"
+%>\
 ${weaver.wps_restapi_url}/jobs${f"?{query}&detail=true" if query else "?detail=true"}\
 </%def>
 

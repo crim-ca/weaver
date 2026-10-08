@@ -16,6 +16,8 @@ Changes:
 
 Fixes:
 ------
+- Fix `HTML` ``Jobs`` breadcrumb and listing links on a `Job`/`Process`/`Provider`-scoped page that incorrectly
+  redirected to the unfiltered `Job` listing instead of preserving the ``process``/``provider`` filtering context.
 - Remove `HTML` duplicate rendering of alternate OGC/WPS/CWL JSON/YAML/XML content negotiation links.
 - Fix `HTML` missing `Provider`-scoped links in corresponding pages when navigating their contents.
 - Fix `HTML` rendering of ``get_process_link`` util helper that omitted a line-continuation after a Mako control
