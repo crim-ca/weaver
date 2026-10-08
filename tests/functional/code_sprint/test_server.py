@@ -188,7 +188,7 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         oas_validated = False
         service_desc_urls = [link["href"] for link in service_desc_links]
         for service_desc_url in service_desc_urls:
-            # OAS generation can be slow on a cold server, which causes sporadic timeouts reported as 504 by request util
+            # OAS generation can be slow on a cold server, which causes sporadic timeouts reported as 504 error
             oas_response = self.client._request("GET", service_desc_url, request_timeout=60, request_retries=3)
             assert oas_response.status_code == 200, f"Failed to retrieve OAS from {service_desc_url}: {oas_response}"
             try:
