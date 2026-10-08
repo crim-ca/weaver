@@ -25,7 +25,7 @@ ${_prefix}/processes${f"?{query}" if query else ""}\
     _prefix = get_processes_link(provider_id=provider_id if provider_id and provider_uri else None)
     if provider_id and not provider_uri:
         query = f"{query}&provider={provider_id}" if query else f"provider={provider_id}"
-%>
+%>\
 ${_prefix}/${process_id}${f"?{query}" if query else ""}\
 </%def>
 
@@ -466,10 +466,10 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 <!--
     Convenience wrapper of 'build_toggle_button_code' for contents retrieved from a process sub-path.
 -->
-<%def name="build_process_toggle_button_code(process_id, type, path, format, language, queries='', name='', btn_tabs='')">
+<%def name="build_process_toggle_button_code(process_id, provider_id, type, path, format, language, queries='', name='', btn_tabs='')">
     ${build_toggle_button_code(
         "process",
-        capture(get_process_link, process_id),
+        capture(get_process_link, process_id, provider_id=provider_id),
         type, path, format, language,
         queries=queries, name=name, btn_tabs=btn_tabs,
     )}
