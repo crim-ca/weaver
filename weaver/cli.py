@@ -37,6 +37,7 @@ from weaver.formats import (
     clean_media_type_format,
     get_content_type,
     get_format,
+    is_directory_media_type,
     repr_json
 )
 from weaver.processes.constants import ProcessSchema
@@ -1518,7 +1519,7 @@ class WeaverClient(object):
                 if "://" not in href and (
                     os.path.isdir(href) or
                     href.endswith("/") or
-                    data.get("type") == ContentType.APP_DIR
+                    is_directory_media_type(data.get("type"))
                 ):
                     return OperationResult(
                         success=False,

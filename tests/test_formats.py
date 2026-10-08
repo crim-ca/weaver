@@ -108,6 +108,63 @@ def test_get_content_type(test_extension, extra_params, expected_content_type):
 
 
 @pytest.mark.parametrize(
+    ["test_media_type", "expected_extension"],
+    [
+        (f.ContentType.APP_ZARR, ".zarr"),
+        (f.ContentType.APP_ZARR_V2, ".zarr"),
+        (f.ContentType.APP_ZARR_V3, ".zarr"),
+        (f.ContentType.APP_ZARR_ZIP, ".zarr.zip"),
+        (f.ContentType.APP_ZIP, ".zip"),  # plain zip must remain distinct
+    ]
+)
+def test_get_extension_zarr(test_media_type, expected_extension):
+    assert f.get_extension(test_media_type) == expected_extension
+    assert f.get_format(test_media_type).extension == expected_extension
+
+
+@pytest.mark.parametrize(
+    ["test_extension", "expected_content_type"],
+    [
+        (".zarr", f.ContentType.APP_ZARR),  # version cannot be inferred from extension
+        (".zarr.zip", f.ContentType.APP_ZARR_ZIP),
+        (".zip", f.ContentType.APP_ZIP),
+    ]
+)
+def test_get_content_type_zarr(test_extension, expected_content_type):
+    assert f.get_content_type(test_extension) == expected_content_type
+
+
+@pytest.mark.parametrize(
+    ["test_media_type", "is_zarr", "is_directory"],
+    [
+        (f.ContentType.APP_ZARR, True, True),
+        (f.ContentType.APP_ZARR_V2, True, True),
+        (f.ContentType.APP_ZARR_V3, True, True),
+        (f"{f.ContentType.APP_ZARR};version=3", True, True),  # no space before parameter
+        (f"{f.ContentType.APP_ZARR_V3}; charset=UTF-8", True, True),
+        (f.ContentType.APP_DIR, False, True),
+        (f.ContentType.APP_ZARR_ZIP, False, False),  # single file
+        (f.ContentType.APP_ZIP, False, False),
+        (f.ContentType.APP_JSON, False, False),
+        ("", False, False),
+        (None, False, False),
+    ]
+)
+def test_zarr_and_directory_media_types(test_media_type, is_zarr, is_directory):
+    assert f.is_zarr_media_type(test_media_type) is is_zarr
+    assert f.is_directory_media_type(test_media_type) is is_directory
+
+
+def test_zarr_media_types_group():
+    assert f.ContentType.ANY_ZARR == {
+        f.ContentType.APP_ZARR,
+        f.ContentType.APP_ZARR_V2,
+        f.ContentType.APP_ZARR_V3,
+    }
+    assert f.ContentType.APP_ZARR_ZIP not in f.ContentType.ANY_ZARR
+
+
+@pytest.mark.parametrize(
     ["content_type", "charset", "expected_content_type"],
     [
         (f.ContentType.APP_JSON, "UTF-8", f"{f.ContentType.APP_JSON}; charset=UTF-8"),

@@ -51,6 +51,7 @@ from weaver.formats import (
     clean_media_type_format,
     get_format,
     guess_target_format,
+    is_directory_media_type,
     repr_json
 )
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
@@ -1185,7 +1186,7 @@ def generate_or_resolve_result(
             with open(loc, mode="w", encoding="utf-8") as out_file:
                 out_file.write(data2str(val))
 
-    if is_ref and output_mode == ExecuteTransmissionMode.VALUE and typ != ContentType.APP_DIR:
+    if is_ref and output_mode == ExecuteTransmissionMode.VALUE and not is_directory_media_type(typ):
         res_path = loc
         if not is_local:
             # reference is a remote file, but by-value requested explicitly

@@ -9,7 +9,7 @@ from celery.utils.log import get_task_logger
 from PIL import Image
 from processes.convert import get_field
 
-from weaver.formats import ContentType, get_content_type
+from weaver.formats import ContentType, get_content_type, is_zarr_media_type
 from weaver.transform.const import CONVERSION_DICT
 
 if TYPE_CHECKING:
@@ -159,7 +159,10 @@ def extend_alternate_formats(
     # Collect missing alternate formats while preserving original order
     missing_formats = []
     for media_type in existing_media_types:
-        for alt_format in conversion_dict.get(media_type, []):
+        alternates = conversion_dict.get(media_type)
+        if alternates is None and is_zarr_media_type(media_type):  # any version or parameters spelling
+            alternates = conversion_dict.get(ContentType.APP_ZARR)
+        for alt_format in alternates or []:
             if alt_format not in seen:
                 missing_formats.append({"mediaType": alt_format})
                 seen.add(alt_format)

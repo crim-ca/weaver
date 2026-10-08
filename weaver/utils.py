@@ -68,7 +68,7 @@ from yaml.scanner import ScannerError
 from weaver.base import Constants, ExtendedEnum
 from weaver.compat import Version
 from weaver.exceptions import WeaverException
-from weaver.formats import ContentType, get_content_type, get_extension, get_format, repr_json
+from weaver.formats import ContentType, get_content_type, get_extension, get_format, is_zarr_media_type, repr_json
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning, UndefinedContainerWarning
 from weaver.xml_util import HTML_TREE_BUILDER, XML
@@ -1485,7 +1485,8 @@ def get_href_headers(
     :param content_type:
         Explicit ``Content-Type`` to provide.
         Otherwise, use default guessed by file system (often ``application/octet-stream``).
-        If the reference is a directory, this parameter is ignored and ``application/directory`` will be enforced.
+        If the reference is a directory, ``application/directory`` is enforced, unless the specified media-type
+        is a Zarr variant (``application/vnd.zarr``), which is preserved.
         Requires that :paramref:`content_headers` is enabled.
     :param content_disposition_type:
         Whether ``inline`` or ``attachment`` should be used.
@@ -1536,7 +1537,7 @@ def get_href_headers(
             f_size = sum(int(get_header("Content-Length", meta, default=0)) for meta in listing)
         else:  # either empty directory, filtered contents, or failed to retrieve listing
             f_size = "0"
-        f_type = ContentType.APP_DIR
+        f_type = content_type if is_zarr_media_type(content_type) else ContentType.APP_DIR
 
     # handle single file
     else:

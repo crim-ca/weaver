@@ -38,6 +38,7 @@ from weaver.formats import (
     get_cwl_file_format,
     get_extension,
     get_format,
+    is_zarr_media_type,
     repr_json
 )
 from weaver.processes.constants import (
@@ -700,6 +701,8 @@ def _get_cwl_fmt_details(wps_fmt):
     if not _wps_io_fmt:
         return None, None, None
     _cwl_io_ext = get_extension(_wps_io_fmt)
+    if is_zarr_media_type(_wps_io_fmt):  # CWL Directory has no applicable 'format'
+        return None, None, _cwl_io_ext
     _cwl_io_ref, _cwl_io_fmt = get_cwl_file_format(_wps_io_fmt, must_exist=True, allow_synonym=False)
     return _cwl_io_ref, _cwl_io_fmt, _cwl_io_ext
 
@@ -720,6 +723,7 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
     :return: Nothing. Changed inplace.
     """
     cwl_io_fmt = None
+    cwl_io_dir = False
     cwl_io_ext = get_extension(ContentType.ANY)
     cwl_io["type"] = PACKAGE_FILE_TYPE
     cwl_id = cwl_io["id"]
@@ -730,6 +734,11 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
         fmt = get_field(wps_io, field, search_variations=True)
         if not fmt:
             continue
+        fmt_list = fmt if isinstance(fmt, (list, tuple)) else [fmt]
+        cwl_io_dir = all(
+            is_zarr_media_type(get_field(fmt_i, "mime_type", search_variations=True))
+            for fmt_i in fmt_list
+        )
         if isinstance(fmt, (list, tuple)) and len(fmt) == 1:
             fmt = fmt[0]
         if not isinstance(fmt, (list, tuple)):  # could be 'dict', 'Format' or any other 'object' holder
@@ -752,6 +761,8 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
                     cwl_ns_multi.update(cwl_io_ref_i)
                     cwl_fmt_multi.update({cwl_io_fmt_i: None})
                     cwl_ext_multi.update({cwl_io_ext: None})
+                elif cwl_io_dir:  # Zarr variants are all the same Directory, which have no format to validate
+                    cwl_ext_multi.update({cwl_io_ext: None})
                 else:
                     # reset all since at least one format could not be mapped to an official schema
                     cwl_ns_multi = {}
@@ -763,6 +774,8 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
             break
 
     cwl_io_ext = [cwl_io_ext] if isinstance(cwl_io_ext, str) else list(cwl_io_ext)
+    if cwl_io_dir:
+        cwl_io["type"] = PACKAGE_DIRECTORY_TYPE
     if cwl_io_fmt:
         # don't use any format if more than one because we cannot enforce multiple formats
         # ('format' must be string: https://www.commonwl.org/v1.2/CommandLineTool.html#File)

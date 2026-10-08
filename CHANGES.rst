@@ -12,7 +12,18 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `Zarr` media-types ``application/vnd.zarr`` (including ``version=2`` and ``version=3`` parameters) for directory
+  stores, and ``application/zarr+zip`` for zipped stores, with their ``.zarr`` and ``.zarr.zip`` extensions.
+  The zipped variant is distinguished from a plain ``application/zip``.
+- Convert `WPS`/`OGC API - Processes` `I/O` using only `Zarr` directory media-types into `CWL` ``Directory`` without
+  ``format`` (not applicable for that type), similarly to the handling of ``application/directory``.
+- Handle `Zarr` directory media-types as directories when returning `Job` results by-value and when refusing
+  local directory uploads to the `Vault` from the `CLI`.
+- Preserve the `Zarr` media-type declared by a `Process` output as the type of the resulting `Job` output when the
+  `CWL` output is a ``Directory`` (instead of reporting it as ``application/directory``), and report it
+  as ``Content-Type`` for directory references when explicitly provided.
+- Offer ``application/zarr+zip`` as alternate format of `Zarr` directory `Job` outputs, using the ``?f={mediaType}``
+  result representation to obtain the zipped store (store contents located at the root of the archive).
 
 Fixes:
 ------

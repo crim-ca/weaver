@@ -64,6 +64,7 @@ from weaver.processes.convert import _convert_any2cwl_io_complex  # noqa: W0212
 from weaver.processes.convert import _get_cwl_js_value_from  # noqa: W0212
 from weaver.processes.convert import (
     PACKAGE_ARRAY_MAX_SIZE,
+    PACKAGE_DIRECTORY_TYPE,
     PACKAGE_FILE_TYPE,
     CWLIODefinition,
     any2cwl_io,
@@ -249,7 +250,38 @@ def test_are_different_and_set_single_null():
                     "glob": ["*.nc", "*.zip"]
                 }
             }
-        )
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_ZARR_V3, "encoding": None, "default": True},
+                ]
+            },
+            {
+                "id": "output",
+                "type": PACKAGE_DIRECTORY_TYPE,  # no "format" applicable to CWL Directory
+                "outputBinding": {
+                    "glob": "*.zarr"
+                }
+            }
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_ZARR_V2, "encoding": None, "default": True},
+                    {"mimeType": ContentType.APP_ZARR_V3, "encoding": None, "default": False},
+                ]
+            },
+            {
+                "id": "output",
+                "type": PACKAGE_DIRECTORY_TYPE,
+                "outputBinding": {
+                    "glob": "*.zarr"  # all versions share the same extension
+                }
+            }
+        ),
     ]
 )
 def test_convert_any2cwl_io_complex(wps_io, cwl_io_expect):
