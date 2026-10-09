@@ -253,6 +253,24 @@ def test_directory_nested_storage_preserves_root_name():
         assert os.path.isfile(os.path.join(expected_root, "data", "chunks", "0"))
 
 
+@pytest.mark.parametrize(
+    ["formats", "expect_type"],
+    [
+        ([ContentType.APP_DIR, ContentType.APP_ZARR_V3], ContentType.APP_ZARR_V3),
+        ([ContentType.APP_DIR, ContentType.APP_ZARR_V2, ContentType.APP_ZARR_V3], ContentType.APP_ZARR_V2),
+        ([ContentType.APP_ZARR_V3, ContentType.APP_DIR], ContentType.APP_ZARR_V3),
+    ]
+)
+def test_resolve_output_format_zarr_directory(formats, expect_type):
+    """
+    CWL ``Directory`` has no ``format``, so the Zarr type declared by the process must be preserved on the output.
+    """
+    output = ComplexOutput("result", "Result", [Format(fmt) for fmt in formats], mode=MODE.SIMPLE)
+    WpsPackage.resolve_output_format(output, "result/sample.zarr", ContentType.APP_DIR)
+    assert output.data_format.mime_type == expect_type
+    assert output.valid_mode == MODE.NONE
+
+
 @pytest.mark.flaky(retries=2, delay=1)
 def test_stdout_stderr_logging_for_commandline_tool_success(caplog):
     """

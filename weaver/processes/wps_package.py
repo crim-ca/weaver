@@ -71,6 +71,8 @@ from weaver.formats import (
     get_cwl_file_format,
     get_extension,
     get_format,
+    is_directory_media_type,
+    is_zarr_media_type,
     map_cwl_media_type,
     repr_json
 )
@@ -2940,6 +2942,14 @@ class WpsPackage(Process):
         When the media-type is resolved, ensure that an appropriate format validator is applied to perform relevant
         checks, or omit them when not implemented.
         """
+        if is_directory_media_type(result_cwl_format):
+            # CWL Directory has no 'format', so a Zarr type can only come from the process definition
+            zarr_formats = [fmt for fmt in output.supported_formats if is_zarr_media_type(fmt.mime_type)]
+            if zarr_formats:
+                if not is_zarr_media_type(output.data_format.mime_type):
+                    output.data_format = zarr_formats[0]
+                output.valid_mode = MODE.NONE  # store name is not required to match the extension
+                return
         result_ctype = map_cwl_media_type(result_cwl_format)
         if not result_ctype:
             # fallback attempt using extension if available

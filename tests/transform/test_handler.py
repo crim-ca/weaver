@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import zipfile
 
 import pytest
 from pyramid.httpexceptions import HTTPUnprocessableEntity
@@ -10,6 +11,7 @@ from tests.resources import TRANSFORM_PATH
 from weaver.formats import ContentType, get_content_type
 from weaver.transform.const import CONVERSION_DICT
 from weaver.transform.handlers import Transform
+from weaver.transform.utils import extend_alternate_formats
 
 
 def using_mimes(func):
@@ -141,3 +143,82 @@ def test_csv_with_empty_headers():
         result = trans.get()
         assert isinstance(result, FileResponse)
         assert os.path.exists(trans.output_path)
+
+
+def _make_zarr_dir(parent):
+    zarr_dir = os.path.join(parent, "data.zarr")
+    os.makedirs(os.path.join(zarr_dir, "var", "c"))
+    for rel_path, content in [
+        ("zarr.json", '{"zarr_format": 3, "node_type": "group"}'),
+        (os.path.join("var", "zarr.json"), '{"zarr_format": 3, "node_type": "array"}'),
+        (os.path.join("var", "c", "0"), "chunk"),
+    ]:
+        with open(os.path.join(zarr_dir, rel_path), "w", encoding="utf-8") as f:
+            f.write(content)
+    return zarr_dir
+
+
+@pytest.mark.parametrize("zarr_type", sorted(ContentType.ANY_ZARR))
+def test_zarr_directory_to_zip(zarr_type):
+    with tempfile.TemporaryDirectory() as tmp_path:
+        zarr_dir = _make_zarr_dir(tmp_path)
+
+        # directories are provided with trailing slash from resolved result locations
+        trans = Transform(
+            file_path=f"{zarr_dir}/",
+            current_media_type=zarr_type,
+            wanted_media_type=ContentType.APP_ZARR_ZIP,
+        )
+        assert isinstance(trans.get(), FileResponse)
+        assert trans.output_path == f"{zarr_dir}.zip"
+        assert trans.output_path.endswith(".zarr.zip")
+
+        with zipfile.ZipFile(trans.output_path) as zip_file:
+            # store contents must be at the archive root, not nested under the directory name
+            assert sorted(zip_file.namelist()) == ["var/c/0", "var/zarr.json", "zarr.json"]
+            assert all(info.compress_type == zipfile.ZIP_STORED for info in zip_file.infolist())
+            assert zip_file.read("var/c/0") == b"chunk"
+
+
+def test_zarr_directory_unsupported_conversion():
+    with tempfile.TemporaryDirectory() as tmp_path:
+        zarr_dir = _make_zarr_dir(tmp_path)
+        trans = Transform(
+            file_path=f"{zarr_dir}/",
+            current_media_type=ContentType.APP_ZARR,
+            wanted_media_type=ContentType.APP_PDF,
+        )
+        with pytest.raises(HTTPUnprocessableEntity):
+            trans.get()
+
+
+@pytest.mark.parametrize("zarr_type", sorted(ContentType.ANY_ZARR))
+def test_extend_alternate_formats_zarr(zarr_type):
+    formats = [{"mediaType": zarr_type}]
+    extended = extend_alternate_formats(formats)
+    assert [fmt["mediaType"] for fmt in extended] == [zarr_type, ContentType.APP_ZARR_ZIP]
+
+
+def test_extend_alternate_formats_zarr_parameter_spelling():
+    zarr_type = f"{ContentType.APP_ZARR};version=3"  # not exactly the same string as the predefined version variant
+    extended = extend_alternate_formats([{"mediaType": zarr_type}])
+    assert [fmt["mediaType"] for fmt in extended] == [zarr_type, ContentType.APP_ZARR_ZIP]
+
+
+def test_extend_alternate_formats_zarr_no_duplicates():
+    formats = [{"mediaType": ContentType.APP_ZARR_V2}, {"mediaType": ContentType.APP_ZARR_V3}]
+    extended = extend_alternate_formats(formats)
+    assert [fmt["mediaType"] for fmt in extended] == [
+        ContentType.APP_ZARR_V2,
+        ContentType.APP_ZARR_V3,
+        ContentType.APP_ZARR_ZIP,
+    ]
+
+
+@pytest.mark.parametrize("media_type", [ContentType.APP_ZARR_ZIP, ContentType.APP_ZIP])
+def test_extend_alternate_formats_zip_not_zarr(media_type):
+    """
+    Zipped files, zarr or not, are not offered as Zarr directory (file cannot be returned as a directory).
+    """
+    formats = [{"mediaType": media_type}]
+    assert extend_alternate_formats(formats) == formats

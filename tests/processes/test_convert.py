@@ -64,9 +64,11 @@ from weaver.processes.convert import _convert_any2cwl_io_complex  # noqa: W0212
 from weaver.processes.convert import _get_cwl_js_value_from  # noqa: W0212
 from weaver.processes.convert import (
     PACKAGE_ARRAY_MAX_SIZE,
+    PACKAGE_DIRECTORY_TYPE,
     PACKAGE_FILE_TYPE,
     CWLIODefinition,
     any2cwl_io,
+    check_io_compatible,
     complex2json,
     convert_input_values_schema,
     convert_value_units,
@@ -249,7 +251,38 @@ def test_are_different_and_set_single_null():
                     "glob": ["*.nc", "*.zip"]
                 }
             }
-        )
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_ZARR_V3, "encoding": None, "default": True},
+                ]
+            },
+            {
+                "id": "output",
+                "type": PACKAGE_DIRECTORY_TYPE,  # no "format" applicable to CWL Directory
+                "outputBinding": {
+                    "glob": "*.zarr"
+                }
+            }
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_ZARR_V2, "encoding": None, "default": True},
+                    {"mimeType": ContentType.APP_ZARR_V3, "encoding": None, "default": False},
+                ]
+            },
+            {
+                "id": "output",
+                "type": PACKAGE_DIRECTORY_TYPE,
+                "outputBinding": {
+                    "glob": "*.zarr"  # all versions share the same extension
+                }
+            }
+        ),
     ]
 )
 def test_convert_any2cwl_io_complex(wps_io, cwl_io_expect):
@@ -1056,6 +1089,26 @@ def test_cwl2wps_io_raise_mixed_types(test_type):
     io_info = {"name": "test", "type": test_type}
     with pytest.raises(PackageTypeError):
         cwl2wps_io(io_info, IO_INPUT)
+
+
+def test_check_io_compatible_zarr_requires_cwl_directory():
+    wps_io = ComplexInput("test", "", supported_formats=[Format(ContentType.APP_ZARR_V3)])
+    cwl_dir = cwl2wps_io({"name": "test", "type": PACKAGE_DIRECTORY_TYPE}, IO_INPUT)
+    check_io_compatible(wps_io, cwl_dir, "test")  # no error
+
+    cwl_file = cwl2wps_io({"name": "test", "type": PACKAGE_FILE_TYPE}, IO_INPUT)
+    with pytest.raises(PackageTypeError, match="Directory"):
+        check_io_compatible(wps_io, cwl_file, "test")
+
+
+def test_check_io_compatible_zarr_output_requires_cwl_directory():
+    wps_io = ComplexOutput("test", "", supported_formats=[Format(ContentType.APP_ZARR_V3)])
+    cwl_dir = cwl2wps_io({"name": "test", "type": PACKAGE_DIRECTORY_TYPE}, IO_OUTPUT)
+    check_io_compatible(wps_io, cwl_dir, "test")  # no error
+
+    cwl_file = cwl2wps_io({"name": "test", "type": PACKAGE_FILE_TYPE}, IO_OUTPUT)
+    with pytest.raises(PackageTypeError, match="Directory"):
+        check_io_compatible(wps_io, cwl_file, "test")
 
 
 @pytest.mark.parametrize(
