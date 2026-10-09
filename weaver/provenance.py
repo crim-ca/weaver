@@ -50,8 +50,10 @@ def _encode_jsonld_document_with_id_context(document, context):
     if isinstance(existing_context, list):
         existing_context.append(_PROV_JSONLD_ID_CONTEXT_TERMS)
     elif existing_context:
+        # This should never happen as @context is always a list
         container["@context"] = [existing_context, _PROV_JSONLD_ID_CONTEXT_TERMS]
     else:
+        # This should never happen as @context is always created
         container["@context"] = _PROV_JSONLD_ID_CONTEXT_TERMS
     return container
 
