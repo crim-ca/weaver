@@ -27,7 +27,7 @@ prov_jsonld_serializer.ID_TYPED_TERMS = prov_jsonld_serializer.ID_TYPED_TERMS | 
 }
 
 # Now that we have bare strings for these IRI references, we also need
-# to inject the proper type defintions into the context, again, by
+# to inject the proper type definitions into the context, again, by
 # doing some dodgy patching of prov_jsonld_serializer.
 _PROV_JSONLD_ID_CONTEXT_TERMS = {
     str(cwl_prov_const.WFPROV["describedByProcess"]): {"@type": "@id"},
@@ -392,7 +392,8 @@ class WeaverResearchObject(ResearchObject):
 
         proc_url = self.job.process_url(self.settings)
         proc_id = f"{self.job.service}:{self.job.process}" if self.job.service else self.job.process
-        proc_sha1 = self.sha1_uuid(document, proc_id)
+        proc_uuid = f"{weaver_instance_sha1}:{proc_id}"
+        proc_sha1 = self.sha1_uuid(document, proc_uuid)
         proc_entity = document.entity(
             proc_sha1,
             {
