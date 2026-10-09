@@ -78,9 +78,10 @@ docker run -p 4001:4001 \
 cd docker
 cp docker-compose.yml.example docker-compose.yml
 
-# Edit docker-compose.yml as needed.  You must also edit the mounted INI
-# file (../config/weaver.ini.example by default), changing the values
-# mongodb.host and BROKER_URL to point to the "mongodb" container, as
+# Edit "docker-compose.yml" (a copy of "docker/docker-compose.yml.example") as needed.
+# You must also edit the mounted INI file in that docker configuration ("../config/weaver.ini.example" by default),
+# by using copies of those example files and adjusting the mounted INI sources with non-example copies.
+# In the INI, "mongodb.host" and "BROKER_URL" must be adjusted to point to the "mongodb" container, as
 # described in the comments.
 docker-compose up -d
 ```
