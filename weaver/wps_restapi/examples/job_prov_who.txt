@@ -1,2 +1,2 @@
-Packaged By: cwltool 3.1.20240708091338.dev15+g9c05bb7d <urn:uuid:eea8f699-1c08-47b2-8aed-8ad30e4eda4c>
-Executed By: crim-ca/weaver:6.1.0 <urn:uuid:b3a49ee7-f620-4154-9e4d-d2e948748deb>
+Packaged By: cwltool 3.3.20260925135508.dev14+g7b63e26cb <urn:uuid:12c660f8-f758-4cbc-89cd-5933a1f82935>
+Executed By: weaver-worker@crim-ca/weaver:6.16.0 <urn:uuid:280e8fc7-51ff-4bad-9187-ff482c884683>

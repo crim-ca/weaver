@@ -86,6 +86,7 @@ Complete skill catalog organized by domain:
 - [job-results](.agents/skills/job-results/SKILL.md)
 - [job-statistics](.agents/skills/job-statistics/SKILL.md)
 - [job-status](.agents/skills/job-status/SKILL.md)
+- [update-provenance-examples](.agents/skills/update-provenance-examples/SKILL.md)
 
 ### Process Management
 

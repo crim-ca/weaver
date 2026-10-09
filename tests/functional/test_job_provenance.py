@@ -1,13 +1,18 @@
 import contextlib
 import copy
 import itertools
+import json
 import os
 import uuid
 from typing import TYPE_CHECKING
 
 import pytest
+from cwltool.cwlprov import provenance_constants as cwl_prov_const
 from parameterized import parameterized
+from prov import constants as prov_const
+from rdflib import Graph, URIRef
 
+from tests.functional import TEST_DATA_ROOT
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import mocked_execute_celery, mocked_sub_requests, mocked_wps_output
 from weaver.formats import ContentType, OutputFormat
@@ -131,9 +136,73 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.APP_JSONLD
         prov = resp.json
-        assert isinstance(prov, list)
-        assert bool(prov), "Must not be an empty list."
-        assert all(isinstance(obj, object) and "@id" in obj and "@type" in obj for obj in prov)
+        assert isinstance(prov, dict)
+        # NOTE: we always get JSON-LD in "flattened" form, so it contains @context and @graph
+        assert "@context" in prov, "JSON-LD must contain @context"
+        assert "@graph" in prov, "JSON-LD must contain @graph"
+        graph = prov["@graph"]
+        assert bool(graph), "JSON-LD @graph not be an empty list."
+        assert all(isinstance(obj, dict) and "@type" in obj for obj in graph)
+        # Replace remote context with local one to avoid network accesses
+        try:
+            idx = prov["@context"].index("https://openprovenance.org/prov-jsonld/context.jsonld")
+            prov["@context"][idx] = f"file://{TEST_DATA_ROOT}/prov_context.jsonld"
+        except ValueError:
+            pass
+
+        # NOTE:
+        #   The following custom (non-formal) PROV attributes reference other PROV-JSONLD records by their
+        #   identifier. They must therefore be encoded as "@id" IRI references rather than "xsd:QName"-typed
+        #   literals, since any other interpretation unexpectedly breaks the reference when considering it as
+        #   ordinary linked data (see 'weaver.provenance' patch of 'prov.serializers.provjsonld.ID_TYPED_TERMS').
+        id_ref_terms = ["foaf:account", "wfprov:wasEnactedBy", "wfprov:describedByProcess"]
+        found_terms = set()
+        for obj in graph:
+            for term in id_ref_terms:
+                if term not in obj:
+                    continue
+                found_terms.add(term)
+                values = obj[term]
+                assert isinstance(values, list) and values, f"Unexpected empty/invalid value for [{term}]."
+                for value in values:
+                    assert isinstance(value, str), (
+                        f"Attribute [{term}] value [{value!r}] must be a plain '@id' IRI reference string, "
+                        "not an 'xsd:QName'-typed literal object."
+                    )
+        assert found_terms == set(id_ref_terms), (
+            f"Not all expected PROV-JSONLD reference terms were found in the generated document: "
+            f"missing {set(id_ref_terms) - found_terms}"
+        )
+        # NOTE:
+        #   The raw compact-IRI-looking string shape checked above is not sufficient on its own: per the
+        #   JSON-LD specification, a bare string under a term is only expanded into a proper IRI node
+        #   reference if the active "@context" declares that term with "@type": "@id" (see
+        #   'weaver.provenance' patch of 'prov.serializers.provjsonld.encode_jsonld_document'). Parse the
+        #   document with a conformant, independent JSON-LD/RDF processor (rdflib) to confirm these values
+        #   are genuinely resolved as IRI references ("URIRef"), not opaque string literals.
+        id_ref_predicates = {
+            cwl_prov_const.FOAF["account"].uri: "foaf:account",
+            cwl_prov_const.WFPROV["wasEnactedBy"].uri: "wfprov:wasEnactedBy",
+            cwl_prov_const.WFPROV["describedByProcess"].uri: "wfprov:describedByProcess",
+            prov_const.PROV_ATTR_GENERAL_ENTITY.uri: "prov:generalEntity",
+            prov_const.PROV_ATTR_SPECIFIC_ENTITY.uri: "prov:specificEntity",
+        }
+        rdf_graph = Graph()
+        rdf_graph.parse(data=json.dumps(prov), format="json-ld")
+        found_predicates = set()
+        for _, predicate, obj in rdf_graph:
+            uri = str(predicate)
+            if uri not in id_ref_predicates:
+                continue
+            found_predicates.add(uri)
+            assert isinstance(obj, URIRef), (
+                f"Attribute [{id_ref_predicates[uri]}] RDF object [{obj!r}] must be resolved as a "
+                f"'URIRef' IRI reference by a conformant JSON-LD processor, not a '{type(obj).__name__}'."
+            )
+        assert found_predicates == set(id_ref_predicates), (
+            "Not all expected PROV-JSONLD reference predicates were found when parsed as RDF: "
+            f"missing {set(id_ref_predicates) - found_predicates}"
+        )
 
     @parameterized.expand([
         ({"f": OutputFormat.YAML}, {}),
