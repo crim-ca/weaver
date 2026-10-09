@@ -4,7 +4,7 @@ import os
 import shutil
 import tempfile
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from werkzeug.datastructures import Headers
 
@@ -56,7 +56,9 @@ if TYPE_CHECKING:
         JobMonitorReference,
         JobOutputs,
         JobResults,
+        JobValueDataBlob,
         JSON,
+        Path,
         UpdateStatusPartialFunction
     )
     from weaver.wps.service import WorkerRequest
@@ -370,18 +372,26 @@ class WpsProcessInterface(abc.ABC):
             if res_type not in PACKAGE_COMPLEX_TYPES:
                 continue
 
-            cwl_out_dir = "/".join([out_dir.rstrip("/"), res_id])
+            # A "." glob represents the outputID directory itself, so there is no additional nesting required.
+            # A named directory should preserve the child root dir name nested under the added outputID directory.
+            cwl_out_dir = os.path.join(out_dir.rstrip("/"), res_id)
+            output_glob = expected_outputs[res_id]["glob"]
+            output_globs = output_glob if isinstance(output_glob, (list, set)) else [output_glob]
+            preserve_dir_name = (
+                res_type == PACKAGE_DIRECTORY_TYPE
+                and any(os.path.basename(glob.rstrip("/")) != "." for glob in output_globs)
+            )
             os.makedirs(cwl_out_dir, mode=0o700, exist_ok=True)
 
             # handle list in case of multiple output values
-            result_values = get_any_value(result)
+            result_values = cast("JobValueDataBlob", get_any_value(result))
             if not isinstance(result_values, list):
                 result_values = [result_values]
             for value in result_values:
                 if isinstance(value, dict):
-                    value = get_any_value(value, file=True, data=False)
-                src_name = value.split("/")[-1]
-                dst_path = "/".join([cwl_out_dir, src_name])
+                    value = cast("Path", get_any_value(value, file=True, data=False))
+                src_name = os.path.basename(os.path.normpath(value))
+                dst_path = os.path.join(cwl_out_dir, src_name)
                 # performance improvement:
                 #   Bypass download if file can be resolved as local resource (already fetched or same server).
                 #   Because CWL expects the file to be in specified 'out_dir', make a link for it to be found
@@ -399,7 +409,11 @@ class WpsProcessInterface(abc.ABC):
                     LOGGER.info("Fetching result [%s] from [%s] to CWL output destination: [%s]",
                                 res_id, value, dst_path)
                     src_path = value
-                fetch_reference(src_path, cwl_out_dir, out_method=out_method, settings=self.settings)
+
+                # directory fetching recreates the URL basename, while mapped local directories do not
+                # this is to ensure that the resolved dir name is nested under its specific '{outputID}' consistently
+                fetch_out_dir = dst_path if map_path and preserve_dir_name else cwl_out_dir
+                fetch_reference(src_path, fetch_out_dir, out_method=out_method, settings=self.settings)
 
     def stage_inputs(self, workflow_inputs):
         # type: (CWL_WorkflowInputs) -> JobInputs

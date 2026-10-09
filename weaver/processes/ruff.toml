@@ -1,0 +1,2 @@
+[lint]
+ignore = ["FLY002"]

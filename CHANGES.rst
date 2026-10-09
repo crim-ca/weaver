@@ -12,6 +12,48 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- Fix `HTML` ``Jobs`` breadcrumb and listing links on a `Job`/`Process`/`Provider`-scoped page that incorrectly
+  redirected to the unfiltered `Job` listing instead of preserving the ``process``/``provider`` filtering context.
+- Remove `HTML` duplicate rendering of alternate OGC/WPS/CWL JSON/YAML/XML content negotiation links.
+- Fix `HTML` missing `Provider`-scoped links in corresponding pages when navigating their contents.
+- Fix `HTML` rendering of ``get_process_link`` util helper that omitted a line-continuation after a Mako control
+  block, leaking a stray newline into generated `Process` `URL` references. This broke the inline ``<script>``
+  blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
+  section, causing a ``ReferenceError`` when clicking them.
+- Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
+
+.. _changes_6.16.0:
+
+`6.16.0 <https://github.com/crim-ca/weaver/tree/6.16.0>`_ (2026-10-06)
+====================================================================================================================
+
+Changes:
+--------
+- Add `HTML` shortcut links to easily toggle contextually between full `Provider` or only local `Process` listing.
+- Add `HTML` support of ``/providers/{providerID}/processes/?f=html`` to list all `Process` references of a `Provider`.
+- Add `HTML` support of ``/processes/?providers=true`` to list all `Provider` and local `Process` references.
+- Add `HTML` support of ``/providers?f=html`` with shortcut navigation from the API frontpage.
+- Add `HTML` support of ``/providers/{providerID}?f=html`` with contextual breadcrumbs and links to related listings.
+- Add `Provider`-aware `HTML` links to `Process` and `Job` listings that resolve corresponding descriptions.
+- Add `HTML` auto-detection and link encoding of embedded `URL` to render references in ``description`` fields.
+- Add `XML` support for ``/providers/{providerID}/processes/{processID}?f=xml`` returning `WPS` offering details.
+- Add ``?provider={providerID}`` and ``?service={providerID}`` query parameters to ``/processes/{processID}`` request
+  as alias to resolve the corresponding ``/providers/{providerID}/processes/{processID}`` resource.
+- Add ``provider`` details embedded within the ``/processes/{processID}`` response if ``?provider={providerID}``
+  or ``?service={providerID}`` query parameter is specified and that the `Provider`'s `Process` can be resolved.
+- Add content negotiation on ``/providers/{providerID}/processes/{processID}/package`` to align with local `Process`.
+- Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}``
+  endpoint to align with the latest OGC API - Processes Core specification.
+- Provide the `CWL` `Application Package` in JSON and YAML on the HTML `Process` description page.
+- Adjust the output directory resolution to preserve the nested base name of the directory, such that when it has a
+  semantic meaning (e.g.: ``output.zarr/``) or when the workflow step rely on their names to operate, it is preserved
+  in the output result (i.e.: ``{jobID}/output/output.zarr/`` rather than renamed to ``{jobID}/output/``).
+  This aligns with the employed strategy for file outputs where the process-level ``{outputID}`` directory name
+  does not impact the original name of the files it contains, which are coming from the `Application Package` logic.
 - Align ``GET /jobs/{jobId}/definition`` (replaces ``GET /jobs/{jobId}/inputs``) with the
   most recent `OGC API - Processes - Part 4: Job Management` specification,
   which includes the ``entity`` URI of the appropriate `Process` definition at the root of the `Job`/`Workflow`.
@@ -45,6 +87,12 @@ Changes:
 
 Fixes:
 ------
+- Fix tutorial examples that used local ``file://`` references rejected by built-in process security validation
+  (resolves `#1033 <https://github.com/crim-ca/weaver/issues/1033>`_).
+- Fix invalid convertion to ``array`` within `I/O` ``schema`` for an optional single-value parameter
+  (i.e.: when ``minOccurs=0`` and ``minOccurs=1``). Since any `CWL` `I/O` providing a ``default`` is resolved
+  as optional (i.e.: ``["null", <type>]``), a definition such as ``type: boolean`` with ``default: true`` was
+  incorrectly advertised as ``boolean[]`` instead of ``boolean?``.
 - Fix ``parse_kvp`` (and consequently ``explode_headers``/``parse_link_header``) incorrectly splitting quoted
   parameter values (e.g.: a ``Link`` header ``title="..."`` containing a comma or semicolon) on their embedded
   separator characters, which could produce malformed fragments and raise an unhandled error when parsing an
@@ -78,7 +126,8 @@ Fixes:
 - Added tests for ``DelimitedStringOneOf`` and ``OneOfCaseInsensitive`` to ensure their related case-sensitive value
   handling remains consistent between them.
 - Fix invalid parsing of ``Link: <{URI}>; rel="profile"`` headers to extract the profile URI.
-- Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
+- Load ``weaver.ini`` during tests in order to apply per-module ``logging`` configurations,
+  notably to reduce ``pymongo`` logs in captured test outputs.
 
 .. _changes_6.15.0:
 
@@ -775,7 +824,7 @@ Changes:
   to request the ``response: document`` and ``response: raw`` parameters
   (fixes `#414 <https://github.com/crim-ca/weaver/issues/414>`_).
   Minor differences exist according to supplied ``transmissionMode`` and the original data/link results.
-  See `Process Execution <file:///home/francis/dev/weaver/docs/build/html/processes.html#proc-op-execute>`_
+  See `Process Execution <https://pavics-weaver.readthedocs.io/en/latest/processes.html#proc-op-execute>`_
   documentation for details.
 - Add support of ``outputs`` execution request body parameter to filter returned outputs from
   the ``GET /jobs/{jobId}/results`` (async) or returned directly (sync) from ``POST /processes/{processId}/execution``

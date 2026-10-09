@@ -2,6 +2,10 @@
 Utilities for rendering elements in other pages.
 -->
 
+<%def name="get_providers_link(query='')">\
+${weaver.wps_restapi_url}/providers${f"?{query}" if query else ""}\
+</%def>
+
 
 <%def name="get_provider_link(provider_id, query='')">\
 ${weaver.wps_restapi_url}/providers/${provider_id}${f"?{query}" if query else ""}\
@@ -11,18 +15,29 @@ ${weaver.wps_restapi_url}/providers/${provider_id}${f"?{query}" if query else ""
 <%def name="get_processes_link(provider_id='', query='')">\
 <%
     _prefix = get_provider_link(provider_id) if provider_id else weaver.wps_restapi_url
-%>
+%>\
 ${_prefix}/processes${f"?{query}" if query else ""}\
 </%def>
 
 
-<%def name="get_process_link(process_id, provider_id='', query='')">\
-${get_processes_link(provider_id=provider_id)}/${process_id}${f"?{query}" if query else ""}\
+<%def name="get_process_link(process_id, provider_id='', provider_uri=False, query='')">\
+<%
+    _prefix = get_processes_link(provider_id=provider_id if provider_id and provider_uri else None)
+    if provider_id and not provider_uri:
+        query = f"{query}&provider={provider_id}" if query else f"provider={provider_id}"
+%>\
+${_prefix}/${process_id}${f"?{query}" if query else ""}\
 </%def>
 
 
 <!--always apply 'detail' query to populate the table in one request-->
-<%def name="get_jobs_link(query='')">\
+<%def name="get_jobs_link(process_id='', provider_id='', query='')">\
+<%
+    if provider_id:
+        query = f"{query}&provider={provider_id}" if query else f"provider={provider_id}"
+    if process_id:
+        query = f"{query}&process={process_id}" if query else f"process={process_id}"
+%>\
 ${weaver.wps_restapi_url}/jobs${f"?{query}&detail=true" if query else "?detail=true"}\
 </%def>
 
@@ -197,6 +212,68 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 </%def>
 
 
+<%def name="render_provider(provider, detail=False)">
+<dl class="indent">
+    <div class="process-provider">
+        <dt id="provider-id">
+            <div class="field-id inline code">
+                <a href="${get_provider_link(provider.id, query='f=html')}">${provider.id}</a>
+            </div>
+            %if "title" in provider:
+                <span class="dash">&#8212;</span>
+                <span class="field-title">${provider.title}</span>
+            %endif
+            <div class="format-link">
+                (<a href="${get_provider_link(provider.id, query='f=json')}">JSON</a>)
+            </div>
+        </dt>
+            <dd>
+            <div class="field">
+                <div class="field-key">Type:</div>
+                <div class="label label-info">${provider.type}</div>
+            </div>
+            <div class="field">
+                <div class="field-key">Location:</div>
+                <div class="code"><a href="${provider.url}">${provider.url}</a></div>
+            </div>
+            %if provider.get("description"):
+                <div class="field">
+                    <div class="field-key">Description:</div>
+                    <div class="field-description">${render_description(provider.description)}</div>
+                </div>
+            %endif
+            %if "version" in provider:
+                <div class="field">
+                    <div class="field-key">Version:</div>
+                    <div class="label label-info version-tag">${provider.version}</div>
+                </div>
+            %endif
+            %if "keywords" in provider:
+                <div class="field">
+                    <div class="field-key">Keywords:</div>
+                    %for keyword in provider.keywords:
+                        <div class="label label-note">${keyword}</div>
+                    %endfor
+                </div>
+            %endif
+            %if detail and provider.get("metadata"):
+                <div class="field">
+                    <div class="field-key">Metadata:</div>
+                    ${render_metadata(provider.metadata)}
+                </div>
+            %endif
+            %if detail and provider.get("links"):
+                <div class="field">
+                    <div class="field-key">Links:</div>
+                    ${render_links(provider.links)}
+                </div>
+            %endif
+        </dd>
+    </div>
+</dl>
+</%def>
+
+
 <%def name="render_inputs(inputs)">
 <dl class="indent">
 %for input_id, input_data in inputs.items():
@@ -215,7 +292,7 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
                 %if field in input_data:
                 <div class="field">
                     <div class="field-key field-sub">${field.capitalize()}:</div>
-                    <div class="field-${field}">${input_data[field]}</div>
+                    <div class="field-${field}">${render_description(input_data[field])}</div>
                 </div>
                 %endif
             %endfor
@@ -270,27 +347,31 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 
 
 <!--
-    Defines a dynamic 'toggle' button that will show/hide a code block, using the response content of a job sub-path.
+    Template function for button toggles between code blocks from API responses.
+
+    Defines a dynamic 'toggle' button that will show/hide a code block, using the response content of a sub-path
+    relative to the resource referenced by 'url' of a given 'ref' (e.g.: a job or a process ID).
 
     The code-block's and button's display and text are dynamically controlled and populated by state functions.
-    Once the response is fetched, the job 'type' contents are cached into to the code block element to avoid fetching
+    Once the response is fetched, the 'type' contents are cached into to the code block element to avoid fetching
     them again. The click event of that display button is swapped for the toggle event to simply show/hide the cached
     contents from that point on.
 
-    HTML class and function names are dynamically attributed with the corresponding 'type' parameter to allow distinct
-    styling as needed. The 'type' should be unique to avoid duplicate referencing of equally named button operations.
+    HTML class and function names are dynamically attributed with the corresponding 'ref' and 'type' parameters to
+    allow distinct styling as needed. The 'ref' identifies the kind of resource the contents are retrieved from, while
+    the 'type' should be unique within that 'ref' to avoid duplicate referencing of equally named button operations.
 
-    An optional 'btn_tabs' class name can be provided to associate multiple buttons within a common group to act as a
-    tab menu. In such case, because each call of this function is done independently, therefore leading to unordered
+    An optional 'btn_tabs' class name can be provided to associate multiple buttons within a common CSS group to act as
+    a tab menu. In such case, because each call of this function is done independently, therefore leading to unordered
     divs of mixed button/div elements per call, we employ 'flex' display (see CSS 'tab-menu') and 'order' to force
     all 'btn_tabs' buttons to appear first, followed by a breaking "newline" space, and the single code content being
     displayed below them. All calls to this function with the same 'btn_tabs' value should be contained within a div
     with the 'tab-menu' style.
 -->
-<%def name="build_job_toggle_button_code(job, type, path, format, language, queries='', name='', btn_tabs='')">
+<%def name="build_toggle_button_code(ref, url, type, path, format, language, queries='', name='', btn_tabs='')">
     <script>
-        async function fetch_job_${type}(event, format, queries) {
-            const url = "${get_job_link(job.id)}";
+        async function fetch_${ref}_${type}(event, format, queries) {
+            const url = "${url}";
             const qs = queries ? "&" + queries : "";
             const resp = await fetch(url + "${path}?f=" + format + qs);
             let data = "";
@@ -302,17 +383,17 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
                 data = await resp.text();
             }
             let code = hljs.highlight(data, {language: "${language}"}).value;
-            let code_block = document.getElementById("job-${type}-code");
-            toggle_job_${type}(event, true);
+            let code_block = document.getElementById("${ref}-${type}-code");
+            toggle_${ref}_${type}(event, true);
             code_block.innerHTML = code;
-            let btn_show = document.getElementById("job-${type}-button-show");
-            btn_show.onclick = function (ev) { toggle_job_${type}(ev, true) };
+            let btn_show = document.getElementById("${ref}-${type}-button-show");
+            btn_show.onclick = function (ev) { toggle_${ref}_${type}(ev, true) };
         }
 
-        function toggle_job_${type}(event, show) {
-            let content = document.getElementById("job-${type}-content");
-            let btn_show = document.getElementById("job-${type}-button-show");
-            let btn_hide = document.getElementById("job-${type}-button-hide");
+        function toggle_${ref}_${type}(event, show) {
+            let content = document.getElementById("${ref}-${type}-content");
+            let btn_show = document.getElementById("${ref}-${type}-button-show");
+            let btn_hide = document.getElementById("${ref}-${type}-button-hide");
             content.style.display = show ? "unset" : "none";
             btn_hide.style.display = show ? "unset" : "none";
             btn_show.style.display = show ? "none" : "unset";
@@ -347,9 +428,9 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 
     <button
         type="button"
-        id="job-${type}-button-show"
+        id="${ref}-${type}-button-show"
         class="button-show"
-        onclick="fetch_job_${type}(event, '${format}', '${queries}')"
+        onclick="fetch_${ref}_${type}(event, '${format}', '${queries}')"
         style="order: -2;"
     >
         Display ${name or type.capitalize()}
@@ -357,9 +438,9 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 
     <button
         type="button"
-        id="job-${type}-button-hide"
+        id="${ref}-${type}-button-hide"
         class="button-hide"
-        onclick="toggle_job_${type}(event, false)"
+        onclick="toggle_${ref}_${type}(event, false)"
         style="display: none; order: -2;"
     >
         Hide ${name or type.capitalize()}
@@ -368,10 +449,102 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
     <div style="flex-basis: 100%; height: 0; display: none; order: -1;"><!--break--></div>
 
     <div
-        id="job-${type}-content"
+        id="${ref}-${type}-content"
         style="display: none"
         class="${btn_tabs} code-container"
     >
-        <pre><code id="job-${type}-code" class="language-${language}"></code></pre>
+        <pre><code id="${ref}-${type}-code" class="language-${language}"></code></pre>
     </div>
+</%def>
+
+<!--
+    Convenience wrapper of 'build_toggle_button_code' for contents retrieved from a job sub-path.
+-->
+<%def name="build_job_toggle_button_code(job, type, path, format, language, queries='', name='', btn_tabs='')">
+    ${build_toggle_button_code(
+        "job",
+        capture(get_job_link, job.id),
+        type, path, format, language,
+        queries=queries, name=name, btn_tabs=btn_tabs,
+    )}
+</%def>
+
+<!--
+    Convenience wrapper of 'build_toggle_button_code' for contents retrieved from a process sub-path.
+-->
+<%def name="build_process_toggle_button_code(process_id, provider_id, type, path, format, language, queries='', name='', btn_tabs='')">
+    ${build_toggle_button_code(
+        "process",
+        capture(get_process_link, process_id, provider_id=provider_id),
+        type, path, format, language,
+        queries=queries, name=name, btn_tabs=btn_tabs,
+    )}
+</%def>
+
+
+<%!
+import html
+import re
+
+_MARKDOWN_LINK_REGEX = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
+_PLAIN_TEXT_URL_REGEX = re.compile(r"https?://[^\s<>()]+")
+
+
+def _linkify_description_text(text):
+    """
+    Convert markdown and plain URLs into HTML anchors while escaping surrounding text.
+    """
+    if not text:
+        return ""
+
+    result = []
+    cursor = 0
+
+    for md_match in _MARKDOWN_LINK_REGEX.finditer(text):
+        start, end = md_match.span()
+        if start > cursor:
+            result.append(("text", text[cursor:start]))
+        result.append(("md", md_match.group(1), md_match.group(2)))
+        cursor = end
+
+    if cursor < len(text):
+        result.append(("text", text[cursor:]))
+
+    content = []
+    for token in result:
+        if token[0] == "md":
+            _, label, url = token
+            label = html.escape(label)
+            href = html.escape(url, quote=True)
+            content.append(f'<a href="{href}">{label}</a>')
+            continue
+
+        segment = token[1]
+        seg_cursor = 0
+        for url_match in _PLAIN_TEXT_URL_REGEX.finditer(segment):
+            url_start, url_end = url_match.span()
+            if url_start > seg_cursor:
+                content.append(html.escape(segment[seg_cursor:url_start]))
+
+            url_value = url_match.group(0)
+            # Keep punctuation outside anchors for cleaner copy/paste and visual flow.
+            suffix = ""
+            while url_value and url_value[-1] in ".,;:!?":
+                suffix = url_value[-1] + suffix
+                url_value = url_value[:-1]
+
+            href = html.escape(url_value, quote=True)
+            label = html.escape(url_value)
+            content.append(f'<a href="{href}">{label}</a>')
+            if suffix:
+                content.append(html.escape(suffix))
+            seg_cursor = url_end
+
+        if seg_cursor < len(segment):
+            content.append(html.escape(segment[seg_cursor:]))
+
+    return "".join(content)
+%>
+<%def name="render_description(text)">
+${_linkify_description_text(text) | n}
 </%def>

@@ -3,7 +3,15 @@
 
 <%block name="breadcrumbs">
 <li><a href="${weaver.wps_restapi_url}?f=html">Home</a></li>
-<li><a href="${util.get_jobs_link(query='f=html')}">Jobs</a></li>
+%if job.service:
+<li><a href="${util.get_providers_link(query='f=html')}">Providers</a></li>
+<li><a href="${util.get_provider_link(job.service, query='f=html')}"><span class="code">${job.service}</span></a></li>
+<li><a href="${util.get_process_link(job.process, provider_id=job.service, query='f=html')}"><span class="code">${job.process}</span></a></li>
+%elif job.process:
+<li><a href="${util.get_processes_link(query='f=html')}">Processes</a></li>
+<li><a href="${util.get_process_link(job.process, query='f=html')}"><span class="code">${job.process}</span></a></li>
+%endif
+<li><a href="${util.get_jobs_link(process_id=job.process, provider_id=job.service, query='f=html')}">Jobs</a></li>
 <li><a href="${util.get_job_link(job.id, query='f=html')}">Job [${job.id}]</a></li>
 </%block>
 
@@ -27,7 +35,7 @@
             </li>
             <li>
                 <div class="nav-link">
-                    Return to <a href="${util.get_jobs_link(query='f=html')}">Jobs Listing</a>
+                    Return to <a href="${util.get_jobs_link(process_id=job.process, provider_id=job.service, query='f=html')}">Jobs Listing</a>
                 </div>
             </li>
             <li>

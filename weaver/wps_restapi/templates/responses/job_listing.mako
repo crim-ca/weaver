@@ -3,11 +3,18 @@
 
 <%block name="breadcrumbs">
 <li><a href="${weaver.wps_restapi_url}?f=html">Home</a></li>
-%if process:
+%if service and process:
+<li><a href="${util.get_providers_link(query='f=html')}">Providers</a></li>
+<li><a href="${util.get_provider_link(service, query='f=html')}"><span class="code">${service}</span></a></li>
+<li><a href="${util.get_process_link(process, provider_id=service, query='f=html')}"><span class="code">${process}</span></a></li>
+%elif service:
+<li><a href="${util.get_providers_link(query='f=html')}">Providers</a></li>
+<li><a href="${util.get_provider_link(service, query='f=html')}"><span class="code">${service}</span></a></li>
+%elif process:
 <li><a href="${util.get_processes_link(query='f=html')}">Processes</a></li>
 <li><a href="${util.get_process_link(process, query='f=html')}"><span class="code">${process}</span></a></li>
 %endif
-<li><a href="${util.get_jobs_link(query='f=html')}">Jobs</a></li>
+<li><a href="${util.get_jobs_link(process_id=process, provider_id=service, query='f=html')}">Jobs</a></li>
 </%block>
 
 <h2 id="jobs" class="page-title">
@@ -15,7 +22,7 @@
 </h2>
 
 <div class="format-link">
-(<a href="${util.get_jobs_link(query='f=json')}">JSON</a>)
+(<a href="${util.get_jobs_link(process_id=process, provider_id=service, query='f=json')}">JSON</a>)
 </div>
 
 <div class="job-listing">
@@ -27,7 +34,29 @@
                     Return to <a href="${weaver.wps_restapi_url}?f=html">API Frontpage</a>
                 </div>
             </li>
-            %if process:
+            %if service and process:
+                <li>
+                    <div class="nav-link">
+                        Return to <a href="${util.get_provider_link(service, query='f=html')}">Provider Description</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="nav-link">
+                        Return to <a href="${util.get_process_link(process, provider_id=service, query='f=html')}">Process Description</a>
+                    </div>
+                </li>
+            %elif service:
+                <li>
+                    <div class="nav-link">
+                        Return to <a href="${util.get_provider_link(service, query='f=html')}">Provider Description</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="nav-link">
+                        Go to <a href="${util.get_processes_link(provider_id=service, query='f=html')}">Provider Processes</a>
+                    </div>
+                </li>
+            %elif process:
                 <li>
                     <div class="nav-link">
                         Return to <a href="${util.get_process_link(process, query='f=html')}">Process Description</a>
