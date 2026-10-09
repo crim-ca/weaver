@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 from cwltool.cwlprov import provenance_constants as cwl_prov_const
 from parameterized import parameterized
+from prov import constants as prov_const
 from rdflib import Graph, URIRef
 
 from tests.functional import TEST_DATA_ROOT
@@ -183,6 +184,8 @@ class TestJobProvenance(TestJobProvenanceBase):
             cwl_prov_const.FOAF["account"].uri: "foaf:account",
             cwl_prov_const.WFPROV["wasEnactedBy"].uri: "wfprov:wasEnactedBy",
             cwl_prov_const.WFPROV["describedByProcess"].uri: "wfprov:describedByProcess",
+            prov_const.PROV_ATTR_GENERAL_ENTITY.uri: "prov:generalEntity",
+            prov_const.PROV_ATTR_SPECIFIC_ENTITY.uri: "prov:specificEntity",
         }
         rdf_graph = Graph()
         rdf_graph.parse(data=json.dumps(prov), format="json-ld")
