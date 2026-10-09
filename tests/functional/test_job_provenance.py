@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import itertools
+import json
 import os
 import uuid
 from typing import TYPE_CHECKING
@@ -11,6 +12,7 @@ from rdflib import Graph, URIRef
 
 from cwltool.cwlprov import provenance_constants as cwl_prov_const
 
+from tests.functional import TEST_DATA_ROOT
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import mocked_execute_celery, mocked_sub_requests, mocked_wps_output
 from weaver.formats import ContentType, OutputFormat
@@ -141,6 +143,13 @@ class TestJobProvenance(TestJobProvenanceBase):
         graph = prov["@graph"]
         assert bool(graph), "JSON-LD @graph not be an empty list."
         assert all(isinstance(obj, dict) and "@type" in obj for obj in graph)
+        # Replace remote context with local one to avoid network accesses
+        try:
+            idx = prov["@context"].index("https://openprovenance.org/prov-jsonld/context.jsonld")
+            prov["@context"][idx] = f"file://{TEST_DATA_ROOT}/prov_context.jsonld"
+        except ValueError:
+            pass
+
         # NOTE:
         #   The following custom (non-formal) PROV attributes reference other PROV-JSONLD records by their
         #   identifier. They must therefore be encoded as "@id" IRI references rather than "xsd:QName"-typed
@@ -177,7 +186,7 @@ class TestJobProvenance(TestJobProvenanceBase):
             cwl_prov_const.WFPROV["describedByProcess"].uri: "wfprov:describedByProcess",
         }
         rdf_graph = Graph()
-        rdf_graph.parse(data=resp.text, format="json-ld")
+        rdf_graph.parse(data=json.dumps(prov), format="json-ld")
         found_predicates = set()
         for _, predicate, obj in rdf_graph:
             uri = str(predicate)
