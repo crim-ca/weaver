@@ -14,7 +14,8 @@ Changes:
 --------
 - Add `Zarr` media-types ``application/vnd.zarr`` (including ``version=2`` and ``version=3`` parameters) for directory
   stores, and ``application/zarr+zip`` for zipped stores, with their ``.zarr`` and ``.zarr.zip`` extensions.
-  The zipped variant is distinguished from a plain ``application/zip``.
+  The zipped variant is distinguished from a plain ``application/zip``
+  (resolves `#1012 <https://github.com/crim-ca/weaver/issues/1012>`_).
 - Convert `WPS`/`OGC API - Processes` `I/O` using only `Zarr` directory media-types into `CWL` ``Directory`` without
   ``format`` (not applicable for that type), similarly to the handling of ``application/directory``.
 - Handle `Zarr` directory media-types as directories when returning `Job` results by-value and when refusing
