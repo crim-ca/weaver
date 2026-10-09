@@ -8,7 +8,7 @@
 # "job_prov*" files land next to the other examples. Requires "curl" and "jq".
 
 fix_urls() {
-    sed -e s,$WEAVER_URL,https://hirondelle.crim.ca/weaver,g \
+    sed -e "s,$WEAVER_URL,https://hirondelle.crim.ca/weaver,g" \
         -e s,localhost,hirondelle.crim.ca,g
 }
 
