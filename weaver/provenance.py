@@ -47,15 +47,12 @@ def _encode_jsonld_document_with_id_context(document, context):
     # type: (ProvDocument, str) -> dict
     container = _prov_encode_jsonld_document(document, context)
     existing_context = container.get("@context")
-    extra_context = {
-        "wfprov": cwl_prov_const.WFPROV.uri,
-        "foaf": cwl_prov_const.FOAF.uri,
-        **_PROV_JSONLD_ID_CONTEXT_TERMS,
-    }
     if isinstance(existing_context, list):
-        existing_context.insert(0, extra_context)
+        existing_context.append(_PROV_JSONLD_ID_CONTEXT_TERMS)
+    elif existing_context:
+        container["@context"] = [existing_context, _PROV_JSONLD_ID_CONTEXT_TERMS]
     else:
-        container["@context"] = [extra_context, existing_context]
+        container["@context"] = _PROV_JSONLD_ID_CONTEXT_TERMS
     return container
 
 
