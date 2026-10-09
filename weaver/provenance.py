@@ -20,19 +20,25 @@ from weaver.utils import get_weaver_url
 # are outside of the PROV vocabulary, but which need to be treated as
 # @id node references (i.e. IRIs). We then need to add context terms
 # so that JSON-LD processors will interpret them as such, done below.
-prov_jsonld_serializer.ID_TYPED_TERMS = prov_jsonld_serializer.ID_TYPED_TERMS | {
+_PROV_JSONLD_EXTRA_ID_TYPED_TERMS = {
     str(cwl_prov_const.WFPROV["describedByProcess"]),
     str(cwl_prov_const.WFPROV["wasEnactedBy"]),
     str(cwl_prov_const.FOAF["account"]),
+    # For some reason (perhaps we are not actually using them
+    # correctly?) we need to include these even though they're
+    # in the PROV ontology!
+    str(prov_const.PROV_ATTR_GENERAL_ENTITY),
+    str(prov_const.PROV_ATTR_SPECIFIC_ENTITY),
 }
+prov_jsonld_serializer.ID_TYPED_TERMS = (
+    prov_jsonld_serializer.ID_TYPED_TERMS | _PROV_JSONLD_EXTRA_ID_TYPED_TERMS
+)
 
 # Now that we have bare strings for these IRI references, we also need
 # to inject the proper type definitions into the context, again, by
 # doing some dodgy patching of prov_jsonld_serializer.
 _PROV_JSONLD_ID_CONTEXT_TERMS = {
-    str(cwl_prov_const.WFPROV["describedByProcess"]): {"@type": "@id"},
-    str(cwl_prov_const.WFPROV["wasEnactedBy"]): {"@type": "@id"},
-    str(cwl_prov_const.FOAF["account"]): {"@type": "@id"},
+    term: {"@type": "@id"} for term in _PROV_JSONLD_EXTRA_ID_TYPED_TERMS
 }
 _prov_encode_jsonld_document = prov_jsonld_serializer.encode_jsonld_document
 
