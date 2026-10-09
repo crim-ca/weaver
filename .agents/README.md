@@ -73,6 +73,8 @@ All skills are organized by category for easy discovery:
 - **[job-results](skills/job-results/SKILL.md)** - Retrieve output results
 - **[job-statistics](skills/job-statistics/SKILL.md)** - Retrieve resource usage metrics
 - **[job-status](skills/job-status/SKILL.md)** - Check job execution status
+- **[update-provenance-examples](skills/update-provenance-examples/SKILL.md)** - Regenerate PROV example
+  files under wps_restapi/examples
 
 ### Process Management
 
