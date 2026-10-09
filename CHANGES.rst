@@ -24,6 +24,7 @@ Fixes:
   block, leaking a stray newline into generated `Process` `URL` references. This broke the inline ``<script>``
   blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
   section, causing a ``ReferenceError`` when clicking them.
+- Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
 
 .. _changes_6.16.0:
 
