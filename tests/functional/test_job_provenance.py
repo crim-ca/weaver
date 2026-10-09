@@ -7,6 +7,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 from parameterized import parameterized
+from rdflib import Graph, URIRef
+
+from cwltool.cwlprov import provenance_constants as cwl_prov_const
 
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import mocked_execute_celery, mocked_sub_requests, mocked_wps_output
@@ -160,6 +163,34 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert found_terms == set(id_ref_terms), (
             f"Not all expected PROV-JSONLD reference terms were found in the generated document: "
             f"missing {set(id_ref_terms) - found_terms}"
+        )
+        # NOTE:
+        #   The raw compact-IRI-looking string shape checked above is not sufficient on its own: per the
+        #   JSON-LD specification, a bare string under a term is only expanded into a proper IRI node
+        #   reference if the active "@context" declares that term with "@type": "@id" (see
+        #   'weaver.provenance' patch of 'prov.serializers.provjsonld.encode_jsonld_document'). Parse the
+        #   document with a conformant, independent JSON-LD/RDF processor (rdflib) to confirm these values
+        #   are genuinely resolved as IRI references ("URIRef"), not opaque string literals.
+        id_ref_predicates = {
+            cwl_prov_const.FOAF["account"].uri: "foaf:account",
+            cwl_prov_const.WFPROV["wasEnactedBy"].uri: "wfprov:wasEnactedBy",
+            cwl_prov_const.WFPROV["describedByProcess"].uri: "wfprov:describedByProcess",
+        }
+        rdf_graph = Graph()
+        rdf_graph.parse(data=resp.text, format="json-ld")
+        found_predicates = set()
+        for _, predicate, obj in rdf_graph:
+            uri = str(predicate)
+            if uri not in id_ref_predicates:
+                continue
+            found_predicates.add(uri)
+            assert isinstance(obj, URIRef), (
+                f"Attribute [{id_ref_predicates[uri]}] RDF object [{obj!r}] must be resolved as a "
+                f"'URIRef' IRI reference by a conformant JSON-LD processor, not a '{type(obj).__name__}'."
+            )
+        assert found_predicates == set(id_ref_predicates), (
+            "Not all expected PROV-JSONLD reference predicates were found when parsed as RDF: "
+            f"missing {set(id_ref_predicates) - found_predicates}"
         )
 
     @parameterized.expand([

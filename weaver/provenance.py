@@ -15,21 +15,45 @@ from weaver.base import Constants
 from weaver.formats import ContentType, OutputFormat
 from weaver.utils import get_weaver_url
 
-# NOTE:
-#   The 'prov' library's PROV-JSONLD serializer only emits a proper JSON-LD '@id' node reference
-#   for a 'QualifiedName' attribute value when its term is one of the hardcoded 'ID_TYPED_TERMS'
-#   ("type", "role", "location"). Every other attribute whose value happens to be a 'QualifiedName'
-#   (e.g.: the "wfprov:wasEnactedBy" relation set below, and "foaf:account" employed by cwltool's
-#   'ResearchObject' for the running agent) is instead encoded as an "xsd:QName"-typed literal, which
-#   generic JSON-LD/RDF consumers do not resolve as a reference to the corresponding node. Since
-#   neither 'ProvDocument.serialize' nor 'ProvJSONLDSerializer.serialize' expose any public option to
-#   control this, extend this private module constant so both known terms are also treated as
-#   '@id'-typed on serialization.
+# Monkeypatch the prov library's PROV-JSONLD serializer to emit bare
+# strings instead of "xsd:QName" typed literals for these types which
+# are outside of the PROV vocabulary, but which need to be treated as
+# @id node references (i.e. IRIs). We then need to add context terms
+# so that JSON-LD processors will interpret them as such, done below.
 prov_jsonld_serializer.ID_TYPED_TERMS = prov_jsonld_serializer.ID_TYPED_TERMS | {
     str(cwl_prov_const.WFPROV["describedByProcess"]),
     str(cwl_prov_const.WFPROV["wasEnactedBy"]),
     str(cwl_prov_const.FOAF["account"]),
 }
+
+# Now that we have bare strings for these IRI references, we also need
+# to inject the proper type defintions into the context, again, by
+# doing some dodgy patching of prov_jsonld_serializer.
+_PROV_JSONLD_ID_CONTEXT_TERMS = {
+    str(cwl_prov_const.WFPROV["describedByProcess"]): {"@type": "@id"},
+    str(cwl_prov_const.WFPROV["wasEnactedBy"]): {"@type": "@id"},
+    str(cwl_prov_const.FOAF["account"]): {"@type": "@id"},
+}
+_prov_encode_jsonld_document = prov_jsonld_serializer.encode_jsonld_document
+
+
+def _encode_jsonld_document_with_id_context(document, context):
+    # type: (ProvDocument, str) -> dict
+    container = _prov_encode_jsonld_document(document, context)
+    existing_context = container.get("@context")
+    extra_context = {
+        "wfprov": cwl_prov_const.WFPROV.uri,
+        "foaf": cwl_prov_const.FOAF.uri,
+        **_PROV_JSONLD_ID_CONTEXT_TERMS,
+    }
+    if isinstance(existing_context, list):
+        existing_context.insert(0, extra_context)
+    else:
+        container["@context"] = [extra_context, existing_context]
+    return container
+
+
+prov_jsonld_serializer.encode_jsonld_document = _encode_jsonld_document_with_id_context
 
 if TYPE_CHECKING:
     from typing import Any, List, Optional, Tuple, Union
@@ -368,9 +392,9 @@ class WeaverResearchObject(ResearchObject):
 
         proc_url = self.job.process_url(self.settings)
         proc_id = f"{self.job.service}:{self.job.process}" if self.job.service else self.job.process
-        proc_uuid = f"{weaver_instance_sha1}:{proc_id}"
+        proc_sha1 = self.sha1_uuid(document, proc_id)
         proc_entity = document.entity(
-            proc_uuid,
+            proc_sha1,
             {
                 prov_const.PROV_TYPE: cwl_prov_const.WFDESC["Process"],
                 prov_const.PROV_LOCATION: proc_url,

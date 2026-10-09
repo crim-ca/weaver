@@ -74,10 +74,13 @@ Changes:
 
 Fixes:
 ------
-- Fix `Job` provenance ``PROV-JSONLD`` output incorrectly encoding ``foaf:account`` and ``wfprov:wasEnactedBy``
-  reference values as ``xsd:QName``-typed literals instead of proper ``@id`` node references, by extending the
-  ``prov`` library JSON-LD serializer's internal set of ``@id``-typed terms, since neither `cwltool` nor ``prov``
-  expose any public option to control this behavior otherwise.
+- Fix `Job` provenance ``PROV-JSONLD`` output incorrectly encoding ``foaf:account``, ``wfprov:wasEnactedBy`` and
+  ``wfprov:describedByProcess`` reference values as ``xsd:QName``-typed literals instead of proper ``@id`` node
+  references, by extending the ``prov`` library JSON-LD serializer's internal set of ``@id``-typed terms, since
+  neither `cwltool` nor ``prov`` expose any public option to control this behavior otherwise. Also inject matching
+  ``"@type": "@id"`` term definitions into the generated ``@context`` so that generic/conformant JSON-LD and RDF
+  processors (e.g.: ``rdflib``, ``pyld``), not just ``prov`` itself, correctly resolve these values as IRI node
+  references instead of opaque string literals.
 - Fix tutorial examples that used local ``file://`` references rejected by built-in process security validation
   (resolves `#1033 <https://github.com/crim-ca/weaver/issues/1033>`_).
 - Fix invalid convertion to ``array`` within `I/O` ``schema`` for an optional single-value parameter
