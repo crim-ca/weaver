@@ -24,9 +24,13 @@ Changes:
   as ``Content-Type`` for directory references when explicitly provided.
 - Offer ``application/zarr+zip`` as alternate format of `Zarr` directory `Job` outputs, using the ``?f={mediaType}``
   result representation to obtain the zipped store (store contents located at the root of the archive).
+- Refuse deployment of a `Process` declaring a `Zarr` directory media-type on an `I/O` that is defined as a `CWL`
+  ``File``, since `Zarr` stores must be represented by a ``Directory``.
 
 Fixes:
 ------
+- Fix files without extension in a remote directory listing (e.g.: `Zarr` chunks such as ``c/0``) being renamed with
+  a default extension (e.g.: ``c/0.txt``) when fetched as part of a directory, which corrupted the directory contents.
 - Remove `HTML` duplicate rendering of alternate OGC/WPS/CWL JSON/YAML/XML content negotiation links.
 - Fix `HTML` missing `Provider`-scoped links in corresponding pages when navigating their contents.
 - Fix `HTML` rendering of ``get_process_link`` util helper that omitted a line-continuation after a Mako control

@@ -38,6 +38,7 @@ from weaver.formats import (
     get_cwl_file_format,
     get_extension,
     get_format,
+    is_directory_media_type,
     is_zarr_media_type,
     repr_json
 )
@@ -3951,3 +3952,18 @@ def check_io_compatible(wps_io, cwl_io, io_id):
         msg_typ = f" (CWL: {fully_qualified_name(cwl_io_type)}, WPS: {fully_qualified_name(wps_io_type)})."
         LOGGER.error("%s.\n  CWL: %s\n  WPS: %s", msg_err, cwl_io_type, wps_io_type)
         raise PackageTypeError(msg_err + msg_typ)
+
+    # Zarr is a directory store, which must be represented by 'Directory' in CWL (a 'File' cannot hold it)
+    if wps_io_type in [ComplexInput, ComplexOutput] and cwl_io_type in [ComplexInput, ComplexOutput]:
+        wps_fmts = get_field(wps_io, "supported_formats", search_variations=False, default=[]) or []
+        cwl_fmts = get_field(cwl_io, "supported_formats", search_variations=False, default=[]) or []
+        wps_zarr = any(is_zarr_media_type(get_field(fmt, "mime_type", search_variations=True)) for fmt in wps_fmts)
+        cwl_dir = any(is_directory_media_type(get_field(fmt, "mime_type", search_variations=True)) for fmt in cwl_fmts)
+        if wps_zarr and not cwl_dir:
+            msg_err = (
+                f"Mismatching CWL/WPS types for merge of I/O ID: [{io_id}] "
+                f"(CWL: File, WPS: {ContentType.APP_ZARR}). "
+                "A Zarr format represents a directory store and requires the CWL I/O to be of type 'Directory'."
+            )
+            LOGGER.error(msg_err)
+            raise PackageTypeError(msg_err)
