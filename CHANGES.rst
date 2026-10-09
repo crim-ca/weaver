@@ -70,7 +70,7 @@ Changes:
 - Ensure that the user agent in the PROV document is created as a
   ``SoftwareAgent`` not a ``Person`` with recent versions of ``prov``
   that more strongly enforce update-only ``ProvRecord``.
-- Add a skill with example data and a script to regenerate the PROV example data for the OpenAPI definitoin.
+- Add a skill with example data and a script to regenerate the PROV example data for the OpenAPI definition.
 
 Fixes:
 ------

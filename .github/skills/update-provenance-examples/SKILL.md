@@ -84,16 +84,14 @@ All located in `weaver/wps_restapi/examples/`, loaded automatically at import ti
 
 ## Generate a Job
 
+The [`submit_echo_job.sh`](scripts/submit_echo_job.sh) script submits an execution of the builtin
+`EchoProcess` using the example request body
+[`echo_body.json`](../../../weaver/wps_restapi/examples/echo_body.json) and prints the resulting
+`Job` ID:
+
 ```bash
 export WEAVER_URL=http://localhost:4001
-
-# Submit an execution of the builtin EchoProcess using the example request body.
-JOB_URL=$(curl -s -i -X POST \
-  -H "Content-Type: application/json" \
-  -H "Prefer: respond-async" \
-  -d @weaver/wps_restapi/examples/echo_body.json \
-  "${WEAVER_URL}/processes/EchoProcess/execution" | grep -i "^Location:" | awk '{print $2}' | tr -d '\r')
-JOB_ID=$(basename "$JOB_URL")
+JOB_ID=$(sh /path/to/.github/skills/update-provenance-examples/scripts/submit_echo_job.sh "$WEAVER_URL")
 
 # Wait for the job to complete (see job-monitor skill for a more robust polling loop).
 weaver monitor -u $WEAVER_URL -j $JOB_ID
@@ -175,8 +173,8 @@ weaver provenance -u $WEAVER_URL -j $JOB_ID -pT who  -F TEXT --stdout > \
 - Requires `weaver.cwl_prov=true` and a successfully completed `Job`; jobs executed while provenance was
   disabled, or that failed/are still running, will not return PROV metadata (see
   [job-provenance](../job-provenance/SKILL.md) limitations).
-- The `job_prov_examples.sh` script assumes a POSIX shell (`sh`), and that `curl`/`jq` are installed and
-  available on `PATH`.
+- The `submit_echo_job.sh` and `job_prov_examples.sh` scripts assume a POSIX shell (`sh`), and that
+  `curl` (and, for the latter, `jq`) are installed and available on `PATH`.
 
 ## Related Skills
 

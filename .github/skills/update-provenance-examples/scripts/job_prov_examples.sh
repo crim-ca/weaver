@@ -12,17 +12,43 @@ fix_urls() {
         -e s,localhost,hirondelle.crim.ca,g
 }
 
+# Fetch $1 (URL) into $2 (output file), optionally pretty-printing with "jq" when $3 is "jq".
+# Aborts the whole script (rather than silently producing an empty/truncated example file) if the
+# "curl" request fails (network error, or a non-2xx response because of "-f") or if "jq" cannot parse
+# the result.
+fetch() {
+    url=$1
+    out=$2
+    jqfmt=$3
+    tmp=$(mktemp) || { echo "ERROR: could not create a temporary file." >&2; exit 1; }
+    if ! curl -sS -f "$url" -o "$tmp"; then
+        echo "ERROR: curl request failed for [$url]" >&2
+        rm -f "$tmp"
+        exit 1
+    fi
+    if [ "$jqfmt" = "jq" ]; then
+        if ! fix_urls < "$tmp" | jq . > "$out"; then
+            echo "ERROR: jq formatting failed for [$url]" >&2
+            rm -f "$tmp"
+            exit 1
+        fi
+    else
+        fix_urls < "$tmp" > "$out"
+    fi
+    rm -f "$tmp"
+}
+
 JOBID=${1??Usage: $0 JOBID [WEAVER_URL]}
 WEAVER_URL=${2:-http://localhost:4001}
 REST=$WEAVER_URL/jobs/$JOBID
 
-curl $REST/prov/who | fix_urls  > job_prov_who.txt
-curl $REST/prov/info | fix_urls  > job_prov_info.txt
-curl $REST/prov/run | fix_urls  > job_prov_run.txt
-curl $REST/prov | fix_urls | jq > job_prov.json
-curl $REST/prov?f=PROV-JSONLD | fix_urls | jq > job_prov.jsonld
-curl $REST/prov?f=PROV-TURTLE | fix_urls > job_prov.ttl
-curl $REST/prov?f=PROV-XML | fix_urls > job_prov.xml
-curl $REST/prov?f=PROV-NT | fix_urls > job_prov.nt
-curl $REST/prov?f=PROV-N | fix_urls > job_prov.provn
+fetch "$REST/prov/who" job_prov_who.txt
+fetch "$REST/prov/info" job_prov_info.txt
+fetch "$REST/prov/run" job_prov_run.txt
+fetch "$REST/prov" job_prov.json jq
+fetch "$REST/prov?f=PROV-JSONLD" job_prov.jsonld jq
+fetch "$REST/prov?f=PROV-TURTLE" job_prov.ttl
+fetch "$REST/prov?f=PROV-XML" job_prov.xml
+fetch "$REST/prov?f=PROV-NT" job_prov.nt
+fetch "$REST/prov?f=PROV-N" job_prov.provn
 
