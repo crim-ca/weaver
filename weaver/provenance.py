@@ -412,7 +412,7 @@ class WeaverResearchObject(ResearchObject):
         job_activity = document.activity(
             self.job.uuid.urn,
             other_attributes={
-                prov_const.PROV_TYPE: cwl_prov_const.WFDESC["ProcessRun"],
+                prov_const.PROV_TYPE: cwl_prov_const.WFPROV["ProcessRun"],
                 prov_const.PROV_LOCATION: job_url,
                 prov_const.PROV_LABEL: "Job Information",
                 cwl_prov_const.WFPROV["wasEnactedBy"]: wf_agent,
