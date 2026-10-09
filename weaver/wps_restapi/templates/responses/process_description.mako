@@ -8,7 +8,9 @@
 <%block name="breadcrumbs">
 <li><a href="${weaver.wps_restapi_url}?f=html">Home</a></li>
 %if provider:
-<li><a href="${util.get_processes_link(query='f=html&providers=true')}">Processes</a></li>
+<li><a href="${util.get_providers_link(query='f=html')}">Providers</a></li>
+<li><a href="${util.get_provider_link(provider.id, query='f=html')}"><span class="code">${provider.id}</span></a></li>
+<li><a href="${util.get_processes_link(provider_id=provider.id, query='f=html')}">Processes</a></li>
 <li><a href="${util.get_process_link(id, provider_id=provider.id, query='f=html')}"><span class="code">${id}</span></a></li>
 %else:
 <li><a href="${util.get_processes_link(query='f=html')}">Processes</a></li>
@@ -33,10 +35,8 @@
 <div class="format-link">
     (<a href="${util.get_process_link(id, provider_id=provider_id, query='f=json')}">OGC JSON</a>,
      <a href="${util.get_process_link(id, provider_id=provider_id, query='f=xml')}">WPS XML</a>)
-    (<a href="${util.get_process_link(id, query='f=json')}">OGC JSON</a>,
-     <a href="${util.get_process_link(id, query='f=xml')}">WPS XML</a>,
-     <a href="${util.get_process_link(id)}/package?f=json">CWL JSON</a>,
-     <a href="${util.get_process_link(id)}/package?f=yaml">CWL YAML</a>)
+     <a href="${util.get_process_link(id, provider_id=provider_id)}/package?f=json">CWL JSON</a>,
+     <a href="${util.get_process_link(id, provider_id=provider_id)}/package?f=yaml">CWL YAML</a>)
 </div>
 
 <div class="content-section nav-menu">
@@ -156,7 +156,7 @@
                 %>
                 %for (pkg_type, pkg_fmt, pkg_lang, pkg_name) in pkg_variants:
                     ${util.build_process_toggle_button_code(
-                        id,
+                        id, provider_id,
                         type=pkg_type, path="/package", format=pkg_fmt, language=pkg_lang,
                         name=pkg_name, btn_tabs="process-package",
                     )}

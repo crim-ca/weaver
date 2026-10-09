@@ -35,7 +35,7 @@ colander<2
 cornice
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
-cryptography>=47.0.0
+cryptography>=50.0.2
 # FIXME: properly support GPU execution
 #   - https://github.com/crim-ca/weaver/issues/104
 #   - https://github.com/crim-ca/weaver/issues/138
@@ -49,7 +49,7 @@ cwltool @ git+https://github.com/crim-ca/cwltool.git@prov-jsonld-fix-association
 cwltool>=3.1.20250925164626; python_version >= "3.14"  # first version available
 # Although cwltool includes cwlprov (see above), we also need the command-line tool, so we install it
 cwlprov @ git+https://github.com/crim-ca/cwlprov-py.git@backport-cwltool-prov
-cwl-utils>=0.42
+cwl-utils>=0.45
 dnspython>=2.8.0  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
 docker>=7.1
 duration
@@ -59,7 +59,7 @@ esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
 geotiff>=0.2.10
 # gunicorn >20 breaks some config.ini loading parameters (paste)
 # use pserve to continue supporting config.ini with paste settings
-gunicorn>=26.0.0
+gunicorn>=26.2.0
 # reduced dependencies contrains to let packages update to latest (https://github.com/vinitkumar/json2xml/issues/157)
 # even more reduced dependency constraints (https://github.com/vinitkumar/json2xml/pull/195)
 json2xml==4.1.0

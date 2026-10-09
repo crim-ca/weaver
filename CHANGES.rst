@@ -12,6 +12,27 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- Fix `HTML` ``Jobs`` breadcrumb and listing links on a `Job`/`Process`/`Provider`-scoped page that incorrectly
+  redirected to the unfiltered `Job` listing instead of preserving the ``process``/``provider`` filtering context.
+- Remove `HTML` duplicate rendering of alternate OGC/WPS/CWL JSON/YAML/XML content negotiation links.
+- Fix `HTML` missing `Provider`-scoped links in corresponding pages when navigating their contents.
+- Fix `HTML` rendering of ``get_process_link`` util helper that omitted a line-continuation after a Mako control
+  block, leaking a stray newline into generated `Process` `URL` references. This broke the inline ``<script>``
+  blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
+  section, causing a ``ReferenceError`` when clicking them.
+- Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
+
+.. _changes_6.16.0:
+
+`6.16.0 <https://github.com/crim-ca/weaver/tree/6.16.0>`_ (2026-10-06)
+====================================================================================================================
+
+Changes:
+--------
 - Add `HTML` shortcut links to easily toggle contextually between full `Provider` or only local `Process` listing.
 - Add `HTML` support of ``/providers/{providerID}/processes/?f=html`` to list all `Process` references of a `Provider`.
 - Add `HTML` support of ``/processes/?providers=true`` to list all `Provider` and local `Process` references.
