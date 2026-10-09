@@ -7,10 +7,9 @@ import uuid
 from typing import TYPE_CHECKING
 
 import pytest
+from cwltool.cwlprov import provenance_constants as cwl_prov_const
 from parameterized import parameterized
 from rdflib import Graph, URIRef
-
-from cwltool.cwlprov import provenance_constants as cwl_prov_const
 
 from tests.functional import TEST_DATA_ROOT
 from tests.functional.utils import ResourcesUtil, WpsConfigBase

@@ -1,5 +1,6 @@
 import json
 from contextlib import ExitStack
+
 from tests.functional.test_builtin import BuiltinAppTest
 
 
