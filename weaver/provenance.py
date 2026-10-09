@@ -8,11 +8,28 @@ from urllib.parse import urlparse
 from cwltool.cwlprov import provenance_constants as cwl_prov_const
 from cwltool.cwlprov.ro import ResearchObject
 from prov import constants as prov_const
+from prov.serializers import provjsonld as prov_jsonld_serializer
 
 from weaver.__meta__ import __version__ as weaver_version
 from weaver.base import Constants
 from weaver.formats import ContentType, OutputFormat
 from weaver.utils import get_weaver_url
+
+# NOTE:
+#   The 'prov' library's PROV-JSONLD serializer only emits a proper JSON-LD '@id' node reference
+#   for a 'QualifiedName' attribute value when its term is one of the hardcoded 'ID_TYPED_TERMS'
+#   ("type", "role", "location"). Every other attribute whose value happens to be a 'QualifiedName'
+#   (e.g.: the "wfprov:wasEnactedBy" relation set below, and "foaf:account" employed by cwltool's
+#   'ResearchObject' for the running agent) is instead encoded as an "xsd:QName"-typed literal, which
+#   generic JSON-LD/RDF consumers do not resolve as a reference to the corresponding node. Since
+#   neither 'ProvDocument.serialize' nor 'ProvJSONLDSerializer.serialize' expose any public option to
+#   control this, extend this private module constant so both known terms are also treated as
+#   '@id'-typed on serialization.
+prov_jsonld_serializer.ID_TYPED_TERMS = prov_jsonld_serializer.ID_TYPED_TERMS | {
+    str(cwl_prov_const.WFPROV["describedByProcess"]),
+    str(cwl_prov_const.WFPROV["wasEnactedBy"]),
+    str(cwl_prov_const.FOAF["account"]),
+}
 
 if TYPE_CHECKING:
     from typing import Any, List, Optional, Tuple, Union
@@ -349,6 +366,18 @@ class WeaverResearchObject(ResearchObject):
                 server_provider_meta,
             )
 
+        proc_url = self.job.process_url(self.settings)
+        proc_id = f"{self.job.service}:{self.job.process}" if self.job.service else self.job.process
+        proc_uuid = f"{weaver_instance_sha1}:{proc_id}"
+        proc_entity = document.entity(
+            proc_uuid,
+            {
+                prov_const.PROV_TYPE: cwl_prov_const.WFDESC["Process"],
+                prov_const.PROV_LOCATION: proc_url,
+                prov_const.PROV_LABEL: "Process Description",
+            }
+        )
+
         # NOTE: Since prov 3.0.0 enforces PROV-CONSTRAINTS, this must
         # be an activity, not an entity, as it shares the ID of the
         # WorkflowRun.  We will leave startTime/endTime blank here to
@@ -363,18 +392,7 @@ class WeaverResearchObject(ResearchObject):
                 prov_const.PROV_LOCATION: job_url,
                 prov_const.PROV_LABEL: "Job Information",
                 cwl_prov_const.WFPROV["wasEnactedBy"]: wf_agent,
-            }
-        )
-        proc_url = self.job.process_url(self.settings)
-        proc_id = f"{self.job.service}:{self.job.process}" if self.job.service else self.job.process
-        proc_uuid = f"{weaver_instance_sha1}:{proc_id}"
-        document.entity(
-            proc_uuid,
-            {
-                prov_const.PROV_TYPE: cwl_prov_const.WFDESC["Process"],
-                prov_const.PROV_LOCATION: proc_url,
-                prov_const.PROV_LABEL: "Process Description",
-                cwl_prov_const.WFPROV["describedByProcess"]: job_activity,
+                cwl_prov_const.WFPROV["describedByProcess"]: proc_entity,
             }
         )
 

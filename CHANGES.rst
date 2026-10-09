@@ -70,9 +70,14 @@ Changes:
 - Ensure that the user agent in the PROV document is created as a
   ``SoftwareAgent`` not a ``Person`` with recent versions of ``prov``
   that more strongly enforce update-only ``ProvRecord``.
+- Add a skill with example data and a script to regenerate the PROV example data for the OpenAPI definitoin.
 
 Fixes:
 ------
+- Fix `Job` provenance ``PROV-JSONLD`` output incorrectly encoding ``foaf:account`` and ``wfprov:wasEnactedBy``
+  reference values as ``xsd:QName``-typed literals instead of proper ``@id`` node references, by extending the
+  ``prov`` library JSON-LD serializer's internal set of ``@id``-typed terms, since neither `cwltool` nor ``prov``
+  expose any public option to control this behavior otherwise.
 - Fix tutorial examples that used local ``file://`` references rejected by built-in process security validation
   (resolves `#1033 <https://github.com/crim-ca/weaver/issues/1033>`_).
 - Fix invalid convertion to ``array`` within `I/O` ``schema`` for an optional single-value parameter
