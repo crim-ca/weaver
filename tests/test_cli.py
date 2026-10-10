@@ -1262,6 +1262,34 @@ def test_auth_request_handler_no_url_ignored_request():
 
 
 @pytest.mark.cli
+@pytest.mark.parametrize(
+    ["client_auth", "override_auth", "headers", "expect"],
+    [
+        (None, None, None, {}),
+        (CookieAuthHandler(token="client-cookie"), None, None, {"Cookie": "client-cookie"}),
+        (BearerAuthHandler(token="client-token"), None, None, {"Authorization": "Bearer client-token"}),
+        (
+            CookieAuthHandler(token="client-cookie"),
+            BearerAuthHandler(token="override-token"),
+            None,
+            {"Authorization": "Bearer override-token"},
+        ),
+        (None, None, {"Cookie": "header-cookie", "X-Other": "ignored"}, {"Cookie": "header-cookie"}),
+    ]
+)
+def test_client_request_auth_headers(client_auth, override_auth, headers, expect):
+    """
+    Tests the resolution of authentication headers the client would apply to a request against the instance.
+
+    These headers allow operations that resolve references on the instance by themselves, such as the local
+    validation of :term:`Workflow` step packages before deployment, to employ the same authentication as the client.
+    """
+    client = WeaverClient(url="https://example.com", auth=client_auth)
+    result = client._get_request_auth_headers("https://example.com", auth=override_auth, headers=headers)
+    assert result == expect
+
+
+@pytest.mark.cli
 def test_upload_file_not_found():
     with tempfile.NamedTemporaryFile() as tmp_file_deleted:
         pass   # delete on close

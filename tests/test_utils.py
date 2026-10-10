@@ -67,6 +67,8 @@ from weaver.utils import (
     fetch_file,
     get_any_value,
     get_base_url,
+    get_cookie_headers,
+    get_header,
     get_path_kvp,
     get_request_args,
     get_request_options,
@@ -77,8 +79,10 @@ from weaver.utils import (
     get_secure_path,
     get_ssl_verify_option,
     get_url_without_query,
+    is_bearer_token_for_url,
     is_update_version,
     is_valid_url,
+    is_weaver_url,
     localize_datetime,
     make_dirs,
     make_link_header,
@@ -103,12 +107,12 @@ from weaver.utils import (
 from weaver.utils import get_caller_name, setup_cache  # isort:skip # noqa: E402
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Tuple, Type
+    from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
     from responses import _Body as BodyType  # noqa: W0212
 
     from tests.utils import S3Scheme
-    from weaver.typedefs import AnyRequestType, HeadersType, SettingsType
+    from weaver.typedefs import AnyHeadersContainer, AnyRequestType, HeadersType, SettingsType
     from weaver.utils import AnyDownloadOutputMethod, AnyRequestMethod, RequestOptions
 
 AWS_S3_REGION_SUBSET = set(random.choices(AWS_S3_REGIONS, k=4))
@@ -2614,6 +2618,104 @@ def test_explode_headers(test_headers, expect_headers, expect_get_all):
 def test_get_response_profile(test_request, test_headers, expect_profile):
     profile = get_response_profile(test_request, test_headers)
     assert profile == expect_profile
+
+
+@pytest.mark.parametrize(
+    ["test_headers", "test_multi", "test_pop", "expect_value", "expect_remain"],
+    [
+        ([("Set-Cookie", "a=1"), ("X", "y"), ("set-cookie", "b=2")], False, False, "a=1", 3),
+        ([("Set-Cookie", "a=1"), ("X", "y"), ("set-cookie", "b=2")], True, False, ["a=1", "b=2"], 3),
+        ([("Set-Cookie", "a=1"), ("X", "y"), ("set-cookie", "b=2")], False, True, "a=1", 2),
+        ([("Set-Cookie", "a=1"), ("X", "y"), ("set-cookie", "b=2")], True, True, ["a=1", "b=2"], 1),
+        ({"Set-Cookie": "a=1", "X": "y"}, True, True, ["a=1"], 1),
+        ({"Set-Cookie": ["a=1", "b=2"], "X": "y"}, False, False, ["a=1", "b=2"], 2),
+        ({"Set-Cookie": ["a=1", "b=2"], "X": "y"}, True, False, ["a=1", "b=2"], 2),
+        ([("X", "y")], True, False, None, 1),
+    ]
+)
+def test_get_header_multi(test_headers, test_multi, test_pop, expect_value, expect_remain):
+    # type: (AnyHeadersContainer, bool, bool, Optional[Union[str, List[str]]], int) -> None
+    """
+    Tests that repeated headers can be retrieved, and optionally removed, either for the first or all matches.
+    """
+    result = get_header("Set-Cookie", test_headers, multi=test_multi, pop=test_pop)
+    assert result == expect_value
+    assert len(test_headers) == expect_remain
+
+
+@pytest.mark.parametrize(
+    ["test_headers", "expect_headers"],
+    [
+        ({"Cookie": "auth_tkt=abc; other=1"}, {"Cookie": "auth_tkt=abc; other=1"}),
+        ({"cookie": "auth_tkt=abc"}, {"Cookie": "auth_tkt=abc"}),
+        ([("Cookie", "auth_tkt=old; a=1"), ("Cookie", "auth_tkt=new")], {"Cookie": "auth_tkt=new; a=1"}),
+        ({"Cookie": ["a=1", "b=2"]}, {"Cookie": "a=1; b=2"}),
+        ({"Set-Cookie": "auth_tkt=abc; Domain=example.com"}, {}),
+        ({"Authorization": "Bearer abc"}, {}),
+        (None, {}),
+    ]
+)
+def test_get_cookie_headers(test_headers, expect_headers):
+    # type: (Optional[AnyHeadersContainer], Dict[str, str]) -> None
+    """
+    Tests that cookies from repeated or multi-valued ``Cookie`` headers are combined into a single ``Cookie`` header.
+
+    The ``Set-Cookie`` header is ignored since it is a response header that must not be forwarded in requests.
+    """
+    result = get_cookie_headers(test_headers)
+    assert result == expect_headers
+
+
+@pytest.mark.parametrize(
+    ["test_url", "weaver_url", "expect_result"],
+    [
+        ("https://weaver.example.com/processes/test", "https://weaver.example.com", True),
+        ("https://weaver.example.com/other/path", "https://weaver.example.com/weaver", True),
+        ("http://weaver.example.com/processes/test", "https://weaver.example.com", False),
+        ("https://weaver.example.com:8443/processes", "https://weaver.example.com", False),
+        ("https://remote.example.com/processes/test", "https://weaver.example.com", False),
+        ("https://weaver.example.com.remote.com/processes", "https://weaver.example.com", False),
+        ("test-process", "https://weaver.example.com", False),
+        (None, "https://weaver.example.com", False),
+        ("https://weaver.example.com/processes/test", "", False),
+    ]
+)
+def test_is_weaver_url(test_url, weaver_url, expect_result):
+    # type: (Optional[str], str, bool) -> None
+    """
+    Tests that only URLs targeting the same scheme and host as the configured ``weaver.url`` are considered local.
+    """
+    assert is_weaver_url(test_url, {"weaver.url": weaver_url}) is expect_result
+
+
+@pytest.mark.parametrize(
+    ["test_audience", "test_url", "expect_result"],
+    [
+        ("step.example.com", "https://step.example.com/processes/test", True),
+        ("https://step.example.com/alternate/path", "http://step.example.com/processes/test", True),
+        ("step.example.com:8443", "https://step.example.com:8443/processes/test", True),
+        ("step.example.com:8443", "https://step.example.com/processes/test", False),
+        ("step.example.com", "https://step.example.com:8443/processes/test", True),
+        (["other.example.com", "step.example.com"], "https://step.example.com/processes/test", True),
+        ("other.example.com", "https://step.example.com/processes/test", False),
+        ("https://step.example.com.evil.test", "https://step.example.com/processes/test", False),
+        ("step.example.com", "https://step.example.com.evil.test/processes/test", False),
+        ("step.example.com", "https://step.example.com:invalid/processes/test", False),
+        ("step.example.com", "https://step.example.com/processes/test", True),
+    ]
+)
+def test_is_bearer_token_for_url(test_audience, test_url, expect_result):
+    # type: (Union[str, List[str]], str, bool) -> None
+    """
+    Tests that Bearer JWT audience hosts and optional ports are matched against the target URL.
+
+    The token signature and time-based claims are intentionally not verified for this forwarding-scope check.
+    """
+    payload = base64.urlsafe_b64encode(json.dumps({"aud": test_audience}).encode("utf-8")).decode("ascii").rstrip("=")
+    token = f"Bearer e30.{payload}.signature"
+    assert is_bearer_token_for_url(token, test_url) is expect_result
+    assert not is_bearer_token_for_url(f"Basic {token}", test_url)
+    assert not is_bearer_token_for_url("Bearer malformed", test_url)
 
 
 def test_make_link_header():

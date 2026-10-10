@@ -1,3 +1,5 @@
+import base64
+import binascii
 import difflib
 import errno
 import fnmatch
@@ -6,6 +8,7 @@ import hashlib
 import importlib.util
 import inspect
 import io
+import json
 import logging
 import os
 import posixpath
@@ -517,6 +520,78 @@ def get_weaver_url(container):
     return value.rstrip("/").strip()
 
 
+def is_weaver_url(url, container):
+    # type: (Optional[str], AnySettingsContainer) -> bool
+    """
+    Validates that the URL targets the same scheme and host as the configured ``weaver.url`` of this instance.
+    """
+    weaver_url = urlparse(get_weaver_url(container))
+    target_url = urlparse(url or "")
+    return bool(weaver_url.netloc) and (target_url.scheme, target_url.netloc) == (weaver_url.scheme, weaver_url.netloc)
+
+
+def is_bearer_token_for_url(auth_header, url):
+    # type: (Optional[str], str) -> bool
+    """
+    Validates whether a Bearer JWT advertises an audience matching the target URL host and optional port.
+
+    The JWT payload is decoded without verifying its signature or time-based claims. This only scopes forwarding
+    of the supplied token; the receiving service remains responsible for validating the token.
+
+    Audience values can be host names, host names with ports, or URLs. URL schemes and paths are ignored.
+
+    :param auth_header: Authorization header that might contain a Bearer JWT.
+    :param url: Target request URL.
+    :returns: ``True`` if the JWT ``aud`` claim matches the target URL host and optional port.
+    """
+    if not auth_header:
+        return False
+    scheme, _, token = auth_header.strip().partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return False
+    token_parts = token.split(".")
+    if len(token_parts) != 3:
+        return False
+    try:
+        payload_part = token_parts[1]
+        payload = json.loads(base64.urlsafe_b64decode(payload_part + "=" * (-len(payload_part) % 4)))
+    except (binascii.Error, json.JSONDecodeError, TypeError, ValueError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    audiences = payload.get("aud")
+    if isinstance(audiences, str):
+        audiences = [audiences]
+    if not isinstance(audiences, list):
+        return False
+
+    target = urlparse(url)
+    target_host = (target.hostname or "").lower()
+    if not target_host:
+        return False
+    try:
+        target_port = target.port
+        if target_port is None:
+            target_port = {"http": 80, "https": 443}.get(target.scheme.lower())
+    except ValueError:
+        return False
+
+    for audience in audiences:
+        if not isinstance(audience, str) or not audience:
+            continue
+        try:
+            audience_url = urlparse(audience if "://" in audience else f"//{audience}")
+            audience_host = (audience_url.hostname or "").lower()
+            audience_port = audience_url.port
+        except ValueError:
+            continue
+        if not audience_host or audience_host != target_host:
+            continue
+        if audience_port is None or audience_port == target_port:
+            return True
+    return False
+
+
 def get_any_id(info, default=None, pop=False, key=False):
     # type: (MutableMapping[str, Any], Default, bool, bool) -> Union[str, Default]
     """
@@ -627,6 +702,7 @@ def get_header(header_name,         # type: str
                default=None,        # type: Optional[str], Optional[Union[str, List[str]]], bool
                pop=False,           # type: bool
                concat=False,        # type: bool
+               multi=False,         # type: bool
                ):                   # type: (...) -> Optional[Union[str, List[str]]]
     """
     Find the specified header within a header container.
@@ -642,7 +718,11 @@ def get_header(header_name,         # type: str
         Allow parts of the header name to be concatenated without hyphens/underscores.
         This can be the case in some :term:`S3` responses.
         Disabled by default to avoid unexpected mismatches, notably for shorter named headers.
-    :returns: Found header if applicable, or the default value.
+    :param multi:
+        Return the values of all matched headers as a flat list instead of only the first one.
+        This is useful for headers that can be repeated, such as ``Set-Cookie``.
+        Values already provided as a list (e.g.: dictionary of lists) are flattened into the result.
+    :returns: Found header(s) if applicable, or the default value.
     """
     def fuzzy_name(_name):
         # type: (str) -> str
@@ -660,31 +740,45 @@ def get_header(header_name,         # type: str
     if isinstance(headers, dict):
         headers = header_container.items()
     header_name = fuzzy_name(header_name)
+    found = []  # type: List[Tuple[int, str, str]]
     for i, (h, v) in enumerate(list(headers)):
         if fuzzy_name(h) == header_name or (concat and concat_name(h) == concat_name(header_name)):
-            if pop:
-                if isinstance(header_container, dict):
-                    del header_container[h]
-                else:
-                    del header_container[i]
-            return v
-    return default
+            found.append((i, h, v))
+            if not multi:
+                break
+    if not found:
+        return default
+    if pop:
+        for i, h, _ in reversed(found):
+            if isinstance(header_container, dict):
+                del header_container[h]
+            else:
+                del header_container[i]
+    if multi:
+        return [val for _, _, v in found for val in (v if isinstance(v, (list, tuple)) else [v])]
+    return found[0][2]
 
 
-def get_cookie_headers(header_container, cookie_header_name="Cookie"):
-    # type: (AnyHeadersContainer, Optional[str]) -> HeadersType
+def get_cookie_headers(header_container):
+    # type: (Optional[AnyHeadersContainer]) -> HeadersType
     """
-    Looks for ``cookie_header_name`` header within ``header_container``.
+    Obtains a single ``Cookie`` header combining all cookies found in ``Cookie`` headers of ``header_container``.
 
-    :returns: new header container in the form ``{'Cookie': <found_cookie>}`` if it was matched, or empty otherwise.
+    When the same cookie name is found multiple times, the last definition is retained.
+
+    :param header_container: Headers from which to retrieve cookies.
+    :returns: new header container in the form ``{'Cookie': <cookies>}`` if any cookie is found, or empty otherwise.
     """
-    try:
-        cookie = get_header(cookie_header_name, header_container)
-        if cookie:
-            return {"Cookie": get_header(cookie_header_name, header_container)}
+    cookies = {}  # type: Dict[str, str]
+    # SECURITY: 'Set-Cookie' is a response header and is ignored to avoid forwarding it as request cookies.
+    for header in get_header("Cookie", header_container, default=[], multi=True):
+        for cookie in str(header).split(";"):
+            name, sep, value = cookie.strip().partition("=")
+            if name and sep:
+                cookies[name] = value
+    if not cookies:
         return {}
-    except KeyError:  # No cookie
-        return {}
+    return {"Cookie": "; ".join(f"{name}={value}" for name, value in cookies.items())}
 
 
 def get_response_profile(request=None, request_headers=None):

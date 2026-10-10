@@ -1,3 +1,4 @@
+import base64
 import json
 
 import mock
@@ -9,6 +10,13 @@ from weaver.exceptions import PackageExecutionError
 from weaver.formats import ContentType
 from weaver.processes.wps3_process import Wps3Process
 from weaver.visibility import Visibility
+from weaver.wps.service import WorkerRequest
+
+
+def _make_bearer_auth_header(audience):
+    # type: (str) -> str
+    payload = base64.urlsafe_b64encode(json.dumps({"aud": audience}).encode("utf-8")).decode("ascii").rstrip("=")
+    return f"Bearer e30.{payload}.signature"
 
 
 def test_wps3_process_step_io_data_or_href():
@@ -87,3 +95,86 @@ def test_wps3_process_step_io_data_or_href():
                     pytest.fail(msg)
                 msg = f"Other error was raised [{exc}], inputs where not correctly handled somewhere"
                 pytest.fail(msg)
+
+
+@pytest.mark.parametrize(
+    ["test_url", "test_headers", "expect_headers"],
+    [
+        (
+            "https://localhost:4001/processes/test/execution",
+            [("Authorization", "Bearer abc"), ("Cookie", "auth_tkt=abc; other=1")],
+            {"Authorization": "Bearer abc", "Cookie": "auth_tkt=abc; other=1"},
+        ),
+        (
+            "https://localhost:4001/processes/test/execution",
+            [("Cookie", "auth_tkt=abc"), ("Set-Cookie", "auth_tkt=xyz; Domain=localhost; Path=/")],
+            {"Cookie": "auth_tkt=abc"},
+        ),
+        (
+            "https://localhost:4001/processes/test/execution",
+            [("Set-Cookie", "auth_tkt=xyz; Domain=localhost; Path=/")],
+            {},
+        ),
+        (
+            "https://remote.example.com/processes/test/execution",
+            [("Authorization", "Bearer abc"), ("Cookie", "auth_tkt=abc")],
+            {},
+        ),
+        (
+            "http://localhost:4001/processes/test/execution",
+            [("Authorization", "Bearer abc"), ("Cookie", "auth_tkt=abc")],
+            {},
+        ),
+        (
+            "https://remote.example.com/processes/test/execution",
+            [
+                ("Authorization", _make_bearer_auth_header("remote.example.com")),
+                ("Cookie", "auth_tkt=abc"),
+            ],
+            {"Authorization": _make_bearer_auth_header("remote.example.com")},
+        ),
+        (
+            "https://remote.example.com/processes/test/execution",
+            [
+                ("Authorization", _make_bearer_auth_header("other.example.com")),
+                ("Cookie", "auth_tkt=abc"),
+            ],
+            {},
+        ),
+        (
+            "http://remote.example.com:8080/processes/test/execution",
+            [
+                ("Authorization", _make_bearer_auth_header("https://remote.example.com:8080/step")),
+                ("Cookie", "auth_tkt=abc"),
+            ],
+            {"Authorization": _make_bearer_auth_header("https://remote.example.com:8080/step")},
+        ),
+        (
+            "https://remote.example.com:8080/processes/test/execution",
+            [
+                ("Authorization", _make_bearer_auth_header("remote.example.com:8443")),
+                ("Cookie", "auth_tkt=abc"),
+            ],
+            {},
+        ),
+    ]
+)
+def test_wps3_process_make_request_auth_chaining(test_url, test_headers, expect_headers):
+    """
+    Tests that user credentials are chained only to same-instance or audience-matched workflow steps.
+
+    Cookies remain local-only. Remote requests can receive only a Bearer JWT with a matching audience.
+    The ``Set-Cookie`` header must never be forwarded, since it is a response header not applicable to a request.
+    """
+    test_process = "test-wps3-process-make-request-auth-chaining"
+    mock_data_sources = {"localhost": {"netloc": "localhost", "ades": "https://localhost:4001", "default": True}}
+    with mock.patch("weaver.processes.sources.fetch_data_sources", return_value=mock_data_sources):
+        req = WorkerRequest(http_headers=test_headers)
+        wps = Wps3Process({}, {}, test_process, req, lambda *_, **__: None)  # noqa
+    wps.settings = {"ades.use_auth_token": False, "weaver.url": "https://localhost:4001"}
+    with mock.patch("weaver.processes.wps_process_base.request_extra") as mock_request:
+        wps.make_request("GET", test_url)
+    assert mock_request.call_count == 1
+    headers = mock_request.call_args.kwargs["headers"]
+    result = {name: headers.get(name) for name in ["Authorization", "Cookie", "Set-Cookie"] if headers.get(name)}
+    assert result == expect_headers

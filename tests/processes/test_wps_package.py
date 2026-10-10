@@ -4,6 +4,7 @@ Unit tests of functions within :mod:`weaver.processes.wps_package`.
 .. seealso::
     - :mod:`tests.functional.wps_package`.
 """
+import base64
 import contextlib
 import copy
 import inspect
@@ -35,7 +36,7 @@ from pywps.validator.mode import MODE
 from tests.functional import TEST_DATA_ROOT
 from tests.utils import assert_equal_any_order
 from weaver.datatype import Job, Process
-from weaver.exceptions import PackageExecutionError, PackageTypeError
+from weaver.exceptions import PackageExecutionError, PackageNotFound, PackageTypeError
 from weaver.formats import (
     IANA_NAMESPACE,
     IANA_NAMESPACE_URL,
@@ -62,6 +63,7 @@ from weaver.processes.constants import (
 from weaver.processes.wps_package import (
     DirectoryNestedStorage,
     WpsPackage,
+    _fetch_process_info,
     _load_package_content,
     _patch_wps_process_description_url,
     _update_package_compatibility,
@@ -72,6 +74,13 @@ from weaver.processes.wps_package import (
 )
 from weaver.wps.service import ExecuteResponse, WorkerRequest
 from weaver.wps_restapi import swagger_definitions as sd
+
+
+def _make_bearer_auth_header(audience):
+    # type: (str) -> str
+    payload = base64.urlsafe_b64encode(json.dumps({"aud": audience}).encode("utf-8")).decode("ascii").rstrip("=")
+    return f"Bearer e30.{payload}.signature"
+
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Optional, TypeVar, Union
@@ -1519,3 +1528,66 @@ def test_process_metadata(cwl_package, wps_metadata, process_metadata_expected, 
 def test_patch_wps_process_description_url(url, hints, expect):
     result = _patch_wps_process_description_url(url, hints)
     assert result == expect
+
+
+@pytest.mark.parametrize(
+    ["info_url", "headers", "expect"],
+    [
+        (
+            "https://weaver.example.com/processes/test/package",
+            {"Authorization": "Bearer abc", "Cookie": "auth_tkt=xyz", "Content-Type": ContentType.APP_CWL_JSON},
+            {"Authorization": "Bearer abc", "Cookie": "auth_tkt=xyz"},
+        ),
+        (
+            "https://weaver.example.com/processes/test/package",
+            {"cookie": "auth_tkt=xyz"},
+            {"Cookie": "auth_tkt=xyz"},
+        ),
+        (
+            "https://remote.example.com/processes/test/package",
+            {"Authorization": "Bearer abc", "Cookie": "auth_tkt=xyz"},
+            {},
+        ),
+        (
+            "https://remote.example.com/processes/test/package",
+            {
+                "Authorization": _make_bearer_auth_header("remote.example.com"),
+                "Cookie": "auth_tkt=xyz",
+            },
+            {"Authorization": _make_bearer_auth_header("remote.example.com")},
+        ),
+        (
+            "https://remote.example.com/processes/test/package",
+            {
+                "Authorization": _make_bearer_auth_header("other.example.com"),
+                "Cookie": "auth_tkt=xyz",
+            },
+            {},
+        ),
+        (
+            "http://weaver.example.com/processes/test/package",
+            {"Authorization": "Bearer abc", "Cookie": "auth_tkt=xyz"},
+            {},
+        ),
+        (
+            "https://weaver.example.com/processes/test/package",
+            None,
+            {},
+        ),
+    ]
+)
+def test_fetch_process_info_auth_headers(info_url, headers, expect):
+    """
+    Tests that original authentication is forwarded only to ``weaver.url`` or an audience-matched remote host.
+
+    This allows a :term:`Workflow` deployment to resolve protected step packages without leaking credentials to
+    unrelated remote locations.
+    """
+    settings = {"weaver.url": "https://weaver.example.com"}
+    mock_resp = mock.MagicMock(status_code=200)
+    mock_resp.json.return_value = {"class": "CommandLineTool"}
+    with mock.patch("weaver.processes.wps_package.request_extra", return_value=mock_resp) as mock_request:
+        result = _fetch_process_info(info_url, PackageNotFound, container=settings, headers=headers)
+    assert result == {"class": "CommandLineTool"}
+    req_headers = mock_request.call_args.kwargs["headers"]
+    assert req_headers == {"Accept": ContentType.APP_JSON, **expect}

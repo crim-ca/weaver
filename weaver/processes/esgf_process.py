@@ -174,8 +174,8 @@ class ESGFProcess(WpsProcessInterface):
         Prepare the :term:`ESGF-CWT` :term:`WPS` client.
         """
         headers = {}
-        headers.update(self.get_auth_cookies())
-        headers.update(self.get_auth_headers())
+        headers.update(self.get_auth_cookies(self.provider))
+        headers.update(self.get_auth_headers(self.provider))
 
         api_key = workflow_inputs.get(InputNames.API_KEY)
 

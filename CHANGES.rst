@@ -16,7 +16,13 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `Workflow` deployment and execution failing to resolve protected step `Process` references. The ``Authorization``
+  and ``Cookie`` headers of the original request are forwarded to the same ``weaver.url``; to avoid the Confused Deputy
+  Problem, a remote step receives no cookies and receives a ``Bearer`` JWT only when its advertised ``aud`` matches the
+  target host. Credentials from ``ades.*`` settings are unaffected.
+- Fix the `CLI` ``deploy`` operation not applying the provided authentication handler when validating the `Workflow`
+  step `Process` references.
+- Fix ``Set-Cookie`` header of the original `Job` request incorrectly forwarded as request cookie to `Workflow` steps.
 
 .. _changes_6.16.0:
 

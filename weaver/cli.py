@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 import yaml
 from colander import EMAIL_RE, URL_REGEX
 from pyramid.httpexceptions import HTTPNotFound, HTTPNotImplemented
+from requests import Request
 from requests.auth import AuthBase, HTTPBasicAuth
 from requests.sessions import Session
 from requests.structures import CaseInsensitiveDict
@@ -737,6 +738,25 @@ class WeaverClient(object):
 
         return cwl_packages
 
+    def _get_request_auth_headers(self, url, auth=None, headers=None):
+        # type: (URL, Optional[AuthBase], Optional[AnyHeadersContainer]) -> HeadersType
+        """
+        Obtain the authentication headers that this client would apply to a request sent to the given URL.
+
+        Allows operations resolving references on the instance by themselves, such as the validation of
+        :term:`Workflow` step packages prior to deployment, to employ the same authentication as the client.
+
+        :param url: Location where the request would be sent.
+        :param auth: Authentication handler overriding the one of the client, if any.
+        :param headers: Additional headers that would be provided with the request.
+        :returns: ``Authorization`` and ``Cookie`` headers that would be applied, if any.
+        """
+        request = Request("GET", url, headers=dict(headers or {})).prepare()
+        auth = auth or self.auth
+        if auth is not None:
+            request = auth(request) or request
+        return {name: request.headers[name] for name in ["Authorization", "Cookie"] if name in request.headers}
+
     def _parse_deploy_package(
         self,
         url,            # type: Optional[URL]
@@ -746,7 +766,11 @@ class WeaverClient(object):
         process_id,     # type: Optional[str]
         headers,        # type: HeadersType
         settings,       # type: SettingsType
+        auth=None,      # type: Optional[AuthBase]
     ):                  # type: (...) -> OperationResult
+        # authentication only employed for local resolution of references, not inserted in the deploy request
+        validate_headers = CaseInsensitiveDict(headers)
+        validate_headers.update(self._get_request_auth_headers(url, auth=auth, headers=headers))
         try:
             # Handle multiple CWL files for multi-deployment
             if isinstance(cwl, list) and len(cwl) > 1:
@@ -779,7 +803,7 @@ class WeaverClient(object):
                 proc = get_process_definition(  # validate + extract
                     info,
                     reference=cast(str, cwl or wps),
-                    headers=headers,
+                    headers=validate_headers,
                     container=settings,
                 )
                 pkg = proc["package"]
@@ -793,7 +817,7 @@ class WeaverClient(object):
                 proc = get_process_definition(  # validate + extract
                     info,
                     package=cast("CWL", pkg),
-                    headers=headers,
+                    headers=validate_headers,
                     container=settings,
                 )
                 pkg = proc["package"]
@@ -804,7 +828,7 @@ class WeaverClient(object):
                 get_process_definition(  # validate only
                     info,
                     package=cast("CWL", cwl),
-                    headers=headers,
+                    headers=validate_headers,
                     container=settings,
                 )
                 body, headers = self._resolve_deploy_package(body, cwl, headers)
@@ -1133,9 +1157,10 @@ class WeaverClient(object):
         req_headers.update(self._parse_auth_token(token, username, password))
         base = self._get_url(url)
         settings = copy.deepcopy(self._settings)
+        settings["weaver.url"] = base
         settings["weaver.wps_restapi_url"] = base
         data = result.body
-        result = self._parse_deploy_package(base, data, cwl, wps, process_id, req_headers, settings)
+        result = self._parse_deploy_package(base, data, cwl, wps, process_id, req_headers, settings, auth=auth)
         if not result.success:
             return result
         p_id = result.message
