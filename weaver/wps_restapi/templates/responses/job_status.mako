@@ -11,7 +11,7 @@
 <li><a href="${util.get_processes_link(query='f=html')}">Processes</a></li>
 <li><a href="${util.get_process_link(job.process, query='f=html')}"><span class="code">${job.process}</span></a></li>
 %endif
-<li><a href="${util.get_jobs_link(query='f=html')}">Jobs</a></li>
+<li><a href="${util.get_jobs_link(process_id=job.process, provider_id=job.service, query='f=html')}">Jobs</a></li>
 <li><a href="${util.get_job_link(job.id, query='f=html')}">Job [${job.id}]</a></li>
 </%block>
 
@@ -35,7 +35,7 @@
             </li>
             <li>
                 <div class="nav-link">
-                    Return to <a href="${util.get_jobs_link(query='f=html')}">Jobs Listing</a>
+                    Return to <a href="${util.get_jobs_link(process_id=job.process, provider_id=job.service, query='f=html')}">Jobs Listing</a>
                 </div>
             </li>
             <li>

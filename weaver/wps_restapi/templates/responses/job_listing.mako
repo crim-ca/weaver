@@ -14,7 +14,7 @@
 <li><a href="${util.get_processes_link(query='f=html')}">Processes</a></li>
 <li><a href="${util.get_process_link(process, query='f=html')}"><span class="code">${process}</span></a></li>
 %endif
-<li><a href="${util.get_jobs_link(query='f=html')}">Jobs</a></li>
+<li><a href="${util.get_jobs_link(process_id=process, provider_id=service, query='f=html')}">Jobs</a></li>
 </%block>
 
 <h2 id="jobs" class="page-title">
@@ -22,7 +22,7 @@
 </h2>
 
 <div class="format-link">
-(<a href="${util.get_jobs_link(query='f=json')}">JSON</a>)
+(<a href="${util.get_jobs_link(process_id=process, provider_id=service, query='f=json')}">JSON</a>)
 </div>
 
 <div class="job-listing">
