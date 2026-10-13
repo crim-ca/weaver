@@ -124,27 +124,52 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 </%def>
 
 
+<!--
+Render a reference value (eg: a 'rel'/'role' identifier) as a clickable link when it is a fully qualified URL
+(eg: 'https://schema.org/author'), or as plain code text otherwise (eg: a registered IANA link relation slug).
+-->
+<%def name="render_metadata_reference(value)">\
+%if value and str(value).startswith(("http://", "https://")):
+<div class="code"><a href="${value}">${value}</a></div>\
+%else:
+<div class="code">${value}</div>\
+%endif
+</%def>
+
+<!--
+Metadata entries can represent either a link reference ('href' + optional 'rel'/'type') or an embedded value
+('value' + optional 'lang'), and can optionally be tagged with a 'role' (eg: schema.org relation) regardless
+of the representation. The 'value' contents can themselves be an arbitrary JSON literal, object or array, which
+must be pretty-printed accordingly instead of dumping the raw Python representation.
+-->
 <%def name="render_metadata(metadata)">
 <dl class="indent">
 %for meta in metadata:
+    <%
+        is_link = "href" in meta
+        meta_title = meta.get("title")
+        meta_rel = meta.get("rel")
+        meta_role = meta.get("role")
+        meta_value = meta.get("value")
+    %>
     <dt>
         <div class="field-key">
-        %if "title" in meta:
-            Title: ${meta.title}
-        %elif "role" in meta:
-            Role: ${meta.role}
+        %if meta_title:
+            <span class="field-title">${meta_title}</span>
         %else:
-            Rel: ${meta.rel}
+            <span class="label label-info">${"Link" if is_link else "Value"}</span>
         %endif
         </div>
     </dt>
     <dd>
-        %if "href" in meta:
+        %if is_link:
             <div class="code">
                 <a href="${meta.href}">${meta.href}</a>
             </div>
+        %elif isinstance(meta_value, (dict, list)):
+            ${render_json(meta_value)}
         %else:
-            <div class="code">${meta.value}</div>
+            <div class="code">${meta_value}</div>
         %endif
         %if "lang" in meta:
             <div class="field">
@@ -157,16 +182,28 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
                 <div class="language">${meta.hreflang}</div>
             </div>
         %endif
-        %if "role" in meta:
+        %if meta_rel:
+            <div class="field">
+                <div class="field-key">Relation:</div>
+                ${render_metadata_reference(meta_rel)}
+            </div>
+        %endif
+        %if meta_role:
             <div class="field">
                 <div class="field-key">Role:</div>
-                <div class="code">${meta.role}</div>
+                ${render_metadata_reference(meta_role)}
             </div>
         %endif
         %if "type" in meta:
-            <div class="field indent">
+            <div class="field">
                 <div class="field-key">Media-Type:</div>
                 <div class="code">${meta.type}</div>
+            </div>
+        %endif
+        %if "id" in meta:
+            <div class="field">
+                <div class="field-key">ID:</div>
+                <div class="code">${meta.id}</div>
             </div>
         %endif
     </dd>
@@ -299,9 +336,16 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
                 </div>
                 ${render_json(input_data.schema)}
             </div>
+            <%
+                input_metadata = input_data.get("metadata")
+            %>
+            %if input_metadata:
+                <div class="field-key field-sub">Metadata:</div>
+                ${render_metadata(input_metadata)}
+            %endif
             <div class>
                 <%
-                    known_fields = {"title", "description", "schema", "minOccurs", "maxOccurs"}
+                    known_fields = {"title", "description", "schema", "minOccurs", "maxOccurs", "metadata"}
                     extra_fields = set(input_data) - known_fields
                 %>
                 %if extra_fields:
@@ -326,13 +370,34 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 %for output_id, output_data in outputs.items():
     <div class="process-output">
         <dt id="output-${output_id}">
-            <a href="#output-${output_id}">${output_id}</a>
+            <div class="field-id inline code">
+                <a href="#output-${output_id}">${output_id}</a>
+            </div>
+            %if "title" in output_data:
+                <span class="dash">&#8212;</span>
+                <span class="field-title">${output_data.title}</span>
+            %endif
         </dt>
         <dd>
-            <div>
-                <div class="field-key">Schema:</div>
+            %for field in ["description"]:
+                %if field in output_data:
+                <div class="field">
+                    <div class="field-key field-sub">${field.capitalize()}:</div>
+                    <div class="field-${field}">${render_description(output_data[field])}</div>
+                </div>
+                %endif
+            %endfor
+            <div class="field-key field-sub">Schema:</div>
+            <div class="indent">
                 ${render_json(output_data.schema)}
             </div>
+            <%
+                output_metadata = output_data.get("metadata")
+            %>
+            %if output_metadata:
+                <div class="field-key field-sub">Metadata:</div>
+                ${render_metadata(output_metadata)}
+            %endif
         </dd>
     </div>
 %endfor

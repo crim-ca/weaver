@@ -16,7 +16,14 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix `HTML` rendering of `Process`/`Provider` ``metadata`` entries that mixed link reference (``rel``/``href``) and
+  value (``role``/``value``) representations, causing duplicated ``role`` fields, ``rel``/``role`` identifiers not
+  rendered as clickable links when they are fully qualified `URL` references, literal embedded JSON ``value`` objects
+  dumped using their raw Python representation instead of pretty-printed JSON, and inconsistent indentation of the
+  ``Media-Type`` field relative to the corresponding link reference.
+- Extend the same ``metadata`` `HTML` rendering improvements to per-``id`` ``inputs``/``outputs`` entries of a
+  `Process`/`Provider` description, and add missing ``title``/``description`` rendering for ``outputs`` (previously
+  only the ``Schema`` was displayed).
 
 .. _changes_6.16.0:
 
