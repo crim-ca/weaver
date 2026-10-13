@@ -105,13 +105,13 @@ writes each result to the corresponding `job_prov*` file in the current director
 
 ```bash
 cd weaver/wps_restapi/examples
-sh /path/to/.github/skills/update-provenance-examples/scripts/job_prov_examples.sh "$JOB_ID"
+sh /path/to/.github/skills/update-provenance-examples/scripts/job_prov_examples.sh "$JOB_ID" "$WEAVER_URL"
 ```
 
-> **Note**: The script targets `http://localhost:4001` and rewrites hostnames to
-> `https://hirondelle.crim.ca/weaver` / `hirondelle.crim.ca` to match the existing examples. Adjust the
-> `REST` variable and `fix_urls` substitutions inside the script if generating examples against a
-> different instance.
+> **Note**: The script rewrites hostnames to
+> `https://hirondelle.crim.ca/weaver` / `hirondelle.crim.ca` to match
+> the existing examples. Adjust the `fix_urls` substitutions inside
+> the script if generating examples against a different instance.
 
 ### Manual Alternative (CLI/curl)
 
