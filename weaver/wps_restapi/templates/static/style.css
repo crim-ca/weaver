@@ -161,7 +161,7 @@ button.active {
 }
 
 .field > .code {
-    margin-top: 0.2em;
+    margin-top: 0.4em;
 }
 
 .field > .uri {
@@ -169,7 +169,7 @@ button.active {
 }
 
 .field > .language {
-    margin-top: 0.2em;
+    margin-top: 0.4em;
 }
 
 .code {
