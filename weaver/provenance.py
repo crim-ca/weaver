@@ -445,7 +445,7 @@ class WeaverResearchObject(ResearchObject):
         document.attribution(crim_entity, weaver_code_entity)
         document.wasDerivedFrom(cwltool_agent, weaver_instance_agent)
         document.specializationOf(wf_agent, weaver_instance_agent)
-        document.wasStartedBy(job_activity, wf_agent, time=self.job.created)
+        document.wasStartedBy(job_activity, wf_agent)
         if server_provider_entity:
             document.derivation(server_provider_entity, weaver_instance_agent)
             document.attribution(server_provider_entity, weaver_instance_agent)

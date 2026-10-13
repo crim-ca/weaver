@@ -1,5 +1,5 @@
 Research Object of CWL workflow run
-Research Object ID: arcp://uuid,e8109c98-cacd-473c-9992-39829ec07f7f/
+Research Object ID: arcp://uuid,28807cca-3d71-4242-84a0-a03707a96f1a/
 Profile: https://w3id.org/cwl/prov/0.7.0
-Workflow run ID: urn:uuid:e8109c98-cacd-473c-9992-39829ec07f7f
-Packaged: 2026-10-09
+Workflow run ID: urn:uuid:28807cca-3d71-4242-84a0-a03707a96f1a
+Packaged: 2026-10-13
