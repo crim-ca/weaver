@@ -137,18 +137,20 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.content_type == ContentType.APP_JSONLD
         prov = resp.json
         assert isinstance(prov, dict)
-        # NOTE: we always get JSON-LD in "flattened" form, so it contains @context and @graph
-        assert "@context" in prov, "JSON-LD must contain @context"
-        assert "@graph" in prov, "JSON-LD must contain @graph"
-        graph = prov["@graph"]
-        assert bool(graph), "JSON-LD @graph not be an empty list."
-        assert all(isinstance(obj, dict) and "@type" in obj for obj in graph)
-        # Replace remote context with local one to avoid network accesses
+        # Verify that we have PROV-JSONLD (not just PROV-O in JSON-LD)
+        assert "@context" in prov, "PROV-JSONLD must contain @context"
+        # Verify PROV context, but then replace it with local one to avoid network accesses
         try:
             idx = prov["@context"].index("https://openprovenance.org/prov-jsonld/context.jsonld")
             prov["@context"][idx] = f"file://{TEST_DATA_ROOT}/prov_context.jsonld"
         except ValueError:
-            pass
+            pytest.fail("PROV-JSONLD context missing from @context")
+        assert "@graph" in prov, "PROV-JSON must contain @graph"
+        graph = prov["@graph"]
+        assert bool(graph), "JSON-LD @graph not be an empty list."
+        assert all(isinstance(obj, dict)
+                   and isinstance(obj.get("@type"), str)
+                   for obj in graph), "Every object must have a @type as a single string value"
 
         # NOTE:
         #   The following custom (non-formal) PROV attributes reference other PROV-JSONLD records by their
