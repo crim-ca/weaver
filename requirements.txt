@@ -121,7 +121,7 @@ pytz
 pywps==4.7.0
 pyyaml>=6.0.3
 rdflib>=7.6.0  # pyup: ignore
-requests>=2.33.1
+requests>=2.34.2
 requests_file
 # FIXME: https://github.com/requests/toolbelt/pull/380
 requests_toolbelt @ git+https://github.com/crim-ca/requests-toolbelt.git@patch-multipart
@@ -131,7 +131,7 @@ ruamel.yaml>=0.19.1
 schema-salad>=8.9.20260417192335,<9
 shapely
 simplejson
-urllib3>=2.7.0
+urllib3>=2.8.0
 urlmatch
 xmltodict>=1.0.4
 webob

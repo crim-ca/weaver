@@ -37,7 +37,7 @@ mdformat-tables
 mock<6
 # AWS mock tests (against boto3)
 # (fix werkzeug>=2.2.2 dependency, see https://github.com/spulec/moto/issues/5341)
-moto>=4.0.8
+moto>=5.2.3
 mypy
 parameterized
 path!=16.12.0,!=17.0.0  # patch pytest-shutil (https://github.com/man-group/pytest-plugins/issues/224)
@@ -51,7 +51,7 @@ pytest-server-fixtures
 #pytest-rerunfailures
 pytest-retry
 pydocstyle
-pylint>=4.0.5,<5
+pylint>=4.1.2,<5
 pylint-per-file-ignores
 responses
 safety
