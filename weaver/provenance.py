@@ -40,10 +40,12 @@ prov_jsonld_serializer.ID_TYPED_TERMS = (
 _PROV_JSONLD_ID_CONTEXT_TERMS = {
     term: {"@type": "@id"} for term in _PROV_JSONLD_EXTRA_ID_TYPED_TERMS
 }
+orig_prov_encode_jsonld_document = None
 
 
 def extra_jsonld_context(document, context):
     # type: (ProvDocument, str) -> dict
+    assert orig_prov_encode_jsonld_document is not None
     container = orig_prov_encode_jsonld_document(document, context)
     existing_context = container.get("@context")
     if isinstance(existing_context, list):

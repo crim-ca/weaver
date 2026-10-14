@@ -4,7 +4,7 @@ import pytest
 from prov.model import ProvDocument
 
 from weaver.formats import ContentType, OutputFormat
-from weaver.provenance import ProvenanceFormat, ProvenancePathType, _encode_jsonld_document_with_id_context
+from weaver.provenance import ProvenanceFormat, ProvenancePathType, extra_jsonld_context
 
 
 @pytest.mark.prov
@@ -194,7 +194,7 @@ def test_provenance_format_compatible(prov, prov_format, output_format, expect, 
 @pytest.mark.prov
 def test_jsonld_type_injection():
     document = ProvDocument()
-    container = _encode_jsonld_document_with_id_context(document, "url")
+    container = extra_jsonld_context(document, "url")
     assert isinstance(container, dict)
     assert "@context" in container
     assert isinstance(container["@context"], list)
@@ -208,9 +208,9 @@ def test_jsonld_type_injection_empty(monkeypatch):
     def supply_no_context(document, context):
         return {}
     document = ProvDocument()
-    monkeypatch.setattr("weaver.provenance._prov_encode_jsonld_document",
+    monkeypatch.setattr("weaver.provenance.orig_prov_encode_jsonld_document",
                         supply_no_context)
-    container = _encode_jsonld_document_with_id_context(document, "url")
+    container = extra_jsonld_context(document, "url")
     assert isinstance(container, dict)
     assert "@context" in container
     assert isinstance(container["@context"], dict)
@@ -222,9 +222,9 @@ def test_jsonld_type_injection_dict(monkeypatch):
     def supply_dict_context(document, context):
         return {"@context": {"bogusTerm": {"@type": "@id"}}}
     document = ProvDocument()
-    monkeypatch.setattr("weaver.provenance._prov_encode_jsonld_document",
+    monkeypatch.setattr("weaver.provenance.orig_prov_encode_jsonld_document",
                         supply_dict_context)
-    container = _encode_jsonld_document_with_id_context(document, "url")
+    container = extra_jsonld_context(document, "url")
     assert isinstance(container, dict)
     assert isinstance(container["@context"], list)
     assert container["@context"]
