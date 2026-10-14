@@ -58,7 +58,8 @@ def _encode_jsonld_document_with_id_context(document, context):
     return container
 
 
-prov_jsonld_serializer.encode_jsonld_document = _encode_jsonld_document_with_id_context
+if prov_jsonld_serializer.encode_jsonld_document is not _encode_jsonld_document_with_id_context:
+    prov_jsonld_serializer.encode_jsonld_document = _encode_jsonld_document_with_id_context
 
 if TYPE_CHECKING:
     from typing import Any, List, Optional, Tuple, Union

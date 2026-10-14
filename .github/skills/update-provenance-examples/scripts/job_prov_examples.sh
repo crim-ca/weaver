@@ -40,7 +40,7 @@ fetch() {
     rm -f "$tmp"
 }
 
-JOBID=${1??Usage: $0 JOBID [WEAVER_URL]}
+JOBID=${1:?Usage: $0 JOBID [WEAVER_URL]}
 WEAVER_URL=${2:-http://localhost:4001}
 REST=$WEAVER_URL/jobs/$JOBID
 
