@@ -132,7 +132,7 @@ ruamel.yaml>=0.19.1
 schema-salad>=8.9.20260417192335,<9
 shapely
 simplejson
-urllib3>=2.7.0
+urllib3>=2.8.0
 urlmatch
 xmltodict>=1.0.4
 webob
