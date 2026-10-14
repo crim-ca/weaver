@@ -3,7 +3,6 @@ import itertools
 import pytest
 from prov.model import ProvDocument
 
-import weaver.provenance
 from weaver.formats import ContentType, OutputFormat
 from weaver.provenance import ProvenanceFormat, ProvenancePathType, _encode_jsonld_document_with_id_context
 
