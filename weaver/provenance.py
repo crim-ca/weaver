@@ -5,8 +5,8 @@ import hashlib
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
-from cwltool.cwlprov import provenance_constants as cwl_prov_const
-from cwltool.cwlprov.ro import ResearchObject
+from cwltool.cwlprov import provenance_constants as cwl_prov_const  # type: ignore
+from cwltool.cwlprov.ro import ResearchObject  # type: ignore
 from prov import constants as prov_const
 from prov.serializers import provjsonld as prov_jsonld_serializer
 
@@ -40,12 +40,11 @@ prov_jsonld_serializer.ID_TYPED_TERMS = (
 _PROV_JSONLD_ID_CONTEXT_TERMS = {
     term: {"@type": "@id"} for term in _PROV_JSONLD_EXTRA_ID_TYPED_TERMS
 }
-_prov_encode_jsonld_document = prov_jsonld_serializer.encode_jsonld_document
 
 
-def _encode_jsonld_document_with_id_context(document, context):
+def extra_jsonld_context(document, context):
     # type: (ProvDocument, str) -> dict
-    container = _prov_encode_jsonld_document(document, context)
+    container = orig_prov_encode_jsonld_document(document, context)
     existing_context = container.get("@context")
     if isinstance(existing_context, list):
         existing_context.append(_PROV_JSONLD_ID_CONTEXT_TERMS)
@@ -58,15 +57,16 @@ def _encode_jsonld_document_with_id_context(document, context):
     return container
 
 
-if prov_jsonld_serializer.encode_jsonld_document is not _encode_jsonld_document_with_id_context:
-    prov_jsonld_serializer.encode_jsonld_document = _encode_jsonld_document_with_id_context
+if prov_jsonld_serializer.encode_jsonld_document is not extra_jsonld_context:
+    orig_prov_encode_jsonld_document = prov_jsonld_serializer.encode_jsonld_document
+    prov_jsonld_serializer.encode_jsonld_document = extra_jsonld_context
 
 if TYPE_CHECKING:
     from typing import Any, List, Optional, Tuple, Union
     from uuid import UUID
 
-    from cwltool.cwlprov.provenance_profile import ProvenanceProfile
-    from cwltool.stdfsaccess import StdFsAccess
+    from cwltool.cwlprov.provenance_profile import ProvenanceProfile  # type: ignore
+    from cwltool.stdfsaccess import StdFsAccess  # type: ignore
     from prov.model import ProvDocument
 
     from weaver.base import EnumType
