@@ -27,7 +27,7 @@ doc8>=2.0.0
 docformatter>=1.7.7,!=1.7.8
 flake8>=7.4.1
 flynt
-isort>=5
+isort>=9.0.2
 # FIXME: pin 'marshmallow' dependency of 'safery' to fix compatibility (https://github.com/pyupio/safety/issues/711)
 marshmallow<4
 mdformat
