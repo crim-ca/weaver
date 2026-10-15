@@ -32,7 +32,8 @@ Retrieve W3C PROV provenance metadata for tracking execution lineage and data de
 ### Optional
 
 - **format** (string): Provenance format
-  - `json`: JSON-LD format (default)
+  - `json`: PROV-JSON format (default)
+  - `jsonld`: PROV-JSONLD format (default)
   - `xml`: PROV-XML format
   - `turtle`: RDF Turtle format
   - `rdf`: RDF/XML format
@@ -40,7 +41,7 @@ Retrieve W3C PROV provenance metadata for tracking execution lineage and data de
 ## CLI Usage
 
 ```bash
-# Get provenance in JSON-LD
+# Get provenance in JSON
 weaver provenance -u $WEAVER_URL -j a1b2c3d4-e5f6-7890-abcd-ef1234567890
 
 # Get provenance in RDF Turtle

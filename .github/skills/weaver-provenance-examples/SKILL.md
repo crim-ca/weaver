@@ -24,6 +24,7 @@ metadata:
   author: dhdqa
   contributors:
     - fmigneault
+    - dhdqa
 ---
 
 # Update Provenance Examples
@@ -68,9 +69,9 @@ All located in `weaver/wps_restapi/examples/`, loaded automatically at import ti
 
 ## Steps
 
-1. Submit an execution of the builtin `EchoProcess` using the example request body
-   [`echo_body.json`](../../../weaver/wps_restapi/examples/echo_body.json) (see
-   [Generate a Job](#generate-a-job) below), and wait for it to reach `succeeded` status (see
+1. Submit an execution of the builtin `EchoProcess` using the example
+   request body [`echo_body.json`](../../../weaver/wps_restapi/examples/echo_body.json)
+   (see [job-execute](../job-execute/SKILL.md)), and wait for it to reach `succeeded` status (see
    [job-monitor](../job-monitor/SKILL.md)).
 2. From the `weaver/wps_restapi/examples/` directory, run the
    [`job_prov_examples.sh`](scripts/job_prov_examples.sh) script with the resulting `Job` ID to fetch
@@ -82,21 +83,6 @@ All located in `weaver/wps_restapi/examples/`, loaded automatically at import ti
    hostnames/tokens not already covered by the script's `fix_urls` substitutions).
 4. Confirm the files still parse correctly and the API documentation renders as expected.
 
-## Generate a Job
-
-The [`submit_echo_job.sh`](scripts/submit_echo_job.sh) script submits an execution of the builtin
-`EchoProcess` using the example request body
-[`echo_body.json`](../../../weaver/wps_restapi/examples/echo_body.json) and prints the resulting
-`Job` ID:
-
-```bash
-export WEAVER_URL=http://localhost:4001
-JOB_ID=$(sh /path/to/.github/skills/update-provenance-examples/scripts/submit_echo_job.sh "$WEAVER_URL")
-
-# Wait for the job to complete (see job-monitor skill for a more robust polling loop).
-weaver monitor -u $WEAVER_URL -j $JOB_ID
-```
-
 ## Regenerate the Examples
 
 The [`job_prov_examples.sh`](scripts/job_prov_examples.sh) script fetches the main PROV document in
@@ -105,7 +91,7 @@ writes each result to the corresponding `job_prov*` file in the current director
 
 ```bash
 cd weaver/wps_restapi/examples
-sh /path/to/.github/skills/update-provenance-examples/scripts/job_prov_examples.sh "$JOB_ID" "$WEAVER_URL"
+sh ../../../.github/skills/update-provenance-examples/scripts/job_prov_examples.sh "$JOB_ID" "$WEAVER_URL"
 ```
 
 > **Note**: The script rewrites hostnames to
@@ -113,35 +99,11 @@ sh /path/to/.github/skills/update-provenance-examples/scripts/job_prov_examples.
 > the existing examples. Adjust the `fix_urls` substitutions inside
 > the script if generating examples against a different instance.
 
-### Manual Alternative (CLI/curl)
+### Alternative
 
-If the script cannot be used (e.g. no `jq` available, or only specific formats need refreshing),
-equivalent individual requests can be issued with the `weaver` CLI:
-
-```bash
-weaver provenance -u $WEAVER_URL -j $JOB_ID -pF PROV-JSON   -F JSON --stdout > \
-  weaver/wps_restapi/examples/job_prov.json
-weaver provenance -u $WEAVER_URL -j $JOB_ID -pF PROV-JSONLD -F JSON --stdout > \
-  weaver/wps_restapi/examples/job_prov.jsonld
-weaver provenance -u $WEAVER_URL -j $JOB_ID -pF PROV-XML    -F XML  --stdout > \
-  weaver/wps_restapi/examples/job_prov.xml
-weaver provenance -u $WEAVER_URL -j $JOB_ID -pF PROV-TURTLE -F TEXT --stdout > \
-  weaver/wps_restapi/examples/job_prov.ttl
-weaver provenance -u $WEAVER_URL -j $JOB_ID -pF PROV-NT     -F TEXT --stdout > \
-  weaver/wps_restapi/examples/job_prov.nt
-weaver provenance -u $WEAVER_URL -j $JOB_ID -pF PROV-N      -F TEXT --stdout > \
-  weaver/wps_restapi/examples/job_prov.provn
-weaver provenance -u $WEAVER_URL -j $JOB_ID -pT info -F TEXT --stdout > \
-  weaver/wps_restapi/examples/job_prov_info.txt
-weaver provenance -u $WEAVER_URL -j $JOB_ID -pT run  -F TEXT --stdout > \
-  weaver/wps_restapi/examples/job_prov_run.txt
-weaver provenance -u $WEAVER_URL -j $JOB_ID -pT who  -F TEXT --stdout > \
-  weaver/wps_restapi/examples/job_prov_who.txt
-```
-
-> **Note**: Exact media-type strings and relevant query parameter alternatives (`?f=json`, `?f=jsonld`,
-> etc.) are defined by `ProvenanceFormat`/`ProvenancePathType` in `weaver/provenance.py`. Verify them
-> against that module if a mismatch occurs, since media-types can evolve between versions.
+If the script cannot be used, or if only certain examples need to be
+updated, the [job-provenance](../job-provenance/SKILL.md) skill can be
+used to fetch the provenance document in the desired formats.
 
 ## Validation
 
@@ -173,7 +135,7 @@ weaver provenance -u $WEAVER_URL -j $JOB_ID -pT who  -F TEXT --stdout > \
 - Requires `weaver.cwl_prov=true` and a successfully completed `Job`; jobs executed while provenance was
   disabled, or that failed/are still running, will not return PROV metadata (see
   [job-provenance](../job-provenance/SKILL.md) limitations).
-- The `submit_echo_job.sh` and `job_prov_examples.sh` scripts assume a POSIX shell (`sh`), and that
+- The `job_prov_examples.sh` script assumes a POSIX shell (`sh`), and that
   `curl` (and, for the latter, `jq`) are installed and available on `PATH`.
 
 ## Related Skills
