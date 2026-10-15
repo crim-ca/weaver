@@ -173,6 +173,9 @@ jobs:
       - name: Start Test Instance
         if: ${{ steps.should_skip_test.outputs.skip != 'true' && matrix.test-server == true }}
         run: |
+          make setup-ini
+          # OpenAPI generation (GET /json) on a cold worker can exceed the default gunicorn 10s timeout on CI runners
+          sed -i -E "s/^timeout = [0-9]+$/timeout = 60/" config/weaver.ini
           make stop start-only
           sleep 10
       - name: Run Tests
