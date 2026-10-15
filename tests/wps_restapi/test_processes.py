@@ -5688,7 +5688,7 @@ class TestMetadataQueryFilters:
         request = self.make_request({f"metadata[outputs][{role}]": "urn:ogc:def:profile:OGC::text-plain"})
         filters = parse_metadata_query_filters(request)
         assert len(filters) == 1
-        assert request.metadata_bracket_handling == "lenient"
+        assert getattr(request, "metadata_bracket_handling", None) == "lenient"
 
         request = self.make_request({f"metadata[outputs][{role}]": "urn:ogc:def:profile:OGC::text-plain"})
         request.headers["Prefer"] = "handling=strict"

@@ -26,7 +26,7 @@ if TYPE_CHECKING:
         TypeVar,
         Union
     )
-    from typing_extensions import Literal, NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
+    from typing_extensions import NotRequired, ParamSpec, Protocol, Required, TypeAlias, TypedDict
 
     import psutil
 
