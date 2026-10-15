@@ -67,6 +67,9 @@ def test_valid_media_type_categories(media_type):
         (f.ContentType.APP_GEOJSON, {}, ".geojson"),  # pywps <4.4 definition
         (f.ContentType.APP_VDN_GEOJSON, {}, ".geojson"),  # pywps>=4.4 definition
         (f.ContentType.IMAGE_GEOTIFF, {}, ".tiff"),  # pywps definition
+        (f.ContentType.APP_OGC_GEOTIFF, {}, ".tiff"),
+        (f.ContentType.IMAGE_JPEG2000, {}, ".jp2"),
+        (f.ContentType.APP_JPEG2000, {}, ".jp2"),
         ("application/x-custom", {}, ".custom"),
         ("application/unknown", {}, ".unknown"),
         (f.ContentType.APP_DIR, {"dot": True}, "/"),
@@ -94,6 +97,7 @@ def test_get_extension(test_media_type, extra_params, expected_extension):
         (".json", {}, f.ContentType.APP_JSON),
         (".tif", {}, f.ContentType.IMAGE_TIFF),
         (".tiff", {}, f.ContentType.IMAGE_TIFF),
+        (".jp2", {}, f.ContentType.IMAGE_JPEG2000),
         (".yml", {}, f.ContentType.APP_YAML),
         (".yaml", {}, f.ContentType.APP_YAML),
         ("/", {}, f.ContentType.APP_DIR),

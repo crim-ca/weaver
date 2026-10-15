@@ -16,6 +16,10 @@ Changes:
 
 Fixes:
 ------
+- Add ``application/tiff`` and ``application/jp2`` as accepted media types for compabitility
+  with older workflows and the OGC Process API Schema examples.
+- Correct regex in ``weaver.formats`` to accept digits in filename extensions when building
+  ``_CONTENT_TYPE_EXT_PATTERN``.
 - Fix `HTML` rendering of `Process`/`Provider` ``metadata`` entries that mixed link reference (``rel``/``href``) and
   value (``role``/``value``) representations, causing duplicated ``role`` fields, ``rel``/``role`` identifiers not
   rendered as clickable links when they are fully qualified `URL` references, literal embedded JSON ``value`` objects
