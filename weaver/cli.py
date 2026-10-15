@@ -1436,8 +1436,8 @@ class WeaverClient(object):
                 """
                 Detect cases representing a :term:`CWL` input value.
 
-                CWL job inputs are identified by a ``class`` field (``File``, ``Directory``, etc.), including any special
-                modifier (``File[]``, ``File?``, etc.). Literals are equivalent in OGC and CWL.
+                CWL job inputs are identified by a ``class`` field (``File``, ``Directory``, etc.), including
+                any special modifier (``File[]``, ``File?``, etc.). Literals are equivalent in OGC and CWL.
                 OGC structures (``value``, ``href``, ``collection``, ``process``, ``bbox``, etc.) must not be searched,
                 since their contents could contain any field leading to false positives. They are preserved as is.
                 If the value of ``inputs`` is itself a CWL object, it is a CWL with ID ``inputs``.
