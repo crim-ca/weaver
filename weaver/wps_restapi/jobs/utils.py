@@ -1245,8 +1245,7 @@ def resolve_result_data(data, content_type=None):
     if not isinstance(data, bytes):
         return data2str(data), False
     ctype = clean_media_type_format(content_type, strip_parameters=True)
-    fmt = get_format(ctype) if ctype else None
-    if ctype == ContentType.APP_ZARR_ZIP or (fmt is not None and ContentEncoding.is_binary(fmt.encoding)):
+    if ctype == ContentType.APP_ZARR_ZIP:
         return data, True
     try:
         return data.decode("UTF-8"), False
