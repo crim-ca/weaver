@@ -154,6 +154,12 @@ inputs:
       - type: string
         contentEncoding: base64
         contentMediaType: image/jp2
+      - type: string
+        contentEncoding: base64
+        contentMediaType: application/tiff; application=geotiff
+      - type: string
+        contentEncoding: base64
+        contentMediaType: application/jp2
   featureCollectionInput:
     title: Feature Collection Input Example
     description: |

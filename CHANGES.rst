@@ -17,7 +17,7 @@ Changes:
   of ``image/tiff; application=geotiff`` and ``image/jp2`` respectively.
   Inputs submitted with them are accepted by any `Process` that defines the official media-types, without explicitly
   listing them in its description. The legacy types are never selected when resolving media-types
-  (e.g.: from file extensions).
+  (e.g.: from file extensions) (resolves `#1068 <https://github.com/crim-ca/weaver/issues/1068>`_).
 
 Fixes:
 ------

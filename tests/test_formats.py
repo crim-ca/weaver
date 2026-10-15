@@ -67,8 +67,9 @@ def test_valid_media_type_categories(media_type):
         (f"{f.ContentType.APP_JSON}; charset=UTF-8", {}, ".json"),  # ignore extra parameters
         (f.ContentType.APP_GEOJSON, {}, ".geojson"),  # pywps <4.4 definition
         (f.ContentType.APP_VDN_GEOJSON, {}, ".geojson"),  # pywps>=4.4 definition
-        (f.ContentType.IMAGE_GEOTIFF, {}, ".tiff"),  # pywps definition
-        (f.ContentType.APP_OGC_GEOTIFF, {}, ".tif"),
+        (f.ContentType.IMAGE_GEOTIFF, {}, ".tiff"),   # pywps definition
+        (f.ContentType.APP_OGC_GEOTIFF, {}, ".tif"),  # most common pattern
+        (f.ContentType.IMAGE_OGC_GEOTIFF, {}, ".tif"),
         (f.ContentType.IMAGE_JPEG2000, {}, ".jp2"),
         (f.ContentType.APP_JPEG2000, {}, ".jp2"),
         ("application/x-custom", {}, ".custom"),
