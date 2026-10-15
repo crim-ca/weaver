@@ -136,6 +136,7 @@ class WorkflowProcesses(enum.Enum):
     APP_PASSTHROUGH_EXPRESSIONS = "PassthroughExpressions"
     APP_WPS1_DOCKER_NETCDF_2_TEXT = "WPS1DockerNetCDF2Text"
     APP_WPS1_JSON_ARRAY_2_NETCDF = "WPS1JsonArray2NetCDF"
+    APP_ZARR_COPY = "ZarrCopy"
     WORKFLOW_CHAIN_COPY = "WorkflowChainCopy"
     WORKFLOW_CHAIN_STRINGS = "WorkflowChainStrings"
     WORKFLOW_DIRECTORY_LISTING = "WorkflowDirectoryListing"
@@ -155,6 +156,7 @@ class WorkflowProcesses(enum.Enum):
     WORKFLOW_STAGE_COPY_IMAGES = "WorkflowStageCopyImages"
     WORKFLOW_WPS1_SCATTER_COPY_NETCDF = "WorkflowWPS1ScatterCopyNetCDF"
     WORKFLOW_WPS1_SELECT_COPY_NETCDF = "WorkflowWPS1SelectCopyNetCDF"
+    WORKFLOW_ZARR_CHAIN = "WorkflowZarrChain"
 
 
 class ProcessInfo(object):
