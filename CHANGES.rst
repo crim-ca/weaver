@@ -16,9 +16,6 @@ Changes:
 
 Fixes:
 ------
-- Fix sporadic ``GET /json`` `OpenAPI` failures (HTTP 500) on cold ``gunicorn`` workers, caused by the generation
-  exceeding the previous ``timeout = 10`` of the example configuration and getting the worker killed before the
-  result could be cached. The example ``timeout`` is increased to 60s.
 - Fix `HTML` rendering of `Process`/`Provider` ``metadata`` entries that mixed link reference (``rel``/``href``) and
   value (``role``/``value``) representations, causing duplicated ``role`` fields, ``rel``/``role`` identifiers not
   rendered as clickable links when they are fully qualified `URL` references, literal embedded JSON ``value`` objects
