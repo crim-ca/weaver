@@ -5605,28 +5605,38 @@ class TestMetadataQueryFilters:
         return request
 
     def test_resolve_metadata_query_uri_absolute(self):
-        """Tests that an absolute IRI is returned unmodified without further CURIE/URN resolution."""
+        """
+        Tests that an absolute IRI is returned unmodified without further CURIE/URN resolution.
+        """
         uri = "https://schema.org/encodingFormat"
         assert resolve_metadata_query_uri(uri, "x") == uri
 
     def test_resolve_metadata_query_uri_curie_resolved(self):
-        """Tests that a Safe CURIE referring to a known OGC definition resolves to its long-form URI."""
+        """
+        Tests that a Safe CURIE referring to a known OGC definition resolves to its long-form URI.
+        """
         resolved = resolve_metadata_query_uri("[ogc-rel:profile]", "x")
         assert resolved.startswith("https://www.opengis.net/def/rel/ogc/")
 
     def test_resolve_metadata_query_uri_malformed(self):
-        """Tests that a value with invalid syntax (e.g., containing whitespace) is reported as a bad request."""
+        """
+        Tests that a value with invalid syntax (e.g., containing whitespace) is reported as a bad request.
+        """
         with pytest.raises(HTTPBadRequest):
             resolve_metadata_query_uri("not a valid uri", "x")
 
     def test_resolve_metadata_query_uri_unresolvable_curie(self):
-        """Tests that a syntactically valid but unresolvable CURIE prefix is reported as unprocessable."""
+        """
+        Tests that a syntactically valid but unresolvable CURIE prefix is reported as unprocessable.
+        """
         with pytest.raises(HTTPUnprocessableEntity):
             resolve_metadata_query_uri("unknown-prefix:thing", "x")
 
     @parameterized.expand(["process", "inputs", "outputs"])
     def test_parse_metadata_query_filters_scopes(self, scope):
-        """Tests that each supported scope (``process``, ``inputs``, ``outputs``) is parsed from the bracket form."""
+        """
+        Tests that each supported scope (``process``, ``inputs``, ``outputs``) is parsed from the bracket form.
+        """
         role = "https://schema.org/encodingFormat"
         request = self.make_request({f"metadata[{scope}][{role}]": "urn:ogc:def:profile:OGC::text-plain"})
         filters = parse_metadata_query_filters(request)
@@ -5634,7 +5644,9 @@ class TestMetadataQueryFilters:
         assert filters[0][2].startswith("https://www.opengis.net/def/profile/")
 
     def test_parse_metadata_query_filters_multiple_profiles_comma_separated(self):
-        """Tests that comma-separated profiles for a same role are extracted as distinct AND-ed filters."""
+        """
+        Tests that comma-separated profiles for a same role are extracted as distinct AND-ed filters.
+        """
         role = "https://schema.org/encodingFormat"
         plain = "https://www.iana.org/assignments/media-types/text/plain"
         html = "https://www.iana.org/assignments/media-types/text/html"
@@ -5643,7 +5655,9 @@ class TestMetadataQueryFilters:
         assert {profile for _, _, profile in filters} == {plain, html}
 
     def test_parse_metadata_query_filters_multiple_profiles_repeated_params(self):
-        """Tests that repeated query parameters for a same role are extracted as distinct AND-ed filters."""
+        """
+        Tests that repeated query parameters for a same role are extracted as distinct AND-ed filters.
+        """
         role = "https://schema.org/encodingFormat"
         plain = "https://www.iana.org/assignments/media-types/text/plain"
         html = "https://www.iana.org/assignments/media-types/text/html"
@@ -5655,7 +5669,9 @@ class TestMetadataQueryFilters:
         assert {profile for _, _, profile in filters} == {plain, html}
 
     def test_parse_metadata_query_filters_curie_doubled_brackets(self):
-        """Tests that a Safe CURIE ``<role>`` with doubled brackets in the parameter name is parsed correctly."""
+        """
+        Tests that a Safe CURIE ``<role>`` with doubled brackets in the parameter name is parsed correctly.
+        """
         request = self.make_request({"metadata[outputs][[ogc-rel:profile]]": "[ogc-rel:profile]"})
         filters = parse_metadata_query_filters(request)
         assert len(filters) == 1
@@ -5665,7 +5681,9 @@ class TestMetadataQueryFilters:
         assert role.startswith("https://www.opengis.net/def/rel/ogc/")
 
     def test_parse_metadata_query_filters_bracket_handling_preference(self):
-        """Tests that the 'Prefer: handling=strict' header rejects literal brackets, while lenient (default) accepts them."""
+        """
+        Tests that the 'Prefer: handling=strict' header rejects literal brackets, while lenient (default) accepts them.
+        """
         role = "https://schema.org/encodingFormat"
         request = self.make_request({f"metadata[outputs][{role}]": "urn:ogc:def:profile:OGC::text-plain"})
         filters = parse_metadata_query_filters(request)
@@ -5678,13 +5696,17 @@ class TestMetadataQueryFilters:
             parse_metadata_query_filters(request)
 
     def test_parse_metadata_query_filters_invalid_scope(self):
-        """Tests that an unsupported scope keyword in the bracket notation is reported as a bad request."""
+        """
+        Tests that an unsupported scope keyword in the bracket notation is reported as a bad request.
+        """
         request = self.make_request({"metadata[bogus][role]": "profile"})
         with pytest.raises(HTTPBadRequest):
             parse_metadata_query_filters(request)
 
     def test_decode_compressed_metadata_query_valid(self):
-        """Tests that a base64url/gzip compacted JSON 'QUERY' content is decoded into equivalent filters."""
+        """
+        Tests that a base64url/gzip compacted JSON 'QUERY' content is decoded into equivalent filters.
+        """
         role = "https://schema.org/encodingFormat"
         content = {"inputs": {role: ["urn:ogc:def:profile:OGC::text-plain"]}}
         payload = gzip.compress(json.dumps(content).encode())
@@ -5697,6 +5719,8 @@ class TestMetadataQueryFilters:
         assert profile.startswith("https://www.opengis.net/def/profile/")
 
     def test_decode_compressed_metadata_query_invalid(self):
-        """Tests that a malformed compacted 'metadata' query value is reported as a bad request."""
+        """
+        Tests that a malformed compacted 'metadata' query value is reported as a bad request.
+        """
         with pytest.raises(HTTPBadRequest):
             decode_compressed_metadata_query("not-a-valid-gzip-base64-value")
