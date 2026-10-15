@@ -75,37 +75,41 @@ prov_turtle = client.provenance(
 
 ```bash
 GET /jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/prov
-Accept: application/json
+Accept: application/ld+json
 ```
 
 ## Returns
 
-W3C PROV document with:
+W3C PROV-JSONLD document, for example:
 
 ```json
 {
-  "@context": "https://www.w3.org/ns/prov",
-  "entity": [
+  "@context": [
     {
+      "": "http://example.com"
+    },
+    "https://openprovenance.org/prov-jsonld/context.jsonld"
+  ],
+  "@graph": [
+    {
+      "@type": "Entity",
       "@id": "input-file-1",
-      "@type": "prov:Entity",
-      "prov:atLocation": "https://example.com/input.nc",
-      "prov:generatedAtTime": "2026-02-19T10:00:00Z"
-    }
-  ],
-  "activity": [
+      "location": [
+        {
+          "@value": "https://example.com/input.nc"
+        }
+      ]
+    },
     {
+      "@type": "Activity",
       "@id": "execution-1",
-      "@type": "prov:Activity",
-      "prov:startedAtTime": "2026-02-19T10:00:05Z",
-      "prov:endedAtTime": "2026-02-19T10:05:20Z",
-      "prov:used": {"@id": "input-file-1"}
-    }
-  ],
-  "wasGeneratedBy": [
+      "startTime": "2026-02-19T10:00:05+00:00",
+      "endTime": "2026-02-19T10:05:20+00:00"
+    },
     {
-      "prov:entity": {"@id": "output-file-1"},
-      "prov:activity": {"@id": "execution-1"}
+      "@type": "Generation",
+      "entity": "input-file-1",
+      "activity": "execution-1"
     }
   ]
 }
@@ -166,7 +170,7 @@ for derivation in prov.body.get("wasDerivedFrom", []):
 
 ```bash
 # Export provenance for archival
-weaver provenance -u $WEAVER_URL -j $JOB_ID -f xml > compliance/job-$JOB_ID-prov.xml
+weaver provenance -u $WEAVER_URL -j $JOB_ID --format xml > compliance/job-$JOB_ID-prov.xml
 ```
 
 ## Related Skills
