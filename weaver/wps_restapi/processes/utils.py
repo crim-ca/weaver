@@ -5,7 +5,6 @@ import logging
 import math
 import urllib.parse
 from typing import TYPE_CHECKING
-
 from typing_extensions import get_args
 
 import colander
