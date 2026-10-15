@@ -34,6 +34,9 @@ Fixes:
 ------
 - Fix files without extension in a remote directory listing (e.g.: `Zarr` chunks such as ``c/0``) being renamed with
   a default extension (e.g.: ``c/0.txt``) when fetched as part of a directory, which corrupted the directory contents.
+- Fix `Job` results returned by-value for binary contents (e.g.: zipped `Zarr`) being decoded as `UTF-8` text, which
+  failed for non-text bytes. Raw bytes are now returned as is for single result responses, and as ``base64`` encoded
+  ``value`` (with ``encoding`` metadata) when embedded in the `JSON` results document.
 - Fix `HTML` rendering of `Process`/`Provider` ``metadata`` entries that mixed link reference (``rel``/``href``) and
   value (``role``/``value``) representations, causing duplicated ``role`` fields, ``rel``/``role`` identifiers not
   rendered as clickable links when they are fully qualified `URL` references, literal embedded JSON ``value`` objects

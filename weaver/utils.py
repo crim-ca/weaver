@@ -68,7 +68,15 @@ from yaml.scanner import ScannerError
 from weaver.base import Constants, ExtendedEnum
 from weaver.compat import Version
 from weaver.exceptions import WeaverException
-from weaver.formats import ContentType, get_content_type, get_extension, get_format, is_zarr_media_type, repr_json
+from weaver.formats import (
+    ZARR_METADATA_FILES,
+    ContentType,
+    get_content_type,
+    get_extension,
+    get_format,
+    is_zarr_media_type,
+    repr_json
+)
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning, UndefinedContainerWarning
 from weaver.xml_util import HTML_TREE_BUILDER, XML
@@ -232,8 +240,6 @@ SUPPORTED_FILE_SCHEMES = frozenset([
     "s3",
     "vault"
 ])
-
-ZARR_METADATA_FILES = frozenset(["zarr.json", ".zgroup", ".zarray"])  # v3, v2 group, v2 array
 
 # note: word characters also match unicode in this case
 FILE_NAME_LOOSE_PATTERN = re.compile(
@@ -2672,7 +2678,8 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
     # Check secure name/extension components individually since a default extension could be resolved if not explicitly
     # provided through 'Content-Disposition' header. Consider that explicitly provided no-extension file name is valid.
     file_name, file_ext = os.path.splitext(file_name)
-    file_name = get_secure_filename(file_name)
+    if not (keep_name and file_name in ZARR_METADATA_FILES):  # sanitization strips the leading dot of '.zgroup', etc.
+        file_name = get_secure_filename(file_name)
     if file_ext or file_url is None:
         file_ext = get_secure_filename(file_ext)
     elif keep_name:

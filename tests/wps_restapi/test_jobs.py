@@ -1,6 +1,8 @@
+import base64
 import contextlib
 import copy
 import datetime
+import io
 import json
 import logging
 import os
@@ -53,7 +55,12 @@ from weaver.visibility import Visibility
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps.utils import get_wps_output_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.utils import get_job_results_document, get_job_status_schema, get_results
+from weaver.wps_restapi.jobs.utils import (
+    get_job_results_document,
+    get_job_results_single,
+    get_job_status_schema,
+    get_results
+)
 from weaver.wps_restapi.swagger_definitions import (
     DATETIME_INTERVAL_CLOSED_SYMBOL,
     DATETIME_INTERVAL_OPEN_END_SYMBOL,
@@ -4343,6 +4350,37 @@ def test_get_job_results_document(results, expected):
     job = Job(task_id="test", outputs={})
     output = get_job_results_document(job, results, settings={})
     assert output == expected
+
+
+BINARY_ZIP_DATA = b"PK\x03\x04\xff\xfe\x00\x80binary"  # not valid UTF-8
+
+
+def _mock_binary_zip_result():
+    job = Job(task_id="test", outputs={"out": {"transmissionMode": ExecuteTransmissionMode.VALUE}})
+    result = {"href": "http://localhost/wps-outputs/test/out/test.zarr.zip", "type": ContentType.APP_ZARR_ZIP}
+    headers = {"Content-Type": ContentType.APP_ZARR_ZIP, "Content-Encoding": ""}
+    patch = mock.patch(
+        "weaver.wps_restapi.jobs.utils.generate_or_resolve_result",
+        return_value=(headers, io.BytesIO(BINARY_ZIP_DATA)),
+    )
+    return job, result, patch
+
+
+def test_get_job_results_single_binary_preserved():
+    job, result, patch = _mock_binary_zip_result()
+    with patch:
+        resp = get_job_results_single(job, result, "out", {"mime_type": ContentType.APP_ZARR_ZIP}, {}, settings={})
+    assert resp.body == BINARY_ZIP_DATA
+
+
+def test_get_job_results_document_binary_base64():
+    job, result, patch = _mock_binary_zip_result()
+    with patch:
+        output = get_job_results_document(job, {"out": result}, settings={})
+    value = output["out"]
+    assert value["mediaType"] == ContentType.APP_ZARR_ZIP
+    assert value["encoding"] == "base64"
+    assert base64.b64decode(value["value"]) == BINARY_ZIP_DATA
 
 
 @pytest.mark.parametrize(

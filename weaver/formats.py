@@ -155,7 +155,7 @@ class ContentType(Constants):
     ANY_TIFF = {IMAGE_GEOTIFF, IMAGE_OGC_GEOTIFF, IMAGE_COG, IMAGE_TIFF}
     ANY_GEOJSON = {APP_GEOJSON, APP_VDN_GEOJSON}
     ANY_YAML = {APP_YAML, APP_X_YAML, TEXT_YAML, TEXT_X_YAML}
-    # 'APP_ZARR_ZIP' is excluded on purpose: it is a single ZIP file (CWL 'File'), not a directory store (CWL 'Directory')
+    # 'APP_ZARR_ZIP' is excluded on purpose: it is a single ZIP file (CWL 'File'), not a directory (CWL 'Directory')
     ANY_ZARR = {APP_ZARR, APP_ZARR_V2, APP_ZARR_V3}
     ANY_JSON = {
         APP_JSON, *ANY_YAML, *ANY_GEOJSON,
@@ -867,6 +867,12 @@ def get_content_type(extension, charset=None, default=None):
     if not ctype:
         return default
     return add_content_type_charset(ctype, charset)
+
+
+ZARR_METADATA_FILES = frozenset(["zarr.json", ".zgroup", ".zarray", ".zattrs", ".zmetadata"])  # v3, v2
+"""
+Known Zarr metadata file names, which also allow detecting a Zarr directory store from its listing.
+"""
 
 
 def is_zarr_media_type(media_type):

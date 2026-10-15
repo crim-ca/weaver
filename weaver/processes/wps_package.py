@@ -1383,9 +1383,12 @@ def format_extension_validator(data_input, mode):
     if mode == MODE.NONE or data_input.data_format is None:
         return True
     extensions = get_extension(data_input.data_format.mime_type, dot=True, variants=True)
+    extensions = [extensions] if isinstance(extensions, str) else extensions
     ref = getattr(data_input._iohandler, "_file") or getattr(data_input._iohandler, "_url")
-    ref_ext = os.path.splitext(ref)[-1].lower()
-    return not ref_ext or ref_ext in extensions  # allow anonymous URL without extension
+    ref = ref.lower()
+    ref_ext = os.path.splitext(ref)[-1]
+    # compare complete suffixes since some extensions are compound (e.g.: '.zarr.zip')
+    return not ref_ext or any(ref.endswith(ext) for ext in extensions)  # allow anonymous URL without extension
 
 
 class DirectoryNestedStorage(CachedStorage):

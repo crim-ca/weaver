@@ -981,6 +981,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         (ContentType.IMAGE_GEOTIFF, MODE.SIMPLE, ".tiff"),  # note: pywps distinguishes with extra 'f'
         (ContentType.IMAGE_OGC_GEOTIFF, MODE.NONE, ".tif"),
         (ContentType.IMAGE_OGC_GEOTIFF, MODE.SIMPLE, ".tif"),
+        (ContentType.APP_ZARR_ZIP, MODE.SIMPLE, ".zarr.zip"),  # compound extension
     ]
 )
 def test_format_extension_validator_pywps_cases(content_type, mode, ext):
@@ -1005,6 +1006,18 @@ def test_format_extension_validator_pywps_cases(content_type, mode, ext):
         validator(data_out, mode)
     ), "should succeed with the internal validator from pywps"
     assert format_extension_validator(data_out, mode), "should succeed with format extension validator from weaver"
+
+
+@pytest.mark.format
+def test_format_extension_validator_compound_extension_mismatch():
+    class MockFileHandler(object):
+        def __init__(self, filename):
+            self._file = filename
+            self.file = filename
+
+    data_out = ComplexOutput("test", "test", [Format(ContentType.APP_ZARR_ZIP)], mode=MODE.SIMPLE)
+    data_out._iohandler = MockFileHandler("test.zip")  # plain ZIP is not a zipped Zarr
+    assert not format_extension_validator(data_out, MODE.SIMPLE)
 
 
 @pytest.mark.format

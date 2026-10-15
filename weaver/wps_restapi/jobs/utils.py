@@ -1229,6 +1229,31 @@ def generate_or_resolve_result(
     return res_headers, res_data
 
 
+def resolve_result_data(data, content_type=None):
+    # type: (Any, Optional[str]) -> Tuple[Union[str, bytes], bool]
+    """
+    Reads the result contents, preserving raw bytes of binary data (e.g.: zipped Zarr) instead of decoding it as text.
+
+    :param data: Stream or value of the result.
+    :param content_type: Media-Type of the result, to identify known binary formats.
+    :return: Tuple of the text or raw bytes contents, and whether they are binary.
+    """
+    if hasattr(data, "seek"):
+        data.seek(0)
+    if hasattr(data, "read"):
+        data = data.read()
+    if not isinstance(data, bytes):
+        return data2str(data), False
+    ctype = clean_media_type_format(content_type, strip_parameters=True)
+    fmt = get_format(ctype) if ctype else None
+    if ctype == ContentType.APP_ZARR_ZIP or (fmt is not None and ContentEncoding.is_binary(fmt.encoding)):
+        return data, True
+    try:
+        return data.decode("UTF-8"), False
+    except UnicodeDecodeError:
+        return data, True
+
+
 def resolve_result_json_literal(
     result,                 # type: ExecutionResultValue
     output_format,          # type: Optional[JobValueFormat]
@@ -1352,8 +1377,10 @@ def get_job_results_single(
     if not ctype:
         ctype = ContentType.TEXT_PLAIN
 
+    out_data, is_binary = resolve_result_data(out_data, ctype)
+    if is_binary:  # raw bytes must be returned as is, without any text encoding
+        return HTTPOk(body=out_data, content_type=ctype, headers=headers)
     c_enc = cast("AnyContentEncoding", headers.get("Content-Encoding") or "UTF-8")  # type: AnyContentEncoding
-    out_data = data2str(out_data)
     out_data = ContentEncoding.encode(out_data, c_enc)
     return HTTPOk(body=out_data, content_type=ctype, charset=c_enc, headers=headers)
 
@@ -1406,9 +1433,13 @@ def get_job_results_document(job, results, *, settings):
             value = val  # use original to avoid string conversion
         else:
             value = {"mediaType": c_type}
-            data = data2str(data)
-            if c_enc:
+            data, is_binary = resolve_result_data(data, c_type)
+            if is_binary:  # not representable as text in JSON
+                c_enc = ContentEncoding.BASE64
+                data = ContentEncoding.encode(data, c_enc, binary=False)
+            elif c_enc:
                 data = ContentEncoding.encode(data, c_enc)
+            if c_enc:
                 value["encoding"] = c_enc
             value["value"] = data
 
