@@ -1,5 +1,5 @@
 ---
-name: update-provenance-examples
+name: weaver-provenance-examples
 description: |
   Regenerate the W3C PROV job provenance example files under weaver/wps_restapi/examples
   (job_prov.json, job_prov.jsonld, job_prov.xml, job_prov.ttl, job_prov.nt, job_prov.provn,
@@ -91,7 +91,7 @@ writes each result to the corresponding `job_prov*` file in the current director
 
 ```bash
 cd weaver/wps_restapi/examples
-sh ../../../.github/skills/update-provenance-examples/scripts/job_prov_examples.sh "$JOB_ID" "$WEAVER_URL"
+sh ../../../.github/skills/weaver-provenance-examples/scripts/job_prov_examples.sh "$JOB_ID" "$WEAVER_URL"
 ```
 
 > **Note**: The script rewrites hostnames to
