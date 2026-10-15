@@ -20,6 +20,10 @@ Fixes:
   and the OGC Process API Schema examples (resolves `#1068 <https://github.com/crim-ca/weaver/issues/1068>`_).
 - Correct regex in ``weaver.formats`` to accept digits in filename extensions when building
   ``_CONTENT_TYPE_EXT_PATTERN``.
+- Fix `CLI` ``execute`` inputs parsing that incorrectly interpreted valid `OGC API - Processes` execution bodies
+  (e.g.: with ``bbox``, nested ``value`` objects) as `CWL` job inputs and failed. Only inputs containing
+  a ``class`` field are now considered `CWL` as originally intended. Logic is simplified to help interpretability
+  (fixes `#1048 <https://github.com/crim-ca/weaver/issues/1048>`_).
 - Fix `HTML` rendering of `Process`/`Provider` ``metadata`` entries that mixed link reference (``rel``/``href``) and
   value (``role``/``value``) representations, causing duplicated ``role`` fields, ``rel``/``role`` identifiers not
   rendered as clickable links when they are fully qualified `URL` references, literal embedded JSON ``value`` objects
