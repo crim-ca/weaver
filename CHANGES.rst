@@ -16,6 +16,10 @@ Changes:
   which provides the semantics of ``metadata`` with ``role``, ``href`` and a profiled-term ``rel`` to annotate the
   `Process` itself or at granular I/O definitions, and aligns with ``dataClasses`` URIs along the I/O ``schema``
   (relates to `opengeospatial/ogcapi-processes#637 <https://github.com/opengeospatial/ogcapi-processes/pull/637>`_).
+- Implement ``GET /processes?metadata[<scope>][<role>]=<profile>`` query filtering to list only `Process` summaries
+  that define a matching ``metadata`` entry, either in the main `process` or per `inputs`/`outputs` definition of the
+  requested `<scope>`, and resolving Safe `CURIE`/`URN` ``role``/``profile`` references to their long-form `URI` as
+  necessary. Corresponding HTTP 400/422 error responses are raised when applicable for invald parsing or combinations.
 
 Fixes:
 ------

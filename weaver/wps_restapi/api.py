@@ -649,20 +649,24 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part5}/req/metadata-profiles/profile-link",
         f"{ogcapi_proc_part5}/req/metadata-profiles/role-register",
         f"{ogcapi_proc_part5}/req/metadata-profiles/concept-relations",
-        # FIXME: process listing '?metadata[<target>][<role>]=<profile>' filtering not yet implemented
-        #        (https://github.com/crim-ca/weaver/issues/745)
-        # f"{ogcapi_proc_part5}/req/metadata-profiles/query-parameter",
-        # f"{ogcapi_proc_part5}/req/metadata-profiles/query-matching",
-        # f"{ogcapi_proc_part5}/req/metadata-profiles/query-curie-matching",
-        # f"{ogcapi_proc_part5}/req/metadata-profiles/query-options",
-        # f"{ogcapi_proc_part5}/req/metadata-profiles/query-method",
-        # f"{ogcapi_proc_part5}/req/metadata-profiles/query-content",
-        # f"{ogcapi_proc_part5}/req/metadata-profiles/query-compression",
-        # f"{ogcapi_proc_part5}/req/metadata-profiles/unsupported-metadata-encoding",
-        # f"{ogcapi_proc_part5}/req/metadata-profiles/invalid-metadata-profile",
-        # f"{ogcapi_proc_part5}/req/metadata-profiles/invalid-role",
+        # '?metadata[<role>]=<profile>' query filtering of process listing (GET method only, JSON/HTML content)
+        f"{ogcapi_proc_part5}/req/metadata-profiles/query-parameter",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/query-matching",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/query-options",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/query-method",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/invalid-metadata-profile",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/invalid-role",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/query-curie-matching",
+        f"{ogcapi_proc_part5}/per/metadata-profiles/safe-curie",
+        f"{ogcapi_proc_part5}/per/metadata-profiles/query-optional",
+        # NOTE: only the mandatory 'GET' method is implemented for the filtered listing. The optional 'QUERY'
+        #       HTTP method variant (filter parameters supplied in the request content instead of the URL) is not
+        #       implemented
+        # f"{ogcapi_proc_part5}/req/metadata-profiles/query-content",  # QUERY method not implemented
+        f"{ogcapi_proc_part5}/req/metadata-profiles/query-compression",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/unsupported-metadata-encoding",
     ] + [
-        # OGC API - Processes - 'Part 5: Versioning' (unofficial)
+        # OGC API - Processes - 'Part 6: Versioning' (unofficial)
         # (see https://github.com/opengeospatial/ogcapi-processes/pull/578)
         f"{ogcapi_proc_part6}/rec/versioning/replace-response-links"
     ] + [

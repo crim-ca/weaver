@@ -257,6 +257,12 @@ OGC_API_PROC_PART4_EXC_UNSUPPORTED_SCHEMA_URI = f"{OGC_API_PROC_PART4_EXC_BASE_U
 OGC_API_PROC_PART5_EXC_BASE_URI = "https://www.opengis.net/def/exceptions/ogcapi-processes-5/1.0"
 OGC_API_PROC_PART5_EXC_PROV_MISSING_URI = f"{OGC_API_PROC_PART5_EXC_BASE_URI}/prov-missing"
 OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI = f"{OGC_API_PROC_PART5_EXC_BASE_URI}/prov-unsupported-format"
+OGC_API_PROC_PART5_EXC_INVALID_METADATA_PROFILE_URI = f"{OGC_API_PROC_PART5_EXC_BASE_URI}/invalid-metadata-profile"
+OGC_API_PROC_PART5_EXC_UNSUPPORTED_METADATA_PROFILE_URI = (
+    f"{OGC_API_PROC_PART5_EXC_BASE_URI}/unsupported-metadata-profile"
+)
+OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI = "https://www.opengis.net/def/profile"
+OGC_API_PROC_PART5_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"
 
 OGC_API_PROC_REL_BASE_URI = "https://www.opengis.net/def/rel/ogc/1.0"
 OGC_API_PROC_REL_EXCEPTIONS_URI = f"{OGC_API_PROC_REL_BASE_URI}/exceptions"
@@ -8518,6 +8524,19 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
 
 
 class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuery, ProcessRevisionsQuery):
+    metadata = ExtendedSchemaNode(
+        colander.String(), missing=drop, default=None, name="metadata[process|inputs|outputs][<role>]",
+        example="metadata[inputs][https://www.opengis.net/def/profile]=urn:ogc:def:profile:OGC::text-plain",
+        description=(
+            "Filters processes by a `role`/`profile` reference that must be matched by an entry of their "
+            "`metadata` field (*OGC API - Processes - Part 5: Provenance and Profiles*, "
+            f"`{OGC_API_PROC_PART5_BASE_URI}/conf/metadata-profiles`). "
+            "The dynamic parameter name must be formatted as `metadata[<scope>][<role>]=<profile>`, where "
+            "`<scope>` is one of `process`, `inputs` or `outputs`, and `<role>`/`<profile>` are IRIs, URNs "
+            "or Safe CURIEs. Multiple `<profile>` for a same `<role>` can be provided using comma-separated "
+            "values, or using repeated query parameters, and must all be matched (logical AND)."
+        )
+    )
     providers = ExtendedSchemaNode(
         QueryBoolean(), example=True, default=False, missing=drop,
         description="List local processes as well as all sub-processes of all registered providers. "

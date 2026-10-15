@@ -1,16 +1,23 @@
+import base64
+import gzip
+import json
 import logging
 import math
 from typing import TYPE_CHECKING
 
+from typing_extensions import get_args
+
 import colander
-from pyramid.httpexceptions import HTTPBadRequest, HTTPOk
+from pyramid.httpexceptions import HTTPBadRequest, HTTPOk, HTTPUnprocessableEntity
 from pyramid.settings import asbool
 
 from weaver.compat import InvalidVersion
 from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.formats import ContentType, OutputFormat, clean_media_type_format, guess_target_format
+from weaver.ogc_definitions import normalize as normalize_ogc_uri
 from weaver.store.base import StoreProcesses
+from weaver.typedefs import MetadataQueryScope
 from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
@@ -84,10 +91,12 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
             "value": list(paging_names.intersection(request.params))
         })
 
+    metadata_filters = parse_metadata_query_filters(request)
     store = get_db(request).get_store(StoreProcesses)
     processes, total_local_processes = store.list_processes(
         visibility=Visibility.PUBLIC,
         total=True,
+        metadata=metadata_filters,
         **revisions_param,
         **paging_param
     )
@@ -104,6 +113,131 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
             LOGGER.debug("Invalid process [%s] because:\n%s", process_ref, invalid)
             invalid_processes_ids.append(process.identifier)
     return valid_processes, invalid_processes_ids, paging_param, with_providers, total_local_processes
+
+
+def resolve_metadata_query_uri(value, instance):
+    # type: (str, str) -> str
+    """
+    Validates and resolves a ``role``/``profile`` reference (`IRI`, `URN` or Safe :term:`CURIE`) to its long-form `URI`.
+
+    Relies on :func:`weaver.ogc_definitions.normalize` as the authority for :term:`CURIE`/`URN` resolution. An
+    absolute `IRI` is returned as-is. Any other value left unresolved (unchanged, or not an `IRI`) by that utility
+    is considered an invalid or unresolvable reference.
+
+    :raises HTTPBadRequest: If ``value`` is empty or contains whitespace (not a valid `IRI`/`URN`/Safe :term:`CURIE`).
+    :raises HTTPUnprocessableEntity: If ``value`` has valid syntax, but its :term:`CURIE` prefix is unresolvable.
+    """
+    if value.startswith(("http://", "https://")):
+        return value
+    if not value or " " in value:
+        raise HTTPBadRequest(json={
+            "type": sd.OGC_API_PROC_PART5_EXC_INVALID_METADATA_PROFILE_URI,
+            "title": "Invalid metadata query reference.",
+            "detail": "Query parameter 'metadata[<role>]' role/profile must be a valid IRI, URN or Safe CURIE.",
+            "status": HTTPBadRequest.code,
+            "instance": instance,
+        })
+    resolved = normalize_ogc_uri(value)
+    if resolved == value or not resolved.startswith(("http://", "https://")):
+        raise HTTPUnprocessableEntity(json={
+            "type": sd.OGC_API_PROC_PART5_EXC_UNSUPPORTED_METADATA_PROFILE_URI,
+            "title": "Unsupported metadata query reference.",
+            "detail": "Query parameter 'metadata[<role>]' role/profile CURIE prefix could not be resolved.",
+            "status": HTTPUnprocessableEntity.code,
+            "instance": instance,
+        })
+    return resolved
+
+
+_METADATA_QUERY_SCOPES = get_args(MetadataQueryScope)
+
+
+def decode_compressed_metadata_query(value):
+    # type: (str) -> JSON
+    """
+    Decodes a ``base64url(gzip(<QUERY content>))`` compacted/encoded single-value ``metadata`` query parameter.
+
+    .. seealso::
+        ``/req/metadata-profiles/query-compression``
+
+    :raises HTTPBadRequest: If the value cannot be decoded, decompressed or parsed as JSON ``QUERY`` content.
+    :returns: Decoded ``QUERY`` content (``{"process": {role: [profile, ...]}, "inputs": {...}, "outputs": {...}}``).
+    """
+    try:
+        padded = value + "=" * (-len(value) % 4)
+        raw = base64.urlsafe_b64decode(padded.encode("ascii"))
+        if raw[:2] != b"\x1f\x8b":  # gzip magic number
+            raise ValueError("Missing gzip magic number.")
+        content = json.loads(gzip.decompress(raw))
+        if not isinstance(content, dict) or not set(content).issubset(_METADATA_QUERY_SCOPES):
+            raise ValueError("Invalid 'QUERY' content structure.")
+    except Exception as exc:
+        raise HTTPBadRequest(json={
+            "type": sd.OGC_API_PROC_PART5_EXC_INVALID_METADATA_PROFILE_URI,
+            "title": "Invalid metadata query parameter.",
+            "detail": f"Compacted 'metadata' query parameter could not be decoded, decompressed or parsed: {exc}",
+            "status": HTTPBadRequest.code,
+            "instance": "metadata",
+        }) from exc
+    return content
+
+
+def parse_metadata_query_filters(request):
+    # type: (PyramidRequest) -> List[Tuple[MetadataQueryScope, str, str]]
+    """
+    Parses ``metadata[<scope>][<role>]=<profile>`` query parameters used to filter process listing by metadata.
+
+    The ``<scope>`` must be one of ``process``, ``inputs`` or ``outputs``, indicating respectively whether the
+    ``<role>``/``<profile>`` must be matched against a ``metadata`` entry of the process itself, or of at least one
+    of its inputs (respectively outputs). Both ``<role>`` and ``<profile>`` can be provided as `IRI`, `URN` or Safe
+    :term:`CURIE`, and are resolved to their long-form `URI` using :func:`weaver.ogc_definitions.normalize` for
+    consistent matching against stored metadata. Multiple ``<profile>`` for the same ``<role>`` can be supplied as
+    comma-separated values, or using repeated query parameters, and must ALL be matched (logical AND). Only
+    ``metadata`` entries that are profile links (``rel`` set to
+    :data:`weaver.wps_restapi.swagger_definitions.OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI`) are considered
+    for the ``<role>``/``<profile>`` matching, as per ``/req/metadata-profiles/profile-link``.
+
+    Alternatively, a single ``metadata`` query parameter (not using the ``metadata[<scope>][<role>]`` form) is
+    interpreted as a `base64url`-encoded, `gzip`-compressed `JSON` ``QUERY`` content representation, as defined by
+    ``/req/metadata-profiles/query-compression``, of the equivalent ``{"process": {<role>: [<profile>, ...]}}``
+    (and/or ``inputs``/``outputs``) filter structure.
+
+    .. seealso::
+        OGC API - Processes - Part 5: Provenance and Profiles (``metadata-profiles`` conformance class).
+
+    :raises HTTPBadRequest: If a ``<scope>`` is not one of the supported values, or ``<role>``/``<profile>`` is not
+        a valid `IRI`/`URN`/Safe :term:`CURIE`, or the compacted/encoded ``metadata`` value cannot be processed.
+    :raises HTTPUnprocessableEntity: If a ``<role>``/``<profile>`` Safe :term:`CURIE` prefix cannot be resolved.
+    :returns: List of resolved ``(scope, role, profile)`` filters to be matched against process ``metadata`` entries.
+    """
+    filters = []
+    for key, values in request.params.dict_of_lists().items():
+        if key == "metadata":
+            content = decode_compressed_metadata_query(values[0])
+            for scope, role_profiles in content.items():
+                for role, profiles in role_profiles.items():
+                    role = resolve_metadata_query_uri(role, key)
+                    for profile in (profiles if isinstance(profiles, list) else [profiles]):
+                        filters.append((scope, role, resolve_metadata_query_uri(profile, key)))
+            continue
+        if not (key.startswith("metadata[") and key.endswith("]")):
+            continue
+        scope_role = key[len("metadata["):-1]
+        scope, _, role = scope_role.partition("][")
+        if not role or scope not in _METADATA_QUERY_SCOPES:
+            raise HTTPBadRequest(json={
+                "type": sd.OGC_API_PROC_PART5_EXC_INVALID_METADATA_PROFILE_URI,
+                "title": "Invalid metadata query parameter.",
+                "detail": f"Query parameter '{key}' must be of form 'metadata[process|inputs|outputs][<role>]'.",
+                "status": HTTPBadRequest.code,
+                "instance": key,
+            })
+        role = resolve_metadata_query_uri(role, key)
+        for value in values:
+            for profile in value.split(","):
+                profile = resolve_metadata_query_uri(profile, key)
+                filters.append((scope, role, profile))
+    return filters
 
 
 def get_process_list_links(request, paging, total, provider=None):

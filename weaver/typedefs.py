@@ -1,4 +1,8 @@
 from typing import TYPE_CHECKING  # pragma: no cover
+from typing_extensions import Literal
+
+# runtime-available alias (used with 'get_args' where the literal values must be inspected dynamically)
+MetadataQueryScope = Literal["process", "inputs", "outputs"]
 
 if TYPE_CHECKING:
     import io
