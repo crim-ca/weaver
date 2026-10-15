@@ -735,9 +735,12 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
         if not fmt:
             continue
         fmt_list = fmt if isinstance(fmt, (list, tuple)) else [fmt]
-        cwl_io_dir = all(
-            is_zarr_media_type(get_field(fmt_i, "mime_type", search_variations=True))
-            for fmt_i in fmt_list
+        fmt_types = [get_field(fmt_i, "mime_type", search_variations=True) for fmt_i in fmt_list]
+        # A Zarr directory store can be published along 'application/directory' (merged from the CWL Directory) and
+        # file-valued alternates added for conversions (zipped store), which must not turn it into a CWL File.
+        cwl_io_dir = any(is_zarr_media_type(typ) for typ in fmt_types) and all(
+            is_zarr_media_type(typ) or typ in [ContentType.APP_DIR, ContentType.APP_ZARR_ZIP]
+            for typ in fmt_types
         )
         if isinstance(fmt, (list, tuple)) and len(fmt) == 1:
             fmt = fmt[0]
@@ -751,6 +754,8 @@ def _convert_any2cwl_io_complex(cwl_io, cwl_ns, wps_io, io_select):
             cwl_fmt_multi = {}  # use dict as ordered set
             cwl_ext_multi = {}  # use dict as ordered set
             for fmt_i in fmt:
+                if cwl_io_dir and not is_zarr_media_type(get_field(fmt_i, "mime_type", search_variations=True)):
+                    continue  # other directory/alternate formats do not apply to a CWL Directory
                 # FIXME: (?)
                 #   when multiple formats are specified, but at least one schema/namespace reference can't be found,
                 #   we must drop all since that unknown format is still allowed but cannot be validated

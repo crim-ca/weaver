@@ -283,6 +283,23 @@ def test_are_different_and_set_single_null():
                 }
             }
         ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_DIR, "encoding": None, "default": False},
+                    {"mimeType": ContentType.APP_ZARR_V3, "encoding": None, "default": True},
+                    {"mimeType": ContentType.APP_ZARR_ZIP, "encoding": None, "default": False},
+                ]
+            },
+            {
+                "id": "output",
+                "type": PACKAGE_DIRECTORY_TYPE,  # as published by Weaver, native directory and zipped alternate
+                "outputBinding": {
+                    "glob": "*.zarr"
+                }
+            }
+        ),
     ]
 )
 def test_convert_any2cwl_io_complex(wps_io, cwl_io_expect):
@@ -2489,6 +2506,28 @@ def test_ogcapi2cwl_process_with_extra_exec_href():
     body["executionUnit"] = [{"unit": cwl}]
     body["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
     assert info == body, "Execution unit should be rewritten with OGC-API hints requirement."
+
+
+def test_ogcapi2cwl_process_zarr_published_formats():
+    """
+    Formats of a Zarr I/O as published by Weaver (with ``application/directory`` and zip alternate) is a Directory.
+    """
+    href = "https://remote-server.com/processes/test-process"
+    formats = [
+        {"mediaType": ContentType.APP_DIR},
+        {"mediaType": ContentType.APP_ZARR_V3, "default": True},
+        {"mediaType": ContentType.APP_ZARR_ZIP},
+    ]
+    body = {
+        "inputs": {"zarr_in": {"formats": formats}},
+        "outputs": {"zarr_out": {"formats": formats}},
+    }
+    cwl, _ = ogcapi2cwl_process(body, href)
+    assert cwl["inputs"]["zarr_in"]["type"] == PACKAGE_DIRECTORY_TYPE
+    assert "format" not in cwl["inputs"]["zarr_in"]
+    assert cwl["outputs"]["zarr_out"]["type"] == PACKAGE_DIRECTORY_TYPE
+    assert "format" not in cwl["outputs"]["zarr_out"]
+    assert cwl["outputs"]["zarr_out"]["outputBinding"] == {"glob": "*.zarr"}
 
 
 def test_ogcapi2cwl_process_without_extra():
