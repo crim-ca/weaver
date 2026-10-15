@@ -29,6 +29,10 @@ Fixes:
   fields on ``InputOutputDescriptionMeta`` schema-node definition.
 - Fix ``PATCH`` list-append logic (``keywords``, ``metadata``, ``links``)
   that discarded the merged result and persisted the original unchanged list instead.
+- Fix `CLI` ``execute`` inputs parsing that incorrectly interpreted valid `OGC API - Processes` execution bodies
+  (e.g.: with ``bbox``, nested ``value`` objects) as `CWL` job inputs and failed. Only inputs containing
+  a ``class`` field are now considered `CWL` as originally intended. Logic is simplified to help interpretability
+  (fixes `#1048 <https://github.com/crim-ca/weaver/issues/1048>`_).
 - Fix `HTML` rendering of `Process`/`Provider` ``metadata`` entries that mixed link reference (``rel``/``href``) and
   value (``role``/``value``) representations, causing duplicated ``role`` fields, ``rel``/``role`` identifiers not
   rendered as clickable links when they are fully qualified `URL` references, literal embedded JSON ``value`` objects
