@@ -659,10 +659,10 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part5}/req/metadata-profiles/query-curie-matching",
         f"{ogcapi_proc_part5}/per/metadata-profiles/safe-curie",
         f"{ogcapi_proc_part5}/per/metadata-profiles/query-optional",
-        # NOTE: only the mandatory 'GET' method is implemented for the filtered listing. The optional 'QUERY'
-        #       HTTP method variant (filter parameters supplied in the request content instead of the URL) is not
-        #       implemented
-        # f"{ogcapi_proc_part5}/req/metadata-profiles/query-content",  # QUERY method not implemented
+        f"{ogcapi_proc_part5}/per/metadata-profiles/query-literal-brackets",
+        f"{ogcapi_proc_part5}/rec/metadata-profiles/query-literal-brackets-error",
+        # FIXME: HTTP QUERY method not implemented. Require OpenAPI 3.2 and custom tweaks of CorniceSwagger
+        # f"{ogcapi_proc_part5}/req/metadata-profiles/query-content",
         f"{ogcapi_proc_part5}/req/metadata-profiles/query-compression",
         f"{ogcapi_proc_part5}/req/metadata-profiles/unsupported-metadata-encoding",
     ] + [

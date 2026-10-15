@@ -3,6 +3,7 @@ import gzip
 import json
 import logging
 import math
+import urllib.parse
 from typing import TYPE_CHECKING
 
 from typing_extensions import get_args
@@ -17,7 +18,7 @@ from weaver.database import get_db
 from weaver.formats import ContentType, OutputFormat, clean_media_type_format, guess_target_format
 from weaver.ogc_definitions import normalize as normalize_ogc_uri
 from weaver.store.base import StoreProcesses
-from weaver.typedefs import MetadataQueryScope
+from weaver.typedefs import MetadataQueryScope, PreferHeaderHandling
 from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
@@ -182,6 +183,27 @@ def decode_compressed_metadata_query(value):
     return content
 
 
+def get_metadata_query_bracket_handling(request):
+    # type: (PyramidRequest) -> PreferHeaderHandling
+    """
+    Resolves the lenient/strict handling of literal (non-percent-encoded) brackets in ``metadata`` query parameters.
+
+    A client can request the ``strict`` handling (refusing literal ``[``/``]`` characters, accepting only their
+    percent-encoded ``%5B``/``%5D`` form) using the ``Prefer: handling=strict`` request header
+    (:rfc:`7240`, Section 4.4), as per ``/per/metadata-profiles/query-literal-brackets``. Any other (or missing)
+    value defaults to the ``lenient`` handling (literal brackets accepted).
+
+    :returns: Either ``"strict"`` or ``"lenient"`` (:data:`weaver.typedefs.PreferHeaderHandling`).
+    """
+    lenient, strict = get_args(PreferHeaderHandling)
+    prefer = request.headers.get("Prefer", "")
+    for pref in prefer.split(","):
+        key, _, value = pref.strip().partition("=")
+        if key.strip().lower() == "handling" and value.strip().strip('"').lower() == strict:
+            return strict
+    return lenient
+
+
 def parse_metadata_query_filters(request):
     # type: (PyramidRequest) -> List[Tuple[MetadataQueryScope, str, str]]
     """
@@ -195,7 +217,17 @@ def parse_metadata_query_filters(request):
     comma-separated values, or using repeated query parameters, and must ALL be matched (logical AND). Only
     ``metadata`` entries that are profile links (``rel`` set to
     :data:`weaver.wps_restapi.swagger_definitions.OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI`) are considered
-    for the ``<role>``/``<profile>`` matching, as per ``/req/metadata-profiles/profile-link``.
+    for the ``<role>``/``<profile>`` matching, as per ``/req/metadata-profiles/profile-link``. When ``<role>``
+    is itself a Safe :term:`CURIE`, it is provided with doubled brackets in the parameter name
+    (e.g., ``metadata[outputs][[ogc-profile:data-type]]``), since the outer brackets delimit the ``deepObject``
+    key, and the inner ones belong to the Safe CURIE, as per ``/req/metadata-profiles/query-curie-matching``.
+
+    By default (``lenient`` handling), literal (non-percent-encoded) ``[``/``]`` characters are accepted in the
+    ``metadata`` query parameter names/values, even though :rfc:`3986` (Section 3.4) disallows them in the query
+    component. A client requesting the ``Prefer: handling=strict`` request header
+    (see :func:`get_metadata_query_bracket_handling`) instead requires all brackets to be percent-encoded
+    (``%5B``/``%5D``), as per ``/per/metadata-profiles/query-literal-brackets`` and
+    ``/rec/metadata-profiles/query-literal-brackets-error``.
 
     Alternatively, a single ``metadata`` query parameter (not using the ``metadata[<scope>][<role>]`` form) is
     interpreted as a `base64url`-encoded, `gzip`-compressed `JSON` ``QUERY`` content representation, as defined by
@@ -206,10 +238,29 @@ def parse_metadata_query_filters(request):
         OGC API - Processes - Part 5: Provenance and Profiles (``metadata-profiles`` conformance class).
 
     :raises HTTPBadRequest: If a ``<scope>`` is not one of the supported values, or ``<role>``/``<profile>`` is not
-        a valid `IRI`/`URN`/Safe :term:`CURIE`, or the compacted/encoded ``metadata`` value cannot be processed.
+        a valid `IRI`/`URN`/Safe :term:`CURIE`, or the compacted/encoded ``metadata`` value cannot be processed, or
+        the ``strict`` handling is requested and literal brackets are found in the raw query string.
     :raises HTTPUnprocessableEntity: If a ``<role>``/``<profile>`` Safe :term:`CURIE` prefix cannot be resolved.
     :returns: List of resolved ``(scope, role, profile)`` filters to be matched against process ``metadata`` entries.
     """
+    bracket_handling = get_metadata_query_bracket_handling(request)
+    request.metadata_bracket_handling = bracket_handling
+    _, strict_mode = get_args(PreferHeaderHandling)
+    if bracket_handling == strict_mode:
+        raw_query = request.query_string or ""
+        for raw_param in raw_query.split("&"):
+            raw_key = raw_param.split("=", 1)[0]
+            if raw_key.startswith("metadata") and ("[" in raw_key or "]" in raw_key):
+                raise HTTPBadRequest(json={
+                    "type": sd.OGC_API_PROC_PART5_EXC_INVALID_METADATA_PROFILE_URI,
+                    "title": "Invalid metadata query parameter.",
+                    "detail": (
+                        "Literal brackets are not accepted under the 'strict' handling preference. "
+                        "Percent-encode '[' and ']' as '%5B' and '%5D'."
+                    ),
+                    "status": HTTPBadRequest.code,
+                    "instance": raw_key,
+                })
     filters = []
     for key, values in request.params.dict_of_lists().items():
         if key == "metadata":
@@ -271,7 +322,7 @@ def get_process_list_links(request, paging, total, provider=None):
          "type": ContentType.APP_JSON, "title": "Process listing summary (identifiers and count only)."},
         {"href": f"{proc_url}?f=json", "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
          "type": ContentType.APP_JSON, "title": "List of registered local processes."},
-        {"href": get_path_kvp(proc_url, **req_params), "rel": "self",
+        {"href": f"{proc_url}?{urllib.parse.urlencode(req_params)}", "rel": "self",
          "type": req_fmt, "title": "Current process listing."},
     ])
     if provider:

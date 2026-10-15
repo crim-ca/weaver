@@ -167,6 +167,9 @@ def get_processes(request):
             for link in body["links"]
         ])
         request.response.headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_PROC_LIST_URI
+        bracket_handling = getattr(request, "metadata_bracket_handling", None)
+        if bracket_handling:
+            request.response.headers["Preference-Applied"] = f"handling={bracket_handling}"
         return Box(body)
 
     except ServiceException as exc:

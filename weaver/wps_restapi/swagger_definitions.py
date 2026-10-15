@@ -980,6 +980,9 @@ class PreferHeader(ExtendedSchemaNode):
         "Parameter 'return' indicates the structure and contents how results should be returned. "
         "Parameter 'wait' and 'respond-async' indicate the execution mode of the process job. "
         "Parameter 'profile' can indicate an alternate results representation than the resolved one by the context. "
+        "Parameter 'handling' set to 'lenient' (default) or 'strict' indicates whether literal (non-percent-encoded) "
+        "brackets are accepted in the `metadata` query parameter of the process listing endpoint "
+        "(see `/per/metadata-profiles/query-literal-brackets`). "
         f"For more details, see {DOC_URL}/processes.html#execution-mode and {DOC_URL}/processes.html#execution-results."
     )
     name = "Prefer"
@@ -8552,7 +8555,12 @@ class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuer
     )
 
 
+class GetProcessesRequestHeaders(RequestHeadersNoBody):
+    prefer = PreferHeader(missing=drop)
+
+
 class GetProcessesEndpoint(ExtendedMappingSchema):
+    header = GetProcessesRequestHeaders()
     querystring = GetProcessesQuery()
 
 
@@ -9192,6 +9200,7 @@ get_processes_responses = {
     "400": BadRequestResponseSchema(description="Error in case of invalid listing query parameters."),
     "405": MethodNotAllowedErrorResponseSchema(),
     "406": NotAcceptableErrorResponseSchema(),
+    "422": UnprocessableEntityResponseSchema(description="Unresolvable metadata-profiles CURIE query filter."),
     "500": InternalServerErrorResponseSchema(),
 }
 post_processes_responses = {

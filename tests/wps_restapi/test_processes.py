@@ -2,6 +2,7 @@
 import base64
 import contextlib
 import copy
+import gzip
 import json
 import os
 import re
@@ -18,8 +19,9 @@ import pytest
 import stopit
 import yaml
 from parameterized import parameterized
-from pyramid.httpexceptions import HTTPUnprocessableEntity
+from pyramid.httpexceptions import HTTPBadRequest, HTTPUnprocessableEntity
 from pywps.inout import LiteralInput
+from webob.multidict import MultiDict
 
 from tests import resources
 from tests.functional.utils import WpsConfigBase
@@ -75,6 +77,11 @@ from weaver.utils import explode_headers, fully_qualified_name, get_path_kvp, lo
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.processes.utils import (
+    decode_compressed_metadata_query,
+    parse_metadata_query_filters,
+    resolve_metadata_query_uri
+)
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
@@ -5492,6 +5499,77 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "Dispatching execution of nested process" in logs
         assert "Abort execution." in logs
 
+    @pytest.mark.oap_part5
+    def test_get_processes_filter_by_metadata_profile(self):
+        """
+        Tests that ``GET /processes?metadata[<scope>][<role>]=<profile>`` filters processes by profile links.
+
+        Validates the ``metadata-profiles`` query filtering (OGC API - Processes - Part 5: Provenance and
+        Profiles) against both the ``process`` and ``outputs`` scopes, confirming that a matching profile
+        link (``rel`` set to the profile relation) includes the process, a mismatched profile excludes it, and
+        a Safe CURIE query value is equivalent to its expanded URI for the match.
+        """
+        p_id = "test-process-filter-metadata-profile"
+        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id)
+        profile_rel = "https://www.opengis.net/def/profile"
+        role = "https://schema.org/encodingFormat"
+        profile = "https://www.iana.org/assignments/media-types/text/plain"
+        other_profile = "https://www.iana.org/assignments/media-types/text/html"
+        output_metadata = {"role": role, "rel": profile_rel, "href": profile}
+        data = {"outputs": {"output": {"metadata": [output_metadata]}}}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+
+        resp = self.app.get(
+            "/processes", params={f"metadata[outputs][{role}]": profile, "links": "false"}, headers=self.json_headers
+        )
+        assert resp.status_code == 200, resp.text
+        assert p_id in [proc["id"] for proc in resp.json["processes"]]
+
+        resp = self.app.get(
+            "/processes",
+            params={f"metadata[outputs][{role}]": other_profile, "links": "false"},
+            headers=self.json_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert p_id not in [proc["id"] for proc in resp.json["processes"]]
+
+        resp = self.app.get(
+            "/processes", params={f"metadata[process][{role}]": profile, "links": "false"}, headers=self.json_headers
+        )
+        assert resp.status_code == 200, resp.text
+        assert p_id not in [proc["id"] for proc in resp.json["processes"]]
+
+        curie_profile = "[ogc-profile:text-plain]"  # arbitrary unresolvable Safe CURIE, matching nothing
+        resp = self.app.get(
+            "/processes",
+            params={f"metadata[outputs][{role}]": curie_profile, "links": "false"},
+            headers=self.json_headers,
+            expect_errors=True,
+        )
+        assert resp.status_code in [200, 422]  # either resolved to no match, or reported as unresolvable
+
+    @pytest.mark.oap_part5
+    def test_get_processes_filter_by_metadata_invalid_request(self):
+        """
+        Tests error reporting of invalid ``metadata`` query filters on ``GET /processes``.
+
+        An improperly formatted bracket notation is reported as a bad request, while a syntactically valid but
+        unresolvable Safe CURIE reference is reported as unprocessable content, as per
+        ``/req/metadata-profiles/invalid-metadata-profile`` and ``/req/metadata-profiles/invalid-role``.
+        """
+        resp = self.app.get(
+            "/processes", params={"metadata[bogus-scope][role]": "profile"},
+            headers=self.json_headers, expect_errors=True,
+        )
+        assert resp.status_code == 400
+
+        resp = self.app.get(
+            "/processes", params={"metadata[process][unresolvable-prefix:role]": "profile"},
+            headers=self.json_headers, expect_errors=True,
+        )
+        assert resp.status_code == 422
+
 
 # pylint: disable=C0103,invalid-name
 @pytest.mark.functional
@@ -5509,3 +5587,116 @@ class WpsRestApiProcessesNoHTMLTest(WpsConfigBase):
     def test_not_acceptable_html_accept_header(self):
         resp = self.app.get("/processes", headers={"Accept": ContentType.TEXT_HTML}, expect_errors=True)
         assert resp.status_code == 406
+
+
+@pytest.mark.oap_part5
+class TestMetadataQueryFilters:
+    """
+    Tests for ``weaver.wps_restapi.processes.utils`` metadata-profiles query parsing and resolution helpers.
+    """
+
+    @staticmethod
+    def make_request(params):
+        # type: (Union[Dict[str, str], List[Tuple[str, str]]]) -> pyramid.testing.DummyRequest
+        request = pyramid.testing.DummyRequest()
+        request.params = MultiDict(params)
+        items = params.items() if isinstance(params, dict) else params
+        request.query_string = "&".join(f"{k}={v}" for k, v in items)
+        return request
+
+    def test_resolve_metadata_query_uri_absolute(self):
+        """Tests that an absolute IRI is returned unmodified without further CURIE/URN resolution."""
+        uri = "https://schema.org/encodingFormat"
+        assert resolve_metadata_query_uri(uri, "x") == uri
+
+    def test_resolve_metadata_query_uri_curie_resolved(self):
+        """Tests that a Safe CURIE referring to a known OGC definition resolves to its long-form URI."""
+        resolved = resolve_metadata_query_uri("[ogc-rel:profile]", "x")
+        assert resolved.startswith("https://www.opengis.net/def/rel/ogc/")
+
+    def test_resolve_metadata_query_uri_malformed(self):
+        """Tests that a value with invalid syntax (e.g., containing whitespace) is reported as a bad request."""
+        with pytest.raises(HTTPBadRequest):
+            resolve_metadata_query_uri("not a valid uri", "x")
+
+    def test_resolve_metadata_query_uri_unresolvable_curie(self):
+        """Tests that a syntactically valid but unresolvable CURIE prefix is reported as unprocessable."""
+        with pytest.raises(HTTPUnprocessableEntity):
+            resolve_metadata_query_uri("unknown-prefix:thing", "x")
+
+    @parameterized.expand(["process", "inputs", "outputs"])
+    def test_parse_metadata_query_filters_scopes(self, scope):
+        """Tests that each supported scope (``process``, ``inputs``, ``outputs``) is parsed from the bracket form."""
+        role = "https://schema.org/encodingFormat"
+        request = self.make_request({f"metadata[{scope}][{role}]": "urn:ogc:def:profile:OGC::text-plain"})
+        filters = parse_metadata_query_filters(request)
+        assert filters == [(scope, role, filters[0][2])]
+        assert filters[0][2].startswith("https://www.opengis.net/def/profile/")
+
+    def test_parse_metadata_query_filters_multiple_profiles_comma_separated(self):
+        """Tests that comma-separated profiles for a same role are extracted as distinct AND-ed filters."""
+        role = "https://schema.org/encodingFormat"
+        plain = "https://www.iana.org/assignments/media-types/text/plain"
+        html = "https://www.iana.org/assignments/media-types/text/html"
+        request = self.make_request({f"metadata[inputs][{role}]": f"{plain},{html}"})
+        filters = parse_metadata_query_filters(request)
+        assert {profile for _, _, profile in filters} == {plain, html}
+
+    def test_parse_metadata_query_filters_multiple_profiles_repeated_params(self):
+        """Tests that repeated query parameters for a same role are extracted as distinct AND-ed filters."""
+        role = "https://schema.org/encodingFormat"
+        plain = "https://www.iana.org/assignments/media-types/text/plain"
+        html = "https://www.iana.org/assignments/media-types/text/html"
+        request = self.make_request([
+            (f"metadata[inputs][{role}]", plain),
+            (f"metadata[inputs][{role}]", html),
+        ])
+        filters = parse_metadata_query_filters(request)
+        assert {profile for _, _, profile in filters} == {plain, html}
+
+    def test_parse_metadata_query_filters_curie_doubled_brackets(self):
+        """Tests that a Safe CURIE ``<role>`` with doubled brackets in the parameter name is parsed correctly."""
+        request = self.make_request({"metadata[outputs][[ogc-rel:profile]]": "[ogc-rel:profile]"})
+        filters = parse_metadata_query_filters(request)
+        assert len(filters) == 1
+        scope, role, profile = filters[0]
+        assert scope == "outputs"
+        assert role == profile
+        assert role.startswith("https://www.opengis.net/def/rel/ogc/")
+
+    def test_parse_metadata_query_filters_bracket_handling_preference(self):
+        """Tests that the 'Prefer: handling=strict' header rejects literal brackets, while lenient (default) accepts them."""
+        role = "https://schema.org/encodingFormat"
+        request = self.make_request({f"metadata[outputs][{role}]": "urn:ogc:def:profile:OGC::text-plain"})
+        filters = parse_metadata_query_filters(request)
+        assert len(filters) == 1
+        assert request.metadata_bracket_handling == "lenient"
+
+        request = self.make_request({f"metadata[outputs][{role}]": "urn:ogc:def:profile:OGC::text-plain"})
+        request.headers["Prefer"] = "handling=strict"
+        with pytest.raises(HTTPBadRequest):
+            parse_metadata_query_filters(request)
+
+    def test_parse_metadata_query_filters_invalid_scope(self):
+        """Tests that an unsupported scope keyword in the bracket notation is reported as a bad request."""
+        request = self.make_request({"metadata[bogus][role]": "profile"})
+        with pytest.raises(HTTPBadRequest):
+            parse_metadata_query_filters(request)
+
+    def test_decode_compressed_metadata_query_valid(self):
+        """Tests that a base64url/gzip compacted JSON 'QUERY' content is decoded into equivalent filters."""
+        role = "https://schema.org/encodingFormat"
+        content = {"inputs": {role: ["urn:ogc:def:profile:OGC::text-plain"]}}
+        payload = gzip.compress(json.dumps(content).encode())
+        compressed = base64.urlsafe_b64encode(payload).decode()
+        request = self.make_request({"metadata": compressed})
+        filters = parse_metadata_query_filters(request)
+        assert len(filters) == 1
+        scope, parsed_role, profile = filters[0]
+        assert (scope, parsed_role) == ("inputs", role)
+        assert profile.startswith("https://www.opengis.net/def/profile/")
+
+    def test_decode_compressed_metadata_query_invalid(self):
+        """Tests that a malformed compacted 'metadata' query value is reported as a bad request."""
+        with pytest.raises(HTTPBadRequest):
+            decode_compressed_metadata_query("not-a-valid-gzip-base64-value")

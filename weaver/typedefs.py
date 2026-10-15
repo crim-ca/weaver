@@ -3,6 +3,7 @@ from typing_extensions import Literal
 
 # runtime-available alias (used with 'get_args' where the literal values must be inspected dynamically)
 MetadataQueryScope = Literal["process", "inputs", "outputs"]
+PreferHeaderHandling = Literal["lenient", "strict"]
 
 if TYPE_CHECKING:
     import io
