@@ -32,11 +32,12 @@ Retrieve W3C PROV provenance metadata for tracking execution lineage and data de
 ### Optional
 
 - **format** (string): Provenance format
-  - `json`: PROV-JSON format (default)
-  - `jsonld`: PROV-JSONLD format (default)
-  - `xml`: PROV-XML format
-  - `turtle`: RDF Turtle format
-  - `rdf`: RDF/XML format
+  - `PROV-JSON`: PROV-JSON format (default)
+  - `PROV-JSONLD`: PROV-JSONLD format
+  - `PROV-TURTLE`: RDF Turtle format
+  - `PROV-N`: PROV-N human-readable (Prolog-like) provenance notation format
+  - `PROV-XML`: PROV-XML format
+  - `PROV-NT`: RDF NTriples format
 
 ## CLI Usage
 
@@ -45,16 +46,14 @@ Retrieve W3C PROV provenance metadata for tracking execution lineage and data de
 weaver provenance -u $WEAVER_URL -j a1b2c3d4-e5f6-7890-abcd-ef1234567890
 
 # Get provenance in RDF Turtle
-weaver provenance -u $WEAVER_URL -j a1b2c3d4-e5f6-7890-abcd-ef1234567890 -f turtle
-
-# Save to file
-weaver provenance -u $WEAVER_URL -j a1b2c3d4-e5f6-7890-abcd-ef1234567890 -o provenance.jsonld
+weaver provenance -u $WEAVER_URL -j a1b2c3d4-e5f6-7890-abcd-ef1234567890 --prov-format PROV-TURTLE
 ```
 
 ## Python Usage
 
 ```python
 from weaver.cli import WeaverClient
+from weaver.provenance import ProvenanceFormat
 
 client = WeaverClient(url="https://weaver.example.com")
 
@@ -68,7 +67,7 @@ for entity in prov.body.get("entities", []):
 # Get provenance in specific format
 prov_turtle = client.provenance(
     job_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    format="turtle"
+    prov_format=ProvenanceFormat.PROV_TURTLE
 )
 ```
 
@@ -76,7 +75,7 @@ prov_turtle = client.provenance(
 
 ```bash
 GET /jobs/a1b2c3d4-e5f6-7890-abcd-ef1234567890/prov
-Accept: application/ld+json
+Accept: application/json
 ```
 
 ## Returns
@@ -167,7 +166,7 @@ for derivation in prov.body.get("wasDerivedFrom", []):
 
 ```bash
 # Export provenance for archival
-weaver provenance -u $WEAVER_URL -j $JOB_ID -f xml -o compliance/job-$JOB_ID-prov.xml
+weaver provenance -u $WEAVER_URL -j $JOB_ID -f xml > compliance/job-$JOB_ID-prov.xml
 ```
 
 ## Related Skills
