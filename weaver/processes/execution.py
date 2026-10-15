@@ -64,6 +64,7 @@ from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process, map_progress
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
+from weaver.transform.utils import extend_alternate_formats
 from weaver.utils import (
     apply_number_with_unit,
     as_int,
@@ -1812,8 +1813,16 @@ def validate_process_io(process, payload):
                 io_ctypes = {
                     # field 'type' as Content-Type is only valid in execute payload
                     # during process description, it is used as the data/value type
-                    get_field(io_fmt, "mime_type", extra_variations=["type"], default="")
+                    # nested 'format' field also allows the media-type specification
+                    ctype
                     for io_fmt in io_exec
+                    for ctype in [
+                        get_field(io_fmt, "mime_type", extra_variations=["type"], default=""),
+                        get_field(
+                            get_field(io_fmt, "format", default={}) or {},
+                            "mime_type", search_variations=True, default=""
+                        ),
+                    ]
                 }
                 io_ctypes = [ctype for ctype in io_ctypes if ctype]
                 io_accept = {
@@ -1821,6 +1830,11 @@ def validate_process_io(process, payload):
                     for io_fmt in io_format
                 }
                 io_accept = [clean_media_type_format(ctype) for ctype in io_accept if ctype]
+                # transparently support legacy media-types equivalent to the supported ones
+                io_accept = [
+                    alt["mediaType"]
+                    for alt in extend_alternate_formats([{"mediaType": ctype} for ctype in io_accept], legacy=True)
+                ]
                 # no format specified explicitly must ensure that the process description has one by default
                 if not io_ctypes:
                     io_default = any(get_field(io_fmt, "default", default=False) for io_fmt in io_format)

@@ -2015,9 +2015,8 @@ def convert_input_values_schema(inputs, schema):
                         input_item = {"id": input_id, "value": input_data}
                     input_list.append(input_item)
             elif isinstance(input_value, dict):
-                input_key = list(input_value)[0]
-                input_value = input_value[input_key]
-                input_list.append({"id": input_id, input_key: input_value})
+                # preserve all fields (e.g.: 'format', 'type', 'schema' along 'href' or 'value')
+                input_list.append({"id": input_id, **input_value})
             else:
                 input_list.append({"id": input_id, "value": input_value})
         return input_list

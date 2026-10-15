@@ -27,6 +27,7 @@ from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process
 from weaver.processes.wps_package import format_extension_validator
 from weaver.store.base import StoreProcesses
+from weaver.transform.utils import extend_alternate_formats
 from weaver.utils import (
     extend_instance,
     get_header,
@@ -291,6 +292,10 @@ class WorkerService(ServiceWPS):
                     data_format.schema = get_field(input_data, "schema", default=data_format.schema)
                     patched_formats.append(data_format)
             input_def.supported_formats = tuple(patched_formats)
+
+        # Legacy media-types are not part of the process description, but are transparently supported in place of
+        # the official ones. Since 'pywps' only accepts submitted formats found in 'supported_formats', add them here.
+        input_def.supported_formats = tuple(extend_alternate_formats(input_def.supported_formats, legacy=True))
 
         # make sure pywps does not "help us" pre-validating the formats incorrectly
         # (when 'emptyvalidator' and some validation is enabled, it is a guaranteed failure)
