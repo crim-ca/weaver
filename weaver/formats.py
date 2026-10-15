@@ -99,6 +99,7 @@ class ContentType(Constants):
     APP_FORM = "application/x-www-form-urlencoded"
     APP_GEOJSON = "application/geo+json"
     APP_VDN_GEOJSON = "application/vnd.geo+json"
+    APP_OGC_GEOTIFF = "application/tiff; application=geotiff"  # legacy
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
     APP_JSON = "application/json"
@@ -107,6 +108,7 @@ class ContentType(Constants):
     APP_OAS_JSON = "application/vnd.oai.openapi+json; version=3.0"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
     APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"
+    APP_JPEG2000 = "application/jp2"  # legacy
     APP_NETCDF = "application/netcdf"       # official (registered IANA: https://github.com/Unidata/netcdf/issues/42)
     APP_X_NETCDF = "application/x-netcdf"   # legacy
     APP_NT = "application/n-triples"
@@ -148,7 +150,7 @@ class ContentType(Constants):
 
     # special handling
     ANY_NETCDF = {APP_NETCDF, APP_X_NETCDF}
-    ANY_TIFF = {IMAGE_GEOTIFF, IMAGE_OGC_GEOTIFF, IMAGE_COG, IMAGE_TIFF}
+    ANY_TIFF = {IMAGE_GEOTIFF, IMAGE_OGC_GEOTIFF, APP_OGC_GEOTIFF, IMAGE_COG, IMAGE_TIFF}
     ANY_GEOJSON = {APP_GEOJSON, APP_VDN_GEOJSON}
     ANY_YAML = {APP_YAML, APP_X_YAML, TEXT_YAML, TEXT_X_YAML}
     ANY_JSON = {
@@ -478,7 +480,6 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_GZIP: ".gz",
     ContentType.APP_TAR_GZ: ".tar.gz",
     ContentType.APP_YAML: ".yaml",
-    ContentType.IMAGE_JPEG2000: ".jp2",
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
     ContentType.IMAGE_OGC_GEOTIFF: ".tif",
     ContentType.ANY: ".*",      # any for glob
@@ -527,7 +528,7 @@ _CONTENT_TYPE_EXTENSION_MAPPING.update({
     if ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
 })
 # apply any remaining local types not explicitly or indirectly added by FORMATS
-_CONTENT_TYPE_EXT_PATTERN = re.compile(r"^[a-z]+/(x-)?(?P<ext>([a-z]+)).*$")
+_CONTENT_TYPE_EXT_PATTERN = re.compile(r"^[a-z]+/(x-)?(?P<ext>([a-z0-9]+)).*$")
 _CONTENT_TYPE_LOCALS_MISSING = [
     (ctype, _CONTENT_TYPE_EXT_PATTERN.match(ctype))
     for ctype in ContentType.values()
@@ -672,6 +673,7 @@ OGC_MAPPING = {
     ContentType.IMAGE_GEOTIFF: "geotiff",
     ContentType.IMAGE_OGC_GEOTIFF: "geotiff",
     ContentType.IMAGE_COG: "geotiff",
+    ContentType.APP_OGC_GEOTIFF: "geotiff",
     ContentType.APP_NETCDF: "netcdf",
     ContentType.APP_X_NETCDF: "netcdf",
 }

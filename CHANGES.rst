@@ -16,6 +16,10 @@ Changes:
 
 Fixes:
 ------
+- Add ``application/tiff`` and ``application/jp2`` as accepted media types for compatibility with older workflows
+  and the OGC Process API Schema examples (resolves `#1068 <https://github.com/crim-ca/weaver/issues/1068>`_).
+- Correct regex in ``weaver.formats`` to accept digits in filename extensions when building
+  ``_CONTENT_TYPE_EXT_PATTERN``.
 - Fix `CLI` ``execute`` inputs parsing that incorrectly interpreted valid `OGC API - Processes` execution bodies
   (e.g.: with ``bbox``, nested ``value`` objects) as `CWL` job inputs and failed. Only inputs containing
   a ``class`` field are now considered `CWL` as originally intended. Logic is simplified to help interpretability
