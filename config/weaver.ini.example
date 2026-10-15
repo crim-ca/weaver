@@ -246,7 +246,9 @@ RESULT_BACKEND = mongodb
 use = egg:gunicorn#main
 bind = 0.0.0.0:4001
 workers = 10
-timeout = 10
+# OpenAPI generation (GET /json) can exceed 10s on a 
+# cold worker with limited CPU, causing worker kill (HTTP 500)
+timeout = 60
 
 # --- waitress ---
 # use = egg:waitress#main
