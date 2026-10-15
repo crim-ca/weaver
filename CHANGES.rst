@@ -20,6 +20,7 @@ Changes:
   that define a matching ``metadata`` entry, either in the main `process` or per `inputs`/`outputs` definition of the
   requested `<scope>`, and resolving Safe `CURIE`/`URN` ``role``/``profile`` references to their long-form `URI` as
   necessary. Corresponding HTTP 400/422 error responses are raised when applicable for invald parsing or combinations.
+- Add `OGC API - Processes - Part 5: Provenance and Profiles` ``metadata-profiles`` conformance class references.
 
 Fixes:
 ------
@@ -36,8 +37,6 @@ Fixes:
 - Extend the same ``metadata`` `HTML` rendering improvements to per-``id`` ``inputs``/``outputs`` entries of a
   `Process`/`Provider` description, and add missing ``title``/``description`` rendering for ``outputs`` (previously
   only the ``Schema`` was displayed).
-- Add `OGC API - Processes - Part 5: Provenance and Profiles` ``metadata-profiles`` conformance class references
-  (``profile-link``, ``role-register``, ``concept-relations``) to the ``/conformance`` endpoint.
 - Fix `HTML` ``Jobs`` breadcrumb and listing links on a `Job`/`Process`/`Provider`-scoped page that incorrectly
   redirected to the unfiltered `Job` listing instead of preserving the ``process``/``provider`` filtering context.
 - Remove `HTML` duplicate rendering of alternate OGC/WPS/CWL JSON/YAML/XML content negotiation links.
