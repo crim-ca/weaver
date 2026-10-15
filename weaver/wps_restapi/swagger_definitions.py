@@ -1643,6 +1643,14 @@ class ProcessDeployMeta(ExtendedMappingSchema):
 
 
 class InputOutputDescriptionMeta(ExtendedMappingSchema):
+    # NOTE:
+    #   'keywords'/'metadata' must be declared explicitly (not inherited) so that they are not silently dropped
+    #   by validation (eg: when parsing a submitted deploy/update payload, or when generating a describe response
+    #   for a process previously updated with per-I/O 'metadata' such as 'role'/'profile' references).
+    #   No 'default' is set, so that unnecessary empty lists are not injected where nothing was provided.
+    keywords = KeywordList(missing=drop, description="Keywords applied to the input/output.")
+    metadata = MetadataList(missing=drop, description="External references relevant to the input/output.")
+
     # remove unnecessary empty lists by default if nothing is provided for inputs/outputs
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None

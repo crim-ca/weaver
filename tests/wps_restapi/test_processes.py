@@ -4239,6 +4239,32 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert body["outputs"]["output"]["title"] == data["outputs"][0]["title"]
         assert body["outputs"]["output"]["description"] == data["outputs"][0]["description"]
 
+    def test_update_process_io_metadata_role_profile(self):
+        """
+        Validate that ``PATCH`` can append ``metadata`` entries with ``role``/``rel`` profile to inputs/outputs.
+
+        .. seealso::
+            OGC API - Processes - Part 5: Provenance and Profiles (``metadata-profiles`` conformance class),
+            which defines ``profile`` metadata links using ``rel: "https://www.opengis.net/def/profile"``.
+        """
+        p_id = "test-process-io-metadata-profile"
+        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version="1.0")
+
+        profile_rel = "https://www.opengis.net/def/profile"
+        output_metadata = {
+            "role": "https://schema.org/encodingFormat",
+            "rel": profile_rel,
+            "href": "https://www.iana.org/assignments/media-types/text/plain",
+        }
+        data = {"outputs": {"output": {"metadata": [output_metadata]}}}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+
+        resp = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert resp.status_code == 200
+        body = resp.json
+        assert output_metadata in body["outputs"]["output"]["metadata"]
+
     def test_update_process_jobs_adjusted(self):
         """
         Validate that given a valid process update, associated jobs update their references to preserve links.

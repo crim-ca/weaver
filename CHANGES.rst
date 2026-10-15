@@ -12,10 +12,18 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `OGC API - Processes - Part 5: Provenance and Profiles` new ``metadata-profiles`` conformance class references
+  which provides the semantics of ``metadata`` with ``role``, ``href`` and a profiled-term ``rel`` to annotate the
+  `Process` itself or at granular I/O definitions, and aligns with ``dataClasses`` URIs along the I/O ``schema``
+  (relates to `opengeospatial/ogcapi-processes#637 <https://github.com/opengeospatial/ogcapi-processes/pull/637>`_).
 
 Fixes:
 ------
+- Fix ``PATCH`` requests silently dropping per-``id`` ``inputs``/``outputs`` ``metadata``
+  (e.g., to add ``role``/``profile`` links) submitted for update, by declaring ``keywords``/``metadata``
+  fields on ``InputOutputDescriptionMeta`` schema-node definition.
+- Fix ``PATCH`` list-append logic (``keywords``, ``metadata``, ``links``)
+  that discarded the merged result and persisted the original unchanged list instead.
 - Fix `HTML` rendering of `Process`/`Provider` ``metadata`` entries that mixed link reference (``rel``/``href``) and
   value (``role``/``value``) representations, causing duplicated ``role`` fields, ``rel``/``role`` identifiers not
   rendered as clickable links when they are fully qualified `URL` references, literal embedded JSON ``value`` objects
@@ -24,6 +32,8 @@ Fixes:
 - Extend the same ``metadata`` `HTML` rendering improvements to per-``id`` ``inputs``/``outputs`` entries of a
   `Process`/`Provider` description, and add missing ``title``/``description`` rendering for ``outputs`` (previously
   only the ``Schema`` was displayed).
+- Add `OGC API - Processes - Part 5: Provenance and Profiles` ``metadata-profiles`` conformance class references
+  (``profile-link``, ``role-register``, ``concept-relations``) to the ``/conformance`` endpoint.
 - Fix `HTML` ``Jobs`` breadcrumb and listing links on a `Job`/`Process`/`Provider`-scoped page that incorrectly
   redirected to the unfiltered `Job` listing instead of preserving the ``process``/``provider`` filtering context.
 - Remove `HTML` duplicate rendering of alternate OGC/WPS/CWL JSON/YAML/XML content negotiation links.
