@@ -34,6 +34,14 @@ Fixes:
 ------
 - Fix files without extension in a remote directory listing (e.g.: `Zarr` chunks such as ``c/0``) being renamed with
   a default extension (e.g.: ``c/0.txt``) when fetched as part of a directory, which corrupted the directory contents.
+- Fix `HTML` rendering of `Process`/`Provider` ``metadata`` entries that mixed link reference (``rel``/``href``) and
+  value (``role``/``value``) representations, causing duplicated ``role`` fields, ``rel``/``role`` identifiers not
+  rendered as clickable links when they are fully qualified `URL` references, literal embedded JSON ``value`` objects
+  dumped using their raw Python representation instead of pretty-printed JSON, and inconsistent indentation of the
+  ``Media-Type`` field relative to the corresponding link reference.
+- Extend the same ``metadata`` `HTML` rendering improvements to per-``id`` ``inputs``/``outputs`` entries of a
+  `Process`/`Provider` description, and add missing ``title``/``description`` rendering for ``outputs`` (previously
+  only the ``Schema`` was displayed).
 - Fix `HTML` ``Jobs`` breadcrumb and listing links on a `Job`/`Process`/`Provider`-scoped page that incorrectly
   redirected to the unfiltered `Job` listing instead of preserving the ``process``/``provider`` filtering context.
 - Remove `HTML` duplicate rendering of alternate OGC/WPS/CWL JSON/YAML/XML content negotiation links.
@@ -42,6 +50,7 @@ Fixes:
   block, leaking a stray newline into generated `Process` `URL` references. This broke the inline ``<script>``
   blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
   section, causing a ``ReferenceError`` when clicking them.
+- Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
 
 .. _changes_6.16.0:
 
