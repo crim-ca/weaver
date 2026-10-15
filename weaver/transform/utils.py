@@ -60,12 +60,7 @@ def is_tiff(image: str) -> bool:
     :return: True if the file is TIFF, False otherwise.
     """
     ext = os.path.splitext(image)[1]
-    return get_content_type(ext) in {
-        ContentType.IMAGE_TIFF,
-        ContentType.IMAGE_GEOTIFF,
-        ContentType.IMAGE_OGC_GEOTIFF,
-        ContentType.IMAGE_COG,
-    }
+    return get_content_type(ext) in ContentType.ANY_TIFF
 
 
 def is_gif(image: str) -> bool:
