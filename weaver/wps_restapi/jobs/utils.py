@@ -1362,6 +1362,12 @@ def get_job_results_single(
             output_format,
             settings=settings,
         )
+        if out_data is None:  # directory (e.g.: Zarr) cannot be returned by value, only by reference
+            link = make_result_link(
+                job, result, output_id, ExecuteTransmissionMode.REFERENCE, output_format, settings=settings
+            )
+            headers.extend([("Link", link[0])])
+            return HTTPNoContent(headers=headers)
         headers.update(out_headers)
 
     ctype = out_headers.get("Content-Type")

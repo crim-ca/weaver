@@ -4383,6 +4383,23 @@ def test_get_job_results_document_binary_base64():
     assert base64.b64decode(value["value"]) == BINARY_ZIP_DATA
 
 
+def test_get_job_results_single_directory_by_reference():
+    """
+    Directory (Zarr) cannot be returned by value, the reference link must be used instead of a ``None`` body.
+    """
+    job = Job(task_id="test", outputs={"out": {"transmissionMode": ExecuteTransmissionMode.VALUE}})
+    url = "http://localhost/wps-outputs/test/out/test.zarr"
+    result = {"href": url, "type": ContentType.APP_ZARR_V3}
+    res_headers = {"Content-Type": ContentType.APP_ZARR_V3, "Content-Location": url}
+    patch = mock.patch("weaver.wps_restapi.jobs.utils.generate_or_resolve_result", return_value=(res_headers, None))
+    with patch:
+        resp = get_job_results_single(job, result, "out", None, [], settings={})
+    assert resp.status_code == 204
+    assert not resp.body
+    links = [val for key, val in resp.headerlist if key == "Link"]
+    assert any(url in link and f"type=\"{ContentType.APP_ZARR_V3}\"" in link for link in links)
+
+
 @pytest.mark.parametrize(
     ["accept_type", "accept_profile"],
     [
