@@ -482,11 +482,8 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_GZIP: ".gz",
     ContentType.APP_TAR_GZ: ".tar.gz",
     ContentType.APP_YAML: ".yaml",
-<<<<<<< HEAD
-=======
-    ContentType.IMAGE_JPEG2000: ".jp2",
     ContentType.APP_JPEG2000: ".jp2",
->>>>>>> 12de737b (make legacy media-type resolution dynamically resolved)
+    ContentType.IMAGE_JPEG2000: ".jp2",
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
     ContentType.IMAGE_OGC_GEOTIFF: ".tif",
     ContentType.APP_OGC_GEOTIFF: ".tif",
