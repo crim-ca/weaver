@@ -453,7 +453,7 @@ class Transform:
         if self.cmt != self.wmt:
             if is_zarr_media_type(self.cmt) and self.wmt == ContentType.APP_ZARR_ZIP:
                 # keep the full name, since Zarr directories are not required to end with '.zarr'
-                self.output_path = self.file_path.rstrip("/") + ".zip"
+                self.output_path = f"{self.file_path.rstrip('/')}.zip"
             else:
                 base_path, _ = os.path.splitext(self.file_path.rstrip("/"))  # directory has trailing slash
                 self.output_path = base_path + self.ext
