@@ -28,7 +28,7 @@ fetch() {
     fi
     if [ "$jqfmt" = "jq" ]; then
         tmp2=$(mktemp) || { echo "ERROR: could not create a temporary file." >&2; exit 1; }
-        if ! fix_urls < "$tmp" | jq --indent 4 . > "$tmp2"; then
+        if ! fix_urls < "$tmp" | jq . > "$tmp2"; then
             echo "ERROR: jq formatting failed for [$url]" >&2
             rm -f "$tmp" "$tmp2"
             exit 1
