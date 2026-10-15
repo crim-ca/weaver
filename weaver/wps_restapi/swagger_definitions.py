@@ -5306,6 +5306,10 @@ class Execute(AllOfKeywordSchema):
     # OGC 'execute.yaml' does not enforce any required item
     description = "Process execution parameters."
     examples = {
+        "ExecuteEchoProcess": {
+            "summary": "Execution body of the sample ``EchoProcess`` with all OGC API input value representations.",
+            "value": EXAMPLES["local_process_execute.json"],
+        },
         "ExecuteJSON": {
             "summary": "Execute a process job using REST JSON payload with OGC API schema.",
             "value": EXAMPLES["job_execute.json"],
