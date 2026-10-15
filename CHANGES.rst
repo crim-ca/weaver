@@ -12,10 +12,23 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `OGC API - Processes - Part 5: Provenance and Profiles` new ``metadata-profiles`` conformance class references
+  which provides the semantics of ``metadata`` with ``role``, ``href`` and a profiled-term ``rel`` to annotate the
+  `Process` itself or at granular I/O definitions, and aligns with ``dataClasses`` URIs along the I/O ``schema``
+  (relates to `opengeospatial/ogcapi-processes#637 <https://github.com/opengeospatial/ogcapi-processes/pull/637>`_).
+- Implement ``GET /processes?metadata[<scope>][<role>]=<profile>`` query filtering to list only `Process` summaries
+  that define a matching ``metadata`` entry, either in the main `process` or per `inputs`/`outputs` definition of the
+  requested `<scope>`, and resolving Safe `CURIE`/`URN` ``role``/``profile`` references to their long-form `URI` as
+  necessary. Corresponding HTTP 400/422 error responses are raised when applicable for invald parsing or combinations.
+- Add `OGC API - Processes - Part 5: Provenance and Profiles` ``metadata-profiles`` conformance class references.
 
 Fixes:
 ------
+- Fix ``PATCH`` requests silently dropping per-``id`` ``inputs``/``outputs`` ``metadata``
+  (e.g., to add ``role``/``profile`` links) submitted for update, by declaring ``keywords``/``metadata``
+  fields on ``InputOutputDescriptionMeta`` schema-node definition.
+- Fix ``PATCH`` list-append logic (``keywords``, ``metadata``, ``links``)
+  that discarded the merged result and persisted the original unchanged list instead.
 - Fix `CLI` ``execute`` inputs parsing that incorrectly interpreted valid `OGC API - Processes` execution bodies
   (e.g.: with ``bbox``, nested ``value`` objects) as `CWL` job inputs and failed. Only inputs containing
   a ``class`` field are now considered `CWL` as originally intended. Logic is simplified to help interpretability

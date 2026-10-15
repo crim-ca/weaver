@@ -1667,7 +1667,7 @@ def _apply_process_metadata(process, update_data):  # pylint: disable=R1260,too-
                     if unique:
                         merged = list(dict.fromkeys(merged))  # not set to preserve order
                     if current != merged:
-                        set_field(dest, target, current)
+                        set_field(dest, target, merged)
                         any_change = True
             else:
                 current = get_field(dest, target, default=None)

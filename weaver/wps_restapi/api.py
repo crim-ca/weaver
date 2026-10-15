@@ -642,7 +642,31 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_part5}/rec/provenance/prov-content-associations",
         f"{ogcapi_proc_part5}/per/provenance/prov-content-negotiation",
     ] if ogcapi_proc_prov else []) + [
-        # OGC API - Processes - 'Part 5: Versioning' (unofficial)
+        # OGC API - Processes - Part 5: Provenance and Profiles, 'metadata-profiles' conformance class
+        # (see https://github.com/opengeospatial/ogcapi-processes/pull/637)
+        f"{ogcapi_proc_part5}/conf/metadata-profiles",
+        f"{ogcapi_proc_part5}/req/metadata-profiles",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/profile-link",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/role-register",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/concept-relations",
+        # '?metadata[<role>]=<profile>' query filtering of process listing (GET method only, JSON/HTML content)
+        f"{ogcapi_proc_part5}/req/metadata-profiles/query-parameter",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/query-matching",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/query-options",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/query-method",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/invalid-metadata-profile",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/invalid-role",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/query-curie-matching",
+        f"{ogcapi_proc_part5}/per/metadata-profiles/safe-curie",
+        f"{ogcapi_proc_part5}/per/metadata-profiles/query-optional",
+        f"{ogcapi_proc_part5}/per/metadata-profiles/query-literal-brackets",
+        f"{ogcapi_proc_part5}/rec/metadata-profiles/query-literal-brackets-error",
+        # FIXME: HTTP QUERY method not implemented. Require OpenAPI 3.2 and custom tweaks of CorniceSwagger
+        # f"{ogcapi_proc_part5}/req/metadata-profiles/query-content",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/query-compression",
+        f"{ogcapi_proc_part5}/req/metadata-profiles/unsupported-metadata-encoding",
+    ] + [
+        # OGC API - Processes - 'Part 6: Versioning' (unofficial)
         # (see https://github.com/opengeospatial/ogcapi-processes/pull/578)
         f"{ogcapi_proc_part6}/rec/versioning/replace-response-links"
     ] + [
