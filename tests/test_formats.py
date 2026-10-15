@@ -18,6 +18,7 @@ from requests.exceptions import ConnectionError
 
 from tests.utils import MockedRequest
 from weaver import formats as f
+from weaver.transform.const import CONVERSION_DICT
 from weaver.utils import null, request_extra
 
 if TYPE_CHECKING:
@@ -67,7 +68,7 @@ def test_valid_media_type_categories(media_type):
         (f.ContentType.APP_GEOJSON, {}, ".geojson"),  # pywps <4.4 definition
         (f.ContentType.APP_VDN_GEOJSON, {}, ".geojson"),  # pywps>=4.4 definition
         (f.ContentType.IMAGE_GEOTIFF, {}, ".tiff"),  # pywps definition
-        (f.ContentType.APP_OGC_GEOTIFF, {}, ".tiff"),
+        (f.ContentType.APP_OGC_GEOTIFF, {}, ".tif"),
         (f.ContentType.IMAGE_JPEG2000, {}, ".jp2"),
         (f.ContentType.APP_JPEG2000, {}, ".jp2"),
         ("application/x-custom", {}, ".custom"),
@@ -870,3 +871,23 @@ def test_find_supported_media_types(io_definition, expected_media_type):
         assert sorted(found_media_type) == sorted(expected_media_type)
     else:
         assert found_media_type == expected_media_type
+
+
+@pytest.mark.parametrize(
+    ["legacy_type", "official_type"],
+    [
+        (f.ContentType.APP_OGC_GEOTIFF, f.ContentType.IMAGE_OGC_GEOTIFF),
+        (f.ContentType.APP_JPEG2000, f.ContentType.IMAGE_JPEG2000),
+    ]
+)
+def test_legacy_media_types(legacy_type, official_type):
+    assert legacy_type in f.ContentType.ANY_LEGACY
+    assert official_type not in f.ContentType.ANY_LEGACY
+    assert legacy_type in CONVERSION_DICT[official_type]
+    assert f.get_format(legacy_type).mime_type == legacy_type
+    ext = f.get_extension(legacy_type)
+    assert f.get_extension(official_type) == ext or ext in f.get_extension(official_type, variants=True)
+    # legacy must never be selected when resolving from extension
+    assert f.get_content_type(ext) not in f.ContentType.ANY_LEGACY
+    for ext_variant in f.get_extension(legacy_type, variants=True):
+        assert f.get_content_type(ext_variant) != legacy_type

@@ -1084,6 +1084,32 @@ class TestWeaverClient(TestWeaverClientBase):
         assert out_data["path"].endswith(".json")
         assert out_data["format"] == fmt
 
+    @pytest.mark.format
+    def test_execute_inputs_legacy_media_type(self):
+        """
+        Legacy media-types of OGC API - Processes examples must be accepted when only the official type is defined.
+        """
+        for official_type, legacy_type in [
+            (ContentType.IMAGE_OGC_GEOTIFF, ContentType.APP_OGC_GEOTIFF),
+            (ContentType.IMAGE_JPEG2000, ContentType.APP_JPEG2000),
+        ]:
+            payload = copy.deepcopy(self.test_payload["CatFile"])
+            process_id = f"{self.test_process_prefix}LegacyMediaType-{legacy_type.split('/')[-1].split(';')[0]}"
+            payload["processDescription"]["process"]["inputs"][0]["formats"] = [
+                {"mediaType": official_type, "default": True},
+            ]
+            self.deploy_process(payload, process_id=process_id)
+            self.test_process["LegacyMediaType"] = process_id
+
+            href = "https://example.com/data.tif"
+            inputs = {"inputs": {"file": {"href": href, "format": {"mediaType": legacy_type}}}}
+            result = self.run_execute_inputs_schema_variant(inputs, process="LegacyMediaType")
+            assert result.success, result.message
+
+            # counter example check that other unrelated types are still not available for the process
+            inputs = {"inputs": {"file": {"href": href, "format": {"mediaType": ContentType.IMAGE_PNG}}}}
+            self.run_execute_inputs_schema_variant(inputs, process="LegacyMediaType", expect_success=False)
+
     @pytest.mark.vault
     def test_execute_inputs_representation_literal_schema_auto_resolve_vault(self):
         # 1st 'file' is the name of the process input
