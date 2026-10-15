@@ -57,8 +57,10 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENT_SECRETS,
     CWL_REQUIREMENT_TIME_LIMIT,
+    PACKAGE_DIRECTORY_TYPE,
     PACKAGE_FILE_TYPE
 )
+from weaver.processes.convert import CWLIODefinition
 from weaver.processes.wps_package import (
     DirectoryNestedStorage,
     WpsPackage,
@@ -269,6 +271,37 @@ def test_resolve_output_format_zarr_directory(formats, expect_type):
     WpsPackage.resolve_output_format(output, "result/sample.zarr", ContentType.APP_DIR)
     assert output.data_format.mime_type == expect_type
     assert output.valid_mode == MODE.NONE
+
+
+@pytest.mark.parametrize(
+    ["cwl_type", "expect_format"],
+    [
+        (PACKAGE_DIRECTORY_TYPE, False),
+        (PACKAGE_FILE_TYPE, True),
+    ]
+)
+def test_make_location_input_format_only_for_file(cwl_type, expect_format):
+    """
+    CWL ``format`` is File-only, therefore a Zarr ``Directory`` input must not receive it.
+    """
+    wps_input = mock.MagicMock()
+    wps_input.identifier = "zarr"
+    wps_input.as_reference = True
+    wps_input.url = "file:///tmp/sample.zarr"
+    wps_input._iohandler._file = None  # noqa
+    wps_input._default = None
+    wps_input.source_type = None
+    wps_input.data_format = Format(ContentType.APP_ZARR_V3)
+    package = mock.MagicMock()
+    package.make_location_input_security_check.side_effect = lambda *args: args[3]
+    package.must_fetch.return_value = False
+    cwl_def = CWLIODefinition(name="zarr", type=cwl_type)
+
+    with mock.patch("weaver.processes.wps_package.get_cwl_file_format", return_value="iana:test"):
+        location = WpsPackage.make_location_input(package, cwl_def, wps_input)
+
+    assert location["class"] == cwl_type
+    assert ("format" in location) == expect_format
 
 
 @pytest.mark.flaky(retries=2, delay=1)

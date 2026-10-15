@@ -2739,7 +2739,12 @@ class WpsPackage(Process):
             input_location = f"file://{input_location}"
 
         location = {"location": input_location, "class": cwl_input_def.type}
-        if input_definition.data_format is not None and input_definition.data_format.mime_type:
+        # CWL 'format' is File-only, a Directory (e.g.: Zarr) must not receive it
+        if (
+            cwl_input_def.type == PACKAGE_FILE_TYPE
+            and input_definition.data_format is not None
+            and input_definition.data_format.mime_type
+        ):
             fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
             if fmt is not None:
                 # in certain cases, the input format might not have been mapped to the exact one in the process

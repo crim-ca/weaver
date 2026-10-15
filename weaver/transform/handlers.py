@@ -451,8 +451,12 @@ class Transform:
         self.ext = get_extension(self.wmt)
 
         if self.cmt != self.wmt:
-            base_path, _ = os.path.splitext(self.file_path.rstrip("/"))  # directory has trailing slash
-            self.output_path = base_path + self.ext
+            if is_zarr_media_type(self.cmt) and self.wmt == ContentType.APP_ZARR_ZIP:
+                # keep the full name, since Zarr directories are not required to end with '.zarr'
+                self.output_path = self.file_path.rstrip("/") + ".zip"
+            else:
+                base_path, _ = os.path.splitext(self.file_path.rstrip("/"))  # directory has trailing slash
+                self.output_path = base_path + self.ext
             if os.path.exists(self.output_path):
                 try:
                     os.remove(self.output_path)

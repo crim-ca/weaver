@@ -180,6 +180,28 @@ def test_zarr_directory_to_zip(zarr_type):
             assert zip_file.read("var/c/0") == b"chunk"
 
 
+@pytest.mark.parametrize("dir_names", [["sample.v2", "sample.v3"], ["sample", "sample.zarr"]])
+def test_zarr_directory_to_zip_distinct_names(dir_names):
+    """
+    Sibling stores must not map to the same archive, otherwise the following conversion removes the previous one.
+    """
+    with tempfile.TemporaryDirectory() as tmp_path:
+        outputs = []
+        for name in dir_names:
+            zarr_dir = os.path.join(tmp_path, name)
+            os.makedirs(zarr_dir)
+            with open(os.path.join(zarr_dir, "zarr.json"), "w", encoding="utf-8") as f:
+                f.write(name)
+            trans = Transform(f"{zarr_dir}/", ContentType.APP_ZARR, ContentType.APP_ZARR_ZIP)
+            trans.get()
+            assert trans.output_path == f"{zarr_dir}.zip"
+            outputs.append(trans.output_path)
+        assert len(set(outputs)) == len(dir_names)
+        for name, path in zip(dir_names, outputs):
+            with zipfile.ZipFile(path) as zip_file:
+                assert zip_file.read("zarr.json") == name.encode()
+
+
 def test_zarr_directory_unsupported_conversion():
     with tempfile.TemporaryDirectory() as tmp_path:
         zarr_dir = _make_zarr_dir(tmp_path)
