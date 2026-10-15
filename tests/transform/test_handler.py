@@ -196,13 +196,15 @@ def test_zarr_directory_unsupported_conversion():
 def test_extend_alternate_formats_zarr(zarr_type):
     formats = [{"mediaType": zarr_type}]
     extended = extend_alternate_formats(formats)
-    assert [fmt["mediaType"] for fmt in extended] == [zarr_type, ContentType.APP_ZARR_ZIP]
+    # explicit version also offers the generic type for convenience
+    generic = [] if zarr_type == ContentType.APP_ZARR else [ContentType.APP_ZARR]
+    assert [fmt["mediaType"] for fmt in extended] == [zarr_type, *generic, ContentType.APP_ZARR_ZIP]
 
 
 def test_extend_alternate_formats_zarr_parameter_spelling():
     zarr_type = f"{ContentType.APP_ZARR};version=3"  # not exactly the same string as the predefined version variant
     extended = extend_alternate_formats([{"mediaType": zarr_type}])
-    assert [fmt["mediaType"] for fmt in extended] == [zarr_type, ContentType.APP_ZARR_ZIP]
+    assert [fmt["mediaType"] for fmt in extended] == [zarr_type, ContentType.APP_ZARR, ContentType.APP_ZARR_ZIP]
 
 
 def test_extend_alternate_formats_zarr_no_duplicates():
@@ -211,6 +213,7 @@ def test_extend_alternate_formats_zarr_no_duplicates():
     assert [fmt["mediaType"] for fmt in extended] == [
         ContentType.APP_ZARR_V2,
         ContentType.APP_ZARR_V3,
+        ContentType.APP_ZARR,
         ContentType.APP_ZARR_ZIP,
     ]
 

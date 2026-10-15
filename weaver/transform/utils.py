@@ -162,7 +162,10 @@ def extend_alternate_formats(
         alternates = conversion_dict.get(media_type)
         if alternates is None and is_zarr_media_type(media_type):  # any version or parameters spelling
             alternates = conversion_dict.get(ContentType.APP_ZARR)
-        for alt_format in alternates or []:
+        alternates = list(alternates or [])
+        if is_zarr_media_type(media_type) and media_type != ContentType.APP_ZARR:
+            alternates.insert(0, ContentType.APP_ZARR)  # explicit version also accepts the generic type
+        for alt_format in alternates:
             if alt_format not in seen:
                 missing_formats.append({"mediaType": alt_format})
                 seen.add(alt_format)

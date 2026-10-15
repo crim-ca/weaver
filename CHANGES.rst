@@ -25,6 +25,8 @@ Changes:
   as ``Content-Type`` for directory references when explicitly provided.
 - Offer ``application/zarr+zip`` as alternate format of `Zarr` directory `Job` outputs, using the ``?f={mediaType}``
   result representation to obtain the zipped store (store contents located at the root of the archive).
+  When an explicit ``version`` of the `Zarr` media-type is declared, the generic ``application/vnd.zarr`` is also
+  offered, and requesting it returns the same directory store without conversion.
 - Refuse deployment of a `Process` declaring a `Zarr` directory media-type on an `I/O` that is defined as a `CWL`
   ``File``, since `Zarr` stores must be represented by a ``Directory``.
 

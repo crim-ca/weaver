@@ -155,6 +155,23 @@ def test_zarr_and_directory_media_types(test_media_type, is_zarr, is_directory):
     assert f.is_directory_media_type(test_media_type) is is_directory
 
 
+@pytest.mark.parametrize(
+    ["test_media_type", "expect_version"],
+    [
+        (f.ContentType.APP_ZARR, None),
+        (f.ContentType.APP_ZARR_V2, "2"),
+        (f.ContentType.APP_ZARR_V3, "3"),
+        (f"{f.ContentType.APP_ZARR};version=3", "3"),  # no space before parameter
+        (f"{f.ContentType.APP_ZARR}; charset=UTF-8; version = 2", "2"),
+        (f.ContentType.APP_ZARR_ZIP, None),
+        (f.ContentType.APP_JSON, None),
+        (None, None),
+    ]
+)
+def test_get_zarr_version(test_media_type, expect_version):
+    assert f.get_zarr_version(test_media_type) == expect_version
+
+
 def test_zarr_media_types_group():
     assert f.ContentType.ANY_ZARR == {
         f.ContentType.APP_ZARR,

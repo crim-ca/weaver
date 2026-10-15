@@ -50,8 +50,10 @@ from weaver.formats import (
     ContentType,
     clean_media_type_format,
     get_format,
+    get_zarr_version,
     guess_target_format,
     is_directory_media_type,
+    is_zarr_media_type,
     repr_json
 )
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
@@ -1159,7 +1161,15 @@ def generate_or_resolve_result(
         out = clean_media_type_format(get_field(output_format, "mime_type", search_variations=True, default=None))
 
     # Apply transform if type is different from desired output and desired output is different from plain
-    if out and out not in EXCLUDED_TYPES and out != typ:
+    # Zarr is not converted between versions: only the generic type or the same version are the identical store
+    out_raw = output_format if isinstance(output_format, str) else get_field(
+        output_format, "mime_type", search_variations=True, default=""
+    )
+    same_zarr = (
+        is_zarr_media_type(out_raw) and is_zarr_media_type(typ) and
+        get_zarr_version(out_raw) in [None, get_zarr_version(typ)]
+    )
+    if out and out not in EXCLUDED_TYPES and out != typ and not same_zarr:
         file_transform = Transform(file_path=loc, current_media_type=typ, wanted_media_type=out)
         typ = out
         file_transform.get()

@@ -38,7 +38,6 @@ from weaver.formats import (
     get_cwl_file_format,
     get_extension,
     get_format,
-    is_directory_media_type,
     is_zarr_media_type,
     repr_json
 )
@@ -3958,7 +3957,8 @@ def check_io_compatible(wps_io, cwl_io, io_id):
         wps_fmts = get_field(wps_io, "supported_formats", search_variations=False, default=[]) or []
         cwl_fmts = get_field(cwl_io, "supported_formats", search_variations=False, default=[]) or []
         wps_zarr = any(is_zarr_media_type(get_field(fmt, "mime_type", search_variations=True)) for fmt in wps_fmts)
-        cwl_dir = any(is_directory_media_type(get_field(fmt, "mime_type", search_variations=True)) for fmt in cwl_fmts)
+        # 'application/directory' is the sentinel set by 'cwl2wps_io' for a real CWL Directory (not any Zarr 'format')
+        cwl_dir = any(get_field(fmt, "mime_type", search_variations=True) == ContentType.APP_DIR for fmt in cwl_fmts)
         if wps_zarr and not cwl_dir:
             msg_err = (
                 f"Mismatching CWL/WPS types for merge of I/O ID: [{io_id}] "

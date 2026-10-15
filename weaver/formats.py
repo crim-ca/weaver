@@ -155,6 +155,7 @@ class ContentType(Constants):
     ANY_TIFF = {IMAGE_GEOTIFF, IMAGE_OGC_GEOTIFF, IMAGE_COG, IMAGE_TIFF}
     ANY_GEOJSON = {APP_GEOJSON, APP_VDN_GEOJSON}
     ANY_YAML = {APP_YAML, APP_X_YAML, TEXT_YAML, TEXT_X_YAML}
+    # 'APP_ZARR_ZIP' is excluded on purpose: it is a single ZIP file (CWL 'File'), not a directory store (CWL 'Directory')
     ANY_ZARR = {APP_ZARR, APP_ZARR_V2, APP_ZARR_V3}
     ANY_JSON = {
         APP_JSON, *ANY_YAML, *ANY_GEOJSON,
@@ -876,6 +877,20 @@ def is_zarr_media_type(media_type):
     if not media_type or not isinstance(media_type, str):
         return False
     return clean_media_type_format(media_type, strip_parameters=True) == ContentType.APP_ZARR
+
+
+def get_zarr_version(media_type):
+    # type: (Any) -> Optional[str]
+    """
+    Obtains the ``version`` parameter of a Zarr media-type, or ``None`` for the generic type without any version.
+    """
+    if not is_zarr_media_type(media_type):
+        return None
+    for param in str(media_type).split(";")[1:]:
+        key, _, value = param.partition("=")
+        if key.strip().lower() == "version":
+            return value.strip().strip("\"") or None
+    return None
 
 
 def is_directory_media_type(media_type):

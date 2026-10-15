@@ -2676,7 +2676,7 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
     if file_ext or file_url is None:
         file_ext = get_secure_filename(file_ext)
     elif keep_name:
-        file_ext = ""  # names are meaningful as is (e.g.: Zarr chunk 'c/0'), avoid renaming to 'c/0.txt'
+        file_ext = ""  # extensionless Zarr chunk (e.g.: 'c/0', often application/zstd data) must keep its name as is
     else:
         file_ext = get_secure_filename(content_type_ext)
     if not FILE_NAME_LOOSE_PATTERN.match(file_name):
@@ -3396,7 +3396,11 @@ def fetch_files_url(file_references,                    # type: Iterable[str]
     file_references = sorted(list(set(file_refs_relative) | set(file_refs_absolute)))
 
     # Zarr chunk/metadata files have no extension (or only a dot-prefix), which must not be altered by a default one.
-    keep_names = any(os.path.basename(path) in ZARR_METADATA_FILES for path in file_references)
+    # Strip any query (e.g.: signed URL tokens) to match the file name itself.
+    keep_names = any(
+        os.path.basename(get_url_without_query(path)) in ZARR_METADATA_FILES
+        for path in file_references
+    )
 
     if out_method == OutputMethod.META:
         return [

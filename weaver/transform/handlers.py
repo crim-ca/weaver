@@ -19,7 +19,7 @@ from PIL import Image
 from pyramid.httpexceptions import HTTPUnprocessableEntity
 from pyramid.response import FileResponse
 
-from weaver.formats import OutputFormat, get_extension
+from weaver.formats import ContentType, OutputFormat, get_extension, is_zarr_media_type
 from weaver.transform.png2svg import rgba_image_to_svg_contiguous
 from weaver.transform.tiff import Tiff
 from weaver.transform.utils import get_content, is_gif, is_image, is_png, is_svg, is_tiff, write_content
@@ -520,7 +520,7 @@ class Transform:
             self.process_yaml()
         if "xml" in self.cmt:
             self.process_xml()
-        if "vnd.zarr" in self.cmt:
+        if is_zarr_media_type(self.cmt):
             self.process_zarr()
 
     def process_zarr(self) -> None:
@@ -529,7 +529,7 @@ class Transform:
 
         :raises RuntimeError: If a conversion type is unsupported.
         """
-        if "zarr+zip" in self.wmt:
+        if self.wmt == ContentType.APP_ZARR_ZIP:
             zarr_to_zip(self.file_path, self.output_path)
         else:
             raise RuntimeError(f"Conversion from Zarr to {self.wmt} is not supported.")

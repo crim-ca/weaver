@@ -1101,6 +1101,16 @@ def test_check_io_compatible_zarr_requires_cwl_directory():
         check_io_compatible(wps_io, cwl_file, "test")
 
 
+def test_check_io_compatible_zarr_cwl_file_with_zarr_format():
+    wps_io = ComplexInput("test", "", supported_formats=[Format(ContentType.APP_ZARR_V3)])
+    cwl_file = cwl2wps_io(
+        {"name": "test", "type": PACKAGE_FILE_TYPE, "format": ContentType.APP_ZARR_V3},
+        IO_INPUT,
+    )
+    with pytest.raises(PackageTypeError, match="Directory"):
+        check_io_compatible(wps_io, cwl_file, "test")
+
+
 def test_check_io_compatible_zarr_output_requires_cwl_directory():
     wps_io = ComplexOutput("test", "", supported_formats=[Format(ContentType.APP_ZARR_V3)])
     cwl_dir = cwl2wps_io({"name": "test", "type": PACKAGE_DIRECTORY_TYPE}, IO_OUTPUT)
