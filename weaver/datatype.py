@@ -60,7 +60,7 @@ from weaver.processes.constants import (
 )
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
-from weaver.provenance import ProvenanceFormat, ProvenancePathType, jsonld2ogcprov
+from weaver.provenance import ProvenanceFormat, ProvenancePathType, convert_to_prov_chain
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreProcesses
@@ -1584,11 +1584,11 @@ class Job(Base, LoggerHandler):
         """
         Read or retrieve data from the packaged :term:`Provenance` directory contents associated to the :term:`Job`.
         """
-        # For the alternative OGC PROV representation, load the JSON-LD
+        # For the alternative OGC PROV representation, load the JSON
         # that cwlprov gives us, we will convert it below
         if prov_format == ContentType.APP_PROV_OGC_JSON:
             prov_path = self.prov_path(container=container, extra_path=extra_path,
-                                       prov_format=ProvenanceFormat.PROV_JSONLD)
+                                       prov_format=ProvenanceFormat.PROV_JSON)
         else:
             prov_path = self.prov_path(container=container, extra_path=extra_path, prov_format=prov_format)
         if prov_path and os.path.isfile(prov_path):
@@ -1625,7 +1625,7 @@ class Job(Base, LoggerHandler):
             data = OutputFormat.convert(data, to=OutputFormat.YAML)
         elif fmt == ContentType.APP_PROV_OGC_JSON:
             # Convert JSON from cwlprov to OGC PROV alternative representation
-            data = jsonld2ogcprov(data)
+            data = convert_to_prov_chain(data)
             fmt = ContentType.APP_PROV_OGC_JSON
         # normalize media-type
         if fmt == ContentType.APP_JSON:
