@@ -415,7 +415,7 @@ class WeaverResearchObject(ResearchObject):
         # be an activity, not an entity, as it shares the ID of the
         # WorkflowRun.
         job_url = self.job.job_url(self.settings)
-        document.activity(
+        job_activity = document.activity(
             self.job.uuid.urn,
             other_attributes={
                 prov_const.PROV_TYPE: cwl_prov_const.WFPROV["ProcessRun"],
@@ -445,6 +445,7 @@ class WeaverResearchObject(ResearchObject):
         document.attribution(crim_entity, weaver_code_entity)
         document.wasDerivedFrom(cwltool_agent, weaver_instance_agent)
         document.specializationOf(wf_agent, weaver_instance_agent)
+        document.wasStartedBy(job_activity, wf_agent)
         if server_provider_entity:
             document.derivation(server_provider_entity, weaver_instance_agent)
             document.attribution(server_provider_entity, weaver_instance_agent)
