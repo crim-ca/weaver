@@ -151,6 +151,8 @@ class ContentType(Constants):
     # special handling
     ANY_NETCDF = {APP_NETCDF, APP_X_NETCDF}
     ANY_TIFF = {IMAGE_GEOTIFF, IMAGE_OGC_GEOTIFF, APP_OGC_GEOTIFF, IMAGE_COG, IMAGE_TIFF}
+    # legacy types are equivalent to the official ones, but never selected when resolving media-types
+    ANY_LEGACY = {APP_OGC_GEOTIFF, APP_JPEG2000}
     ANY_GEOJSON = {APP_GEOJSON, APP_VDN_GEOJSON}
     ANY_YAML = {APP_YAML, APP_X_YAML, TEXT_YAML, TEXT_X_YAML}
     ANY_JSON = {
@@ -480,8 +482,11 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_GZIP: ".gz",
     ContentType.APP_TAR_GZ: ".tar.gz",
     ContentType.APP_YAML: ".yaml",
+    ContentType.APP_JPEG2000: ".jp2",
+    ContentType.IMAGE_JPEG2000: ".jp2",
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
     ContentType.IMAGE_OGC_GEOTIFF: ".tif",
+    ContentType.APP_OGC_GEOTIFF: ".tif",
     ContentType.ANY: ".*",      # any for glob
     ContentType.APP_DIR: "/",   # force href to finish with explicit '/' to mark directory
     ContentType.APP_OCTET_STREAM: ".bin",
@@ -570,7 +575,10 @@ _EXTENSION_CONTENT_TYPES_MAPPING = {
     # because the same extension can represent multiple distinct Content-Types,
     # derive the simplest (shortest) one by default for guessing generic Content-Type
     ext: ctype for ctype, ext in reversed(sorted(
-        _CONTENT_TYPE_EXTENSION_MAPPING.items(),
+        (
+            (ctype, ext) for ctype, ext in _CONTENT_TYPE_EXTENSION_MAPPING.items()
+            if ctype not in ContentType.ANY_LEGACY
+        ),
         key=lambda typ_ext: len(typ_ext[0])
     ))
 }

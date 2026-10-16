@@ -12,14 +12,18 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add legacy ``application/tiff; application=geotiff`` and ``application/jp2`` media-types
+  (from the `OGC API - Processes` examples) as dynamically supported equivalents
+  of ``image/tiff; application=geotiff`` and ``image/jp2`` respectively.
+  Inputs submitted with them are accepted by any `Process` that defines the official media-types, without explicitly
+  listing them in its description. The legacy types are never selected when resolving media-types
+  (e.g.: from file extensions) (resolves `#1068 <https://github.com/crim-ca/weaver/issues/1068>`_).
 
 Fixes:
 ------
-- Add ``application/tiff`` and ``application/jp2`` as accepted media types for compatibility with older workflows
-  and the OGC Process API Schema examples (resolves `#1068 <https://github.com/crim-ca/weaver/issues/1068>`_).
-- Correct regex in ``weaver.formats`` to accept digits in filename extensions when building
-  ``_CONTENT_TYPE_EXT_PATTERN``.
+- Fix execution input validation that ignored ``format.mediaType`` of an input, and the conversion of single
+  ``Job`` input mapping to listing that dropped any field other than the first one (e.g.: ``format`` next to ``href``).
+- Fix media-type extension parsing pattern that did not support digits (e.g.: ``jp2``).
 - Fix `CLI` ``execute`` inputs parsing that incorrectly interpreted valid `OGC API - Processes` execution bodies
   (e.g.: with ``bbox``, nested ``value`` objects) as `CWL` job inputs and failed. Only inputs containing
   a ``class`` field are now considered `CWL` as originally intended. Logic is simplified to help interpretability

@@ -22,6 +22,9 @@ CONVERSION_DICT = {
     ContentType.TEXT_CSV: [ContentType.APP_XML, ContentType.APP_YAML, ContentType.APP_JSON],
     ContentType.APP_XML: [ContentType.APP_YAML, ContentType.APP_JSON],
     ContentType.APP_YAML: [ContentType.TEXT_CSV, ContentType.APP_XML, ContentType.APP_JSON],
-    ContentType.APP_JSON: [ContentType.TEXT_CSV, ContentType.APP_XML, ContentType.APP_YAML]
+    ContentType.APP_JSON: [ContentType.TEXT_CSV, ContentType.APP_XML, ContentType.APP_YAML],
+    # legacy equivalents (see 'ContentType.ANY_LEGACY') transparently supported in place of the official ones
+    ContentType.IMAGE_OGC_GEOTIFF: [ContentType.APP_OGC_GEOTIFF],
+    ContentType.IMAGE_JPEG2000: [ContentType.APP_JPEG2000],
 }
 EXCLUDED_TYPES = {ContentType.APP_RAW_JSON, ContentType.APP_OCTET_STREAM, ContentType.TEXT_PLAIN}
