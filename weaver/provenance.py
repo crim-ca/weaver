@@ -8,11 +8,56 @@ from urllib.parse import urlparse
 from cwltool.cwlprov import provenance_constants as cwl_prov_const
 from cwltool.cwlprov.ro import ResearchObject
 from prov import constants as prov_const
+from prov.serializers import provjsonld as prov_jsonld_serializer
 
 from weaver.__meta__ import __version__ as weaver_version
 from weaver.base import Constants
 from weaver.formats import ContentType, OutputFormat
 from weaver.utils import get_weaver_url
+
+# Monkeypatch the prov library's PROV-JSONLD serializer to emit bare
+# strings instead of "xsd:QName" typed literals for these types which
+# are outside of the PROV vocabulary, but which need to be treated as
+# @id node references (i.e. IRIs). We then need to add context terms
+# so that JSON-LD processors will interpret them as such, done below.
+_PROV_JSONLD_EXTRA_ID_TYPED_TERMS = {
+    str(cwl_prov_const.WFPROV["describedByProcess"]),
+    str(cwl_prov_const.WFPROV["wasEnactedBy"]),
+    str(cwl_prov_const.FOAF["account"]),
+    str(prov_const.PROV_ATTR_GENERAL_ENTITY),
+    str(prov_const.PROV_ATTR_SPECIFIC_ENTITY),
+}
+prov_jsonld_serializer.ID_TYPED_TERMS = (
+    prov_jsonld_serializer.ID_TYPED_TERMS | _PROV_JSONLD_EXTRA_ID_TYPED_TERMS
+)
+
+# Now that we have bare strings for these IRI references, we also need
+# to inject the proper type definitions into the context, again, by
+# doing some fragile patching of prov_jsonld_serializer.  This should
+# be removed once the prov library is fixed upstream.
+_PROV_JSONLD_ID_CONTEXT_TERMS = {
+    term: {"@type": "@id"} for term in _PROV_JSONLD_EXTRA_ID_TYPED_TERMS
+}
+
+
+def extra_jsonld_context(document, context):
+    # type: (ProvDocument, str) -> dict
+    container = prov_jsonld_serializer._weaver_orig_encoder(document, context)
+    existing_context = container.get("@context")
+    if isinstance(existing_context, list):
+        existing_context.append(_PROV_JSONLD_ID_CONTEXT_TERMS)
+    elif existing_context:
+        # This should never happen as @context is always a list
+        container["@context"] = [existing_context, _PROV_JSONLD_ID_CONTEXT_TERMS]
+    else:
+        # This should never happen as @context is always created
+        container["@context"] = _PROV_JSONLD_ID_CONTEXT_TERMS
+    return container
+
+
+if not hasattr(prov_jsonld_serializer, "_weaver_orig_encoder"):
+    prov_jsonld_serializer._weaver_orig_encoder = prov_jsonld_serializer.encode_jsonld_document
+    prov_jsonld_serializer.encode_jsonld_document = extra_jsonld_context
 
 if TYPE_CHECKING:
     from typing import Any, List, Optional, Tuple, Union
@@ -277,6 +322,12 @@ class WeaverResearchObject(ResearchObject):
         )
         document = prov_profile.document
 
+        # following agents are expected to exist (created by inherited class)
+        cwltool_agent = document.get_record(cwl_prov_const.ACCOUNT_UUID)[0]
+        user_uuid = self.orcid or cwl_prov_const.USER_UUID
+        user_agent = document.get_record(user_uuid)[0]
+        wf_agent = document.get_record(self.engine_uuid)[0]  # current job run aligned with cwl workflow
+
         doi_ns = document.add_namespace("doi", "https://doi.org/")
 
         weaver_full_name = f"crim-ca/weaver:{weaver_version}"
@@ -343,19 +394,12 @@ class WeaverResearchObject(ResearchObject):
                 server_provider_meta,
             )
 
-        job_entity = document.entity(
-            self.job.uuid.urn,
-            {
-                prov_const.PROV_TYPE: cwl_prov_const.WFDESC["ProcessRun"],
-                prov_const.PROV_LOCATION: self.job.job_url(self.settings),
-                prov_const.PROV_LABEL: "Job Information",
-            }
-        )
         proc_url = self.job.process_url(self.settings)
         proc_id = f"{self.job.service}:{self.job.process}" if self.job.service else self.job.process
         proc_uuid = f"{weaver_instance_sha1}:{proc_id}"
+        proc_sha1 = self.sha1_uuid(document, proc_uuid)
         proc_entity = document.entity(
-            proc_uuid,
+            proc_sha1,
             {
                 prov_const.PROV_TYPE: cwl_prov_const.WFDESC["Process"],
                 prov_const.PROV_LOCATION: proc_url,
@@ -363,35 +407,45 @@ class WeaverResearchObject(ResearchObject):
             }
         )
 
-        # following agents are expected to exist (created by inherited class)
-        cwltool_agent = document.get_record(cwl_prov_const.ACCOUNT_UUID)[0]
-        user_uuid = self.orcid or cwl_prov_const.USER_UUID
-        user_agent = document.get_record(user_uuid)[0]
-        wf_agent = document.get_record(self.engine_uuid)[0]  # current job run aligned with cwl workflow
+        # NOTE: Since prov 3.0.0 enforces PROV-CONSTRAINTS, this must
+        # be an activity, not an entity, as it shares the ID of the
+        # WorkflowRun.
+        job_url = self.job.job_url(self.settings)
+        job_activity = document.activity(
+            self.job.uuid.urn,
+            other_attributes={
+                prov_const.PROV_TYPE: cwl_prov_const.WFPROV["ProcessRun"],
+                prov_const.PROV_LOCATION: job_url,
+                prov_const.PROV_LABEL: "Job Information",
+                cwl_prov_const.WFPROV["wasEnactedBy"]: wf_agent,
+                cwl_prov_const.WFPROV["describedByProcess"]: proc_entity,
+            }
+        )
 
-        # adjust user agent as software rather than person (see 'resolve_user'), and leave any other types untouched
-        user_types = cast(set, user_agent.get_attribute(prov_const.PROV_TYPE))
-        user_types.symmetric_difference_update({
-            prov_const.PROV["Person"],
-            cwl_prov_const.SCHEMA["Person"],
-            prov_const.PROV["SoftwareAgent"],
-            cwl_prov_const.SCHEMA["SoftwareApplication"],
-        })
+        # NOTE: This is a somewhat fragile workaround for cwlprov
+        # unconditionally creating the user agent as a Person.  The
+        # intent of PROV is that records should be update-only to
+        # ensure their integrity, but the only other way to solve this
+        # would be to duplicate all of the functionality in
+        # `ResearchObject.user_provenance`.
+        user_types = user_agent._attributes[prov_const.PROV_TYPE]
+        user_types.discard(prov_const.PROV["Person"])
+        user_types.discard(cwl_prov_const.SCHEMA["Person"])
+        user_types.add(prov_const.PROV["SoftwareAgent"])
+        user_types.add(cwl_prov_const.SCHEMA["SoftwareApplication"])
 
         # define relationships cross-references: https://wf4ever.github.io/ro/wfprov.owl
-        document.primary_source(weaver_instance_agent, weaver_code_entity)
-        document.actedOnBehalfOf(weaver_instance_agent, user_agent)
-        document.specializationOf(weaver_instance_agent, cwltool_agent)
-        document.attribution(crim_entity, weaver_code_entity)
-        document.wasDerivedFrom(cwltool_agent, weaver_instance_agent)
-        document.wasStartedBy(job_entity, weaver_instance_agent)
-        document.wasStartedBy(wf_agent, job_entity, time=self.job.created)
-        document.specializationOf(wf_agent, job_entity)
-        document.alternateOf(wf_agent, job_entity)
-        document.wasGeneratedBy(job_entity, proc_entity)
+        document.primary_source(generatedEntity=weaver_instance_agent, usedEntity=weaver_code_entity)
+        document.actedOnBehalfOf(delegate=weaver_instance_agent, responsible=user_agent)
+        document.specializationOf(specificEntity=weaver_instance_agent, generalEntity=cwltool_agent)
+        document.attribution(entity=crim_entity, agent=weaver_code_entity)
+        document.wasDerivedFrom(generatedEntity=cwltool_agent, usedEntity=weaver_instance_agent)
+        document.specializationOf(specificEntity=wf_agent, generalEntity=weaver_instance_agent)
+        document.wasStartedBy(activity=job_activity, trigger=wf_agent)
         if server_provider_entity:
-            document.derivation(server_provider_entity, weaver_instance_agent)
-            document.attribution(server_provider_entity, weaver_instance_agent)
+            document.derivation(generatedEntity=server_provider_entity,
+                                usedEntity=weaver_instance_agent)
+            document.attribution(entity=server_provider_entity, agent=weaver_instance_agent)
 
         return prov_profile
 
