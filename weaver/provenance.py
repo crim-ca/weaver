@@ -459,10 +459,10 @@ def _iri_str(value):
     return value.uri if hasattr(value, "uri") else str(value)
 
 
-def jsonld2ogcprov(input_data):
+def convert_to_prov_chain(input_data):
     # type: (str) -> str
-    """Convert a PROV-JSONLD document (as text) to OGC Provenance Chain JSON (array form, text)."""
-    document = ProvDocument.deserialize(content=input_data, format="jsonld")
+    """Convert a PROV-JSON document (as text) to OGC Provenance Chain JSON (array form, text)."""
+    document = ProvDocument.deserialize(content=input_data, format="json")
 
     objects_by_id = {}
     order = []
