@@ -27,7 +27,7 @@ Retrieve W3C PROV provenance metadata for tracking execution lineage and data de
 
 ### Required
 
-- **job_id** (string): Job identifier
+- **job_reference** (string): Job identifier
 
 ### Optional
 

@@ -86,7 +86,6 @@ Complete skill catalog organized by domain:
 - [job-results](.agents/skills/job-results/SKILL.md)
 - [job-statistics](.agents/skills/job-statistics/SKILL.md)
 - [job-status](.agents/skills/job-status/SKILL.md)
-- [update-provenance-examples](.agents/skills/update-provenance-examples/SKILL.md)
 
 ### Process Management
 
@@ -112,6 +111,7 @@ Complete skill catalog organized by domain:
   codebase
 - [weaver-skills-update](.agents/skills/weaver-skills-update/SKILL.md) - Update Agent Skills related to Weaver
   or its codebase
+- [weaver-provenance-examples](.agents/skills/weaver-provenance-examples/SKILL.md)
 
 ### Vault
 
