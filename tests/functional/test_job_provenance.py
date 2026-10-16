@@ -145,7 +145,7 @@ class TestJobProvenance(TestJobProvenanceBase):
             prov["@context"][idx] = f"file://{TEST_DATA_ROOT}/prov_context.jsonld"
         except ValueError:
             pytest.fail("PROV-JSONLD context missing from @context")
-        assert "@graph" in prov, "PROV-JSON must contain @graph"
+        assert "@graph" in prov, "PROV-JSONLD must contain @graph"
         graph = prov["@graph"]
         assert bool(graph), "JSON-LD @graph not be an empty list."
         assert all(isinstance(obj, dict)
