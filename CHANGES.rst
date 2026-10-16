@@ -50,6 +50,10 @@ Fixes:
   blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
   section, causing a ``ReferenceError`` when clicking them.
 - Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
+- Fix `BoundingBox` `I/O` description entries (`input`/`output`) being silently dropped entirely from `Process`
+  ``GET`` describe responses whenever a mismatched `CWL`/`WPS` ``format``/``schema`` auto-generated an invalid
+  ``metadata`` "Schema" link reference (empty ``href``, or missing required ``rel``), causing the corresponding
+  `AllOf`/`OneOf` schema validation to fail and the whole `I/O` entry to be discarded instead of rendered.
 
 .. _changes_6.16.0:
 
