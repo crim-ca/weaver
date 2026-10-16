@@ -5,8 +5,8 @@ import hashlib
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
-from cwltool.cwlprov import provenance_constants as cwl_prov_const  # type: ignore
-from cwltool.cwlprov.ro import ResearchObject  # type: ignore
+from cwltool.cwlprov import provenance_constants as cwl_prov_const
+from cwltool.cwlprov.ro import ResearchObject
 from prov import constants as prov_const
 from prov.serializers import provjsonld as prov_jsonld_serializer
 
@@ -67,8 +67,8 @@ if TYPE_CHECKING:
     from typing import Any, List, Optional, Tuple, Union
     from uuid import UUID
 
-    from cwltool.cwlprov.provenance_profile import ProvenanceProfile  # type: ignore
-    from cwltool.stdfsaccess import StdFsAccess  # type: ignore
+    from cwltool.cwlprov.provenance_profile import ProvenanceProfile
+    from cwltool.stdfsaccess import StdFsAccess
     from prov.model import ProvDocument
 
     from weaver.base import EnumType
