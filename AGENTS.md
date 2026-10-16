@@ -111,7 +111,7 @@ Complete skill catalog organized by domain:
   codebase
 - [weaver-skills-update](.agents/skills/weaver-skills-update/SKILL.md) - Update Agent Skills related to Weaver
   or its codebase
-- [weaver-provenance-examples](.agents/skills/weaver-provenance-examples/SKILL.md)
+- [weaver-provenance-examples](.agents/skills/weaver-provenance-examples/SKILL.md) - Update provenance example files under
 
 ### Vault
 
