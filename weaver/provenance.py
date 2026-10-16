@@ -24,9 +24,6 @@ _PROV_JSONLD_EXTRA_ID_TYPED_TERMS = {
     str(cwl_prov_const.WFPROV["describedByProcess"]),
     str(cwl_prov_const.WFPROV["wasEnactedBy"]),
     str(cwl_prov_const.FOAF["account"]),
-    # For some reason (perhaps we are not actually using them
-    # correctly?) we need to include these even though they're
-    # in the PROV ontology!
     str(prov_const.PROV_ATTR_GENERAL_ENTITY),
     str(prov_const.PROV_ATTR_SPECIFIC_ENTITY),
 }
@@ -36,7 +33,8 @@ prov_jsonld_serializer.ID_TYPED_TERMS = (
 
 # Now that we have bare strings for these IRI references, we also need
 # to inject the proper type definitions into the context, again, by
-# doing some dodgy patching of prov_jsonld_serializer.
+# doing some fragile patching of prov_jsonld_serializer.  This should
+# be removed once the prov library is fixed upstream.
 _PROV_JSONLD_ID_CONTEXT_TERMS = {
     term: {"@type": "@id"} for term in _PROV_JSONLD_EXTRA_ID_TYPED_TERMS
 }
