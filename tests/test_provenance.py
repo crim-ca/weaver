@@ -208,8 +208,7 @@ def test_jsonld_type_injection_empty(monkeypatch):
     def supply_no_context(document, context):
         return {}
     document = ProvDocument()
-    monkeypatch.setattr("weaver.provenance.orig_prov_encode_jsonld_document",
-                        supply_no_context)
+    monkeypatch.setattr("prov.serializers.provjsonld._weaver_orig_encoder", supply_no_context)
     container = extra_jsonld_context(document, "url")
     assert isinstance(container, dict)
     assert "@context" in container
@@ -222,7 +221,7 @@ def test_jsonld_type_injection_dict(monkeypatch):
     def supply_dict_context(document, context):
         return {"@context": {"bogusTerm": {"@type": "@id"}}}
     document = ProvDocument()
-    monkeypatch.setattr("weaver.provenance.orig_prov_encode_jsonld_document",
+    monkeypatch.setattr("prov.serializers.provjsonld._weaver_orig_encoder",
                         supply_dict_context)
     container = extra_jsonld_context(document, "url")
     assert isinstance(container, dict)
