@@ -58,7 +58,7 @@ from weaver.provenance import ProvenanceFormat
 client = WeaverClient(url="https://weaver.example.com")
 
 # Get provenance
-prov = client.provenance(job_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+prov = client.provenance(job_reference="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 
 # Access provenance entities
 for entity in prov.body.get("entities", []):
@@ -151,7 +151,7 @@ W3C PROV-JSONLD document, for example:
 
 ```python
 # Extract complete workflow lineage
-prov = client.provenance(job_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+prov = client.provenance(job_reference="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 
 # Document software versions used
 for agent in prov.body.get("agents", []):
