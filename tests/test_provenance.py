@@ -227,6 +227,8 @@ def test_jsonld_type_injection_dict(monkeypatch):
     container = extra_jsonld_context(document, "url")
     assert isinstance(container, dict)
     assert isinstance(container["@context"], list)
-    assert container["@context"]
-    assert isinstance(container["@context"][-1], dict)
-    assert "wfprov:describedByProcess" in container["@context"][-1]
+    assert len(container["@context"]) == 2
+    assert isinstance(container["@context"][0], dict)
+    assert "bogusTerm" in container["@context"][0]
+    assert isinstance(container["@context"][1], dict)
+    assert "wfprov:describedByProcess" in container["@context"][1]
