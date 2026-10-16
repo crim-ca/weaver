@@ -413,10 +413,7 @@ class WeaverResearchObject(ResearchObject):
 
         # NOTE: Since prov 3.0.0 enforces PROV-CONSTRAINTS, this must
         # be an activity, not an entity, as it shares the ID of the
-        # WorkflowRun.  We will leave startTime/endTime blank here to
-        # allow it to be unified properly with WorkflowRun, whose
-        # start time is (incorrectly) the moment of creation of the
-        # provenance profile, not the job itself.
+        # WorkflowRun.
         job_url = self.job.job_url(self.settings)
         document.activity(
             self.job.uuid.urn,

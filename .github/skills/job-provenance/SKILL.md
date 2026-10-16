@@ -66,7 +66,7 @@ for entity in prov.body.get("entities", []):
 
 # Get provenance in specific format
 prov_turtle = client.provenance(
-    job_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    job_reference="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     prov_format=ProvenanceFormat.PROV_TURTLE
 )
 ```
