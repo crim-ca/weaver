@@ -5724,3 +5724,29 @@ class TestMetadataQueryFilters:
         """
         with pytest.raises(HTTPBadRequest):
             decode_compressed_metadata_query("not-a-valid-gzip-base64-value")
+
+    def test_decode_compressed_metadata_query_missing_gzip_magic_number(self):
+        """
+        Tests that a valid base64url value that does not decode to gzip-compressed content is rejected.
+        """
+        # valid base64url encoding, but decoded bytes do not start with the gzip magic number (b'\x1f\x8b')
+        not_gzip = base64.urlsafe_b64encode(b"not-gzip-content").decode()
+        with pytest.raises(HTTPBadRequest):
+            decode_compressed_metadata_query(not_gzip)
+
+    def test_decode_compressed_metadata_query_invalid_decompressed_content(self):
+        """
+        Tests that valid gzip/base64url content that does not decode to expected ``QUERY`` JSON structure is rejected.
+        """
+        # valid gzip/base64url, but decompressed JSON content is not a mapping of known scopes
+        not_json = base64.urlsafe_b64encode(gzip.compress(b"not-a-json-object")).decode()
+        with pytest.raises(HTTPBadRequest):
+            decode_compressed_metadata_query(not_json)
+
+        not_dict = base64.urlsafe_b64encode(gzip.compress(json.dumps(["unexpected", "list"]).encode())).decode()
+        with pytest.raises(HTTPBadRequest):
+            decode_compressed_metadata_query(not_dict)
+
+        unknown_scope = base64.urlsafe_b64encode(gzip.compress(json.dumps({"bogus-scope": {}}).encode())).decode()
+        with pytest.raises(HTTPBadRequest):
+            decode_compressed_metadata_query(unknown_scope)
