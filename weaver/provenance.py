@@ -459,36 +459,26 @@ _RECORD_TYPE_FIELD = {
 }
 
 
-def _iri_str(value):
-    """Render a prov QualifiedName/identifier/literal as a full IRI string ref."""
-    if value is None:
-        return None
-    return value.uri if hasattr(value, "uri") else str(value)
-
-
 def convert_to_prov_chain(input_data):
     # type: (str) -> str
     """Convert a PROV-JSON document (as text) to OGC Provenance Chain JSON (array form, text)."""
     document = ProvDocument.deserialize(content=input_data, format="json")
-
     objects_by_id = {}
-    order = []
 
-    def get_or_create(identifier, prov_type):
-        key = _iri_str(identifier)
-        if key not in objects_by_id:
-            objects_by_id[key] = {"id": key, _RECORD_TYPE_FIELD[prov_type]: prov_type}
-            order.append(key)
-        return objects_by_id[key]
-
+    # Create the inventory of subjects in document ordering (for now)
     for record in document.get_records():
         record_type = record.get_type().localpart if record.get_type() else None
-        if (
-            record_type in ("Entity", "Activity", "Agent")
-            and record.identifier is not None
-        ):
-            get_or_create(record.identifier, record_type)
+        if record_type not in _RECORD_TYPE_FIELD:  # only objects in the OGC schema
+            continue
+        # FIXME: we may need these, are they blank nodes?
+        if record.identifier is None:
+            continue
+        key = record.identifier.uri
+        if key in objects_by_id:
+            continue
+        objects_by_id[key] = {"id": key, _RECORD_TYPE_FIELD[record_type]: record_type}
 
+    # Output relations
     for record in document.get_records(ProvRelation):
         handler = _RELATION_HANDLERS.get(record.get_type())
         if handler is None:
@@ -496,24 +486,25 @@ def convert_to_prov_chain(input_data):
         prop, subject_role, object_role = handler
         # formal_attributes keys are QualifiedName objects (e.g. prov:activity); match by localpart.
         formal = {key.localpart: value for key, value in record.formal_attributes}
-        subject_id = _iri_str(
-            formal.get(subject_role) or formal.get("entity") or formal.get("activity")
-        )
-        object_id = _iri_str(formal.get(object_role))
-        if subject_id is None or object_id is None:
+        subj = formal.get(subject_role)
+        if subj is None:
             continue
-        subject_obj = objects_by_id.get(subject_id)
-        if subject_obj is None:
+        obj = formal.get(object_role)
+        if obj is None:
+            continue
+        subj_prov = objects_by_id.get(subj.uri)
+        if subj_prov is None:
             # Relation referencing a record not declared as Entity/Activity/Agent in this
             # document (e.g. cross-bundle reference) - skip, nothing to attach it to.
             continue
-        existing = subject_obj.get(prop)
+        existing = subj_prov.get(prop)
         if existing is None:
-            subject_obj[prop] = object_id
+            subj_prov[prop] = obj.uri
         elif isinstance(existing, list):
-            if object_id not in existing:
-                existing.append(object_id)
-        elif existing != object_id:
-            subject_obj[prop] = [existing, object_id]
+            if obj.uri not in existing:
+                existing.append(obj.uri)
+        elif existing != obj.uri:
+            subj_prov[prop] = [existing, obj.uri]
 
-    return json.dumps([objects_by_id[key] for key in order])
+    # Use insertion order as output order
+    return json.dumps([objects_by_id[key] for key in objects_by_id])
