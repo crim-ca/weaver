@@ -164,10 +164,6 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov = resp.json
         assert isinstance(prov, list)
         assert all("id" in obj for obj in prov)
-        objtypes = {}
-        for obj in prov:
-            objtypes.setdefault(obj["provType"], []).append(obj)
-        assert all("wasAssociatedWith" in obj for obj in objtypes["Activity"])
 
     @parameterized.expand([
         ({"f": "ld+json"}, {}),

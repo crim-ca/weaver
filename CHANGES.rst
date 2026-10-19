@@ -30,6 +30,10 @@ Changes:
   Inputs submitted with them are accepted by any `Process` that defines the official media-types, without explicitly
   listing them in its description. The legacy types are never selected when resolving media-types
   (e.g.: from file extensions).
+- Add ``application/ogcprov+json`` and ``PROV-OGC-JSON`` formats returning `OGC Provenance Chain JSON
+  <https://ogcincubator.github.io/bblock-prov-schema/bblock/ogc.ogc-utils.prov/json-schema>`_, a simplified
+  graph-centric JSON representation of provenance for OGC Processes workflows (resolves `#1017
+  <https://github.com/crim-ca/weaver/issues/1017>`_)
 
 Fixes:
 ------
