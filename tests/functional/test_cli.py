@@ -1094,7 +1094,8 @@ class TestWeaverClient(TestWeaverClientBase):
             (ContentType.IMAGE_JPEG2000, ContentType.APP_JPEG2000),
         ]:
             payload = copy.deepcopy(self.test_payload["CatFile"])
-            process_id = f"{self.test_process_prefix}LegacyMediaType-{legacy_type.rsplit('/')[-1].split(';', 1)[0]}"
+            legacy_base_type = legacy_type.rsplit("/", 1)[-1].split(";", 1)[0]
+            process_id = f"{self.test_process_prefix}LegacyMediaType-{legacy_base_type}"
             payload["processDescription"]["process"]["inputs"][0]["formats"] = [
                 {"mediaType": official_type, "default": True},
             ]
