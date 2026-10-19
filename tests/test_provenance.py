@@ -90,6 +90,7 @@ def test_provenance_media_types():
         ("prov-json", ProvenanceFormat.PROV_JSON),
         ("PROV-JSON", ProvenanceFormat.PROV_JSON),
         ("PROV-JSONLD", ProvenanceFormat.PROV_JSONLD),
+        ("PROV-OGC-JSON", ProvenanceFormat.PROV_OGC_JSON),
     ]
 )
 def test_provenance_format(provenance, expect):
@@ -104,6 +105,7 @@ def test_provenance_format(provenance, expect):
         (None, None),
         (ProvenanceFormat.PROV_JSON, ContentType.APP_PROV_JSON),
         (ProvenanceFormat.PROV_JSONLD, ContentType.APP_JSONLD),
+        (ProvenanceFormat.PROV_OGC_JSON, ContentType.APP_PROV_OGC_JSON),
         (ProvenanceFormat.PROV_XML, ContentType.APP_PROV_XML),
         (ProvenanceFormat.PROV_NT, ContentType.APP_NT),
         (ProvenanceFormat.PROV_N, ContentType.TEXT_PROVN),
