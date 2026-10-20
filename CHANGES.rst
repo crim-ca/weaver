@@ -45,6 +45,24 @@ Fixes:
   blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
   section, causing a ``ReferenceError`` when clicking them.
 - Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
+- Update to upcoming version of ``cwlprov`` to produce `PROV-JSONLD <https://www.w3.org/submissions/prov-jsonld/>`_
+  rather than PROV-O as JSON-LD (fixes `#1009 <https://github.com/crim-ca/weaver/issues/1009>`_).
+- Fix `Job` provenance ``PROV-JSONLD`` output incorrectly encoding ``foaf:account``, ``wfprov:wasEnactedBy`` and
+  ``wfprov:describedByProcess`` reference values as ``xsd:QName``-typed literals instead of proper ``@id`` node
+  references, by extending the ``prov`` library JSON-LD serializer's internal set of ``@id``-typed terms, since
+  neither `cwltool` nor ``prov`` expose any public option to control this behavior otherwise. Also inject matching
+  ``"@type": "@id"`` term definitions into the generated ``@context`` so that generic/conformant JSON-LD and RDF
+  processors (e.g.: ``rdflib``, ``pyld``), not just ``prov`` itself, correctly resolve these values as IRI node
+  references instead of opaque string literals.
+- Create ``ProcessRun`` as an ``Activity`` rather than an ``Entity`` to satisfy
+  `PROV-CONSTRAINTS <https://www.w3.org/TR/2013/REC-prov-constraints-20130430/#entity-activity-disjoint_text>`_
+  requirement for disjoint activity and entity (as of ``prov>=3.0.0``).
+- Remove relationships in the generated PROV that are inconsistent with the changes to ``ProcessRun``.
+- Remove inconsistent and redundant timestamps from the generated PROV.
+- Ensure that the user agent in the PROV document is created as a ``SoftwareAgent`` not a ``Person`` with recent
+  versions of ``prov`` that more strongly enforce update-only ``ProvRecord``.
+- Add a skill with example data and a script to regenerate the PROV example data for the OpenAPI definition.
+- Correct the command-line and code examples in the ``job-provenance`` skill.
 
 .. _changes_6.16.0:
 

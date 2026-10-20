@@ -1,10 +1,34 @@
-2024-12-12 09:16:17.843852                            Flow 1c49f085-bbd7-410d-a801-81fd42469e8a [ Run of workflow/packed.cwl#main
-2024-12-12 09:16:17.846280                            In   2ef7bde608ce5404e97d5f042f95f89f1c232871 < wf:main/message
-2024-12-12 09:16:17.863017                            In   2ef7bde608ce5404e97d5f042f95f89f1c232871 < wf:main/echo/message
-                           2024-12-12 09:16:18.867039 Out  59967079-217e-4bdb-92d7-2ef2f784825c > wf:main/echo/output
-                           2024-12-12 09:16:18.867039 Out  2ab450c1-7309-4c5b-b65b-b4dfa44f384b > wf:main/echo/PACKAGE_OUTPUT_HOOK_LOG_c46f5d8d-e599-4152-8ded-f529e19524d4
-                           2024-12-12 09:16:18.867039 Out  6b04550d-c2bd-400b-858b-14e287bbf8c3 > wf:main/echo/PACKAGE_OUTPUT_HOOK_LOG_606e3f88-0388-4c97-b139-58fed24b37c1
-                           2024-12-12 09:16:18.869180 Out  59967079-217e-4bdb-92d7-2ef2f784825c > wf:main/primary/output
-                           2024-12-12 09:16:18.869180 Out  2ab450c1-7309-4c5b-b65b-b4dfa44f384b > wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_c46f5d8d-e599-4152-8ded-f529e19524d4
-                           2024-12-12 09:16:18.869180 Out  6b04550d-c2bd-400b-858b-14e287bbf8c3 > wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_606e3f88-0388-4c97-b139-58fed24b37c1
-                           2024-12-12 09:16:18.867034 Flow 1c49f085-bbd7-410d-a801-81fd42469e8a ] Run of workflow/packed.cwl#main  (0:00:01.023182)
+2026-10-16 11:37:51.486926                            Flow 7f592cf0-c119-47fc-81da-b34f8713e8d0 [ Run of workflow/packed.cwl#main 
+2026-10-16 11:37:51.491558                            In   0cf60d40470fde378076afacf5812f961208a018 < wf:main/stringInput
+2026-10-16 11:37:51.491643                            In   750a46fe-cb96-41c3-b065-42f5093fa564 < wf:main/measureInput
+2026-10-16 11:37:51.491925                            In   d88aaa302517127d82182445af28a866c379e7ac < wf:main/dateInput
+2026-10-16 11:37:51.491985                            In   daf070fa-5734-4649-8e92-1e7ffac6558e < wf:main/doubleInput
+2026-10-16 11:37:51.492135                            In   cdf296d3-da23-4ddf-b562-00fcf2c581fc < wf:main/arrayInput
+2026-10-16 11:37:51.492566                            In   644d7580-2707-4e69-a1f0-77123c01e512 < wf:main/complexObjectInput
+2026-10-16 11:37:51.493234                            In   7db95221-105d-40bc-9598-90a3b4ce0fca < wf:main/geometryInput
+2026-10-16 11:37:51.493602                            In   0c4b5f14-3ad4-4ba9-8910-d42a54b87b0a < wf:main/boundingBoxInput
+2026-10-16 11:37:51.493932                            In   509a08f0-b24c-49c1-8026-eed08dd41d1d < wf:main/imagesInput
+2026-10-16 11:37:51.494263                            In   e502125a-54b0-4943-9c88-080b0773d8c1 < wf:main/featureCollectionInput
+2026-10-16 11:37:51.495562                            In   0cf60d40470fde378076afacf5812f961208a018 < wf:main/EchoProcess/stringInput
+2026-10-16 11:37:51.495629                            In   093e178f-0805-420a-b39e-afac9d869c78 < wf:main/EchoProcess/measureInput
+2026-10-16 11:37:51.495986                            In   d88aaa302517127d82182445af28a866c379e7ac < wf:main/EchoProcess/dateInput
+2026-10-16 11:37:51.496051                            In   ee0ed44c-05c0-4f01-99f1-045dd77b00de < wf:main/EchoProcess/doubleInput
+2026-10-16 11:37:51.496199                            In   d1811d76-3425-404f-8db6-9fb1137ef1c4 < wf:main/EchoProcess/arrayInput
+2026-10-16 11:37:51.496499                            In   690c6efe-7d54-4659-82be-7df9b289fa6c < wf:main/EchoProcess/complexObjectInput
+2026-10-16 11:37:51.497051                            In   d6e00522-4910-4997-a272-086a8bccdf1d < wf:main/EchoProcess/geometryInput
+2026-10-16 11:37:51.497292                            In   d98455f8-5fae-4672-84b5-9f2dc367e9df < wf:main/EchoProcess/boundingBoxInput
+2026-10-16 11:37:51.497551                            In   89398bc5-2f6d-4937-81c0-fd5bc622dd02 < wf:main/EchoProcess/imagesInput
+2026-10-16 11:37:51.497759                            In   7736b9c7-f9da-4e36-a1e1-36bf5d928535 < wf:main/EchoProcess/featureCollectionInput
+                           2026-10-16 11:37:51.505588 Out  0cf60d40470fde378076afacf5812f961208a018 > wf:main/primary/stringOutput
+                           2026-10-16 11:37:51.505588 Out  12a972e2-0f23-4b55-b603-b33873db63ed > wf:main/primary/measureOutput
+                           2026-10-16 11:37:51.505588 Out  d88aaa302517127d82182445af28a866c379e7ac > wf:main/primary/dateOutput
+                           2026-10-16 11:37:51.505588 Out  65982fe0-5ef6-4b3f-a9eb-1f195eec3284 > wf:main/primary/doubleOutput
+                           2026-10-16 11:37:51.505588 Out  ba843640-9bb2-4536-9320-c7647e3e9fd0 > wf:main/primary/arrayOutput
+                           2026-10-16 11:37:51.505588 Out  690c6efe-7d54-4659-82be-7df9b289fa6c > wf:main/primary/complexObjectOutput
+                           2026-10-16 11:37:51.505588 Out  4fa2d44b-0a03-4d2c-827b-94bf189e1906 > wf:main/primary/geometryOutput
+                           2026-10-16 11:37:51.505588 Out  d98455f8-5fae-4672-84b5-9f2dc367e9df > wf:main/primary/boundingBoxOutput
+                           2026-10-16 11:37:51.505588 Out  0e21e20b-ae10-4500-b5a0-0fea7e6c6bed > wf:main/primary/imagesOutput
+                           2026-10-16 11:37:51.505588 Out  7736b9c7-f9da-4e36-a1e1-36bf5d928535 > wf:main/primary/featureCollectionOutput
+                           2026-10-16 11:37:51.505588 Out  14420a63-31e2-4702-9df1-f01b459f3402 > wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_b0589965-3ad0-4094-be5e-b4d2ceebbc01
+                           2026-10-16 11:37:51.505588 Out  35500d25-37c3-49f2-9c68-5a7e7db7fe2b > wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_19f9c57f-6907-481f-ad7e-d39759d6de8d
+                           2026-10-16 11:37:51.507568 Flow 7f592cf0-c119-47fc-81da-b34f8713e8d0 ] Run of workflow/packed.cwl#main  (0:00:00.020642)
