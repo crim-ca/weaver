@@ -1,0 +1,1194 @@
+{
+  "prefix": {
+    "wfprov": "http://purl.org/wf4ever/wfprov#",
+    "wfdesc": "http://purl.org/wf4ever/wfdesc#",
+    "cwlprov": "https://w3id.org/cwl/prov#",
+    "foaf": "http://xmlns.com/foaf/0.1/",
+    "schema": "http://schema.org/",
+    "orcid": "https://orcid.org/",
+    "id": "urn:uuid:",
+    "data": "urn:hash::sha1:",
+    "sha256": "nih:sha-256;",
+    "researchobject": "arcp://uuid,74e06198-faf8-404f-b905-c6f02361070d/",
+    "metadata": "arcp://uuid,74e06198-faf8-404f-b905-c6f02361070d/metadata/",
+    "provenance": "arcp://uuid,74e06198-faf8-404f-b905-c6f02361070d/metadata/provenance/",
+    "wf": "arcp://uuid,74e06198-faf8-404f-b905-c6f02361070d/workflow/packed.cwl#",
+    "input": "arcp://uuid,74e06198-faf8-404f-b905-c6f02361070d/workflow/primary-job.json#",
+    "doi": "https://doi.org/",
+    "wf4ever": "http://purl.org/wf4ever/wf4ever#"
+  },
+  "agent": {
+    "id:f7e9b70e-2d9e-4813-b9cb-3271007ce638": [
+      {},
+      {
+        "prov:type": {
+          "$": "foaf:OnlineAccount",
+          "type": "xsd:QName"
+        },
+        "prov:location": "https://hirondelle.crim.ca/weaver",
+        "cwlprov:hostname": "hirondelle.crim.ca"
+      },
+      {
+        "prov:type": {
+          "$": "foaf:OnlineAccount",
+          "type": "xsd:QName"
+        },
+        "prov:label": "weaver-worker",
+        "foaf:accountName": "weaver-worker"
+      }
+    ],
+    "id:fbe60c5c-faf3-4b9f-9e93-e4bd24ae2d8e": {
+      "prov:type": [
+        {
+          "$": "prov:SoftwareAgent",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "schema:SoftwareApplication",
+          "type": "xsd:QName"
+        }
+      ],
+      "prov:label": "weaver-worker@crim-ca/weaver:6.16.0",
+      "foaf:name": "weaver-worker@crim-ca/weaver:6.16.0",
+      "foaf:account": {
+        "$": "id:f7e9b70e-2d9e-4813-b9cb-3271007ce638",
+        "type": "xsd:QName"
+      },
+      "schema:name": "weaver-worker@crim-ca/weaver:6.16.0"
+    },
+    "id:571242cd-16e3-4590-a5ab-5d2717158356": {
+      "prov:type": [
+        {
+          "$": "prov:SoftwareAgent",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wfprov:WorkflowEngine",
+          "type": "xsd:QName"
+        }
+      ],
+      "prov:label": "cwltool 3.3.20260925135508.dev16+gb9328b53f"
+    },
+    "data:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11": {
+      "prov:type": {
+        "$": "prov:SoftwareAgent",
+        "type": "xsd:QName"
+      },
+      "prov:location": "https://hirondelle.crim.ca/weaver",
+      "prov:label": [
+        "Weaver is an OGC-API flavored Execution Management Service that allows the execution of workflows chaining various applications and Web Processing Services inputs and outputs. Remote execution is deferred by the EMS to one or many Application, Deployment and Execution Service or remote service providers, and employs Common Workflow Language (CWL) configurations to define an OGC Application Package deployed for each process.",
+        "crim-ca/weaver:6.16.0"
+      ],
+      "prov:generalEntity": "data:644e201526525f62152815a76a2dc773450f3dd9",
+      "prov:specificEntity": "doi:10.5281/zenodo.14210717"
+    }
+  },
+  "actedOnBehalfOf": {
+    "_:id1": {
+      "prov:delegate": "id:f7e9b70e-2d9e-4813-b9cb-3271007ce638",
+      "prov:responsible": "id:fbe60c5c-faf3-4b9f-9e93-e4bd24ae2d8e"
+    },
+    "_:id2": {
+      "prov:delegate": "id:571242cd-16e3-4590-a5ab-5d2717158356",
+      "prov:responsible": "id:f7e9b70e-2d9e-4813-b9cb-3271007ce638",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d"
+    },
+    "_:id6": {
+      "prov:delegate": "data:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11",
+      "prov:responsible": "id:fbe60c5c-faf3-4b9f-9e93-e4bd24ae2d8e"
+    }
+  },
+  "activity": {
+    "id:74e06198-faf8-404f-b905-c6f02361070d": [
+      {
+        "prov:startTime": "2026-10-16T17:47:04.491802+00:00",
+        "prov:type": {
+          "$": "wfprov:WorkflowRun",
+          "type": "xsd:QName"
+        },
+        "prov:label": "Run of workflow/packed.cwl#main"
+      },
+      {
+        "prov:type": {
+          "$": "wfprov:ProcessRun",
+          "type": "xsd:QName"
+        },
+        "prov:location": "https://hirondelle.crim.ca/weaver/processes/EchoProcess/jobs/74e06198-faf8-404f-b905-c6f02361070d",
+        "prov:label": "Job Information",
+        "wfprov:wasEnactedBy": {
+          "$": "id:571242cd-16e3-4590-a5ab-5d2717158356",
+          "type": "xsd:QName"
+        },
+        "wfprov:describedByProcess": {
+          "$": "data:3074a57368a31e0f562f819313be239fbdd327e1",
+          "type": "xsd:QName"
+        }
+      }
+    ]
+  },
+  "wasAssociatedWith": {
+    "_:id3": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:agent": "id:571242cd-16e3-4590-a5ab-5d2717158356",
+      "prov:plan": "wf:main"
+    },
+    "_:id4": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:agent": "id:571242cd-16e3-4590-a5ab-5d2717158356"
+    }
+  },
+  "entity": {
+    "data:644e201526525f62152815a76a2dc773450f3dd9": {
+      "prov:type": {
+        "$": "prov:PrimarySource",
+        "type": "xsd:QName"
+      },
+      "prov:label": "Source code repository",
+      "prov:location": "https://github.com/crim-ca/weaver"
+    },
+    "data:3102f6d7a018ebae572f457d711ed7e1e7a11bc2": {
+      "prov:type": {
+        "$": "prov:Organization",
+        "type": "xsd:QName"
+      },
+      "foaf:name": "Computer Research Institute of Montréal",
+      "schema:name": "Computer Research Institute of Montréal"
+    },
+    "data:838cdfa4bbf09d1aedd26d79b46bfa8778ede2e0": {
+      "foaf:name": "Computer Research Institute of Montréal (CRIM)",
+      "schema:name": "Computer Research Institute of Montréal (CRIM)",
+      "prov:location": "http://pavics-weaver.readthedocs.org/en/latest/",
+      "prov:type": {
+        "$": "prov:Organization",
+        "type": "xsd:QName"
+      },
+      "prov:label": "Server Provider"
+    },
+    "data:3074a57368a31e0f562f819313be239fbdd327e1": {
+      "prov:type": {
+        "$": "wfdesc:Process",
+        "type": "xsd:QName"
+      },
+      "prov:location": "https://hirondelle.crim.ca/weaver/processes/EchoProcess",
+      "prov:label": "Process Description"
+    },
+    "wf:main": {
+      "prov:type": [
+        {
+          "$": "wfdesc:Process",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "prov:Plan",
+          "type": "xsd:QName"
+        }
+      ],
+      "prov:label": "Prospective provenance"
+    },
+    "data:0cf60d40470fde378076afacf5812f961208a018": [
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        "prov:value": "Value2"
+      },
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        "prov:value": "Value2"
+      },
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        "prov:value": "Value2"
+      }
+    ],
+    "id:75067df1-5f40-43e5-8d4a-b61fe9180be2": {
+      "prov:value": {
+        "$": "9.81",
+        "type": "xsd:double"
+      }
+    },
+    "data:d88aaa302517127d82182445af28a866c379e7ac": [
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        "prov:value": "2026-10-08T21:15:05.071416"
+      },
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        "prov:value": "2026-10-08T21:15:05.071416"
+      },
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        "prov:value": "2026-10-08T21:15:05.071416"
+      }
+    ],
+    "id:fc5de38e-114d-42ab-9393-c412bd377c67": {
+      "prov:value": {
+        "$": "3.1416",
+        "type": "xsd:double"
+      }
+    },
+    "id:11ba9076-c5af-4d23-b541-f877c99eab94": {
+      "prov:value": {
+        "$": "1",
+        "type": "xsd:int"
+      }
+    },
+    "id:b401a368-b393-4d91-9408-6878d3e37a45": {
+      "prov:value": {
+        "$": "2",
+        "type": "xsd:int"
+      }
+    },
+    "id:79d60899-f39e-491c-9c04-5bdf3150de14": {
+      "prov:value": {
+        "$": "3",
+        "type": "xsd:int"
+      }
+    },
+    "id:73c6b0c6-c003-486b-8490-20a1675c4241": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "prov:Collection",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "data:387a00b69dd6112551d5167f4498e05a89166eb0": [
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        }
+      },
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        }
+      }
+    ],
+    "id:98cb9b06-ec64-4852-8c50-c9f54a5d5cc6": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "data:9f71fd268fb807d8085c9e92abd2d33310184f31": [
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        }
+      },
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        }
+      }
+    ],
+    "id:3b402eee-5800-48c8-b0e4-d2b929706c67": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "data:a17865ee4d8af3ebe8bd5b092dbb92464ba4cff4": [
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        }
+      },
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        }
+      }
+    ],
+    "id:b0255581-4972-4c5a-b8f2-da7e01a61393": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "id:9f4df9be-bc9e-4e38-b6d3-874bdce32504": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "prov:Collection",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "data:fc6f6f7466a49edf8dd6d0aa6d30457c85263b2d": [
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        }
+      },
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        }
+      }
+    ],
+    "id:98f9f086-22e4-42a1-97be-1964fa1c0e60": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "data:661863675627302283a66531e9d849a0670e7c03": [
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        }
+      },
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        }
+      }
+    ],
+    "id:0df4f898-5240-4468-b400-87f2e97aed76": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "id:37f16f9a-9e57-45fd-90e0-f6d4344b8c89": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "prov:Collection",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "data:f421813fc7dea73d182e0d89307b5ba45128a9b5": [
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        }
+      },
+      {
+        "prov:type": {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        }
+      }
+    ],
+    "id:f53f9b36-f0e7-4f36-b642-e2b1285074d5": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "id:4fedb9a0-0834-4277-be39-084b460052c7": {
+      "prov:value": {
+        "$": "9.81",
+        "type": "xsd:double"
+      }
+    },
+    "id:fd486b9d-5d8e-49e8-8214-0997974a91d9": {
+      "prov:value": {
+        "$": "3.1416",
+        "type": "xsd:double"
+      }
+    },
+    "id:40cb666f-413a-4740-8a51-7e7510ea42ce": {
+      "prov:value": {
+        "$": "1",
+        "type": "xsd:int"
+      }
+    },
+    "id:4cf76477-e3d4-47ea-abea-35919fc98a75": {
+      "prov:value": {
+        "$": "2",
+        "type": "xsd:int"
+      }
+    },
+    "id:82d4ded7-7285-404e-9aa2-facdc4de0144": {
+      "prov:value": {
+        "$": "3",
+        "type": "xsd:int"
+      }
+    },
+    "id:485436f8-ee48-44c6-b5e0-1d7b27fc0cd1": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "prov:Collection",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "id:fce17247-c52a-4efe-b765-81b02c06b4a8": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ],
+      "cwlprov:basename": "input",
+      "cwlprov:nameroot": "input",
+      "cwlprov:nameext": ""
+    },
+    "id:6edb1990-e450-46d9-8744-39ca6082429b": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ],
+      "cwlprov:basename": "input_sl10ojou",
+      "cwlprov:nameroot": "input_sl10ojou",
+      "cwlprov:nameext": ""
+    },
+    "id:99e4d728-6188-43f1-b6e9-d3690c8318eb": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ],
+      "cwlprov:basename": "input_hqvxladn",
+      "cwlprov:nameroot": "input_hqvxladn",
+      "cwlprov:nameext": ""
+    },
+    "id:7714baf0-cc3f-4dfb-8e7e-629c205e6978": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "prov:Collection",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "id:bc9c7364-e059-467a-9961-b9e5dc5edf3d": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ],
+      "cwlprov:basename": "input_6m3uyr7y",
+      "cwlprov:nameroot": "input_6m3uyr7y",
+      "cwlprov:nameext": ""
+    },
+    "id:6570048f-b008-4919-b10c-da0d49f609b1": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ],
+      "cwlprov:basename": "input_n_svg17s",
+      "cwlprov:nameroot": "input_n_svg17s",
+      "cwlprov:nameext": ""
+    },
+    "id:bc065d16-73eb-40b8-ae68-87da9d722e2f": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "prov:Collection",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "id:89459ff6-67e4-4912-b07b-4a7265fd2f45": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ],
+      "cwlprov:basename": "input_m3y0xqcz",
+      "cwlprov:nameroot": "input_m3y0xqcz",
+      "cwlprov:nameext": ""
+    },
+    "id:3fc14d0c-e76e-4671-a5a4-04d62f3d39a1": {
+      "prov:value": {
+        "$": "9.81",
+        "type": "xsd:double"
+      }
+    },
+    "id:02993657-0af1-42fa-ab25-2acd0072e07a": {
+      "prov:value": {
+        "$": "3.1416",
+        "type": "xsd:double"
+      }
+    },
+    "id:822a5a94-44fa-461e-bf21-250491eaa0ed": {
+      "prov:value": {
+        "$": "1",
+        "type": "xsd:int"
+      }
+    },
+    "id:3de4c30e-e23a-4576-bf19-e9a8653cbee6": {
+      "prov:value": {
+        "$": "2",
+        "type": "xsd:int"
+      }
+    },
+    "id:016468a2-6491-4085-9130-1dfed18da80f": {
+      "prov:value": {
+        "$": "3",
+        "type": "xsd:int"
+      }
+    },
+    "id:097845fb-2bcb-4f66-a965-8482aad281dd": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "prov:Collection",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "id:b8b8cf39-19ca-4819-a042-f63b8742256a": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "prov:Collection",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "id:7b606ad6-086c-4f8b-93dc-395e7b8c1ef1": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "prov:Collection",
+          "type": "xsd:QName"
+        }
+      ]
+    },
+    "data:da39a3ee5e6b4b0d3255bfef95601890afd80709": {
+      "prov:type": {
+        "$": "wfprov:Artifact",
+        "type": "xsd:QName"
+      }
+    },
+    "id:10390fe8-4a81-4931-8df3-87169058a973": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ],
+      "cwlprov:basename": "stderr.log",
+      "cwlprov:nameroot": "stderr",
+      "cwlprov:nameext": ".log"
+    },
+    "data:adc83b19e793491b1c6ea0fd8b46cd9f32e592fc": {
+      "prov:type": {
+        "$": "wfprov:Artifact",
+        "type": "xsd:QName"
+      }
+    },
+    "id:b1bc278c-5ccc-4f02-acc3-917330566ac3": {
+      "prov:type": [
+        {
+          "$": "wfprov:Artifact",
+          "type": "xsd:QName"
+        },
+        {
+          "$": "wf4ever:File",
+          "type": "xsd:QName"
+        }
+      ],
+      "cwlprov:basename": "stdout.log",
+      "cwlprov:nameroot": "stdout",
+      "cwlprov:nameext": ".log"
+    }
+  },
+  "wasDerivedFrom": {
+    "_:id5": {
+      "prov:generatedEntity": "data:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11",
+      "prov:usedEntity": "data:644e201526525f62152815a76a2dc773450f3dd9",
+      "prov:type": {
+        "$": "prov:PrimarySource",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id9": {
+      "prov:generatedEntity": "id:f7e9b70e-2d9e-4813-b9cb-3271007ce638",
+      "prov:usedEntity": "data:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11"
+    },
+    "_:id12": {
+      "prov:generatedEntity": "data:838cdfa4bbf09d1aedd26d79b46bfa8778ede2e0",
+      "prov:usedEntity": "data:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11"
+    }
+  },
+  "specializationOf": {
+    "_:id7": {
+      "prov:specificEntity": "data:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11",
+      "prov:generalEntity": "id:f7e9b70e-2d9e-4813-b9cb-3271007ce638"
+    },
+    "_:id10": {
+      "prov:specificEntity": "id:571242cd-16e3-4590-a5ab-5d2717158356",
+      "prov:generalEntity": "data:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11"
+    },
+    "_:id22": {
+      "prov:specificEntity": "id:98cb9b06-ec64-4852-8c50-c9f54a5d5cc6",
+      "prov:generalEntity": "data:387a00b69dd6112551d5167f4498e05a89166eb0"
+    },
+    "_:id24": {
+      "prov:specificEntity": "id:3b402eee-5800-48c8-b0e4-d2b929706c67",
+      "prov:generalEntity": "data:9f71fd268fb807d8085c9e92abd2d33310184f31"
+    },
+    "_:id25": {
+      "prov:specificEntity": "id:b0255581-4972-4c5a-b8f2-da7e01a61393",
+      "prov:generalEntity": "data:a17865ee4d8af3ebe8bd5b092dbb92464ba4cff4"
+    },
+    "_:id29": {
+      "prov:specificEntity": "id:98f9f086-22e4-42a1-97be-1964fa1c0e60",
+      "prov:generalEntity": "data:fc6f6f7466a49edf8dd6d0aa6d30457c85263b2d"
+    },
+    "_:id31": {
+      "prov:specificEntity": "id:0df4f898-5240-4468-b400-87f2e97aed76",
+      "prov:generalEntity": "data:661863675627302283a66531e9d849a0670e7c03"
+    },
+    "_:id34": {
+      "prov:specificEntity": "id:f53f9b36-f0e7-4f36-b642-e2b1285074d5",
+      "prov:generalEntity": "data:f421813fc7dea73d182e0d89307b5ba45128a9b5"
+    },
+    "_:id44": {
+      "prov:specificEntity": "id:fce17247-c52a-4efe-b765-81b02c06b4a8",
+      "prov:generalEntity": "data:387a00b69dd6112551d5167f4498e05a89166eb0"
+    },
+    "_:id46": {
+      "prov:specificEntity": "id:6edb1990-e450-46d9-8744-39ca6082429b",
+      "prov:generalEntity": "data:9f71fd268fb807d8085c9e92abd2d33310184f31"
+    },
+    "_:id47": {
+      "prov:specificEntity": "id:99e4d728-6188-43f1-b6e9-d3690c8318eb",
+      "prov:generalEntity": "data:a17865ee4d8af3ebe8bd5b092dbb92464ba4cff4"
+    },
+    "_:id51": {
+      "prov:specificEntity": "id:bc9c7364-e059-467a-9961-b9e5dc5edf3d",
+      "prov:generalEntity": "data:fc6f6f7466a49edf8dd6d0aa6d30457c85263b2d"
+    },
+    "_:id53": {
+      "prov:specificEntity": "id:6570048f-b008-4919-b10c-da0d49f609b1",
+      "prov:generalEntity": "data:661863675627302283a66531e9d849a0670e7c03"
+    },
+    "_:id56": {
+      "prov:specificEntity": "id:89459ff6-67e4-4912-b07b-4a7265fd2f45",
+      "prov:generalEntity": "data:f421813fc7dea73d182e0d89307b5ba45128a9b5"
+    },
+    "_:id74": {
+      "prov:specificEntity": "id:10390fe8-4a81-4931-8df3-87169058a973",
+      "prov:generalEntity": "data:da39a3ee5e6b4b0d3255bfef95601890afd80709"
+    },
+    "_:id76": {
+      "prov:specificEntity": "id:b1bc278c-5ccc-4f02-acc3-917330566ac3",
+      "prov:generalEntity": "data:adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    }
+  },
+  "wasAttributedTo": {
+    "_:id8": {
+      "prov:entity": "data:3102f6d7a018ebae572f457d711ed7e1e7a11bc2",
+      "prov:agent": "data:644e201526525f62152815a76a2dc773450f3dd9"
+    },
+    "_:id13": {
+      "prov:entity": "data:838cdfa4bbf09d1aedd26d79b46bfa8778ede2e0",
+      "prov:agent": "data:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11"
+    }
+  },
+  "wasStartedBy": {
+    "_:id11": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:trigger": "id:571242cd-16e3-4590-a5ab-5d2717158356"
+    }
+  },
+  "used": {
+    "_:id14": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "data:0cf60d40470fde378076afacf5812f961208a018",
+      "prov:time": "2026-10-16T17:47:04.496834+00:00",
+      "prov:role": {
+        "$": "wf:main/stringInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id15": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:75067df1-5f40-43e5-8d4a-b61fe9180be2",
+      "prov:time": "2026-10-16T17:47:04.496922+00:00",
+      "prov:role": {
+        "$": "wf:main/measureInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id16": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "data:d88aaa302517127d82182445af28a866c379e7ac",
+      "prov:time": "2026-10-16T17:47:04.497247+00:00",
+      "prov:role": {
+        "$": "wf:main/dateInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id17": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:fc5de38e-114d-42ab-9393-c412bd377c67",
+      "prov:time": "2026-10-16T17:47:04.497310+00:00",
+      "prov:role": {
+        "$": "wf:main/doubleInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id21": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:73c6b0c6-c003-486b-8490-20a1675c4241",
+      "prov:time": "2026-10-16T17:47:04.497457+00:00",
+      "prov:role": {
+        "$": "wf:main/arrayInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id23": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:98cb9b06-ec64-4852-8c50-c9f54a5d5cc6",
+      "prov:time": "2026-10-16T17:47:04.497817+00:00",
+      "prov:role": {
+        "$": "wf:main/complexObjectInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id28": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:9f4df9be-bc9e-4e38-b6d3-874bdce32504",
+      "prov:time": "2026-10-16T17:47:04.498461+00:00",
+      "prov:role": {
+        "$": "wf:main/geometryInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id30": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:98f9f086-22e4-42a1-97be-1964fa1c0e60",
+      "prov:time": "2026-10-16T17:47:04.498829+00:00",
+      "prov:role": {
+        "$": "wf:main/boundingBoxInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id33": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:37f16f9a-9e57-45fd-90e0-f6d4344b8c89",
+      "prov:time": "2026-10-16T17:47:04.499162+00:00",
+      "prov:role": {
+        "$": "wf:main/imagesInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id35": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:f53f9b36-f0e7-4f36-b642-e2b1285074d5",
+      "prov:time": "2026-10-16T17:47:04.499537+00:00",
+      "prov:role": {
+        "$": "wf:main/featureCollectionInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id36": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "data:0cf60d40470fde378076afacf5812f961208a018",
+      "prov:time": "2026-10-16T17:47:04.501206+00:00",
+      "prov:role": {
+        "$": "wf:main/EchoProcess/stringInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id37": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:4fedb9a0-0834-4277-be39-084b460052c7",
+      "prov:time": "2026-10-16T17:47:04.501311+00:00",
+      "prov:role": {
+        "$": "wf:main/EchoProcess/measureInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id38": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "data:d88aaa302517127d82182445af28a866c379e7ac",
+      "prov:time": "2026-10-16T17:47:04.501608+00:00",
+      "prov:role": {
+        "$": "wf:main/EchoProcess/dateInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id39": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:fd486b9d-5d8e-49e8-8214-0997974a91d9",
+      "prov:time": "2026-10-16T17:47:04.501671+00:00",
+      "prov:role": {
+        "$": "wf:main/EchoProcess/doubleInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id43": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:485436f8-ee48-44c6-b5e0-1d7b27fc0cd1",
+      "prov:time": "2026-10-16T17:47:04.501822+00:00",
+      "prov:role": {
+        "$": "wf:main/EchoProcess/arrayInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id45": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:fce17247-c52a-4efe-b765-81b02c06b4a8",
+      "prov:time": "2026-10-16T17:47:04.502116+00:00",
+      "prov:role": {
+        "$": "wf:main/EchoProcess/complexObjectInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id50": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:7714baf0-cc3f-4dfb-8e7e-629c205e6978",
+      "prov:time": "2026-10-16T17:47:04.502656+00:00",
+      "prov:role": {
+        "$": "wf:main/EchoProcess/geometryInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id52": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:bc9c7364-e059-467a-9961-b9e5dc5edf3d",
+      "prov:time": "2026-10-16T17:47:04.502954+00:00",
+      "prov:role": {
+        "$": "wf:main/EchoProcess/boundingBoxInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id55": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:bc065d16-73eb-40b8-ae68-87da9d722e2f",
+      "prov:time": "2026-10-16T17:47:04.503291+00:00",
+      "prov:role": {
+        "$": "wf:main/EchoProcess/imagesInput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id57": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:entity": "id:89459ff6-67e4-4912-b07b-4a7265fd2f45",
+      "prov:time": "2026-10-16T17:47:04.503518+00:00",
+      "prov:role": {
+        "$": "wf:main/EchoProcess/featureCollectionInput",
+        "type": "xsd:QName"
+      }
+    }
+  },
+  "hadMember": {
+    "_:id18": {
+      "prov:collection": "id:73c6b0c6-c003-486b-8490-20a1675c4241",
+      "prov:entity": "id:11ba9076-c5af-4d23-b541-f877c99eab94"
+    },
+    "_:id19": {
+      "prov:collection": "id:73c6b0c6-c003-486b-8490-20a1675c4241",
+      "prov:entity": "id:b401a368-b393-4d91-9408-6878d3e37a45"
+    },
+    "_:id20": {
+      "prov:collection": "id:73c6b0c6-c003-486b-8490-20a1675c4241",
+      "prov:entity": "id:79d60899-f39e-491c-9c04-5bdf3150de14"
+    },
+    "_:id26": {
+      "prov:collection": "id:9f4df9be-bc9e-4e38-b6d3-874bdce32504",
+      "prov:entity": "id:3b402eee-5800-48c8-b0e4-d2b929706c67"
+    },
+    "_:id27": {
+      "prov:collection": "id:9f4df9be-bc9e-4e38-b6d3-874bdce32504",
+      "prov:entity": "id:b0255581-4972-4c5a-b8f2-da7e01a61393"
+    },
+    "_:id32": {
+      "prov:collection": "id:37f16f9a-9e57-45fd-90e0-f6d4344b8c89",
+      "prov:entity": "id:0df4f898-5240-4468-b400-87f2e97aed76"
+    },
+    "_:id40": {
+      "prov:collection": "id:485436f8-ee48-44c6-b5e0-1d7b27fc0cd1",
+      "prov:entity": "id:40cb666f-413a-4740-8a51-7e7510ea42ce"
+    },
+    "_:id41": {
+      "prov:collection": "id:485436f8-ee48-44c6-b5e0-1d7b27fc0cd1",
+      "prov:entity": "id:4cf76477-e3d4-47ea-abea-35919fc98a75"
+    },
+    "_:id42": {
+      "prov:collection": "id:485436f8-ee48-44c6-b5e0-1d7b27fc0cd1",
+      "prov:entity": "id:82d4ded7-7285-404e-9aa2-facdc4de0144"
+    },
+    "_:id48": {
+      "prov:collection": "id:7714baf0-cc3f-4dfb-8e7e-629c205e6978",
+      "prov:entity": "id:6edb1990-e450-46d9-8744-39ca6082429b"
+    },
+    "_:id49": {
+      "prov:collection": "id:7714baf0-cc3f-4dfb-8e7e-629c205e6978",
+      "prov:entity": "id:99e4d728-6188-43f1-b6e9-d3690c8318eb"
+    },
+    "_:id54": {
+      "prov:collection": "id:bc065d16-73eb-40b8-ae68-87da9d722e2f",
+      "prov:entity": "id:6570048f-b008-4919-b10c-da0d49f609b1"
+    },
+    "_:id62": {
+      "prov:collection": "id:097845fb-2bcb-4f66-a965-8482aad281dd",
+      "prov:entity": "id:822a5a94-44fa-461e-bf21-250491eaa0ed"
+    },
+    "_:id63": {
+      "prov:collection": "id:097845fb-2bcb-4f66-a965-8482aad281dd",
+      "prov:entity": "id:3de4c30e-e23a-4576-bf19-e9a8653cbee6"
+    },
+    "_:id64": {
+      "prov:collection": "id:097845fb-2bcb-4f66-a965-8482aad281dd",
+      "prov:entity": "id:016468a2-6491-4085-9130-1dfed18da80f"
+    },
+    "_:id67": {
+      "prov:collection": "id:b8b8cf39-19ca-4819-a042-f63b8742256a",
+      "prov:entity": "id:6edb1990-e450-46d9-8744-39ca6082429b"
+    },
+    "_:id68": {
+      "prov:collection": "id:b8b8cf39-19ca-4819-a042-f63b8742256a",
+      "prov:entity": "id:99e4d728-6188-43f1-b6e9-d3690c8318eb"
+    },
+    "_:id71": {
+      "prov:collection": "id:7b606ad6-086c-4f8b-93dc-395e7b8c1ef1",
+      "prov:entity": "id:6570048f-b008-4919-b10c-da0d49f609b1"
+    }
+  },
+  "wasGeneratedBy": {
+    "_:id58": {
+      "prov:entity": "data:0cf60d40470fde378076afacf5812f961208a018",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:time": "2026-10-16T17:47:04.510437+00:00",
+      "prov:role": {
+        "$": "wf:main/primary/stringOutput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id59": {
+      "prov:entity": "id:3fc14d0c-e76e-4671-a5a4-04d62f3d39a1",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:time": "2026-10-16T17:47:04.510437+00:00",
+      "prov:role": {
+        "$": "wf:main/primary/measureOutput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id60": {
+      "prov:entity": "data:d88aaa302517127d82182445af28a866c379e7ac",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:time": "2026-10-16T17:47:04.510437+00:00",
+      "prov:role": {
+        "$": "wf:main/primary/dateOutput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id61": {
+      "prov:entity": "id:02993657-0af1-42fa-ab25-2acd0072e07a",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:time": "2026-10-16T17:47:04.510437+00:00",
+      "prov:role": {
+        "$": "wf:main/primary/doubleOutput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id65": {
+      "prov:entity": "id:097845fb-2bcb-4f66-a965-8482aad281dd",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:time": "2026-10-16T17:47:04.510437+00:00",
+      "prov:role": {
+        "$": "wf:main/primary/arrayOutput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id66": {
+      "prov:entity": "id:fce17247-c52a-4efe-b765-81b02c06b4a8",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:time": "2026-10-16T17:47:04.510437+00:00",
+      "prov:role": {
+        "$": "wf:main/primary/complexObjectOutput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id69": {
+      "prov:entity": "id:b8b8cf39-19ca-4819-a042-f63b8742256a",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:time": "2026-10-16T17:47:04.510437+00:00",
+      "prov:role": {
+        "$": "wf:main/primary/geometryOutput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id70": {
+      "prov:entity": "id:bc9c7364-e059-467a-9961-b9e5dc5edf3d",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:time": "2026-10-16T17:47:04.510437+00:00",
+      "prov:role": {
+        "$": "wf:main/primary/boundingBoxOutput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id72": {
+      "prov:entity": "id:7b606ad6-086c-4f8b-93dc-395e7b8c1ef1",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:time": "2026-10-16T17:47:04.510437+00:00",
+      "prov:role": {
+        "$": "wf:main/primary/imagesOutput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id73": {
+      "prov:entity": "id:89459ff6-67e4-4912-b07b-4a7265fd2f45",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:time": "2026-10-16T17:47:04.510437+00:00",
+      "prov:role": {
+        "$": "wf:main/primary/featureCollectionOutput",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id75": {
+      "prov:entity": "id:10390fe8-4a81-4931-8df3-87169058a973",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:time": "2026-10-16T17:47:04.510437+00:00",
+      "prov:role": {
+        "$": "wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_988c90d3-6ab5-4370-b397-bd3427966cda",
+        "type": "xsd:QName"
+      }
+    },
+    "_:id77": {
+      "prov:entity": "id:b1bc278c-5ccc-4f02-acc3-917330566ac3",
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:time": "2026-10-16T17:47:04.510437+00:00",
+      "prov:role": {
+        "$": "wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_513c257f-2b74-49fe-b4e9-0ebd443eb8a8",
+        "type": "xsd:QName"
+      }
+    }
+  },
+  "wasEndedBy": {
+    "_:id78": {
+      "prov:activity": "id:74e06198-faf8-404f-b905-c6f02361070d",
+      "prov:ender": "id:571242cd-16e3-4590-a5ab-5d2717158356",
+      "prov:time": "2026-10-16T17:47:04.513584+00:00"
+    }
+  }
+}

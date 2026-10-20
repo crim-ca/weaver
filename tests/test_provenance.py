@@ -1,9 +1,11 @@
 import itertools
+import json
 
 import pytest
 
 from weaver.formats import ContentType, OutputFormat
-from weaver.provenance import ProvenanceFormat, ProvenancePathType
+from weaver.provenance import ProvenanceFormat, ProvenancePathType, convert_to_prov_chain
+from tests import resources
 
 
 @pytest.mark.prov
@@ -192,3 +194,12 @@ def test_provenance_format_compatible(prov, prov_format, output_format, expect, 
     result, error = ProvenanceFormat.resolve_compatible_formats(prov, prov_format, output_format)
     assert result == expect
     assert error if is_error else error is None, "When an error is expected, a string detailing it should be returned."
+
+
+def test_convert_to_prov_chain():
+    prov_data = resources.load_resource("job_prov.json", text=True)
+    prov_json = convert_to_prov_chain(prov_data)
+    assert prov_json
+    prov_chain = json.loads(prov_json)
+    assert isinstance(prov_chain, list)
+    assert all("id" in obj for obj in prov_chain)
