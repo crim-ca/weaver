@@ -1830,10 +1830,15 @@ def validate_process_io(process, payload):
                     for io_fmt in io_format
                 }
                 io_accept = [clean_media_type_format(ctype) for ctype in io_accept if ctype]
-                # transparently support legacy media-types equivalent to the supported ones
+                # transparently support legacy media-types equivalent to the supported ones for inputs
+                # outputs can be requested with any alternate format they can be converted to
+                io_accept_any = [ctype in [ContentType.ANY, ContentType.TEXT_PLAIN] for ctype in io_accept]
                 io_accept = [
                     alt["mediaType"]
-                    for alt in extend_alternate_formats([{"mediaType": ctype} for ctype in io_accept], legacy=True)
+                    for alt in extend_alternate_formats(
+                        [{"mediaType": ctype} for ctype in io_accept],
+                        legacy=io_type == "inputs",
+                    )
                 ]
                 # no format specified explicitly must ensure that the process description has one by default
                 if not io_ctypes:
@@ -1854,7 +1859,7 @@ def validate_process_io(process, payload):
                 # if a media-type was specified, allow it even if not
                 # within "allowed" when they are the default 'any' types
                 any_types = [ContentType.ANY, ContentType.TEXT_PLAIN]
-                if not all(io_fmt in any_types for io_fmt in io_accept):
+                if not all(io_accept_any):
                     # otherwise, all formats must be within allowed ones
                     io_accept += any_types
                     if not all(io_fmt in io_accept for io_fmt in io_ctypes):
