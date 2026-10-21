@@ -64,6 +64,7 @@ from weaver.processes.types import ProcessType
 from weaver.processes.utils import get_process, map_progress
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
+from weaver.transform.utils import extend_alternate_formats
 from weaver.utils import (
     apply_number_with_unit,
     as_int,
@@ -1812,8 +1813,16 @@ def validate_process_io(process, payload):
                 io_ctypes = {
                     # field 'type' as Content-Type is only valid in execute payload
                     # during process description, it is used as the data/value type
-                    get_field(io_fmt, "mime_type", extra_variations=["type"], default="")
+                    # nested 'format' field also allows the media-type specification
+                    ctype
                     for io_fmt in io_exec
+                    for ctype in [
+                        get_field(io_fmt, "mime_type", extra_variations=["type"], default=""),
+                        get_field(
+                            get_field(io_fmt, "format", default={}) or {},
+                            "mime_type", search_variations=True, default=""
+                        ),
+                    ]
                 }
                 io_ctypes = [ctype for ctype in io_ctypes if ctype]
                 io_accept = {
@@ -1821,6 +1830,16 @@ def validate_process_io(process, payload):
                     for io_fmt in io_format
                 }
                 io_accept = [clean_media_type_format(ctype) for ctype in io_accept if ctype]
+                # transparently support legacy media-types equivalent to the supported ones for inputs
+                # outputs can be requested with any alternate format they can be converted to
+                io_accept_any = [ctype in [ContentType.ANY, ContentType.TEXT_PLAIN] for ctype in io_accept]
+                io_accept = [
+                    alt["mediaType"]
+                    for alt in extend_alternate_formats(
+                        [{"mediaType": ctype} for ctype in io_accept],
+                        legacy=io_type == "inputs",
+                    )
+                ]
                 # no format specified explicitly must ensure that the process description has one by default
                 if not io_ctypes:
                     io_default = any(get_field(io_fmt, "default", default=False) for io_fmt in io_format)
@@ -1840,7 +1859,7 @@ def validate_process_io(process, payload):
                 # if a media-type was specified, allow it even if not
                 # within "allowed" when they are the default 'any' types
                 any_types = [ContentType.ANY, ContentType.TEXT_PLAIN]
-                if not all(io_fmt in any_types for io_fmt in io_accept):
+                if not all(io_accept_any):
                     # otherwise, all formats must be within allowed ones
                     io_accept += any_types
                     if not all(io_fmt in io_accept for io_fmt in io_ctypes):
