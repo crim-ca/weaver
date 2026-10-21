@@ -21,6 +21,9 @@ Changes:
   requested `<scope>`, and resolving Safe `CURIE`/`URN` ``role``/``profile`` references to their long-form `URI` as
   necessary. Corresponding HTTP 400/422 error responses are raised when applicable for invald parsing or combinations.
 - Add `OGC API - Processes - Part 5: Provenance and Profiles` ``metadata-profiles`` conformance class references.
+- Implement ``OPTIONS /processes`` to advertise supported methods and deployment media types with ``Allow``
+  and ``Accept-Post`` headers, as required by the ``metadata-profiles`` requirements.
+  Add ``Vary: Accept, Prefer`` because process-list response behavior depends on those request headers.
 
 Fixes:
 ------

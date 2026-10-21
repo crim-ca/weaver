@@ -989,7 +989,7 @@ def get_openapi_json(
         # if unresolved, routes will use default endpoint paths without configured setting prefixes (if any)
         pyramid_registry=registry,
     )
-    swagger.ignore_methods = ["OPTIONS"]  # don't ignore HEAD, used by vault
+    swagger.ignore_methods = []  # don't ignore HEAD or OPTIONS (explicitly defined by routes)
     # function docstrings are used to create the route's summary in Swagger-UI
     swagger.summary_docstrings = use_docstring_summary
     swagger_base_spec = {"schemes": [http_scheme]}

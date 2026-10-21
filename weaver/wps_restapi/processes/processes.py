@@ -51,6 +51,19 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
+@sd.processes_service.options(tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES, sd.TAG_DEPLOY])
+def options_processes(request):
+    # type: (PyramidRequest) -> HTTPNoContent
+    """
+    Returns the methods supported by the process listing and deployment endpoint.
+    """
+    return HTTPNoContent(headers={
+        "Allow": "GET, POST, OPTIONS",
+        "Accept-Post": ", ".join(sorted(sd.DeployContentTypeAny.validator.choices)),
+        "Vary": "Accept, Prefer",
+    })
+
+
 @sd.processes_service.get(
     tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
     schema=sd.GetProcessesEndpoint(),
@@ -162,6 +175,7 @@ def get_processes(request):
         body["description"] = sd.OkGetProcessesListResponse.description
         LOGGER.debug("Process listing generated, validating schema...")
         body = sd.MultiProcessesListing().deserialize(body)
+        request.response.headers["Vary"] = "Accept, Prefer"
         request.response.headers.extend([
             ("Link", make_link_header(link))
             for link in body["links"]

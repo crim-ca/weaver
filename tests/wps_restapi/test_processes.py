@@ -210,6 +210,21 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         self.process_store.set_visibility(self.process_public.identifier, Visibility.PUBLIC)
         self.process_store.set_visibility(self.process_private.identifier, Visibility.PRIVATE)
 
+    @pytest.mark.oap_part5
+    def test_options_processes_metadata_profile_query_options(self):
+        """
+        Tests [OGC API Processes Part 5] that process-listing headers advertise supported methods and vary dimensions.
+        """
+        response = self.app.options("/processes")
+        assert response.status_code == 204
+        assert response.headers["Allow"] == "GET, POST, OPTIONS"
+        assert "QUERY" not in response.headers["Allow"]
+        assert "Accept-Query" not in response.headers
+        assert set(response.headers["Accept-Post"].split(", ")) == set(sd.DeployContentTypeAny.validator.choices)
+        assert response.headers["Vary"] == "Accept, Prefer"
+        listing = self.app.get("/processes", headers=self.json_headers)
+        assert listing.headers["Vary"] == "Accept, Prefer"
+
     def get_process_deploy_template(self, process_id=None, cwl=None, schema=ProcessSchema.OLD):
         # type: (Optional[str], Optional[CWL], ProcessSchemaType) -> JSON
         """
