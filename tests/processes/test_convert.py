@@ -26,8 +26,6 @@ from pywps.inout.literaltypes import AllowedValue, AnyValue
 from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
 
-from weaver.formats import SchemaRole
-
 from tests import resources
 from tests.utils import MockedResponse, assert_equal_any_order, mocked_remote_server_requests_wps1
 from weaver import ogc_definitions as ogc_def, xml_util
@@ -42,6 +40,7 @@ from weaver.formats import (
     OGC_NAMESPACE_DEFINITION,
     ContentEncoding,
     ContentType,
+    SchemaRole,
     get_cwl_file_format
 )
 from weaver.processes.constants import (
