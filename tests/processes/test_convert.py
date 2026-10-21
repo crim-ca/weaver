@@ -21,7 +21,7 @@ from owslib.crs import Crs
 from owslib.wps import ComplexData, Input as OWSInput, Output as OWSOutput
 from pywps.inout.basic import UOM
 from pywps.inout.formats import Format
-from pywps.inout.inputs import ComplexInput, LiteralInput
+from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.literaltypes import AllowedValue, AnyValue
 from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
@@ -40,6 +40,7 @@ from weaver.formats import (
     OGC_NAMESPACE_DEFINITION,
     ContentEncoding,
     ContentType,
+    SchemaRole,
     get_cwl_file_format
 )
 from weaver.processes.constants import (
@@ -73,6 +74,7 @@ from weaver.processes.convert import (
     cwl2json_input_values,
     cwl2wps_io,
     get_cwl_io_type,
+    get_field,
     get_io_type_category,
     is_cwl_complex_type,
     json2oas_io,
@@ -80,6 +82,7 @@ from weaver.processes.convert import (
     json2wps_datatype,
     json2wps_io,
     json2wps_supported_uoms,
+    merge_io_fields,
     merge_io_formats,
     normalize_ordered_io,
     oas2json_io,
@@ -1708,6 +1711,36 @@ def test_merge_io_formats_wps_overlaps_cwl():
         Format(ContentType.APP_XML),
         Format(ContentType.TEXT_PLAIN),
     ])
+
+
+def test_merge_io_fields_bbox_cwl_schema_added():
+    """
+    Validate that a CWL ``Format`` with a ``schema`` reference is converted into a WPS ``Metadata`` ``Schema`` entry.
+    """
+    wps_io = BoundingBoxInput("test", "", crss=["EPSG:4326"])
+    cwl_fmt = Format(ContentType.APP_JSON, schema="https://example.com/bbox-schema.json")
+    cwl_io = ComplexInput("test", "", supported_formats=[cwl_fmt], data_format=cwl_fmt)
+    merged_io = merge_io_fields(wps_io, cwl_io)
+    metadata = get_field(merged_io, "metadata", default=[])
+    schema_meta = [meta for meta in metadata if get_field(meta, "href", default=None) == cwl_fmt.schema]
+    assert len(schema_meta) == 1
+    assert get_field(schema_meta[0], "role", default=None) == SchemaRole.JSON_SCHEMA
+    assert get_field(schema_meta[0], "rel", default=None) == "schema"
+
+
+def test_merge_io_fields_bbox_cwl_schema_missing():
+    """
+    Validate that no invalid ``Metadata`` entry (empty ``href``) is generated when CWL ``Format`` has no ``schema``.
+    """
+    wps_io = BoundingBoxInput("test", "", crss=["EPSG:4326"])
+    cwl_fmt = Format(ContentType.APP_JSON)  # no 'schema' provided
+    cwl_io = ComplexInput("test", "", supported_formats=[cwl_fmt], data_format=cwl_fmt)
+    metadata_before = list(get_field(wps_io, "metadata", default=[]))
+    merged_io = merge_io_fields(wps_io, cwl_io)
+    metadata_after = get_field(merged_io, "metadata", default=[])
+    # no new 'Schema' metadata entry (with invalid empty 'href') should have been added
+    assert len(metadata_after) == len(metadata_before)
+    assert not any(get_field(meta, "href", default=None) == "" for meta in metadata_after)
 
 
 def test_normalize_ordered_io_with_builtin_dict_and_hints():
