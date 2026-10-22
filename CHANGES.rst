@@ -37,6 +37,36 @@ Fixes:
 - Fix `Job` results returned by-value for binary contents (e.g.: zipped `Zarr`) being decoded as `UTF-8` text, which
   failed for non-text bytes. Raw bytes are now returned as is for single result responses, and as ``base64`` encoded
   ``value`` (with ``encoding`` metadata) when embedded in the `JSON` results document.
+- Add `OGC API - Processes - Part 5: Provenance and Profiles` new ``metadata-profiles`` conformance class references
+  which provides the semantics of ``metadata`` with ``role``, ``href`` and a profiled-term ``rel`` to annotate the
+  `Process` itself or at granular I/O definitions, and aligns with ``dataClasses`` URIs along the I/O ``schema``
+  (relates to `opengeospatial/ogcapi-processes#637 <https://github.com/opengeospatial/ogcapi-processes/pull/637>`_).
+- Implement ``GET /processes?metadata[<scope>][<role>]=<profile>`` query filtering to list only `Process` summaries
+  that define a matching ``metadata`` entry, either in the main `process` or per `inputs`/`outputs` definition of the
+  requested `<scope>`, and resolving Safe `CURIE`/`URN` ``role``/``profile`` references to their long-form `URI` as
+  necessary. Corresponding HTTP 400/422 error responses are raised when applicable for invald parsing or combinations.
+- Add `OGC API - Processes - Part 5: Provenance and Profiles` ``metadata-profiles`` conformance class references.
+- Implement ``OPTIONS /processes`` to advertise supported methods and deployment media types with ``Allow``
+  and ``Accept-Post`` headers, as required by the ``metadata-profiles`` requirements.
+  Add ``Vary: Accept, Prefer`` because process-list response behavior depends on those request headers.
+- Add legacy ``application/tiff; application=geotiff`` and ``application/jp2`` media-types
+  (from the `OGC API - Processes` examples) as dynamically supported equivalents
+  of ``image/tiff; application=geotiff`` and ``image/jp2`` respectively.
+  Inputs submitted with them are accepted by any `Process` that defines the official media-types, without explicitly
+  listing them in its description. The legacy types are never selected when resolving media-types
+  (e.g.: from file extensions).
+- Fix ``PATCH`` requests silently dropping per-``id`` ``inputs``/``outputs`` ``metadata``
+  (e.g., to add ``role``/``profile`` links) submitted for update, by declaring ``keywords``/``metadata``
+  fields on ``InputOutputDescriptionMeta`` schema-node definition.
+- Fix ``PATCH`` list-append logic (``keywords``, ``metadata``, ``links``)
+  that discarded the merged result and persisted the original unchanged list instead.
+- Fix execution input validation that ignored ``format.mediaType`` of an input, and the conversion of single
+  ``Job`` input mapping to listing that dropped any field other than the first one (e.g.: ``format`` next to ``href``).
+- Fix media-type extension parsing pattern that did not support digits (e.g.: ``jp2``).
+- Fix `CLI` ``execute`` inputs parsing that incorrectly interpreted valid `OGC API - Processes` execution bodies
+  (e.g.: with ``bbox``, nested ``value`` objects) as `CWL` job inputs and failed. Only inputs containing
+  a ``class`` field are now considered `CWL` as originally intended. Logic is simplified to help interpretability
+  (fixes `#1048 <https://github.com/crim-ca/weaver/issues/1048>`_).
 - Fix `HTML` rendering of `Process`/`Provider` ``metadata`` entries that mixed link reference (``rel``/``href``) and
   value (``role``/``value``) representations, causing duplicated ``role`` fields, ``rel``/``role`` identifiers not
   rendered as clickable links when they are fully qualified `URL` references, literal embedded JSON ``value`` objects
@@ -54,6 +84,10 @@ Fixes:
   blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
   section, causing a ``ReferenceError`` when clicking them.
 - Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
+- Fix `BoundingBox` `I/O` description entries (`input`/`output`) being silently dropped entirely from `Process`
+  ``GET`` describe responses whenever a mismatched `CWL`/`WPS` ``format``/``schema`` auto-generated an invalid
+  ``metadata`` "Schema" link reference (empty ``href``, or missing required ``rel``), causing the corresponding
+  `AllOf`/`OneOf` schema validation to fail and the whole `I/O` entry to be discarded instead of rendered.
 
 .. _changes_6.16.0:
 

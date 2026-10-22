@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Union
 from celery.utils.log import get_task_logger
 from PIL import Image
 from processes.convert import get_field
+from pywps.inout.formats import Format
 
 from weaver.formats import ContentType, get_content_type, is_zarr_media_type
 from weaver.transform.const import CONVERSION_DICT
@@ -60,12 +61,7 @@ def is_tiff(image: str) -> bool:
     :return: True if the file is TIFF, False otherwise.
     """
     ext = os.path.splitext(image)[1]
-    return get_content_type(ext) in {
-        ContentType.IMAGE_TIFF,
-        ContentType.IMAGE_GEOTIFF,
-        ContentType.IMAGE_OGC_GEOTIFF,
-        ContentType.IMAGE_COG,
-    }
+    return get_content_type(ext) in ContentType.ANY_TIFF
 
 
 def is_gif(image: str) -> bool:
@@ -130,35 +126,41 @@ def write_images(images: List[Image.Image], output_file: str, ext: str = "png") 
 
 
 def extend_alternate_formats(
-    formats: Iterable["FormatMediaType"],
+    formats: Iterable[Union["FormatMediaType", Format]],
     conversion_dict: Optional[Dict[ContentType, List[ContentType]]] = None,
-) -> List["FormatMediaType"]:
+    legacy: bool = False,
+) -> List[Union["FormatMediaType", Format]]:
     """
     Extend a list of formats with missing alternate formats while preserving the original order.
 
-    :param formats: A list of format dictionaries containing the "mediaType" key.
+    :param formats: A list of format dictionaries containing the "mediaType" key, or :mod:`pywps` formats.
     :param conversion_dict: A dictionary mapping media types to their alternate formats.
                            If None, uses the default CONVERSION_DICT.
+    :param legacy: Add only the legacy :term:`Media-Type` equivalents of the formats, instead of the conversion
+        alternates (which never include legacy ones). Legacy formats are not part of process descriptions,
+        but can be transparently employed in their place.
     :return: The extended list of formats with alternate formats added in a consistent order.
     """
     if conversion_dict is None:
         conversion_dict = CONVERSION_DICT
 
-    if not formats or not all(isinstance(fmt, dict) for fmt in formats):
+    if not formats or not all(isinstance(fmt, (dict, Format)) for fmt in formats):
         return formats  # No formats or invalid structure, return as-is
 
     # Extract existing media types while preserving order
-    existing_media_types = []
-    seen = set()
+    existing_formats = {}
     for format_entry in formats:
-        media_type = get_field(format_entry, "mediaType", search_variations=True)
-        if media_type and media_type not in seen:
-            existing_media_types.append(media_type)
-            seen.add(media_type)
+        if isinstance(format_entry, Format):
+            media_type = format_entry.mime_type
+        else:
+            media_type = get_field(format_entry, "mediaType", search_variations=True)
+        if media_type and media_type not in existing_formats:
+            existing_formats[media_type] = format_entry
+    seen = set(existing_formats)
 
     # Collect missing alternate formats while preserving original order
     missing_formats = []
-    for media_type in existing_media_types:
+    for media_type, format_entry in existing_formats.items():
         alternates = conversion_dict.get(media_type)
         if alternates is None and is_zarr_media_type(media_type):  # any version or parameters spelling
             alternates = conversion_dict.get(ContentType.APP_ZARR)
@@ -166,8 +168,19 @@ def extend_alternate_formats(
         if is_zarr_media_type(media_type) and media_type != ContentType.APP_ZARR:
             alternates.insert(0, ContentType.APP_ZARR)  # explicit version also accepts the generic type
         for alt_format in alternates:
-            if alt_format not in seen:
-                missing_formats.append({"mediaType": alt_format})
-                seen.add(alt_format)
+            if alt_format in seen or (alt_format in ContentType.ANY_LEGACY) != legacy:
+                continue
+            if isinstance(format_entry, Format):
+                alt_entry = Format(
+                    alt_format,
+                    extension=format_entry.extension,
+                    encoding=format_entry.encoding,
+                    schema=format_entry.schema,
+                )
+                alt_entry.default = False  # attribute added dynamically by Weaver on supported formats
+            else:
+                alt_entry = {"mediaType": alt_format}
+            missing_formats.append(alt_entry)
+            seen.add(alt_format)
 
-    return formats + missing_formats
+    return list(formats) + missing_formats

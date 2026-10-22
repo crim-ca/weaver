@@ -1,16 +1,23 @@
+import base64
+import gzip
+import json
 import logging
 import math
+import urllib.parse
 from typing import TYPE_CHECKING
+from typing_extensions import get_args
 
 import colander
-from pyramid.httpexceptions import HTTPBadRequest, HTTPOk
+from pyramid.httpexceptions import HTTPBadRequest, HTTPOk, HTTPUnprocessableEntity
 from pyramid.settings import asbool
 
 from weaver.compat import InvalidVersion
 from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.formats import ContentType, OutputFormat, clean_media_type_format, guess_target_format
+from weaver.ogc_definitions import normalize as normalize_ogc_uri
 from weaver.store.base import StoreProcesses
+from weaver.typedefs import MetadataQueryScope, PreferHeaderHandling
 from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
@@ -84,10 +91,12 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
             "value": list(paging_names.intersection(request.params))
         })
 
+    metadata_filters = parse_metadata_query_filters(request)
     store = get_db(request).get_store(StoreProcesses)
     processes, total_local_processes = store.list_processes(
         visibility=Visibility.PUBLIC,
         total=True,
+        metadata=metadata_filters,
         **revisions_param,
         **paging_param
     )
@@ -104,6 +113,181 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
             LOGGER.debug("Invalid process [%s] because:\n%s", process_ref, invalid)
             invalid_processes_ids.append(process.identifier)
     return valid_processes, invalid_processes_ids, paging_param, with_providers, total_local_processes
+
+
+def resolve_metadata_query_uri(value, instance):
+    # type: (str, str) -> str
+    """
+    Validates and resolves a ``role``/``profile`` reference (`IRI`, `URN` or Safe :term:`CURIE`) to its long-form `URI`.
+
+    Relies on :func:`weaver.ogc_definitions.normalize` as the authority for :term:`CURIE`/`URN` resolution. An
+    absolute `IRI` is returned as-is. Any other value left unresolved (unchanged, or not an `IRI`) by that utility
+    is considered an invalid or unresolvable reference.
+
+    :raises HTTPBadRequest: If ``value`` is empty or contains whitespace (not a valid `IRI`/`URN`/Safe :term:`CURIE`).
+    :raises HTTPUnprocessableEntity: If ``value`` has valid syntax, but its :term:`CURIE` prefix is unresolvable.
+    """
+    if value.startswith(("http://", "https://")):
+        return value
+    if not value or " " in value:
+        raise HTTPBadRequest(json={
+            "type": sd.OGC_API_PROC_PART5_EXC_INVALID_METADATA_PROFILE_URI,
+            "title": "Invalid metadata query reference.",
+            "detail": "Query parameter 'metadata[<role>]' role/profile must be a valid IRI, URN or Safe CURIE.",
+            "status": HTTPBadRequest.code,
+            "instance": instance,
+        })
+    resolved = normalize_ogc_uri(value)
+    if resolved == value or not resolved.startswith(("http://", "https://")):
+        raise HTTPUnprocessableEntity(json={
+            "type": sd.OGC_API_PROC_PART5_EXC_UNSUPPORTED_METADATA_PROFILE_URI,
+            "title": "Unsupported metadata query reference.",
+            "detail": "Query parameter 'metadata[<role>]' role/profile CURIE prefix could not be resolved.",
+            "status": HTTPUnprocessableEntity.code,
+            "instance": instance,
+        })
+    return resolved
+
+
+_METADATA_QUERY_SCOPES = get_args(MetadataQueryScope)
+
+
+def decode_compressed_metadata_query(value):
+    # type: (str) -> JSON
+    """
+    Decodes a ``base64url(gzip(<QUERY content>))`` compacted/encoded single-value ``metadata`` query parameter.
+
+    .. seealso::
+        ``/req/metadata-profiles/query-compression``
+
+    :raises HTTPBadRequest: If the value cannot be decoded, decompressed or parsed as JSON ``QUERY`` content.
+    :returns: Decoded ``QUERY`` content (``{"process": {role: [profile, ...]}, "inputs": {...}, "outputs": {...}}``).
+    """
+    try:
+        padded = value + "=" * (-len(value) % 4)
+        raw = base64.urlsafe_b64decode(padded.encode("ascii"))
+        if raw[:2] != b"\x1f\x8b":  # gzip magic number
+            raise ValueError("Missing gzip magic number.")
+        content = json.loads(gzip.decompress(raw))
+        if not isinstance(content, dict) or not set(content).issubset(_METADATA_QUERY_SCOPES):
+            raise ValueError("Invalid 'QUERY' content structure.")
+    except Exception as exc:
+        raise HTTPBadRequest(json={
+            "type": sd.OGC_API_PROC_PART5_EXC_INVALID_METADATA_PROFILE_URI,
+            "title": "Invalid metadata query parameter.",
+            "detail": f"Compacted 'metadata' query parameter could not be decoded, decompressed or parsed: {exc}",
+            "status": HTTPBadRequest.code,
+            "instance": "metadata",
+        }) from exc
+    return content
+
+
+def get_metadata_query_bracket_handling(request):
+    # type: (PyramidRequest) -> PreferHeaderHandling
+    """
+    Resolves the lenient/strict handling of literal (non-percent-encoded) brackets in ``metadata`` query parameters.
+
+    A client can request the ``strict`` handling (refusing literal ``[``/``]`` characters, accepting only their
+    percent-encoded ``%5B``/``%5D`` form) using the ``Prefer: handling=strict`` request header
+    (:rfc:`7240`, Section 4.4), as per ``/per/metadata-profiles/query-literal-brackets``. Any other (or missing)
+    value defaults to the ``lenient`` handling (literal brackets accepted).
+
+    :returns: Either ``"strict"`` or ``"lenient"`` (:data:`weaver.typedefs.PreferHeaderHandling`).
+    """
+    lenient, strict = get_args(PreferHeaderHandling)
+    prefer = request.headers.get("Prefer", "")
+    for pref in prefer.split(","):
+        key, _, value = pref.strip().partition("=")
+        if key.strip().lower() == "handling" and value.strip().strip('"').lower() == strict:
+            return strict
+    return lenient
+
+
+def parse_metadata_query_filters(request):
+    # type: (PyramidRequest) -> List[Tuple[MetadataQueryScope, str, str]]
+    """
+    Parses ``metadata[<scope>][<role>]=<profile>`` query parameters used to filter process listing by metadata.
+
+    The ``<scope>`` must be one of ``process``, ``inputs`` or ``outputs``, indicating respectively whether the
+    ``<role>``/``<profile>`` must be matched against a ``metadata`` entry of the process itself, or of at least one
+    of its inputs (respectively outputs). Both ``<role>`` and ``<profile>`` can be provided as `IRI`, `URN` or Safe
+    :term:`CURIE`, and are resolved to their long-form `URI` using :func:`weaver.ogc_definitions.normalize` for
+    consistent matching against stored metadata. Multiple ``<profile>`` for the same ``<role>`` can be supplied as
+    comma-separated values, or using repeated query parameters, and must ALL be matched (logical AND). Only
+    ``metadata`` entries that are profile links (``rel`` set to
+    :data:`weaver.wps_restapi.swagger_definitions.OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI`) are considered
+    for the ``<role>``/``<profile>`` matching, as per ``/req/metadata-profiles/profile-link``. When ``<role>``
+    is itself a Safe :term:`CURIE`, it is provided with doubled brackets in the parameter name
+    (e.g., ``metadata[outputs][[ogc-profile:data-type]]``), since the outer brackets delimit the ``deepObject``
+    key, and the inner ones belong to the Safe CURIE, as per ``/req/metadata-profiles/query-curie-matching``.
+
+    By default (``lenient`` handling), literal (non-percent-encoded) ``[``/``]`` characters are accepted in the
+    ``metadata`` query parameter names/values, even though :rfc:`3986` (Section 3.4) disallows them in the query
+    component. A client requesting the ``Prefer: handling=strict`` request header
+    (see :func:`get_metadata_query_bracket_handling`) instead requires all brackets to be percent-encoded
+    (``%5B``/``%5D``), as per ``/per/metadata-profiles/query-literal-brackets`` and
+    ``/rec/metadata-profiles/query-literal-brackets-error``.
+
+    Alternatively, a single ``metadata`` query parameter (not using the ``metadata[<scope>][<role>]`` form) is
+    interpreted as a `base64url`-encoded, `gzip`-compressed `JSON` ``QUERY`` content representation, as defined by
+    ``/req/metadata-profiles/query-compression``, of the equivalent ``{"process": {<role>: [<profile>, ...]}}``
+    (and/or ``inputs``/``outputs``) filter structure.
+
+    .. seealso::
+        OGC API - Processes - Part 5: Provenance and Profiles (``metadata-profiles`` conformance class).
+
+    :raises HTTPBadRequest: If a ``<scope>`` is not one of the supported values, or ``<role>``/``<profile>`` is not
+        a valid `IRI`/`URN`/Safe :term:`CURIE`, or the compacted/encoded ``metadata`` value cannot be processed, or
+        the ``strict`` handling is requested and literal brackets are found in the raw query string.
+    :raises HTTPUnprocessableEntity: If a ``<role>``/``<profile>`` Safe :term:`CURIE` prefix cannot be resolved.
+    :returns: List of resolved ``(scope, role, profile)`` filters to be matched against process ``metadata`` entries.
+    """
+    bracket_handling = get_metadata_query_bracket_handling(request)
+    request.metadata_bracket_handling = bracket_handling
+    _, strict_mode = get_args(PreferHeaderHandling)
+    if bracket_handling == strict_mode:
+        raw_query = request.query_string or ""
+        for raw_param in raw_query.split("&"):
+            raw_key = raw_param.split("=", 1)[0]
+            if raw_key.startswith("metadata") and ("[" in raw_key or "]" in raw_key):
+                raise HTTPBadRequest(json={
+                    "type": sd.OGC_API_PROC_PART5_EXC_INVALID_METADATA_PROFILE_URI,
+                    "title": "Invalid metadata query parameter.",
+                    "detail": (
+                        "Literal brackets are not accepted under the 'strict' handling preference. "
+                        "Percent-encode '[' and ']' as '%5B' and '%5D'."
+                    ),
+                    "status": HTTPBadRequest.code,
+                    "instance": raw_key,
+                })
+    filters = []
+    for key, values in request.params.dict_of_lists().items():
+        if key == "metadata":
+            content = decode_compressed_metadata_query(values[0])
+            for scope, role_profiles in content.items():
+                for role, profiles in role_profiles.items():
+                    role = resolve_metadata_query_uri(role, key)
+                    for profile in (profiles if isinstance(profiles, list) else [profiles]):
+                        filters.append((scope, role, resolve_metadata_query_uri(profile, key)))
+            continue
+        if not (key.startswith("metadata[") and key.endswith("]")):
+            continue
+        scope_role = key[len("metadata["):-1]
+        scope, _, role = scope_role.partition("][")
+        if not role or scope not in _METADATA_QUERY_SCOPES:
+            raise HTTPBadRequest(json={
+                "type": sd.OGC_API_PROC_PART5_EXC_INVALID_METADATA_PROFILE_URI,
+                "title": "Invalid metadata query parameter.",
+                "detail": f"Query parameter '{key}' must be of form 'metadata[process|inputs|outputs][<role>]'.",
+                "status": HTTPBadRequest.code,
+                "instance": key,
+            })
+        role = resolve_metadata_query_uri(role, key)
+        for value in values:
+            for profile in value.split(","):
+                profile = resolve_metadata_query_uri(profile, key)
+                filters.append((scope, role, profile))
+    return filters
 
 
 def get_process_list_links(request, paging, total, provider=None):
@@ -137,7 +321,7 @@ def get_process_list_links(request, paging, total, provider=None):
          "type": ContentType.APP_JSON, "title": "Process listing summary (identifiers and count only)."},
         {"href": f"{proc_url}?f=json", "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
          "type": ContentType.APP_JSON, "title": "List of registered local processes."},
-        {"href": get_path_kvp(proc_url, **req_params), "rel": "self",
+        {"href": f"{proc_url}?{urllib.parse.urlencode(req_params)}", "rel": "self",
          "type": req_fmt, "title": "Current process listing."},
     ])
     if provider:

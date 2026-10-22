@@ -25,5 +25,8 @@ CONVERSION_DICT = {
     ContentType.APP_JSON: [ContentType.TEXT_CSV, ContentType.APP_XML, ContentType.APP_YAML],
     # directory can be offered as single file, but not the reverse since a file cannot be returned as directory
     **{zarr_type: [ContentType.APP_ZARR_ZIP] for zarr_type in ContentType.ANY_ZARR},
+    # legacy equivalents (see 'ContentType.ANY_LEGACY') transparently supported in place of the official ones
+    ContentType.IMAGE_OGC_GEOTIFF: [ContentType.APP_OGC_GEOTIFF],
+    ContentType.IMAGE_JPEG2000: [ContentType.APP_JPEG2000],
 }
 EXCLUDED_TYPES = {ContentType.APP_RAW_JSON, ContentType.APP_OCTET_STREAM, ContentType.TEXT_PLAIN}
