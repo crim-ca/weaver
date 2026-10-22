@@ -39,6 +39,15 @@ from pywps.response.describe import DescribeResponse
 from werkzeug.wrappers import Request as WerkzeugRequest
 
 from weaver import xml_util
+from weaver.collections.stac import (
+    STAC_API_DATA_ACCESS,
+    STAC_API_MARKER,
+    STAC_COLLECTION_FILE,
+    get_collection_api_path,
+    get_collection_dir_name,
+    get_item_path
+)
+from weaver.collections.utils import collection_api_url, collection_enabled
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import (
     ExecuteControlOption,
@@ -74,6 +83,7 @@ from weaver.utils import (
     as_version_major_minor_patch,
     extend_instance,
     fully_qualified_name,
+    get_any_id,
     get_job_log_msg,
     get_log_date_fmt,
     get_log_fmt,
@@ -85,7 +95,7 @@ from weaver.utils import (
 )
 from weaver.visibility import Visibility
 from weaver.warning import NonBreakingExceptionWarning, UnsupportedOperationWarning
-from weaver.wps.utils import get_wps_client, get_wps_output_dir, get_wps_url
+from weaver.wps.utils import get_wps_client, get_wps_output_dir, get_wps_output_url, get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
@@ -1536,6 +1546,58 @@ class Job(Base, LoggerHandler):
                 ])
         return links
 
+    def collection_url(self, container=None, extra_path=None):
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> URL
+        """
+        Obtain the URL of the :term:`STAC` collection representation of :term:`Job` results.
+
+        :param container: Resolve application settings to obtain the base URL of the outputs location.
+        :param extra_path: Path relative to the collection, or ``None`` for the collection document itself.
+        """
+        api_url = collection_api_url(container)
+        if api_url:
+            return f"{api_url}/collections/{self.id}{get_collection_api_path(extra_path)}"
+        out_url = get_wps_output_url(container).rstrip("/")
+        base_path = self.result_path()
+        coll_dir = os.path.join(os.path.dirname(base_path), get_collection_dir_name(self.id))
+        return f"{out_url}/{coll_dir}/{extra_path or STAC_COLLECTION_FILE}"
+
+    def collection_path(self, container=None, extra_path=None):
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> Path
+        """
+        Obtain the local path of the static :term:`STAC` collection directory of :term:`Job` results.
+
+        :param container: Resolve application settings to obtain the storage root directory of the outputs.
+        :param extra_path: Path relative to the collection directory, or ``None`` for the directory itself.
+        """
+        base_path = self.result_path()
+        coll_dir = os.path.join(os.path.dirname(base_path), get_collection_dir_name(self.id))
+        coll_path = os.path.join(get_wps_output_dir(container), coll_dir)
+        return os.path.join(coll_path, extra_path) if extra_path else coll_path
+
+    def collection_exists(self, container=None):
+        # type: (Optional[AnySettingsContainer]) -> bool
+        marker = STAC_API_MARKER if collection_api_url(container) else STAC_COLLECTION_FILE
+        return collection_enabled(container) and os.path.isfile(self.collection_path(container, marker))
+
+    def collection_links(self, container=None, self_link=None):
+        # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
+        """
+        Obtains the link to the collection representation of :term:`Job` results.
+        """
+        if not collection_enabled(container):
+            return []
+        response_url = get_path_kvp(self.results_url(container), response=ExecuteResponse.COLLECTION)
+        is_results = self_link == "results"
+        href = self.collection_url(container) if is_results and self.collection_exists(container) else response_url
+        return [{
+            "href": href,
+            "rel": "alternate" if is_results else "collection",
+            "profile": sd.OGC_API_PROC_PROFILE_COLLECTION_URI,
+            "type": ContentType.APP_JSON,
+            "title": "Job results as STAC Collection.",
+        }]
+
     def prov_url(self, container=None, extra_path=None):
         # type: (Optional[AnySettingsContainer], Optional[ProvenancePathType]) -> str
         extra_path = str(extra_path or "")
@@ -1689,6 +1751,7 @@ class Job(Base, LoggerHandler):
                 f_links = self.get_all_possible_formats_links(url=job_url, results=self.results)
                 if len(f_links) > 0:
                     job_links.extend(f_links)
+                job_links.extend(self.collection_links(settings, self_link))
             else:
                 job_links.append({
                     "href": f"{job_url}/exceptions", "rel": sd.OGC_API_PROC_REL_EXCEPTIONS_URI,
@@ -2986,9 +3049,31 @@ class Process(Base):
                 process[io_type] = normalize_ordered_io(process[io_type], io_hints[io_type])
             process.update({"process": dict(process), **additional_properties})
             return sd.ProcessDescriptionOLD(schema_meta_include=True).deserialize(process)
+        self.update_data_access_apis(process, request)
         # process fields directly at root + I/O as mappings
         process.update(additional_properties)
         return sd.ProcessDescriptionOGC(schema_meta_include=True).deserialize(process)
+
+    def update_data_access_apis(self, process, container=None):
+        # type: (JSON, Optional[AnySettingsContainer]) -> None
+        """
+        Dynamically reports ``dataAccessAPIs`` of outputs according to the current server configuration.
+
+        Any stored definition is dropped when the feature is disabled to avoid reporting unavailable mechanisms.
+        """
+        enabled = collection_enabled(container)
+        has_api = bool(collection_api_url(container))
+        outputs = process.get("outputs")
+        outputs = outputs.values() if isinstance(outputs, dict) else (outputs or [])
+        for out_def in outputs:
+            out_def.pop("dataAccessAPIs", None)
+            if not enabled:
+                continue
+            is_literal = "literalDataDomains" in out_def or out_def.get("type") in ["literal", "bbox"]
+            if is_literal:
+                out_def["dataAccessAPIs"] = []
+            elif has_api:
+                out_def["dataAccessAPIs"] = list(STAC_API_DATA_ACCESS)
 
     def summary(self, revision=False, links=True, container=None):
         # type: (bool, bool, Optional[AnySettingsContainer]) -> JSON

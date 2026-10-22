@@ -95,7 +95,13 @@ from weaver.wps.utils import (
     load_pywps_config
 )
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.jobs.utils import get_job_results_response, get_job_return, get_job_submission_response
+from weaver.wps_restapi.jobs.utils import (
+    apply_response_query,
+    get_job_results_response,
+    get_job_return,
+    get_job_submission_response,
+    save_job_collection
+)
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 
 LOGGER = logging.getLogger(__name__)
@@ -347,6 +353,12 @@ def execute_process(task, job_id, wps_url, headers=None):
             job.status = Status.SUCCEEDED
         job.status_message = f"Job {job.status}."
         job.mark_finished()
+        is_collection = job.execution_response in [ExecuteResponse.COLLECTION, ExecuteResponse.LANDING_PAGE]
+        if task_success and map_status(job.status) == Status.SUCCESSFUL and is_collection:
+            try:
+                save_job_collection(job, settings)
+            except Exception as exc:  # noqa: W0703  # avoid impacting the job outcome
+                LOGGER.warning("Ignoring failure to generate collection of job [%s]: [%s]", job.id, exc, exc_info=exc)
         if task_success:
             job.progress = JobProgress.DONE
         job.save_log(logger=task_logger, message="Job task complete.")
@@ -1164,8 +1176,7 @@ def submit_job(request, reference, tags=None, process_id=None):
     # validate context if needed later on by the job for early failure
     context = get_wps_output_context(request)
 
-    # FIXME: to remove once implemented (https://github.com/crim-ca/weaver/issues/683)
-    validate_response_collection_unsupported(request, json_body)
+    json_body = apply_response_query(request, json_body)
 
     prov_id = None  # None OK if local
     proc_id = None  # None OK if remote, but can be found as well if available from WPS-REST path  # noqa
@@ -1872,22 +1883,3 @@ def validate_process_io(process, payload):
                             "occurrences": io_len,
                         }
                     })
-
-
-def validate_response_collection_unsupported(request, json_body):
-    # FIXME: Add support for 'response=collection' to control job status collection representation
-    #        See: https://github.com/opengeospatial/ogcapi-processes/issues/557
-    #             https://github.com/crim-ca/weaver/issues/683
-    response_value = None
-    if "response" in json_body:
-        response_value = json_body.get("response")
-    if not response_value and hasattr(request, "params"):
-        response_value = request.params.get("response")
-    if response_value and isinstance(response_value, str):
-        if response_value.lower() == "collection":
-            raise HTTPNotImplemented(json={
-                "type": "NotImplemented",
-                "title": "Response collection format not implemented",
-                "detail": "The 'response=collection' parameter is not yet supported.",
-                "status": HTTPNotImplemented.code,
-            })

@@ -231,6 +231,8 @@
 .. _submit-issue: https://github.com/crim-ca/weaver/issues/new/choose
 .. |w3c| replace:: W3C
 .. _w3c: https://www.w3.org/
+.. |w3c-safe-curie| replace:: W3C CURIE Syntax 1.0 - Safe CURIE
+.. _w3c-safe-curie: https://www.w3.org/TR/curie/#P_safe_curie
 
 .. STAC
 .. |stac-spec| replace:: STAC Specification
@@ -245,6 +247,14 @@
 .. _stac-items: https://github.com/radiantearth/stac-spec/blob/master/item-spec/item-spec.md
 .. |stac-assets| replace:: STAC Assets
 .. _stac-assets: https://github.com/radiantearth/stac-spec/blob/master/commons/assets.md
+.. |stac-ext| replace:: STAC Extensions
+.. _stac-ext: https://stac-extensions.github.io/
+.. |stac-ext-file| replace:: ``file``
+.. _stac-ext-file: https://github.com/stac-extensions/file
+.. |stac-ext-application| replace:: ``application``
+.. _stac-ext-application: https://github.com/stac-extensions/application
+.. |stac-ext-processing| replace:: ``processing``
+.. _stac-ext-processing: https://github.com/stac-extensions/processing
 
 .. Example references
 .. |examples| replace:: Examples

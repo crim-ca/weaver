@@ -41,10 +41,14 @@ if TYPE_CHECKING:
     ]
     ExecuteResponseDocumentType = Literal["document"]
     ExecuteResponseRawType = Literal["raw"]
+    ExecuteResponseCollectionType = Literal["collection"]
+    ExecuteResponseLandingPageType = Literal["landingPage"]
     ExecuteResponseConstantsType: TypeAlias = "ExecuteResponse"
     AnyExecuteResponse = Union[
         ExecuteResponseDocumentType,
         ExecuteResponseRawType,
+        ExecuteResponseCollectionType,
+        ExecuteResponseLandingPageType,
         ExecuteResponseConstantsType,
     ]
     ExecuteTransmissionModeReferenceType = Literal["reference"]
@@ -110,6 +114,8 @@ class ExecuteReturnPreference(Constants):
 class ExecuteResponse(Constants):
     RAW = "raw"             # type: ExecuteResponseRawType
     DOCUMENT = "document"   # type: ExecuteResponseDocumentType
+    COLLECTION = "collection"  # type: ExecuteResponseCollectionType
+    LANDING_PAGE = "landingPage"  # type: ExecuteResponseLandingPageType
 
 
 class ExecuteTransmissionMode(Constants):

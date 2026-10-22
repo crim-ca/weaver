@@ -107,6 +107,8 @@ def get_conformance(category, settings):
     ogcapi_proc_enabled = asbool(settings.get("weaver.wps_restapi", True))
     ogcapi_proc_html = asbool(settings.get("weaver.wps_restapi_html", True))
     ogcapi_proc_prov = asbool(settings.get("weaver.cwl_prov", True))
+    ogcapi_proc_collection = asbool(settings.get("weaver.job_collection", True))
+    ogcapi_proc_collection_api = bool(settings.get("weaver.job_collection_stac_api_public_url"))
     ogcapi_proc_conformance = ([
         f"{ogcapi_common}/conf/core",
         f"{ogcapi_common}/per/core/additional-link-relations",
@@ -452,14 +454,29 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_core2}/req/collection-input",
         f"{ogcapi_proc_core2}/req/collection-input/collection-access",
         f"{ogcapi_proc_core2}/req/collection-input/referenced-collection",
-        # FIXME: Collection Outputs (https://github.com/crim-ca/weaver/issues/683)
-        # f"{ogcapi_proc_core2}/req/collection-output",
+    ] + (([
+        f"{ogcapi_proc_core2}/conf/collection-output",
+    ] + ([
+        f"{ogcapi_proc_core2}/conf/collection-output/data-access-mechanisms",
+    ] if ogcapi_proc_collection_api else []) + [
+        f"{ogcapi_proc_core2}/conf/collection-output/response-output-many-grouped",
+        f"{ogcapi_proc_core2}/conf/collection-output/response-output-many-results",
+        f"{ogcapi_proc_core2}/conf/collection-output/response-profile",
+        f"{ogcapi_proc_core2}/conf/collection-output/response-unsupported",
+        f"{ogcapi_proc_core2}/req/collection-output",
         # f"{ogcapi_proc_core2}/req/collection-output/collection-response",
-        # f"{ogcapi_proc_core2}/req/collection-output/data-access-mechanisms",
-        # f"{ogcapi_proc_core2}/req/collection-output/landing-page",
+    ] + ([
+        f"{ogcapi_proc_core2}/req/collection-output/data-access-mechanisms",
+        f"{ogcapi_proc_core2}/req/collection-output/landing-page",
         # f"{ogcapi_proc_core2}/req/collection-output/landing-page-response",
+    ] if ogcapi_proc_collection_api else []) + [
+        f"{ogcapi_proc_core2}/req/collection-output/response-output-many-grouped",
+        f"{ogcapi_proc_core2}/req/collection-output/response-output-many-results",
+        f"{ogcapi_proc_core2}/req/collection-output/response-profile",
         # f"{ogcapi_proc_core2}/req/collection-output/response-query-parameter",
+        f"{ogcapi_proc_core2}/req/collection-output/response-unsupported",
         # f"{ogcapi_proc_core2}/per/collection-output/expiry",
+    ]) if ogcapi_proc_collection else []) + [
         # FIXME: Collection 'properties'
         #  (https://github.com/crim-ca/weaver/issues/750, PR https://github.com/crim-ca/weaver/pull/752)
         # f"{ogcapi_proc_core2}/req/input-fields-modifiers/derived-fields",

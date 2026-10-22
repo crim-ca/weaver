@@ -17,7 +17,9 @@ from pyramid.httpexceptions import (
     HTTPNoContent,
     HTTPNotAcceptable,
     HTTPNotFound,
+    HTTPNotImplemented,
     HTTPOk,
+    HTTPSeeOther,
     HTTPUnprocessableEntity
 )
 from pyramid.response import FileResponse
@@ -26,6 +28,8 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 from webob.headers import ResponseHeaders
 
 from weaver import ogc_definitions as ogc_def
+from weaver.collections.stac import STAC_COLLECTION_PROFILES, AmbiguousCollectionItems, generate_job_collection
+from weaver.collections.utils import collection_api_url, collection_enabled
 from weaver.database import get_db
 from weaver.datatype import Job, Process
 from weaver.exceptions import (
@@ -742,6 +746,139 @@ def get_job_output_transmission(job, output_id, is_reference):
     return out_mode, out_fmt
 
 
+def apply_response_query(request, body):
+    # type: (Optional[AnyRequestType], Optional[JSON]) -> Optional[JSON]
+    """
+    Applies the ``response`` query parameter as alias of the ``response`` body parameter, if applicable.
+
+    An explicit ``response`` in the body takes precedence over the query parameter.
+    """
+    params = getattr(request, "params", None)
+    response = params.get("response") if params is not None else None
+    response = {str(v).lower(): v for v in ExecuteResponse.values()}.get(str(response).lower()) if response else None
+    if not response or (body and body.get("response")):
+        return body
+    return {**(body or {}), "response": response}
+
+
+def get_header_container(request, request_headers):
+    # type: (Optional[AnyRequestType], Optional[AnyHeadersContainer]) -> AnyHeadersContainer
+    """
+    Combines the explicitly provided headers with those of the request.
+    """
+    headers = dict(getattr(request, "headers", None) or {})
+    headers.update(dict(request_headers or {}))
+    return headers
+
+
+def is_cache_disabled(headers):
+    # type: (Optional[AnyHeadersContainer]) -> bool
+    """
+    Indicates if the ``Cache-Control`` header requests the content to be regenerated using the ``no-cache`` directive.
+    """
+    directives = str(get_header("Cache-Control", headers or {}, default="") or "").lower().split(",")
+    return "no-cache" in [directive.strip() for directive in directives]
+
+
+def save_job_collection(job, container, force=False):
+    # type: (Job, AnySettingsContainer, bool) -> Optional[Path]
+    """
+    Generates the static :term:`STAC` collection of a successful :term:`Job` results, unless it already exists.
+
+    :param job: Successful job for which to generate the collection.
+    :param container: Application settings.
+    :param force: Regenerate the collection even if it already exists.
+    :return: Path of the collection document, or ``None`` if it could not be generated.
+    """
+    settings = get_settings(container)
+    results, _ = get_results(job, settings, schema=JobInputsOutputsSchema.OGC)
+    process = None
+    if job.is_local:
+        try:
+            process = get_db(settings).get_store(StoreProcesses).fetch_by_id(job.process)
+        except Exception as exc:  # noqa: W0703
+            LOGGER.warning("Could not retrieve process [%s] of job [%s]: [%s]", job.process, job.id, exc)
+    return generate_job_collection(job, settings, results, process, force=force)
+
+
+def get_job_collection_response(
+    job,                    # type: Job
+    container,              # type: AnySettingsContainer
+    request_headers=None,   # type: Optional[AnyHeadersContainer]
+    response_headers=None,  # type: Optional[AnyHeadersContainer]
+    response=ExecuteResponse.COLLECTION,    # type: str
+    profile=None,           # type: Optional[str]
+):                          # type: (...) -> AnyResponseType
+    """
+    Generates the :term:`STAC` collection of the :term:`Job` results if needed, and redirects to its location.
+
+    An existing collection is reused, unless ``Cache-Control: no-cache`` is specified in the request headers.
+    """
+    if not collection_enabled(container):
+        raise HTTPNotImplemented(
+            json={
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/unsupported-collection-output",
+                "title": "Job results collection disabled",
+                "detail": "The generation of job results as collection is disabled by the server configuration.",
+                "status": HTTPNotImplemented.code,
+                "instance": job.results_url(container),
+            },
+            content_type=ContentType.APP_PROBLEM_JSON,
+        )
+    if profile and profile not in [sd.OGC_API_PROC_PROFILE_COLLECTION_URI, *STAC_COLLECTION_PROFILES]:
+        raise HTTPNotAcceptable(
+            json={
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/unsupported-collection-output",
+                "title": "Unsupported collection profile",
+                "detail": f"Collection profile [{profile}] is not supported. Only STAC collections are available.",
+                "status": HTTPNotAcceptable.code,
+                "instance": job.results_url(container),
+            },
+            content_type=ContentType.APP_PROBLEM_JSON,
+        )
+    api_url = collection_api_url(container)
+    if response == ExecuteResponse.LANDING_PAGE and not api_url:
+        raise HTTPNotImplemented(
+            json={
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/unsupported-collection-output",
+                "title": "Unsupported landing page response",
+                "detail": "Landing page response requires a STAC API configured for job results collections.",
+                "status": HTTPNotImplemented.code,
+                "instance": job.results_url(container),
+            },
+            content_type=ContentType.APP_PROBLEM_JSON,
+        )
+    try:
+        path = save_job_collection(job, container, force=is_cache_disabled(request_headers))
+    except AmbiguousCollectionItems as exc:
+        raise HTTPUnprocessableEntity(
+            json={
+                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/ambiguous-collection-output",
+                "title": "Ambiguous job results collection",
+                "detail": str(exc),
+                "status": HTTPUnprocessableEntity.code,
+                "instance": job.results_url(container),
+            },
+            content_type=ContentType.APP_PROBLEM_JSON,
+        )
+    if not path or not os.path.isfile(path):
+        raise HTTPInternalServerError(
+            json={
+                "type": "NoApplicableCode",
+                "title": "Job results collection failure",
+                "detail": "The job results collection could not be generated.",
+                "status": HTTPInternalServerError.code,
+                "instance": job.results_url(container),
+            },
+            content_type=ContentType.APP_PROBLEM_JSON,
+        )
+    headers = ResponseHeaders(response_headers or {})
+    headers["Content-Type"] = ContentType.APP_JSON
+    headers["Location"] = api_url if response == ExecuteResponse.LANDING_PAGE else job.collection_url(container)
+    headers.pop("Content-Location", None)
+    return HTTPSeeOther(headers=headers)
+
+
 def get_job_return(
     job=None,       # type: Optional[Job]
     body=None,      # type: Optional[ProcessExecution]
@@ -755,7 +892,8 @@ def get_job_return(
     this format is employed. When doing the initial parsing, ``job=None`` MUST be used.
     """
     body = body or {}
-    resp = ExecuteResponse.get(body.get("response"))
+    resp = body.get("response")
+    resp = resp if resp in ExecuteResponse.values() else ExecuteResponse.get(resp)
     if resp:
         return resp, ExecuteReturnPreference.MINIMAL
 
@@ -885,7 +1023,17 @@ def get_job_results_response(
         headers.add("Link", link_header)
 
     # resolve request details to redirect for appropriate response handlers
+    results_contents = apply_response_query(request, results_contents)
     job_resp, job_ret = get_job_return(job, results_contents, results_headers)
+    if job_resp in [ExecuteResponse.COLLECTION, ExecuteResponse.LANDING_PAGE]:
+        return get_job_collection_response(
+            job,
+            container,
+            request_headers=get_header_container(request, request_headers),
+            response_headers=headers,
+            response=job_resp,
+            profile=get_response_profile(request, request_headers),
+        )
     is_accept_multipart = (
         isinstance(job.accept_type, str) and
         any(ctype in job.accept_type for ctype in ContentType.ANY_MULTIPART)
@@ -1790,12 +1938,18 @@ def dismiss_job_task(job, container):
 
     wps_out_dir = get_wps_output_dir(container)
     job_out_dir = os.path.join(wps_out_dir, str(job.id))
+    job_out_collection = job.collection_path(container)
     job_out_log = os.path.join(wps_out_dir, f"{str(job.id)}.log")
     job_out_xml = os.path.join(wps_out_dir, f"{str(job.id)}.xml")
     if os.path.isdir(job_out_dir):
         LOGGER.debug("Job [%s] dismiss operation: Removing output results.", job.id)
         shutil.rmtree(job_out_dir, onerror=lambda func, path, _exc: LOGGER.warning(  # pylint: disable=W4903
             "Job [%s] dismiss operation: Failed to delete [%s] due to [%s]", job.id, job_out_dir, _exc
+        ))
+    if os.path.isdir(job_out_collection):
+        LOGGER.debug("Job [%s] dismiss operation: Removing output results collection.", job.id)
+        shutil.rmtree(job_out_collection, onerror=lambda func, path, _exc: LOGGER.warning(  # pylint: disable=W4903
+            "Job [%s] dismiss operation: Failed to delete [%s] due to [%s]", job.id, job_out_collection, _exc
         ))
     if os.path.isfile(job_out_log):
         LOGGER.debug("Job [%s] dismiss operation: Removing output logs.", job.id)

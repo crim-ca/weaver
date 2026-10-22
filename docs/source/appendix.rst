@@ -69,7 +69,8 @@ Glossary
     Compact URI
         A shortened representation of a :term:`URI` that uses a prefix and a reference separated by a colon,
         such as ``prefix:reference``. In the context of :term:`OGC API`, this is often used to represent a
-        link relation (``rel``) value in HTTP headers or other locations (e.g.: ``[ogc-rel:results]``).
+        link relation (``rel``) value in HTTP headers or other locations.
+        When placed in brackets (e.g.: ``[ogc-rel:results]``), they are consided *Safe CURIE* (|w3c-safe-curie|_).
 
     CRS
     Coordinate Reference System
@@ -80,6 +81,11 @@ Glossary
         .. seealso::
             - Reference :term:`W3C`/:term:`OGC` documentation about |crs|_.
             - Reference definition of |crs-def|_.
+
+    CSV
+    Comma Separated Value
+        A general representation of ``<value>,<value>,...``, often employed within request and response headers,
+        query parameters, or other similar representations that accept multiple values.
 
     CWL
     Common Workflow Language

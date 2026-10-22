@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 import tempfile
+import uuid
 import warnings
 from datetime import date
 from typing import TYPE_CHECKING, cast
@@ -34,6 +35,7 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
+from weaver.collections.stac import AmbiguousCollectionItems
 from weaver.compat import Version
 from weaver.datatype import Job, Process, Service
 from weaver.execute import (
@@ -80,6 +82,7 @@ class WpsRestApiJobsTest(JobUtils):
             "weaver.url": "https://localhost",
             "weaver.wps_email_encrypt_salt": "weaver-test",
             "weaver.wps_output_dir": "/tmp/weaver-test/wps-outputs",  # nosec: B108 # don't care hardcoded for test
+            "weaver.wps_output_url": "https://localhost/wpsoutputs",
         }
         cls.config = setup_config_with_mongodb(settings=cls.settings)
         cls.app = get_test_weaver_app(config=cls.config)
@@ -3802,6 +3805,205 @@ class WpsRestApiJobsTest(JobUtils):
         # Verify the digest is valid and deterministic
         expected_digest = compute_file_digest_multibase(test_file)
         assert output_result["digestMultibase"] == expected_digest
+
+    def make_collection_job(self):
+        # type: () -> Job
+        job_id = str(uuid.uuid4())
+        job_dir = os.path.join(self.settings["weaver.wps_output_dir"], job_id)
+        os.makedirs(job_dir, exist_ok=True)
+        with open(os.path.join(job_dir, "output.txt"), mode="w", encoding="utf-8") as out_file:
+            out_file.write("collection test content")
+        return self.make_job(
+            task_id=job_id, process=self.process_public.identifier, service=None,
+            status=Status.SUCCEEDED, progress=100, access=Visibility.PUBLIC,
+            results=[{"id": "output", "href": f"{job_id}/output.txt", "mimeType": ContentType.TEXT_PLAIN}],
+        )
+
+    @pytest.mark.job
+    @pytest.mark.collection
+    @pytest.mark.functional
+    def test_job_results_collection_on_request_only(self):
+        """
+        Tests that the results collection is generated only when requested, reused, and removed on dismiss.
+        """
+        job = self.make_collection_job()
+        coll_dir = os.path.join(self.settings["weaver.wps_output_dir"], f"{job.id}-collection")
+        path = f"/jobs/{job.id}/results"
+
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert not os.path.exists(coll_dir), "collection must not be generated unless requested"
+        links = self.app.get(f"/jobs/{job.id}", headers=self.json_headers).json["links"]
+        on_demand = [
+            lnk for lnk in links if lnk["rel"] == "collection" and "profile" in lnk
+        ]
+        assert len(on_demand) == 1
+        assert on_demand[0]["href"].endswith(f"/jobs/{job.id}/results?response=collection")
+        assert on_demand[0]["profile"] == "https://www.opengis.net/def/profile/OGC/0/ogc-collection"
+        result_links = [link for link in resp.headers.getall("Link") if 'rel="alternate"' in link]
+        assert any('profile="https://www.opengis.net/def/profile/OGC/0/ogc-collection"' in link
+                   for link in result_links)
+
+        resp = self.app.get(f"{path}?response=collection", headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 303
+        assert resp.headers["Location"].endswith(f"{job.id}-collection/collection.json")
+        assert os.path.isfile(os.path.join(coll_dir, "collection.json"))
+        assert os.path.isfile(os.path.join(coll_dir, "items", f"{job.id}-0.json"))
+        assert os.path.isfile(os.path.join(coll_dir, "items", "index.json"))
+
+        links = self.app.get(f"/jobs/{job.id}", headers=self.json_headers).json["links"]
+        assert any(lnk["rel"] == "collection" and "profile" in lnk and
+                   lnk["href"].endswith(f"/jobs/{job.id}/results?response=collection") for lnk in links)
+        assert any(lnk["rel"] == "https://www.w3.org/ns/prov" for lnk in links)
+
+        marker = os.path.join(coll_dir, "marker")
+        with open(marker, mode="w", encoding="utf-8") as f:
+            f.write("x")
+        headers = {**self.json_headers, "Cache-Control": "no-cache"}
+        resp = self.app.get(f"{path}?response=document", headers=headers)
+        assert resp.status_code == 200
+        assert os.path.exists(marker), "no-cache must be ignored for non-collection responses"
+        resp = self.app.get(f"{path}?response=collection", headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 303
+        assert os.path.exists(marker), "existing collection must be reused"
+        resp = self.app.get(f"{path}?response=collection", headers=headers, expect_errors=True)
+        assert resp.status_code == 303
+        assert not os.path.exists(marker), "no-cache must regenerate the collection"
+        assert os.path.isfile(os.path.join(coll_dir, "collection.json"))
+
+        resp = self.app.delete_json(f"/jobs/{job.id}", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert not os.path.exists(coll_dir), "collection must be removed with the job"
+
+    @pytest.mark.job
+    @pytest.mark.collection
+    @pytest.mark.functional
+    def test_job_results_collection_disabled(self):
+        """
+        Tests that the collection is not provided when disabled by configuration.
+        """
+        job = self.make_collection_job()
+        coll_dir = os.path.join(self.settings["weaver.wps_output_dir"], f"{job.id}-collection")
+        with mock.patch("weaver.wps_restapi.jobs.utils.collection_enabled", return_value=False):
+            resp = self.app.get(f"/jobs/{job.id}/results?response=collection", headers=self.json_headers,
+                                expect_errors=True)
+        assert resp.status_code == 501
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
+        assert resp.json["status"] == 501 and resp.json["title"] and resp.json["detail"]
+        assert not os.path.exists(coll_dir)
+
+    @pytest.mark.job
+    @pytest.mark.collection
+    def test_job_results_collection_unsupported_variants(self):
+        """
+        Tests that unsupported result representations and profiles return Problem Details responses.
+        """
+        job = self.make_collection_job()
+        for query, status in [
+            ("response=landingPage", 501),
+            ("response=collection&profile=https://example.com/other", 406),
+        ]:
+            resp = self.app.get(f"/jobs/{job.id}/results?{query}", headers=self.json_headers, expect_errors=True)
+            assert resp.status_code == status, query
+            assert resp.content_type == ContentType.APP_PROBLEM_JSON
+            assert resp.json["status"] == status
+
+    @pytest.mark.job
+    @pytest.mark.collection
+    def test_job_results_collection_ambiguous_outputs(self):
+        """
+        Tests that ambiguous result-array alignment is reported as an HTTP 422 Problem Details response.
+        """
+        job = self.make_collection_job()
+        with mock.patch(
+            "weaver.wps_restapi.jobs.utils.save_job_collection",
+            side_effect=AmbiguousCollectionItems("Geo-like output arrays have ambiguous cardinalities."),
+        ):
+            response = self.app.get(
+                f"/jobs/{job.id}/results?response=collection",
+                headers=self.json_headers,
+                expect_errors=True,
+            )
+        assert response.status_code == 422
+        assert response.content_type == ContentType.APP_PROBLEM_JSON
+        assert response.json["title"] == "Ambiguous job results collection"
+        assert "ambiguous cardinalities" in response.json["detail"]
+        assert response.json["status"] == 422
+
+    @pytest.mark.job
+    @pytest.mark.collection
+    def test_job_results_landing_page_stac_api_redirect(self):
+        """
+        Tests that the landing page response redirects to the public STAC API root, not to the staging URL.
+        """
+        job = self.make_collection_job()
+        settings = {
+            "weaver.job_collection": True,
+            "weaver.job_collection_stac_api_public_url": "https://stac.example.com/api/",
+            "weaver.job_collection_stac_api_staging_url": "http://stac-internal:8080/api",
+        }
+        with mock.patch.dict(self.app.app.registry.settings, settings):
+            with mock.patch("weaver.wps_restapi.jobs.utils.save_job_collection", return_value=__file__):
+                resp = self.app.get(f"/jobs/{job.id}/results?response=landingPage", headers=self.json_headers)
+                alias = self.app.get(f"/jobs/{job.id}/results?response=collection", headers=self.json_headers)
+        assert resp.status_code == 303
+        assert resp.headers["Location"] == "https://stac.example.com/api"
+        assert alias.status_code == 303
+        assert alias.headers["Location"] == f"https://stac.example.com/api/collections/{job.id}"
+
+    @pytest.mark.job
+    @pytest.mark.collection
+    def test_process_description_data_access_apis_dynamic(self):
+        """
+        Tests that ``dataAccessAPIs`` are reported dynamically according to the current configuration.
+        """
+        process = self.process_store.fetch_by_id(self.process_public.identifier)
+        for enabled, api, expect in [(False, None, None), (True, None, None), (True, "https://stac", ["stac"])]:
+            settings = {"weaver.job_collection": enabled, "weaver.job_collection_stac_api_public_url": api}
+            data = {"outputs": [{"id": "o", "type": "complex", "dataAccessAPIs": ["stale"]}]}
+            process.update_data_access_apis(data, settings)
+            found = data["outputs"][0].get("dataAccessAPIs")
+            assert (found is None) if expect is None else bool(found), f"unexpected {found} for {settings}"
+
+    @pytest.mark.job
+    @pytest.mark.collection
+    def test_conformance_collection_output_dynamic(self):
+        """
+        Tests that sorted collection output conformance references reflect the enabled features and API configuration.
+        """
+        from weaver.wps_restapi.api import get_conformance
+        prefix = "http://www.opengis.net/spec/ogcapi-processes-1/2.0"
+        collection_refs = {
+            f"{prefix}/{category}/collection-output{suffix}"
+            for category in ["conf", "req"]
+            for suffix in [
+                "", "/response-output-many-grouped", "/response-output-many-results",
+                "/response-profile", "/response-unsupported",
+            ]
+        }
+        api_refs = {
+            f"{prefix}/conf/collection-output/data-access-mechanisms",
+            f"{prefix}/req/collection-output/data-access-mechanisms",
+            f"{prefix}/req/collection-output/landing-page",
+        }
+        for restapi_enabled in [True, False]:
+            for collection_enabled in [True, False]:
+                for api_url in [None, "https://stac.example.com"]:
+                    settings = {
+                        "weaver.wps_restapi": restapi_enabled,
+                        "weaver.job_collection": collection_enabled,
+                        "weaver.job_collection_stac_api_public_url": api_url,
+                    }
+                    for category in [None, "conf", "req"]:
+                        references = get_conformance(category, settings)["conformsTo"]
+                        assert references == sorted(references)
+                        found = {ref for ref in references if "/collection-output" in ref}
+                        expected = set()
+                        if restapi_enabled and collection_enabled:
+                            expected = collection_refs | api_refs if api_url else collection_refs
+                            if category:
+                                expected = {ref for ref in expected if f"/{category}/" in ref}
+                        assert found == expected, f"Unexpected conformance for {settings} and category {category}"
 
     @pytest.mark.multipart
     @pytest.mark.job
