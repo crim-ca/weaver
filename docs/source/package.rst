@@ -1076,17 +1076,15 @@ validation that a ``Directory`` is properly parsed by `Weaver`, provided URL ref
 slash (``/``) character.
 
 .. versionadded:: 6.17.0
-    `Zarr`_ directory stores are also handled as ``Directory`` type. Declaring only ``application/vnd.zarr``
+    :term:`Zarr` directory stores are also handled as ``Directory`` type. Declaring only ``application/vnd.zarr``
     (optionally with ``version=2`` or ``version=3``) as format of a :term:`WPS`/:term:`OGC API - Processes`
     input or output maps it to a :term:`CWL` ``Directory`` without ``format`` (not applicable for that type),
     in the same way as ``application/directory``. Because a ``File`` cannot hold a directory store, declaring
     such a format on a :term:`CWL` ``File`` is refused at deployment. When the :term:`CWL` output is a ``Directory``,
-    the declared `Zarr` media-type is preserved as the type of the resulting :term:`Job` output (instead of
-    ``application/directory``). `Zarr` directory results can also be obtained as a single zipped store, using
+    the declared :term:`Zarr` media-type is preserved as the type of the resulting :term:`Job` output (instead of
+    ``application/directory``). :term:`Zarr` directory results can also be obtained as a single zipped store, using
     ``application/zarr+zip`` with the ``?f={mediaType}`` result representation. No conversion is performed
-    between `Zarr` versions.
-
-.. _Zarr: https://zarr.dev/
+    between :term:`Zarr` versions.
 
 .. warning::
     Note that, when using ``Directory`` type, very few format and content validation can be accomplished for individual
