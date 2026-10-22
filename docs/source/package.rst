@@ -1076,15 +1076,8 @@ validation that a ``Directory`` is properly parsed by `Weaver`, provided URL ref
 slash (``/``) character.
 
 .. versionadded:: 6.17.0
-    :term:`Zarr` directory stores are also handled as ``Directory`` type. Declaring only ``application/vnd.zarr``
-    (optionally with ``version=2`` or ``version=3``) as format of a :term:`WPS`/:term:`OGC API - Processes`
-    input or output maps it to a :term:`CWL` ``Directory`` without ``format`` (not applicable for that type),
-    in the same way as ``application/directory``. Because a ``File`` cannot hold a directory store, declaring
-    such a format on a :term:`CWL` ``File`` is refused at deployment. When the :term:`CWL` output is a ``Directory``,
-    the declared :term:`Zarr` media-type is preserved as the type of the resulting :term:`Job` output (instead of
-    ``application/directory``). :term:`Zarr` directory results can also be obtained as a single zipped store, using
-    ``application/zarr+zip`` with the ``?f={mediaType}`` result representation. No conversion is performed
-    between :term:`Zarr` versions.
+    :term:`Zarr` directory stores are also handled as ``Directory`` type, in the same way as
+    ``application/directory``. See `Zarr Directory Type`_ below for details specific to this variant.
 
 .. warning::
     Note that, when using ``Directory`` type, very few format and content validation can be accomplished for individual
@@ -1131,6 +1124,91 @@ The following ``Directory`` listing formats are supported.
     |                                                           | More details about supported references can be found |
     |                                                           | in :ref:`aws_s3_ref`.                                |
     +-----------------------------------------------------------+------------------------------------------------------+
+
+.. _cwl-zarr:
+
+Zarr Directory Type
+~~~~~~~~~~~~~~~~~~~~
+
+.. versionadded:: 6.17.0
+    Support of :term:`Zarr` directory stores, mapped onto the same :term:`CWL` ``Directory`` type described above.
+
+A :term:`Zarr` store is reported as a regular ``Directory`` (see `Directory Type`_), distinguished only by employing
+one of the ``application/vnd.zarr`` media-types (optionally with a ``version=2`` or ``version=3`` parameter) instead
+of ``application/directory``. Because :term:`CWL` ``Directory`` does not support a ``format`` field, the following
+considerations specifically apply to :term:`Zarr` stores.
+
+Explicit Media-Type and Version
+    `Weaver` does **not** inspect the contents of a directory (e.g.: presence of ``zarr.json``, ``.zgroup``,
+    ``.zattrs``, etc.) to automatically detect that it corresponds to a :term:`Zarr` store, nor to infer which
+    :term:`Zarr` specification ``version`` it employs. The Application Package developer **must** explicitly declare
+    ``application/vnd.zarr`` (with the applicable ``version`` parameter when relevant) under the ``formats``
+    (or ``format`` for a single-value output) of the corresponding :term:`WPS`/:term:`OGC API - Processes` input or
+    output at :ref:`deployment <proc_op_deploy>`. Omitting it causes the :term:`I/O` to instead be reported using the
+    generic ``application/directory`` media-type, even though the underlying :term:`CWL` ``Directory`` behaves
+    identically. Automatic detection of the ``version`` from known :term:`Zarr` metadata files could be considered as
+    a future enhancement, but is intentionally out of scope of this initial support to keep behavior explicit.
+    Because a :term:`CWL` ``File`` cannot hold a directory store, declaring a :term:`Zarr` media-type on a
+    :term:`CWL` ``File`` :term:`I/O` is refused at deployment.
+
+Directory Naming
+    Unlike other ``Directory`` contents, a :term:`Zarr` store location is **not** required to end with the ``.zarr``
+    extension, since this is not mandated by the :term:`Zarr` specification itself. `Weaver` disables the file
+    extension validation for :term:`Zarr` outputs specifically, since the declared media-type (above) is sufficient
+    to resolve the applicable type. However, when an explicit :term:`CWL` Application Package is **not** provided
+    (i.e.: a remote :term:`WPS` process automatically wrapped by `Weaver`), the auto-generated ``outputBinding.glob``
+    pattern relies on the ``.zarr`` extension (e.g.: ``*.zarr``) to locate produced results, in which case the
+    produced directory must employ that extension for the pattern to match it. When an explicit :term:`CWL`
+    Application Package is supplied instead, the developer fully controls the ``outputBinding.glob`` pattern, and can
+    therefore employ any directory name, as illustrated below. As for any other ``Directory``, the resolved
+    reference is still appended a trailing slash (``/``) by `Weaver` once resolved as the final :term:`Job` output
+    location, regardless of the employed ``glob`` pattern.
+
+    .. code-block:: yaml
+        :caption: Example of CWL ``outputBinding`` for a Zarr output without the '.zarr' extension
+        :linenos:
+
+        outputs:
+          result:
+            type: Directory
+            outputBinding:
+              glob: outputs/result  # extension not required, the declared 'formats' provide the Zarr media-type
+
+Zarr vs Zarr+Zip
+    ``application/zarr+zip`` represents a **single zipped archive** of a :term:`Zarr` store, and must therefore be
+    mapped to a :term:`CWL` ``File`` (not ``Directory``), contrary to the directory-based ``application/vnd.zarr``
+    media-types. If an Application Package directly produces an already-zipped :term:`Zarr` store, the corresponding
+    :term:`I/O` should be declared as a :term:`CWL` ``File`` with ``application/zarr+zip`` format, exactly as any
+    other file-based output, and `Weaver` will not attempt any additional zip operation in that case.
+
+    Declaring both a :term:`Zarr` directory media-type and ``application/zarr+zip`` as supported ``formats`` of the
+    same :term:`I/O` is supported and does not cause a deployment error. When `Weaver` auto-generates the :term:`CWL`
+    definition (e.g.: from a remote :term:`WPS`/:term:`OGC API - Processes` reference without its own :term:`CWL`),
+    the :term:`I/O` resolves as a :term:`CWL` ``Directory``, and ``application/zarr+zip`` is entirely ignored for
+    that resolution (it contributes neither ``format`` nor ``outputBinding.glob`` extension). When an explicit
+    :term:`CWL` Application Package is supplied instead, its own ``type: Directory`` and ``outputBinding`` are used
+    as-is, and declaring ``application/zarr+zip`` alongside the :term:`Zarr` media-type in the :term:`WPS` ``formats``
+    is simply treated as an additional alternate representation (see below), without altering the :term:`CWL` side.
+
+Zipped Alternate Representation
+    `Weaver` automatically advertises ``application/zarr+zip`` as an alternate representation of a :term:`Zarr`
+    directory :term:`Job` output, without requiring the Application Package developer to declare it explicitly. The
+    zipped archive is generated **on-demand**, not ahead of time nor persisted across requests, only when the
+    :term:`Job` result is requested using that representation, either with the ``?f=application/zarr+zip`` query
+    parameter, or an equivalent ``Accept: application/zarr+zip`` header, as described in :ref:`proc_op_result`.
+    Requesting the result using the native :term:`Zarr` directory media-type (or omitting the requested format)
+    instead returns the original directory reference as is, without any transformation.
+
+    .. warning::
+        The reverse operation (unzipping ``application/zarr+zip`` back into a ``Directory`` representation) is
+        **not supported**. If the Application Package produces the archive directly (see `Zarr vs Zarr+Zip`_ above),
+        no directory-based alternate representation will be generated or offered for that output.
+
+    No conversion is performed between distinct :term:`Zarr` ``version`` parameters (e.g.: requesting ``version=2``
+    representation of a :term:`Job` output produced using ``version=3``), since the underlying store structure
+    differs between versions and cannot be transparently translated by `Weaver`. Only the generic
+    ``application/vnd.zarr`` (without ``version``) or the exact same declared ``version`` are considered equivalent
+    to the original type for this purpose.
 
 .. _cwl-file-format:
 
