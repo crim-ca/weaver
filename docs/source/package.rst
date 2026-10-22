@@ -1174,6 +1174,8 @@ Directory Naming
             outputBinding:
               glob: outputs/result  # extension not required, the declared 'formats' provide the Zarr media-type
 
+.. _zarr-vs-zarr-zip:
+
 Zarr vs Zarr+Zip
     ``application/zarr+zip`` represents a **single zipped archive** of a :term:`Zarr` store, and must therefore be
     mapped to a :term:`CWL` ``File`` (not ``Directory``), contrary to the directory-based ``application/vnd.zarr``
@@ -1201,7 +1203,7 @@ Zipped Alternate Representation
 
     .. warning::
         The reverse operation (unzipping ``application/zarr+zip`` back into a ``Directory`` representation) is
-        **not supported**. If the Application Package produces the archive directly (see `Zarr vs Zarr+Zip`_ above),
+        **not supported**. If the Application Package produces the archive directly (see :ref:`zarr-vs-zarr-zip` above),
         no directory-based alternate representation will be generated or offered for that output.
 
     No conversion is performed between distinct :term:`Zarr` ``version`` parameters (e.g.: requesting ``version=2``
