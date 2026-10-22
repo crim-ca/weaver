@@ -3,9 +3,9 @@ import json
 
 import pytest
 
+from tests import resources
 from weaver.formats import ContentType, OutputFormat
 from weaver.provenance import ProvenanceFormat, ProvenancePathType, convert_to_prov_chain
-from tests import resources
 
 
 @pytest.mark.prov
@@ -196,10 +196,26 @@ def test_provenance_format_compatible(prov, prov_format, output_format, expect, 
     assert error if is_error else error is None, "When an error is expected, a string detailing it should be returned."
 
 
-def test_convert_to_prov_chain():
+def test_convert_to_prov_list():
     prov_data = resources.load_resource("job_prov.json", text=True)
     prov_json = convert_to_prov_chain(prov_data)
     assert prov_json
     prov_chain = json.loads(prov_json)
     assert isinstance(prov_chain, list)
     assert all("id" in obj for obj in prov_chain)
+    assert all("provType" in obj for obj in prov_chain)
+
+
+def test_convert_to_prov_object():
+    prov_data = resources.load_resource("job_prov.json", text=True)
+    # Could get this from the data (it is the workflow run object)
+    root_id = "urn:uuid:74e06198-faf8-404f-b905-c6f02361070d"
+    prov_json = convert_to_prov_chain(prov_data, root_id)
+    assert prov_json
+    prov_chain = json.loads(prov_json)
+    print(json.dumps(prov_chain, indent=2))
+    assert isinstance(prov_chain, dict)
+    assert "id" in prov_chain
+    assert prov_chain["id"] == root_id
+    assert "provType" in prov_chain
+    assert prov_chain["provType"] == "Activity"
