@@ -176,6 +176,43 @@ Type names refer to the Python built-in :class:`bool`, :class:`int`, and :class:
 
    .. versionadded:: 6.1
 
+.. confval:: weaver.job_collection
+   :type: bool-like
+   :default: ``true``
+
+   Configure whether the :term:`STAC` Collection of successful :term:`Job` results can be generated on request
+   and advertised using alternate links. See :ref:`proc_op_job_collection` for details.
+
+   .. versionadded:: 6.19
+
+.. confval:: weaver.job_collection_stac_api_public_url
+   :type: URL
+   :default: ``None``
+
+   Public URL of a :term:`STAC` API where :term:`Job` results Collections and Items are published.
+   When :confval:`weaver.job_collection` is enabled, the :term:`STAC` Collection and Items are stored as static files
+   by default. When this URL is provided, they are submitted using ``POST`` requests to this API instead.
+   It is also employed for metadata links and the final redirect of the Collection.
+   If :confval:`weaver.job_collection_stac_api_staging_url` is also provided, it is used for the ``POST`` requests.
+
+   .. seealso::
+      :ref:`proc_op_job_collection_publish`
+
+   .. versionadded:: 6.19
+
+.. confval:: weaver.job_collection_stac_api_staging_url
+   :type: URL
+   :default: ``None``
+
+   Staging URL of a :term:`STAC` API employed to ``POST`` the :term:`Job` results Collections and Items.
+   It is only considered when :confval:`weaver.job_collection_stac_api_public_url` is also defined.
+   The public URL remains employed for the metadata links and the final redirect of the Collection.
+
+   .. seealso::
+      :ref:`proc_op_job_collection_publish`
+
+   .. versionadded:: 6.19
+
 .. confval:: weaver.wps
    :type: bool-like
    :default: ``true``
