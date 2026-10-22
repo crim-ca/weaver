@@ -1625,7 +1625,7 @@ class Job(Base, LoggerHandler):
             data = OutputFormat.convert(data, to=OutputFormat.YAML)
         elif fmt == ContentType.APP_PROV_OGC_JSON:
             # Convert JSON from cwlprov to OGC PROV alternative representation
-            data = convert_to_prov_chain(data)
+            data = convert_to_prov_chain(data, f"urn:uuid:{self.id}")
             fmt = ContentType.APP_PROV_OGC_JSON
         # normalize media-type
         if fmt == ContentType.APP_JSON:
