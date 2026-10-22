@@ -3,7 +3,7 @@ Definitions related to :term:`Provenance` features and the :term:`W3C` ``PROV`` 
 """
 import hashlib
 import json
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, NamedTuple, cast
 from urllib.parse import urlparse
 
 from cwltool.cwlprov import provenance_constants as cwl_prov_const
@@ -432,72 +432,158 @@ class WeaverResearchObject(ResearchObject):
         return weaver_fqdn, weaver_url
 
 
-# Maps a PROV relation type to the (provenance-chain property, subject role, object role)
-# used to fold that relation into the referencing record, e.g. wasGeneratedBy is folded
-# into the Entity that is the relation's "entity".
+# Map PROV relations to the names used in OGC Provenance Chain JSON
+# (which are taken from the PROV-O ontology).  Forward and inverse
+# relations are provided to allow rooted graphs to be built in the
+# "object" form of OGC Provenance.  Some inverse relations are not
+# officially part of PROV-O but "recommended" for specific
+# implementation cases such as this one. These are defined in
+# https://www.w3.org/ns/prov-o-inverses and were extracted with:
+#
+# SELECT ?rel ?inv WHERE { ?inv owl:inverseOf ?rel }
+#
+# Obviously, subj_role and obj_role are reversed for the inverses.
+class RelationHandler(NamedTuple):
+    forward: str
+    inverse: str
+    subject_role: str
+    object_role: str
+
+
 _RELATION_HANDLERS = {
-    prov_const.PROV_GENERATION: ("wasGeneratedBy", "entity", "activity"),
-    prov_const.PROV_USAGE: ("used", "activity", "entity"),
-    prov_const.PROV_ASSOCIATION: ("wasAssociatedWith", "activity", "agent"),
-    prov_const.PROV_ATTRIBUTION: ("wasAttributedTo", "entity", "agent"),
-    prov_const.PROV_DERIVATION: ("wasDerivedFrom", "generatedEntity", "usedEntity"),
-    prov_const.PROV_DELEGATION: ("actedOnBehalfOf", "delegate", "responsible"),
+    prov_const.PROV_GENERATION: RelationHandler("wasGeneratedBy", "generated",
+                                                "entity", "activity"),
+    prov_const.PROV_USAGE: RelationHandler("used", "wasUsedBy", "activity", "entity"),
+    prov_const.PROV_ASSOCIATION: RelationHandler("wasAssociatedWith", "wasAssociateFor",
+                                                 "activity", "agent"),
+    prov_const.PROV_ATTRIBUTION: RelationHandler("wasAttributedTo", "contributed",
+                                                 "entity", "agent"),
+    prov_const.PROV_DERIVATION: RelationHandler("wasDerivedFrom", "hadDerivation",
+                                                "generatedEntity", "usedEntity"),
+    prov_const.PROV_DELEGATION: RelationHandler("actedOnBehalfOf", "hadDelegate",
+                                                "delegate", "responsible"),
+}
+_RELATION_FIELDS = set([*(h.forward for h in _RELATION_HANDLERS.values()),
+                        *(h.inverse for h in _RELATION_HANDLERS.values())])
+_OBJECT_TYPES = {
+    "Entity",
+    "Activity",
+    "Agent",
 }
 
 
-_RECORD_TYPE_FIELD = {
-    "Entity": "provType",
-    "Activity": "provType",
-    "Agent": "provType",
-}
+def convert_to_prov_chain(input_data, root_uri=None):
+    # type: (str, str | None) -> str
+    """
+    Convert a PROV-JSON document (as text) to OGC Provenance Chain JSON.
 
+    Since OGC Provenance Chain has no notion of bundles, this operates
+    on the flattened PROV document.  Only objects and relations
+    defined in the schema are considered:
 
-def convert_to_prov_chain(input_data):
-    # type: (str) -> str
-    """Convert a PROV-JSON document (as text) to OGC Provenance Chain JSON (array form, text)."""
+    - Entity
+    - Activity
+    - Agent
+    - Generation
+    - Usage
+    - Association
+    - Attribution
+    - Derivation
+    - Delegation
+
+    :param root_id: If not ``None``, return object provenance rooted
+    at the object with the given ID.  Otherwise, return array-form
+    provenance for all objects.
+
+    """
     document = ProvDocument.deserialize(content=input_data, format="json")
-    objects_by_id = {}
+    objects_by_uri = {}
 
-    # Create the inventory of subjects in document ordering (for now)
+    # Create the inventory of objects, maintaining document ordering
     for record in document.get_records():
         record_type = record.get_type().localpart if record.get_type() else None
-        if record_type not in _RECORD_TYPE_FIELD:  # only objects in the OGC schema
+        if record_type not in _OBJECT_TYPES:  # only objects in the OGC schema
             continue
-        # FIXME: we may need these, are they blank nodes?
         if record.identifier is None:
             continue
         key = record.identifier.uri
-        if key in objects_by_id:
+        if key in objects_by_uri:
             continue
-        objects_by_id[key] = {"id": key, _RECORD_TYPE_FIELD[record_type]: record_type}
+        objects_by_uri[key] = {"id": key, "provType": record_type}
 
-    # Output relations
+    # Fail fast if an unknown root URI is requested
+    root_obj = None
+    if root_uri is not None:
+        root_obj = objects_by_uri.get(root_uri)
+        if root_obj is None:
+            raise ValueError(f"Requested root object {root_uri} not found in PROV document")
+
+    def _resolve_relation(prov, prop, uri):
+        # type: (dict[str, Any], str, str) -> None
+        existing = prov.get(prop)
+        if existing is None:
+            prov[prop] = uri
+        elif isinstance(existing, list):
+            if uri not in existing:
+                existing.append(uri)
+        elif existing != uri:
+            subj_prov[prop] = [existing, uri]
+
+    # Add recognized relations to recognized subjects
     for record in document.get_records(ProvRelation):
         handler = _RELATION_HANDLERS.get(record.get_type())
         if handler is None:
             continue
-        prop, subject_role, object_role = handler
-        # formal_attributes keys are QualifiedName objects (e.g. prov:activity); match by localpart.
+        # Resolve attributes to QNames
         formal = {key.localpart: value for key, value in record.formal_attributes}
-        subj = formal.get(subject_role)
+        breakpoint()
+        subj = formal.get(handler.subject_role)
         if subj is None:
             continue
-        obj = formal.get(object_role)
+        obj = formal.get(handler.object_role)
         if obj is None:
             continue
-        subj_prov = objects_by_id.get(subj.uri)
+        # For list form, resolve only forward relations for subjects
+        subj_prov = objects_by_uri.get(subj.uri)
         if subj_prov is None:
-            # Relation referencing a record not declared as Entity/Activity/Agent in this
-            # document (e.g. cross-bundle reference) - skip, nothing to attach it to.
+            # Relation referencing a record not declared in this document
             continue
-        existing = subj_prov.get(prop)
-        if existing is None:
-            subj_prov[prop] = obj.uri
-        elif isinstance(existing, list):
-            if obj.uri not in existing:
-                existing.append(obj.uri)
-        elif existing != obj.uri:
-            subj_prov[prop] = [existing, obj.uri]
+        _resolve_relation(subj_prov, handler.forward, obj.uri)
+        if root_obj is None:
+            continue
+        # For object form, resolve inverse relations for objects as well
+        obj_prov = objects_by_uri.get(obj.uri)
+        if obj_prov is None:
+            # Relation referencing a record not declared in this document
+            continue
+        _resolve_relation(obj_prov, handler.inverse, subj.uri)
 
-    # Use insertion order as output order
-    return json.dumps([objects_by_id[key] for key in objects_by_id])
+    def _ogc_prov_obj(objects_by_uri, root_obj, expanded):
+        # type: (dict[str, dict[str, Any]], dict[str, Any], set[str]) -> str
+        for attr, val in root_obj.items():
+            if attr not in _RELATION_FIELDS:
+                continue
+        if isinstance(val, list):
+            for idx, uri in enumerate(val):
+                if not isinstance(uri, str):
+                    continue
+                obj = objects_by_uri.get(uri)
+                if uri in expanded or obj is None:
+                    continue
+                expanded.add(uri)
+                val[idx] = _ogc_prov_obj(objects_by_uri, obj, expanded)
+        elif isinstance(val, str):
+            obj = objects_by_uri.get(val)
+            if not (val in expanded or obj is None):
+                expanded.add(val)
+                root_obj[attr] = _ogc_prov_obj(objects_by_uri, obj, expanded)
+        return root_obj
+
+    if root_obj:
+        # Object form: Traverse graph depth-first in document order
+        # replacing objects with their referents.
+        expanded = set([root_uri])
+        return json.dumps(_ogc_prov_obj(objects_by_uri, root_obj, expanded))
+    else:
+        # List form: Output resolved objects in document order
+        return json.dumps([objects_by_uri[key] for key in objects_by_uri])
