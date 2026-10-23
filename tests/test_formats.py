@@ -832,13 +832,13 @@ def test_output_format_version(test_format, allow_version, expect_type):
             f.OutputFormat.XML_STR,
             # FIXME: 'encoding="UTF-8"' missing (https://github.com/vinitkumar/json2xml/pull/213)
             inspect.cleandoc("""
-            <?xml version="1.0" ?>
+            <?xml version="1.0" encoding="UTF-8" ?>
             <item>
-                <data type="list">
-                    <item type="int">123</item>
-                </data>
+              <data type="list">
+                <item type="int">123</item>
+              </data>
             </item>
-            """).replace("    ", "\t")
+            """)
         ),
     ]
 )
