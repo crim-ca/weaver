@@ -843,10 +843,14 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   | - `currencylayer <https://currencylayer.com/documentation>`_
   | - `exchangeratesapi <https://exchangeratesapi.io/documentation/>`_
   | - `fixer <https://fixer.io/documentation>`_
+  | - `allratestoday <https://allratestoday.com/open-api/>`_ (keyless, `ECB` reference rates)
   | - `scrapper <https://www.x-rates.com/table/?from=USD&amount=1>`_
   | - ``custom``
   |
   | In each case, requests will be attempted using ``weaver.quotation_currency_token`` to authenticate with the API.
+    The ``allratestoday`` converter does not require a token. It uses the daily European Central Bank reference rates
+    (about 30 currencies), and its terms ask for a visible link to `AllRatesToday <https://allratestoday.com>`_
+    where the converted amounts are shown.
     Request caching of 1 hour will be used by default to limit chances of rate-limiting, but converter-specific plans
     could block request at any moment depending on the amount of :ref:`quotation` requests accomplished.
     In such case, the conversion will not be performed and will remain in the default currency.
