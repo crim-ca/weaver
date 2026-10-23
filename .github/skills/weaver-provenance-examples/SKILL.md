@@ -94,10 +94,10 @@ cd weaver/wps_restapi/examples
 sh ../../../.github/skills/weaver-provenance-examples/scripts/job_prov_examples.sh "$JOB_ID" "$WEAVER_URL"
 ```
 
-> **Note**: The script rewrites hostnames to
-> `https://hirondelle.crim.ca/weaver` / `hirondelle.crim.ca` to match
-> the existing examples. Adjust the `fix_urls` substitutions inside
-> the script if generating examples against a different instance.
+> [!NOTE]
+> The script rewrites hostnames to `https://hirondelle.crim.ca/weaver` > / `hirondelle.crim.ca` to match
+> the existing examples. Adjust the `fix_urls` substitutions inside the script if generating examples
+> against a different instance.
 
 ### Alternative
 
