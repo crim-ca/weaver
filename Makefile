@@ -295,10 +295,10 @@ install-transform: install-cairo-dependencies       # install-transform dependen
 
 .PHONY: install-cairo-dependencies
 install-cairo-dependencies:   ## install required dependencies for Transformer
-	@command -v ldconfig >/dev/null 2>&1 && ldconfig -p 2>/dev/null | grep -F 'libpangocairo' >/dev/null || ( \
+	@if command -v ldconfig >/dev/null 2>&1; then ldconfig -p 2>/dev/null | grep -F 'libpangocairo' >/dev/null || ( \
 		echo "Binary package libpangocairo not found. Attempting to install it."; \
 		$(SUDO) apt-get install libpangocairo-1.0-0 \
-	)
+	); fi
 
 .PHONY: install-dev-npm
 install-dev-npm: install-npm install-npm-stylelint install-npm-remarklint	## install all npm development dependencies
