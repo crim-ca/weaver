@@ -418,6 +418,13 @@ Glossary
           It is employed in `Weaver` as an alternative and equivalent representation of :term:`JSON` format, mostly
           in cases where configuration files are defined to allow the insertion of additional documentation details.
 
+    Zarr
+        A community standard for storing chunked, compressed N-dimensional arrays as a directory store, with its
+        metadata and data distributed across multiple nested files.
+
+        .. seealso::
+            |zarr-link|_ official website.
+
 ************
 Useful Links
 ************

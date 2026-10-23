@@ -12,6 +12,31 @@ Changes
 
 Changes:
 --------
+- Add `Zarr` media-types ``application/vnd.zarr`` (including ``version=2`` and ``version=3`` parameters) for directory
+  stores, and ``application/zarr+zip`` for zipped stores, with their ``.zarr`` and ``.zarr.zip`` extensions.
+  The zipped variant is distinguished from a plain ``application/zip``
+  (resolves `#1012 <https://github.com/crim-ca/weaver/issues/1012>`_).
+- Convert `WPS`/`OGC API - Processes` `I/O` using only `Zarr` directory media-types into `CWL` ``Directory`` without
+  ``format`` (not applicable for that type), similarly to the handling of ``application/directory``.
+- Handle `Zarr` directory media-types as directories when returning `Job` results by-value and when refusing
+  local directory uploads to the `Vault` from the `CLI`.
+- Preserve the `Zarr` media-type declared by a `Process` output as the type of the resulting `Job` output when the
+  `CWL` output is a ``Directory`` (instead of reporting it as ``application/directory``), and report it
+  as ``Content-Type`` for directory references when explicitly provided.
+- Offer ``application/zarr+zip`` as alternate format of `Zarr` directory `Job` outputs, using the ``?f={mediaType}``
+  result representation to obtain the zipped store (store contents located at the root of the archive).
+  When an explicit ``version`` of the `Zarr` media-type is declared, the generic ``application/vnd.zarr`` is also
+  offered, and requesting it returns the same directory store without conversion.
+- Refuse deployment of a `Process` declaring a `Zarr` directory media-type on an `I/O` that is defined as a `CWL`
+  ``File``, since `Zarr` stores must be represented by a ``Directory``.
+
+Fixes:
+------
+- Fix files without extension in a remote directory listing (e.g.: `Zarr` chunks such as ``c/0``) being renamed with
+  a default extension (e.g.: ``c/0.txt``) when fetched as part of a directory, which corrupted the directory contents.
+- Fix `Job` results returned by-value for binary contents (e.g.: zipped `Zarr`) being decoded as `UTF-8` text, which
+  failed for non-text bytes. Raw bytes are now returned as is for single result responses, and as ``base64`` encoded
+  ``value`` (with ``encoding`` metadata) when embedded in the `JSON` results document.
 - Add `OGC API - Processes - Part 5: Provenance and Profiles` new ``metadata-profiles`` conformance class references
   which provides the semantics of ``metadata`` with ``role``, ``href`` and a profiled-term ``rel`` to annotate the
   `Process` itself or at granular I/O definitions, and aligns with ``dataClasses`` URIs along the I/O ``schema``
@@ -30,9 +55,6 @@ Changes:
   Inputs submitted with them are accepted by any `Process` that defines the official media-types, without explicitly
   listing them in its description. The legacy types are never selected when resolving media-types
   (e.g.: from file extensions).
-
-Fixes:
-------
 - Fix ``PATCH`` requests silently dropping per-``id`` ``inputs``/``outputs`` ``metadata``
   (e.g., to add ``role``/``profile`` links) submitted for update, by declaring ``keywords``/``metadata``
   fields on ``InputOutputDescriptionMeta`` schema-node definition.

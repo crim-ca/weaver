@@ -50,7 +50,10 @@ from weaver.formats import (
     ContentType,
     clean_media_type_format,
     get_format,
+    get_zarr_version,
     guess_target_format,
+    is_directory_media_type,
+    is_zarr_media_type,
     repr_json
 )
 from weaver.owsexceptions import OWSNoApplicableCode, OWSNotFound
@@ -1158,7 +1161,15 @@ def generate_or_resolve_result(
         out = clean_media_type_format(get_field(output_format, "mime_type", search_variations=True, default=None))
 
     # Apply transform if type is different from desired output and desired output is different from plain
-    if out and out not in EXCLUDED_TYPES and out != typ:
+    # Zarr is not converted between versions: only the generic type or the same version are the identical store
+    out_raw = output_format if isinstance(output_format, str) else get_field(
+        output_format, "mime_type", search_variations=True, default=""
+    )
+    same_zarr = (
+        is_zarr_media_type(out_raw) and is_zarr_media_type(typ) and
+        get_zarr_version(out_raw) in [None, get_zarr_version(typ)]
+    )
+    if out and out not in EXCLUDED_TYPES and out != typ and not same_zarr:
         file_transform = Transform(file_path=loc, current_media_type=typ, wanted_media_type=out)
         typ = out
         file_transform.get()
@@ -1185,7 +1196,7 @@ def generate_or_resolve_result(
             with open(loc, mode="w", encoding="utf-8") as out_file:
                 out_file.write(data2str(val))
 
-    if is_ref and output_mode == ExecuteTransmissionMode.VALUE and typ != ContentType.APP_DIR:
+    if is_ref and output_mode == ExecuteTransmissionMode.VALUE and not is_directory_media_type(typ):
         res_path = loc
         if not is_local:
             # reference is a remote file, but by-value requested explicitly
@@ -1216,6 +1227,30 @@ def generate_or_resolve_result(
     if not os.path.exists(loc) and is_local:
         res_headers.pop("Content-Location", None)
     return res_headers, res_data
+
+
+def resolve_result_data(data, content_type=None):
+    # type: (Any, Optional[str]) -> Tuple[Union[str, bytes], bool]
+    """
+    Reads the result contents, preserving raw bytes of binary data (e.g.: zipped Zarr) instead of decoding it as text.
+
+    :param data: Stream or value of the result.
+    :param content_type: Media-Type of the result, to identify known binary formats.
+    :return: Tuple of the text or raw bytes contents, and whether they are binary.
+    """
+    if hasattr(data, "seek"):
+        data.seek(0)
+    if hasattr(data, "read"):
+        data = data.read()
+    if not isinstance(data, bytes):
+        return data2str(data), False
+    ctype = clean_media_type_format(content_type, strip_parameters=True)
+    if ctype == ContentType.APP_ZARR_ZIP:
+        return data, True
+    try:
+        return data.decode("UTF-8"), False
+    except UnicodeDecodeError:
+        return data, True
 
 
 def resolve_result_json_literal(
@@ -1327,6 +1362,12 @@ def get_job_results_single(
             output_format,
             settings=settings,
         )
+        if out_data is None:  # directory (e.g.: Zarr) cannot be returned by value, only by reference
+            link = make_result_link(
+                job, result, output_id, ExecuteTransmissionMode.REFERENCE, output_format, settings=settings
+            )
+            headers.extend([("Link", link[0])])
+            return HTTPNoContent(headers=headers)
         headers.update(out_headers)
 
     ctype = out_headers.get("Content-Type")
@@ -1341,8 +1382,10 @@ def get_job_results_single(
     if not ctype:
         ctype = ContentType.TEXT_PLAIN
 
+    out_data, is_binary = resolve_result_data(out_data, ctype)
+    if is_binary:  # raw bytes must be returned as is, without any text encoding
+        return HTTPOk(body=out_data, content_type=ctype, headers=headers)
     c_enc = cast("AnyContentEncoding", headers.get("Content-Encoding") or "UTF-8")  # type: AnyContentEncoding
-    out_data = data2str(out_data)
     out_data = ContentEncoding.encode(out_data, c_enc)
     return HTTPOk(body=out_data, content_type=ctype, charset=c_enc, headers=headers)
 
@@ -1395,9 +1438,13 @@ def get_job_results_document(job, results, *, settings):
             value = val  # use original to avoid string conversion
         else:
             value = {"mediaType": c_type}
-            data = data2str(data)
-            if c_enc:
+            data, is_binary = resolve_result_data(data, c_type)
+            if is_binary:  # not representable as text in JSON
+                c_enc = ContentEncoding.BASE64
+                data = ContentEncoding.encode(data, c_enc, binary=False)
+            elif c_enc:
                 data = ContentEncoding.encode(data, c_enc)
+            if c_enc:
                 value["encoding"] = c_enc
             value["value"] = data
 

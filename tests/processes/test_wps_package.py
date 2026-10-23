@@ -57,8 +57,10 @@ from weaver.processes.constants import (
     CWL_REQUIREMENT_RESOURCE,
     CWL_REQUIREMENT_SECRETS,
     CWL_REQUIREMENT_TIME_LIMIT,
+    PACKAGE_DIRECTORY_TYPE,
     PACKAGE_FILE_TYPE
 )
+from weaver.processes.convert import CWLIODefinition
 from weaver.processes.wps_package import (
     DirectoryNestedStorage,
     WpsPackage,
@@ -251,6 +253,55 @@ def test_directory_nested_storage_preserves_root_name():
         assert result_url == f"https://example.com/wps-outputs/job/{output_id}/{root_name}/"
         assert os.path.isfile(os.path.join(expected_root, "zarr.json"))
         assert os.path.isfile(os.path.join(expected_root, "data", "chunks", "0"))
+
+
+@pytest.mark.parametrize(
+    ["formats", "expect_type"],
+    [
+        ([ContentType.APP_DIR, ContentType.APP_ZARR_V3], ContentType.APP_ZARR_V3),
+        ([ContentType.APP_DIR, ContentType.APP_ZARR_V2, ContentType.APP_ZARR_V3], ContentType.APP_ZARR_V2),
+        ([ContentType.APP_ZARR_V3, ContentType.APP_DIR], ContentType.APP_ZARR_V3),
+    ]
+)
+def test_resolve_output_format_zarr_directory(formats, expect_type):
+    """
+    CWL ``Directory`` has no ``format``, so the Zarr type declared by the process must be preserved on the output.
+    """
+    output = ComplexOutput("result", "Result", [Format(fmt) for fmt in formats], mode=MODE.SIMPLE)
+    WpsPackage.resolve_output_format(output, "result/sample.zarr", ContentType.APP_DIR)
+    assert output.data_format.mime_type == expect_type
+    assert output.valid_mode == MODE.NONE
+
+
+@pytest.mark.parametrize(
+    ["cwl_type", "expect_format"],
+    [
+        (PACKAGE_DIRECTORY_TYPE, False),
+        (PACKAGE_FILE_TYPE, True),
+    ]
+)
+def test_make_location_input_format_only_for_file(cwl_type, expect_format):
+    """
+    CWL ``format`` is File-only, therefore a Zarr ``Directory`` input must not receive it.
+    """
+    wps_input = mock.MagicMock()
+    wps_input.identifier = "zarr"
+    wps_input.as_reference = True
+    wps_input.url = "file:///tmp/sample.zarr"
+    wps_input._iohandler._file = None  # noqa
+    wps_input._default = None
+    wps_input.source_type = None
+    wps_input.data_format = Format(ContentType.APP_ZARR_V3)
+    package = mock.MagicMock()
+    package.make_location_input_security_check.side_effect = lambda *args: args[3]
+    package.must_fetch.return_value = False
+    cwl_def = CWLIODefinition(name="zarr", type=cwl_type)
+
+    with mock.patch("weaver.processes.wps_package.get_cwl_file_format", return_value="iana:test"):
+        location = WpsPackage.make_location_input(package, cwl_def, wps_input)
+
+    assert location["class"] == cwl_type
+    assert ("format" in location) == expect_format
 
 
 @pytest.mark.flaky(retries=2, delay=1)
@@ -963,6 +1014,7 @@ def test_format_extension_validator_basic(data_input, mode, expect):
         (ContentType.IMAGE_GEOTIFF, MODE.SIMPLE, ".tiff"),  # note: pywps distinguishes with extra 'f'
         (ContentType.IMAGE_OGC_GEOTIFF, MODE.NONE, ".tif"),
         (ContentType.IMAGE_OGC_GEOTIFF, MODE.SIMPLE, ".tif"),
+        (ContentType.APP_ZARR_ZIP, MODE.SIMPLE, ".zarr.zip"),  # compound extension
     ]
 )
 def test_format_extension_validator_pywps_cases(content_type, mode, ext):
@@ -987,6 +1039,18 @@ def test_format_extension_validator_pywps_cases(content_type, mode, ext):
         validator(data_out, mode)
     ), "should succeed with the internal validator from pywps"
     assert format_extension_validator(data_out, mode), "should succeed with format extension validator from weaver"
+
+
+@pytest.mark.format
+def test_format_extension_validator_compound_extension_mismatch():
+    class MockFileHandler(object):
+        def __init__(self, filename):
+            self._file = filename
+            self.file = filename
+
+    data_out = ComplexOutput("test", "test", [Format(ContentType.APP_ZARR_ZIP)], mode=MODE.SIMPLE)
+    data_out._iohandler = MockFileHandler("test.zip")  # plain ZIP is not a zipped Zarr
+    assert not format_extension_validator(data_out, MODE.SIMPLE)
 
 
 @pytest.mark.format
