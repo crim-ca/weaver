@@ -1,7 +1,6 @@
 import itertools
 
 import pytest
-from prov.model import ProvDocument
 
 from weaver.formats import ContentType, OutputFormat
 from weaver.provenance import ProvenanceFormat, ProvenancePathType

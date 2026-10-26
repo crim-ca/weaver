@@ -1,15 +1,12 @@
 import contextlib
 import copy
 import itertools
-import json
 import os
 import uuid
 from typing import TYPE_CHECKING
 
 import pytest
-from cwltool.cwlprov import provenance_constants as cwl_prov_const
 from parameterized import parameterized
-from prov import constants as prov_const
 
 from tests.functional import TEST_DATA_ROOT
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
@@ -183,7 +180,6 @@ class TestJobProvenance(TestJobProvenanceBase):
 
         # Verify that we have @id references for URIs in the graph
         id_ref_terms = ["foaf:account", "wfprov:wasEnactedBy", "wfprov:describedByProcess"]
-        found_terms = set()
         for obj in graph:
             for term in id_ref_terms:
                 if term not in obj:
