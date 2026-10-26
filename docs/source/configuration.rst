@@ -849,7 +849,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
   |
   | In each case, requests will be attempted using ``weaver.quotation_currency_token`` to authenticate with the API.
     The ``allratestoday`` converter does not require a token. It uses the daily European Central Bank reference rates
-    (about 30 currencies), and its terms ask for a visible link to `AllRatesToday <https://allratestoday.com>`_
+    (about 30 currencies), and its terms ask for a visible link to `AllRatesToday <https://allratestoday.com>`__
     where the converted amounts are shown.
     Request caching of 1 hour will be used by default to limit chances of rate-limiting, but converter-specific plans
     could block request at any moment depending on the amount of :ref:`quotation` requests accomplished.
