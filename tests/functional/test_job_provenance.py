@@ -10,7 +10,6 @@ import pytest
 from cwltool.cwlprov import provenance_constants as cwl_prov_const
 from parameterized import parameterized
 from prov import constants as prov_const
-from rdflib import Graph, URIRef
 
 from tests.functional import TEST_DATA_ROOT
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
@@ -120,6 +119,36 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov = resp.json
         assert "prefix" in prov
         assert "wfprov" in prov["prefix"]
+        # Ensure that our activity was both started and ended
+        assert "activity" in prov
+        assert isinstance(prov["activity"], dict)
+        start_time = None
+        started_id = None
+        for key, values in prov["activity"].items():
+            if not isinstance(values, list):
+                values = [values]
+            for record in values:
+                if "prov:startTime" in record:
+                    start_time = record["prov:startTime"]
+                    started_id = key
+                    break
+        assert start_time is not None
+        assert started_id is not None
+        # In JSON we will have a wasEndedBy for that activity
+        assert "wasEndedBy" in prov
+        assert isinstance(prov["wasEndedBy"], dict)
+        end_time = None
+        ended_id = None
+        for key, values in prov["wasEndedBy"].items():
+            if not isinstance(values, list):
+                values = [values]
+            for record in values:
+                ended_id = record.get("prov:activity")
+                if ended_id == started_id:
+                    end_time = record.get("prov:time")
+                    break
+        assert end_time is not None
+        assert ended_id is not None
 
     @parameterized.expand([
         ({"f": "ld+json"}, {}),
@@ -162,42 +191,26 @@ class TestJobProvenance(TestJobProvenanceBase):
                 values = obj[term]
                 assert isinstance(values, list) and values, f"Unexpected empty/invalid value for {term}: {obj}"
                 for value in values:
-                    if isinstance(value, str):
-                        pass  # Accept bare URI strings
-                    elif isinstance(value, dict):
-                        assert "@id" in value, f"Expected an @id reference for {term}, got {value}"
-                    else:
-                        assert False, f"Unrecognized value for {term}: {value}"
-        # NOTE:
-        #   The raw compact-IRI-looking string shape checked above is not sufficient on its own: per the
-        #   JSON-LD specification, a bare string under a term is only expanded into a proper IRI node
-        #   reference if the active "@context" declares that term with "@type": "@id" (see
-        #   'weaver.provenance' patch of 'prov.serializers.provjsonld.encode_jsonld_document'). Parse the
-        #   document with a conformant, independent JSON-LD/RDF processor (rdflib) to confirm these values
-        #   are genuinely resolved as IRI references ("URIRef"), not opaque string literals.
-        id_ref_predicates = {
-            cwl_prov_const.FOAF["account"].uri: "foaf:account",
-            cwl_prov_const.WFPROV["wasEnactedBy"].uri: "wfprov:wasEnactedBy",
-            cwl_prov_const.WFPROV["describedByProcess"].uri: "wfprov:describedByProcess",
-            prov_const.PROV_ATTR_GENERAL_ENTITY.uri: "prov:generalEntity",
-            prov_const.PROV_ATTR_SPECIFIC_ENTITY.uri: "prov:specificEntity",
-        }
-        rdf_graph = Graph()
-        rdf_graph.parse(data=json.dumps(prov), format="json-ld")
-        found_predicates = set()
-        for _, predicate, obj in rdf_graph:
-            uri = str(predicate)
-            if uri not in id_ref_predicates:
-                continue
-            found_predicates.add(uri)
-            assert isinstance(obj, URIRef), (
-                f"Attribute [{id_ref_predicates[uri]}] RDF object [{obj!r}] must be resolved as a "
-                f"'URIRef' IRI reference by a conformant JSON-LD processor, not a '{type(obj).__name__}'."
-            )
-        assert found_predicates == set(id_ref_predicates), (
-            "Not all expected PROV-JSONLD reference predicates were found when parsed as RDF: "
-            f"missing {set(id_ref_predicates) - found_predicates}"
-        )
+                    assert isinstance(value, dict), f"Expected a dictionary for {term}, got {value}"
+                    assert "@id" in value, f"Expected an @id reference for {term}, got {value}"
+        # Ensure that our activity was started and ended
+        start_id = end_id = None
+        start_time = end_time = None
+        for obj in graph:
+            if obj.get("@type") == "Activity":
+                start_id = obj.get("@id")
+                start_time = obj.get("startTime")
+                break
+        assert start_id is not None
+        assert start_time is not None
+        for obj in graph:
+            if obj.get("@type") == "End":
+                end_id = obj.get("activity")
+                if end_id == start_id:
+                    end_time = obj.get("time")
+                    break
+        assert end_id is not None
+        assert end_time is not None
 
     @parameterized.expand([
         ({"f": OutputFormat.YAML}, {}),
@@ -232,6 +245,8 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.content_type == ContentType.APP_PROV_XML
         prov = resp.text
         assert "<prov:document xmlns:wfprov" in prov
+        assert "<prov:startTime" in prov
+        assert "<prov:wasEndedBy" in prov
 
     @parameterized.expand([
         ({"f": "turtle"}, {}),
@@ -246,6 +261,9 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.content_type == ContentType.TEXT_TURTLE
         prov = resp.text
         assert "@prefix cwlprov: " in prov
+        # Start and end are expressed differently in RDF
+        assert "startedAtTime" in prov
+        assert "qualifiedEnd" in prov
 
     @parameterized.expand([
         ({"f": "nt"}, {}),
@@ -261,6 +279,9 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov = resp.text
         assert "_:N" in prov
         assert "wfprov" in prov
+        # Start and end are expressed differently in RDF
+        assert "startedAtTime" in prov
+        assert "qualifiedEnd" in prov
 
     @parameterized.expand([
         ({"f": "n"}, {}),
@@ -276,6 +297,8 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.content_type == ContentType.TEXT_PROVN
         prov = resp.text
         assert "prov:type='wfprov:WorkflowEngine'" in prov
+        # No explicit start time in PROV-N
+        assert "wasEndedBy" in prov
 
     @parameterized.expand([
         ({}, {"Accept": "application/unsupported"}),
