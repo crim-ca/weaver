@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 from parameterized import parameterized
 
+from tests.functional import TEST_DATA_ROOT
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import mocked_execute_celery, mocked_sub_requests, mocked_wps_output
 from weaver.formats import ContentType, OutputFormat
@@ -115,6 +116,36 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov = resp.json
         assert "prefix" in prov
         assert "wfprov" in prov["prefix"]
+        # Ensure that our activity was both started and ended
+        assert "activity" in prov
+        assert isinstance(prov["activity"], dict)
+        start_time = None
+        started_id = None
+        for key, values in prov["activity"].items():
+            if not isinstance(values, list):
+                values = [values]
+            for record in values:
+                if "prov:startTime" in record:
+                    start_time = record["prov:startTime"]
+                    started_id = key
+                    break
+        assert start_time is not None
+        assert started_id is not None
+        # In JSON we will have a wasEndedBy for that activity
+        assert "wasEndedBy" in prov
+        assert isinstance(prov["wasEndedBy"], dict)
+        end_time = None
+        ended_id = None
+        for key, values in prov["wasEndedBy"].items():
+            if not isinstance(values, list):
+                values = [values]
+            for record in values:
+                ended_id = record.get("prov:activity")
+                if ended_id == started_id:
+                    end_time = record.get("prov:time")
+                    break
+        assert end_time is not None
+        assert ended_id is not None
 
     @parameterized.expand([
         ({"f": "ld+json"}, {}),
@@ -131,9 +162,51 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.APP_JSONLD
         prov = resp.json
-        assert isinstance(prov, list)
-        assert bool(prov), "Must not be an empty list."
-        assert all(isinstance(obj, object) and "@id" in obj and "@type" in obj for obj in prov)
+        assert isinstance(prov, dict)
+        # Verify that we have PROV-JSONLD (not just PROV-O in JSON-LD)
+        assert "@context" in prov, "PROV-JSONLD must contain @context"
+        # Verify PROV context, but then replace it with local one to avoid network accesses
+        try:
+            idx = prov["@context"].index("https://openprovenance.org/prov-jsonld/context.jsonld")
+            prov["@context"][idx] = f"file://{TEST_DATA_ROOT}/prov_context.jsonld"
+        except ValueError:
+            pytest.fail("PROV-JSONLD context missing from @context")
+        assert "@graph" in prov, "PROV-JSONLD must contain @graph"
+        graph = prov["@graph"]
+        assert bool(graph), "JSON-LD @graph not be an empty list."
+        assert all(isinstance(obj, dict)
+                   and isinstance(obj.get("@type"), str)
+                   for obj in graph), "Every object must have a @type as a single string value"
+
+        # Verify that we have @id references for URIs in the graph
+        id_ref_terms = ["foaf:account", "wfprov:wasEnactedBy", "wfprov:describedByProcess"]
+        for obj in graph:
+            for term in id_ref_terms:
+                if term not in obj:
+                    continue
+                values = obj[term]
+                assert isinstance(values, list) and values, f"Unexpected empty/invalid value for {term}: {obj}"
+                for value in values:
+                    assert isinstance(value, dict), f"Expected a dictionary for {term}, got {value}"
+                    assert "@id" in value, f"Expected an @id reference for {term}, got {value}"
+        # Ensure that our activity was started and ended
+        start_id = end_id = None
+        start_time = end_time = None
+        for obj in graph:
+            if obj.get("@type") == "Activity":
+                start_id = obj.get("@id")
+                start_time = obj.get("startTime")
+                break
+        assert start_id is not None
+        assert start_time is not None
+        for obj in graph:
+            if obj.get("@type") == "End":
+                end_id = obj.get("activity")
+                if end_id == start_id:
+                    end_time = obj.get("time")
+                    break
+        assert end_id is not None
+        assert end_time is not None
 
     @parameterized.expand([
         ({"f": OutputFormat.YAML}, {}),
@@ -168,6 +241,8 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.content_type == ContentType.APP_PROV_XML
         prov = resp.text
         assert "<prov:document xmlns:wfprov" in prov
+        assert "<prov:startTime" in prov
+        assert "<prov:wasEndedBy" in prov
 
     @parameterized.expand([
         ({"f": "turtle"}, {}),
@@ -182,6 +257,9 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.content_type == ContentType.TEXT_TURTLE
         prov = resp.text
         assert "@prefix cwlprov: " in prov
+        # Start and end are expressed differently in RDF
+        assert "startedAtTime" in prov
+        assert "qualifiedEnd" in prov
 
     @parameterized.expand([
         ({"f": "nt"}, {}),
@@ -197,6 +275,9 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov = resp.text
         assert "_:N" in prov
         assert "wfprov" in prov
+        # Start and end are expressed differently in RDF
+        assert "startedAtTime" in prov
+        assert "qualifiedEnd" in prov
 
     @parameterized.expand([
         ({"f": "n"}, {}),
@@ -212,6 +293,8 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.content_type == ContentType.TEXT_PROVN
         prov = resp.text
         assert "prov:type='wfprov:WorkflowEngine'" in prov
+        # No explicit start time in PROV-N
+        assert "wasEndedBy" in prov
 
     @parameterized.expand([
         ({}, {"Accept": "application/unsupported"}),

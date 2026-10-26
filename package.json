@@ -76,6 +76,10 @@
       [
         "remark-lint-table-cell-padding",
         "padded"
+      ],
+      [
+        "remark-lint-no-undefined-references",
+        { "allow" : ["!NOTE"] }
       ]
     ]
   },
