@@ -389,18 +389,15 @@ class WeaverResearchObject(ResearchObject):
         user_types.add(prov_const.PROV["SoftwareAgent"])
         user_types.add(cwl_prov_const.SCHEMA["SoftwareApplication"])
 
-        # define relationships cross-references: https://wf4ever.github.io/ro/wfprov.owl
-        document.primary_source(generatedEntity=weaver_instance_agent, usedEntity=weaver_code_entity)
+        # Define PROV relations
+        document.hadPrimarySource(generatedEntity=weaver_instance_agent, usedEntity=weaver_code_entity)
         document.actedOnBehalfOf(delegate=weaver_instance_agent, responsible=user_agent)
-        document.specializationOf(specificEntity=weaver_instance_agent, generalEntity=cwltool_agent)
-        document.attribution(entity=crim_entity, agent=weaver_code_entity)
-        document.wasDerivedFrom(generatedEntity=cwltool_agent, usedEntity=weaver_instance_agent)
-        document.specializationOf(specificEntity=wf_agent, generalEntity=weaver_instance_agent)
+        document.wasAttributedTo(entity=crim_entity, agent=weaver_code_entity)
         document.wasStartedBy(activity=job_activity, trigger=wf_agent)
         if server_provider_entity:
-            document.derivation(generatedEntity=server_provider_entity,
-                                usedEntity=weaver_instance_agent)
-            document.attribution(entity=server_provider_entity, agent=weaver_instance_agent)
+            document.wasDerivedFrom(generatedEntity=server_provider_entity,
+                                    usedEntity=weaver_instance_agent)
+            document.wasAttributedTo(entity=server_provider_entity, agent=weaver_instance_agent)
 
         return prov_profile
 
