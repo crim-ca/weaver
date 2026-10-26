@@ -145,33 +145,29 @@ Examples:
 
 ## Content Structure
 
-After frontmatter, structure SKILL.md as follows.
+After frontmatter, structure `SKILL.md` as follows.
 Sections that are not applicable can be omitted, but should be provided if available to offer alternatives.
 
-````markdown
-# Skill Title
+### Standard sections
 
-One-line summary of the capability.
+- `# Skill Title` — Name of the skill followed by one-line summary of the capability.
+- `## When to Use` — A list of very brief and concise use cases of the skill.
+- `## Parameters` — Inputs with their types and descriptions.
+- `## CLI Usage` — Commands and flags.
+- `## Python Usage` — Python examples.
+- `## API Request` — API request examples.
+- `## Returns` — Response format.
+- `## Limitations` — Issues, causes, and workarounds.
+- `## Related Skills` — Relevant skills and their relationship.
+- `## References` — Documentation and specifications.
 
-## When to Use
-
-- Use case 1
-- Use case 2
-- Use case 3
-
-## Parameters
-
-- **param_name** (type): Description
-- **param_name** (type): Optional description
-
-## CLI Usage
+### CLI Usage
 
 ```bash
-# Example command
 command --flag value
 ```
 
-## Python Usage
+### Python Usage
 
 ```python
 from weaver.client import WeaverClient
@@ -180,16 +176,16 @@ client = WeaverClient(url="...")
 result = client.method()
 ```
 
-## API Request
+### API Request
 
 ```bash
 curl -X GET \
   "${WEAVER_URL}/endpoint"
 ```
 
-## Returns
+### Returns
 
-JSON structure or response format.
+Describe the JSON structure or response format.
 
 ## Limitations
 
@@ -218,6 +214,14 @@ JSON structure or response format.
 8. **Update metadata keywords**: These enable AI agent discovery
 9. **Provide skils**: Link to related skills, but only if actually relevant and specific to the skill being documented
 10. **Provide references**: Link to documentation and specifications if needd for better understanding or context
+11. **Using Fenced Code**: Use fenced code blocks for examples and steps, but do not abuse it when code isn't involved.
+12. **GitHub-style alerts**: When needed, use `> [!NOTE]` and `> [!WARNING]` instead of bold labels in prose
+
+### Example GitHub-style alerts
+
+> [!NOTE]
+> Use this format for supplemental information. Use `[!WARNING]` for cautions.
+
 
 ## Step-by-Step Creation
 
@@ -322,4 +326,3 @@ Before considering a skill complete:
 - **Agent Skills Specification**: <https://agentskills.io/specification>
 - **Weaver Documentation**: <https://pavics-weaver.readthedocs.io/>
 - **Weaver GitHub**: <https://github.com/crim-ca/weaver>
-

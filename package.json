@@ -35,6 +35,22 @@
       "remark-frontmatter",
       "remark-preset-lint-consistent",
       "remark-preset-lint-recommended",
+      [
+        "remark-lint-blockquote-indentation",
+        2
+      ],
+      [
+        "remark-lint-no-undefined-references",
+        {
+          "allow": [
+            "!note",
+            "!tip",
+            "!important",
+            "!warning",
+            "!caution"
+          ]
+        }
+      ],
       "remark-lint-list-item-content-indent",
       "remark-lint-checkbox-content-indent",
       [
