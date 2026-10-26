@@ -8,56 +8,11 @@ from urllib.parse import urlparse
 from cwltool.cwlprov import provenance_constants as cwl_prov_const
 from cwltool.cwlprov.ro import ResearchObject
 from prov import constants as prov_const
-from prov.serializers import provjsonld as prov_jsonld_serializer
 
 from weaver.__meta__ import __version__ as weaver_version
 from weaver.base import Constants
 from weaver.formats import ContentType, OutputFormat
 from weaver.utils import get_weaver_url
-
-# Monkeypatch the prov library's PROV-JSONLD serializer to emit bare
-# strings instead of "xsd:QName" typed literals for these types which
-# are outside of the PROV vocabulary, but which need to be treated as
-# @id node references (i.e. IRIs). We then need to add context terms
-# so that JSON-LD processors will interpret them as such, done below.
-_PROV_JSONLD_EXTRA_ID_TYPED_TERMS = {
-    str(cwl_prov_const.WFPROV["describedByProcess"]),
-    str(cwl_prov_const.WFPROV["wasEnactedBy"]),
-    str(cwl_prov_const.FOAF["account"]),
-    str(prov_const.PROV_ATTR_GENERAL_ENTITY),
-    str(prov_const.PROV_ATTR_SPECIFIC_ENTITY),
-}
-prov_jsonld_serializer.ID_TYPED_TERMS = (
-    prov_jsonld_serializer.ID_TYPED_TERMS | _PROV_JSONLD_EXTRA_ID_TYPED_TERMS
-)
-
-# Now that we have bare strings for these IRI references, we also need
-# to inject the proper type definitions into the context, again, by
-# doing some fragile patching of prov_jsonld_serializer.  This should
-# be removed once the prov library is fixed upstream.
-_PROV_JSONLD_ID_CONTEXT_TERMS = {
-    term: {"@type": "@id"} for term in _PROV_JSONLD_EXTRA_ID_TYPED_TERMS
-}
-
-
-def extra_jsonld_context(document, context):
-    # type: (ProvDocument, str) -> dict
-    container = prov_jsonld_serializer._weaver_orig_encoder(document, context)
-    existing_context = container.get("@context")
-    if isinstance(existing_context, list):
-        existing_context.append(_PROV_JSONLD_ID_CONTEXT_TERMS)
-    elif existing_context:
-        # This should never happen as @context is always a list
-        container["@context"] = [existing_context, _PROV_JSONLD_ID_CONTEXT_TERMS]
-    else:
-        # This should never happen as @context is always created
-        container["@context"] = _PROV_JSONLD_ID_CONTEXT_TERMS
-    return container
-
-
-if not hasattr(prov_jsonld_serializer, "_weaver_orig_encoder"):
-    prov_jsonld_serializer._weaver_orig_encoder = prov_jsonld_serializer.encode_jsonld_document
-    prov_jsonld_serializer.encode_jsonld_document = extra_jsonld_context
 
 if TYPE_CHECKING:
     from typing import Any, List, Optional, Tuple, Union
