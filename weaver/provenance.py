@@ -1,6 +1,7 @@
 """
 Definitions related to :term:`Provenance` features and the :term:`W3C` ``PROV`` specification.
 """
+import datetime
 import hashlib
 import json
 from typing import TYPE_CHECKING, NamedTuple, cast
@@ -9,6 +10,7 @@ from urllib.parse import urlparse
 from cwltool.cwlprov import provenance_constants as cwl_prov_const
 from cwltool.cwlprov.ro import ResearchObject
 from prov import constants as prov_const
+from prov.identifier import Identifier, QualifiedName
 from prov.model import ProvDocument, ProvRelation
 
 from weaver.__meta__ import __version__ as weaver_version
@@ -469,6 +471,8 @@ _RELATION_HANDLERS = {
                                                 "generatedEntity", "usedEntity"),
     prov_const.PROV_DELEGATION: RelationHandler("actedOnBehalfOf", "hadDelegate",
                                                 "delegate", "responsible"),
+    prov_const.PROV_SPECIALIZATION: RelationHandler("generalEntity", "specificEntity",
+                                                    "specificEntity", "generalEntity"),
 }
 _RELATION_FIELDS = set([*(h.forward for h in _RELATION_HANDLERS.values()),
                         *(h.inverse for h in _RELATION_HANDLERS.values())])
@@ -477,6 +481,70 @@ _OBJECT_TYPES = {
     "Activity",
     "Agent",
 }
+_PROV_ATTRS = (("startTime", prov_const.PROV_ATTR_STARTTIME),
+               ("endTime", prov_const.PROV_ATTR_ENDTIME),
+               ("time", prov_const.PROV_ATTR_TIME),
+               ("location", prov_const.PROV_LOCATION))
+
+
+def _prov_value(value):
+    # type: (Any) -> Any
+    """
+    Convert a PROV attribute value into a JSON-serializable representation.
+    """
+    if isinstance(value, (QualifiedName, Identifier)):
+        return value.uri
+    if isinstance(value, datetime.datetime):
+        return value.isoformat()
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def _ogc_prov_objects(document):
+    # type: (ProvDocument) -> dict[str, dict[str, Any]]
+    objects_by_uri = {}  # type: dict[str, dict[str, Any]]
+    for record in document.get_records():
+        record_type = record.get_type().localpart if record.get_type() else None
+        if record_type not in _OBJECT_TYPES:  # only objects in the OGC schema
+            continue
+        if record.identifier is None:
+            continue
+        key = record.identifier.uri
+        if key in objects_by_uri:
+            continue
+        objects_by_uri[key] = {"id": key, "provType": record_type}
+        if record.value:
+            objects_by_uri[key]["value"] = list(record.value)
+        if record.label != record.identifier:
+            objects_by_uri[key]["label"] = record.label
+        prov_types = [str(val) for val in record.get_attribute(prov_const.PROV_TYPE)]
+        if prov_types:
+            objects_by_uri[key]["prov:type"] = prov_types[0] if len(prov_types) == 1 else prov_types
+        for attr, prov_attr in _PROV_ATTRS:
+            values = [_prov_value(val) for val in record.get_attribute(prov_attr)]
+            if values:
+                objects_by_uri[key][attr] = values[0] if len(values) == 1 else values
+    return objects_by_uri
+
+
+def _ogc_prov_nested(objects_by_uri, root_obj, expanded):
+    # type: (dict[str, dict[str, Any]], dict[str, Any], set[str]) -> dict[str, Any]
+    for attr, vals in root_obj.items():
+        if attr not in _RELATION_FIELDS:
+            continue
+        if isinstance(vals, str):
+            vals = [vals]
+        for idx, uri in enumerate(vals):
+            if not isinstance(uri, str):
+                continue
+            obj = objects_by_uri.get(uri)
+            if uri in expanded or obj is None:
+                continue
+            expanded.add(uri)
+            vals[idx] = _ogc_prov_nested(objects_by_uri, obj, expanded)
+        root_obj[attr] = vals[0] if len(vals) == 1 else vals
+    return root_obj
 
 
 def convert_to_prov_chain(input_data, root_uri=None):
@@ -498,26 +566,23 @@ def convert_to_prov_chain(input_data, root_uri=None):
     - Derivation
     - Delegation
 
+    Certain PROV attributes are also supported:
+
+    - prov:type (contains extra types not specified in ``provType``)
+    - startTime
+    - endTime
+    - time
+    - location
+    - label
+    - value
+
     :param root_id: If not ``None``, return object provenance rooted
     at the object with the given ID.  Otherwise, return array-form
     provenance for all objects.
 
     """
     document = ProvDocument.deserialize(content=input_data, format="json")
-    objects_by_uri = {}
-
-    # Create the inventory of objects, maintaining document ordering
-    for record in document.get_records():
-        record_type = record.get_type().localpart if record.get_type() else None
-        if record_type not in _OBJECT_TYPES:  # only objects in the OGC schema
-            continue
-        if record.identifier is None:
-            continue
-        key = record.identifier.uri
-        if key in objects_by_uri:
-            continue
-        objects_by_uri[key] = {"id": key, "provType": record_type}
-
+    objects_by_uri = _ogc_prov_objects(document)
     # Fail fast if an unknown root URI is requested
     root_obj = None
     if root_uri is not None:
@@ -564,29 +629,13 @@ def convert_to_prov_chain(input_data, root_uri=None):
             continue
         _resolve_relation(obj_prov, handler.inverse, subj.uri)
 
-    def _ogc_prov_obj(objects_by_uri, root_obj, expanded):
-        # type: (dict[str, dict[str, Any]], dict[str, Any], set[str]) -> dict[str, Any]
-        for attr, vals in root_obj.items():
-            if attr not in _RELATION_FIELDS:
-                continue
-            if isinstance(vals, str):
-                vals = [vals]
-            for idx, uri in enumerate(vals):
-                if not isinstance(uri, str):
-                    continue
-                obj = objects_by_uri.get(uri)
-                if uri in expanded or obj is None:
-                    continue
-                expanded.add(uri)
-                vals[idx] = _ogc_prov_obj(objects_by_uri, obj, expanded)
-            root_obj[attr] = vals[0] if len(vals) == 1 else vals
-        return root_obj
-
     if root_obj:
         # Object form: Traverse graph depth-first in document order
         # replacing objects with their referents.
-        expanded = set([root_uri])
-        return json.dumps(_ogc_prov_obj(objects_by_uri, root_obj, expanded))
+        expanded = set()
+        assert root_uri is not None  # we checked it above
+        expanded.add(root_uri)
+        return json.dumps(_ogc_prov_nested(objects_by_uri, root_obj, expanded))
     else:
         # List form: Output resolved objects in document order
         return json.dumps([objects_by_uri[key] for key in objects_by_uri])
