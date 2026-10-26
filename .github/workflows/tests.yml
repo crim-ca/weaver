@@ -44,7 +44,7 @@ jobs:
       CONDA_CMD: ""
       DOCKER_TEST_EXEC_ARGS: "-T"
       # globally excluded 'checks', to be re-executed by dedicated job
-      CHECKS_EXCLUDE: "links"
+      CHECKS_EXCLUDE: "links check-security-secrets"
     services:
       # Label used to access the service container
       mongodb:
@@ -129,7 +129,7 @@ jobs:
       - name: Setup Python
         # skip python setup if running with docker or if test should be skipped
         if: ${{ steps.should_skip_test.outputs.skip != 'true' && matrix.test-case != 'test-docker' }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v6.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v6.0.0
         with:
           python-version: "${{ matrix.python-version }}"
           cache: 'pip'
@@ -267,7 +267,7 @@ jobs:
             echo "::set-output name=TAG_VERSION::${GITHUB_REF##*/}"
           fi
       - name: Login to DockerHub
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
