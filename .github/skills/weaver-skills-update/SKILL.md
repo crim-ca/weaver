@@ -134,8 +134,13 @@ git diff origin/master weaver/cli.py | grep -A5 "def "
 
 #### 2. Identify affected skills
 
-Map commands to their related skills. For example, `deploy` maps to `process-deploy`, `execute` maps to
-`job-execute`, `status` maps to `job-status`, `logs` maps to `job-logs`, and `results` maps to `job-results`.
+| Command   | Related skill    |
+| --------- | ---------------- |
+| `deploy`  | `process-deploy` |
+| `execute` | `job-execute`    |
+| `status`  | `job-status`     |
+| `logs`    | `job-logs`       |
+| `results` | `job-results`    |
 
 #### 3. Update skill documentation
 
