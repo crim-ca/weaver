@@ -534,16 +534,15 @@ def convert_to_prov_chain(input_data, root_uri=None):
             if uri not in existing:
                 existing.append(uri)
         elif existing != uri:
-            subj_prov[prop] = [existing, uri]
+            prov[prop] = [existing, uri]
 
     # Add recognized relations to recognized subjects
     for record in document.get_records(ProvRelation):
         handler = _RELATION_HANDLERS.get(record.get_type())
         if handler is None:
             continue
-        # Resolve attributes to QNames
+        # Resolve attributes to QNames using local part (assume prefix is prov)
         formal = {key.localpart: value for key, value in record.formal_attributes}
-        breakpoint()
         subj = formal.get(handler.subject_role)
         if subj is None:
             continue
@@ -566,24 +565,21 @@ def convert_to_prov_chain(input_data, root_uri=None):
         _resolve_relation(obj_prov, handler.inverse, subj.uri)
 
     def _ogc_prov_obj(objects_by_uri, root_obj, expanded):
-        # type: (dict[str, dict[str, Any]], dict[str, Any], set[str]) -> str
-        for attr, val in root_obj.items():
+        # type: (dict[str, dict[str, Any]], dict[str, Any], set[str]) -> dict[str, Any]
+        for attr, vals in root_obj.items():
             if attr not in _RELATION_FIELDS:
                 continue
-        if isinstance(val, list):
-            for idx, uri in enumerate(val):
+            if isinstance(vals, str):
+                vals = [vals]
+            for idx, uri in enumerate(vals):
                 if not isinstance(uri, str):
                     continue
                 obj = objects_by_uri.get(uri)
                 if uri in expanded or obj is None:
                     continue
                 expanded.add(uri)
-                val[idx] = _ogc_prov_obj(objects_by_uri, obj, expanded)
-        elif isinstance(val, str):
-            obj = objects_by_uri.get(val)
-            if not (val in expanded or obj is None):
-                expanded.add(val)
-                root_obj[attr] = _ogc_prov_obj(objects_by_uri, obj, expanded)
+                vals[idx] = _ogc_prov_obj(objects_by_uri, obj, expanded)
+            root_obj[attr] = vals[0] if len(vals) == 1 else vals
         return root_obj
 
     if root_obj:
