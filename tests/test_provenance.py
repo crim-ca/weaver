@@ -201,9 +201,16 @@ def test_convert_to_prov_list():
     prov_json = convert_to_prov_chain(prov_data)
     assert prov_json
     prov_chain = json.loads(prov_json)
+    with open("prov_list.json", "w") as fh:
+        json.dump(prov_chain, fh, indent=2)
+    # It should be a prov chain as a list
     assert isinstance(prov_chain, list)
     assert all("id" in obj for obj in prov_chain)
     assert all("provType" in obj for obj in prov_chain)
+    # It should not be nested
+    assert all(isinstance(obj["wasGeneratedBy"], str)
+               for obj in prov_chain
+               if "wasGeneratedBy" in obj)
 
 
 def test_convert_to_prov_object():
@@ -213,9 +220,14 @@ def test_convert_to_prov_object():
     prov_json = convert_to_prov_chain(prov_data, root_id)
     assert prov_json
     prov_chain = json.loads(prov_json)
-    print(json.dumps(prov_chain, indent=2))
+    with open("prov_obj.json", "w") as fh:
+        json.dump(prov_chain, fh, indent=2)
+    # Make sure it is an activity
     assert isinstance(prov_chain, dict)
     assert "id" in prov_chain
     assert prov_chain["id"] == root_id
     assert "provType" in prov_chain
     assert prov_chain["provType"] == "Activity"
+    # It should be nested
+    assert "wasAssociatedWith" in prov_chain
+    assert isinstance(prov_chain["wasAssociatedWith"], dict)
