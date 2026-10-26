@@ -221,13 +221,14 @@ conda-env-export:		## export the conda environment
 ## -- Build targets ------------------------------------------------------------------------------------------------- ##
 
 .PHONY: install
-install: install-all    ## alias for 'install-all' target
+install: install-run    ## alias for 'install-run' target
 
 .PHONY: install-run
-install-run: install-sys install-pkg install-raw install-dev ## install requirements and application to run locally
+install-run: install-sys install-pkg install-raw ## install requirements and application to run locally (no dev)
 
 .PHONY: install-all
-install-all: install-sys install-pkg install-pip install-dev ## install application with all dependencies
+install-all: install-sys install-pkg install-pip install-dev \
+	install-dev-npm install-betterleaks ## install application dependencies and all dev utilities
 
 .PHONY: install-doc
 install-doc: install-pip	## install documentation dependencies
@@ -236,7 +237,7 @@ install-doc: install-pip	## install documentation dependencies
 	@echo "Install with pip complete. Run documentation generation with 'make docs' target."
 
 .PHONY: install-dev
-install-dev: install-pip install-transform 	## install development and test dependencies
+install-dev: install-pip install-transform 	## install development and test dependencies (Python only)
 	@echo "Installing development packages with pip..."
 	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-dev.txt"'
 	@echo "Install with pip complete. Test service with 'make test*' variations."
@@ -260,7 +261,7 @@ install-pip:	## install application as a package to allow import from another py
 	@echo "Install with pip complete."
 
 .PHONY: install-raw
-install-raw:	## install without any requirements or dependencies (suppose everything is setup)
+install-raw:	## install without any requirements or dependencies (editable source)
 	@echo "Installing package without dependencies..."
 	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -e "$(APP_ROOT)" --no-deps'
 	@echo "Install package complete."
@@ -513,7 +514,7 @@ CHECKS_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_PY))
 
 # items that should not install python dev packages should be added here instead
 # they must provide their own target/only + with dependency install variants
-CHECKS_NO_PY ?= css md
+CHECKS_NO_PY ?= css md security-secrets
 CHECKS_NO_PY := $(addprefix check-, $(CHECKS_NO_PY))
 CHECKS_NO_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_NO_PY))
 CHECKS_NO_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_NO_PY))
@@ -561,6 +562,37 @@ check-lint-only: | mkdir-reports  	## check linting of code style
 
 .PHONY: check-security-only
 check-security-only: check-security-code-only check-security-deps-only  ## run security checks
+
+# Betterleaks release used by the repository secret scan.
+BETTERLEAKS_VERSION ?= 1.9.0
+BETTERLEAKS_SHA256 ?= f8b185a39ffcece2a1ca82bf3a4e7435cd81963ffd16b7a9128daf75f35f6de7
+BETTERLEAKS_CONFIG ?= $(APP_ROOT)/.github/.gitleaks.toml
+BETTERLEAKS_CMD ?= $(DOWNLOAD_CACHE)/betterleaks-$(BETTERLEAKS_VERSION)/betterleaks
+
+.PHONY: check-security-secrets
+check-security-secrets: install-betterleaks  ## install Betterleaks and scan repository history for secrets
+	@$(MAKE) check-security-secrets-only
+
+.PHONY: install-betterleaks
+install-betterleaks: $(BETTERLEAKS_CMD)  ## install Betterleaks for repository secret scanning
+
+$(BETTERLEAKS_CMD):
+	@set -eu; \
+		tmpdir="$$(mktemp -d)"; \
+		trap 'rm -rf "$$tmpdir"' EXIT; \
+		curl --fail --location --silent --show-error \
+			--output "$$tmpdir/betterleaks.tar.gz" \
+			"https://github.com/betterleaks/betterleaks/releases/download/v$(BETTERLEAKS_VERSION)/betterleaks_$(BETTERLEAKS_VERSION)_linux_x64.tar.gz"; \
+		echo "$(BETTERLEAKS_SHA256)  $$tmpdir/betterleaks.tar.gz" | sha256sum --check; \
+		tar -xzf "$$tmpdir/betterleaks.tar.gz" -C "$$tmpdir" betterleaks; \
+		mkdir -p "$(dir $(BETTERLEAKS_CMD))"; \
+		install -m 0755 "$$tmpdir/betterleaks" "$(BETTERLEAKS_CMD)"
+
+.PHONY: check-security-secrets-only
+check-security-secrets-only:  ## run secret scan with an installed Betterleaks binary
+	@"$(BETTERLEAKS_CMD)" --config "$(BETTERLEAKS_CONFIG)" \
+		--gitleaks-ignore-path /dev/null \
+		git "$(APP_ROOT)" --redact --exit-code 2
 
 # FIXME: safety ignore file (https://github.com/pyupio/safety/issues/351)
 # ignored codes:
