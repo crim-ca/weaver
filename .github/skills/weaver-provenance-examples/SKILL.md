@@ -95,7 +95,7 @@ sh ../../../.github/skills/weaver-provenance-examples/scripts/job_prov_examples.
 ```
 
 > [!NOTE]
-> The script rewrites hostnames to `https://hirondelle.crim.ca/weaver` > / `hirondelle.crim.ca` to match
+> The script rewrites hostnames to `https://hirondelle.crim.ca/weaver` and `hirondelle.crim.ca` to match
 > the existing examples. Adjust the `fix_urls` substitutions inside the script if generating examples
 > against a different instance.
 
