@@ -7,8 +7,7 @@ description: |
   cwltool/cwlprov integration, or the /jobs/{jobId}/prov endpoints that alter the PROV metadata
   structure or content, to keep OpenAPI documentation examples accurate and in sync.
 license: Apache-2.0
-compatibility: Requires a running Weaver instance with weaver.cwl_prov=true, a completed Job with
-  provenance metadata, and curl/jq (via the provided script) or the weaver CLI.
+compatibility: Requires a running Weaver instance with weaver.cwl_prov=true, a completed Job with provenance metadata, and curl/jq (via the provided script) or the weaver CLI.
 metadata:
   category: setup-operations
   version: "1.1.0"
@@ -46,17 +45,17 @@ All located in `weaver/wps_restapi/examples/`, loaded automatically at import ti
 `SCHEMA_EXAMPLE_DIR`/`EXAMPLES` in `weaver/wps_restapi/swagger_definitions.py` and referenced by
 `get_job_prov_responses` / `get_job_prov_metadata_responses`:
 
-| File | Content | PROV format |
-| - | - | - |
-| `job_prov.json` | Main PROV document | `PROV-JSON` |
-| `job_prov.jsonld` | Main PROV document | `PROV-JSONLD` |
-| `job_prov.xml` | Main PROV document | `PROV-XML` |
-| `job_prov.ttl` | Main PROV document | `PROV-TURTLE` |
-| `job_prov.nt` | Main PROV document | `PROV-NT` |
-| `job_prov.provn` | Main PROV document | `PROV-N` |
-| `job_prov_info.txt` | `/prov/info` research object summary | plain text |
-| `job_prov_run.txt` | `/prov/run` execution timeline | plain text |
-| `job_prov_who.txt` | `/prov/who` agents summary | plain text |
+| File                | Content                              | PROV format   |
+| ------------------- | ------------------------------------ | ------------- |
+| `job_prov.json`     | Main PROV document                   | `PROV-JSON`   |
+| `job_prov.jsonld`   | Main PROV document                   | `PROV-JSONLD` |
+| `job_prov.xml`      | Main PROV document                   | `PROV-XML`    |
+| `job_prov.ttl`      | Main PROV document                   | `PROV-TURTLE` |
+| `job_prov.nt`       | Main PROV document                   | `PROV-NT`     |
+| `job_prov.provn`    | Main PROV document                   | `PROV-N`      |
+| `job_prov_info.txt` | `/prov/info` research object summary | plain text    |
+| `job_prov_run.txt`  | `/prov/run` execution timeline       | plain text    |
+| `job_prov_who.txt`  | `/prov/who` agents summary           | plain text    |
 
 ## Prerequisites
 
@@ -95,9 +94,9 @@ sh ../../../.github/skills/weaver-provenance-examples/scripts/job_prov_examples.
 ```
 
 > [!NOTE]
-> The script rewrites hostnames to `https://hirondelle.crim.ca/weaver` and `hirondelle.crim.ca` to match
-> the existing examples. Adjust the `fix_urls` substitutions inside the script if generating examples
-> against a different instance.
+> The script rewrites hostnames to `hirondelle.crim.ca` to match the
+> existing examples. Adjust the `fix_urls` substitutions inside the
+> script if generating examples against a different instance.
 
 ### Alternative
 
@@ -111,7 +110,7 @@ used to fetch the provenance document in the desired formats.
 
    ```bash
    python3 -c "from weaver.wps_restapi.swagger_definitions import EXAMPLES; \
-     print(sorted(k for k in EXAMPLES if k.startswith('job_prov')))"
+       print(sorted(k for k in EXAMPLES if k.startswith('job_prov')))"
    ```
 
 2. Run the provenance-related functional tests to confirm nothing else broke:
