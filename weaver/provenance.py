@@ -278,7 +278,6 @@ class WeaverResearchObject(ResearchObject):
         document = prov_profile.document
 
         # following agents are expected to exist (created by inherited class)
-        cwltool_agent = document.get_record(cwl_prov_const.ACCOUNT_UUID)[0]
         user_uuid = self.orcid or cwl_prov_const.USER_UUID
         user_agent = document.get_record(user_uuid)[0]
         wf_agent = document.get_record(self.engine_uuid)[0]  # current job run aligned with cwl workflow
@@ -376,6 +375,9 @@ class WeaverResearchObject(ResearchObject):
                 cwl_prov_const.WFPROV["describedByProcess"]: proc_entity,
             }
         )
+        # Add a wasStartedBy relation (this is redundant for
+        # single-process jobs, but will unify in RDF or JSONLD)
+        document.wasStartedBy(activity=job_activity, starter=wf_agent)
 
         # NOTE: This is a somewhat fragile workaround for cwlprov
         # unconditionally creating the user agent as a Person.  The
@@ -393,7 +395,6 @@ class WeaverResearchObject(ResearchObject):
         document.hadPrimarySource(generatedEntity=weaver_instance_agent, usedEntity=weaver_code_entity)
         document.actedOnBehalfOf(delegate=weaver_instance_agent, responsible=user_agent)
         document.wasAttributedTo(entity=crim_entity, agent=weaver_code_entity)
-        document.wasStartedBy(activity=job_activity, trigger=wf_agent)
         if server_provider_entity:
             document.wasDerivedFrom(generatedEntity=server_provider_entity,
                                     usedEntity=weaver_instance_agent)
