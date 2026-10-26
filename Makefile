@@ -226,9 +226,9 @@ install: install-run    ## alias for 'install-run' target
 .PHONY: install-run
 install-run: install-sys install-pkg install-raw ## install requirements and application to run locally (no dev)
 
+override _INSTALL_ALL := install-sys install-pkg install-pip install-dev install-dev-npm install-betterleaks
 .PHONY: install-all
-install-all: install-sys install-pkg install-pip install-dev \
-	install-dev-npm install-betterleaks ## install application dependencies and all dev utilities
+install-all: $(_INSTALL_ALL) ## install application dependencies and all dev utilities
 
 .PHONY: install-doc
 install-doc: install-pip	## install documentation dependencies
