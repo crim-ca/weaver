@@ -567,11 +567,12 @@ check-security-only: check-security-code-only check-security-deps-only  ## run s
 BETTERLEAKS_VERSION ?= 1.9.0
 BETTERLEAKS_SHA256 ?= f8b185a39ffcece2a1ca82bf3a4e7435cd81963ffd16b7a9128daf75f35f6de7
 BETTERLEAKS_CONFIG ?= $(APP_ROOT)/.github/.gitleaks.toml
+BETTERLEAKS_SOURCE ?= https://github.com/betterleaks/betterleaks/releases/download/v$(BETTERLEAKS_VERSION)/betterleaks_$(BETTERLEAKS_VERSION)_linux_x64.tar.gz
 BETTERLEAKS_CMD ?= $(DOWNLOAD_CACHE)/betterleaks-$(BETTERLEAKS_VERSION)/betterleaks
 
 .PHONY: check-security-secrets
-check-security-secrets: install-betterleaks  ## install Betterleaks and scan repository history for secrets
-	@$(MAKE) check-security-secrets-only
+.NOTPARALLEL: check-security-secrets
+check-security-secrets: install-betterleaks check-security-secrets-only  ## install Betterleaks and scan repository history for secrets
 
 .PHONY: install-betterleaks
 install-betterleaks: $(BETTERLEAKS_CMD)  ## install Betterleaks for repository secret scanning
@@ -580,9 +581,7 @@ $(BETTERLEAKS_CMD):
 	@set -eu; \
 		tmpdir="$$(mktemp -d)"; \
 		trap 'rm -rf "$$tmpdir"' EXIT; \
-		curl --fail --location --silent --show-error \
-			--output "$$tmpdir/betterleaks.tar.gz" \
-			"https://github.com/betterleaks/betterleaks/releases/download/v$(BETTERLEAKS_VERSION)/betterleaks_$(BETTERLEAKS_VERSION)_linux_x64.tar.gz"; \
+		curl --fail --location --silent --show-error --output "$$tmpdir/betterleaks.tar.gz" "$(BETTERLEAKS_SOURCE)"; \
 		echo "$(BETTERLEAKS_SHA256)  $$tmpdir/betterleaks.tar.gz" | sha256sum --check; \
 		tar -xzf "$$tmpdir/betterleaks.tar.gz" -C "$$tmpdir" betterleaks; \
 		mkdir -p "$(dir $(BETTERLEAKS_CMD))"; \
@@ -592,7 +591,8 @@ $(BETTERLEAKS_CMD):
 check-security-secrets-only:  ## run secret scan with an installed Betterleaks binary
 	@"$(BETTERLEAKS_CMD)" --config "$(BETTERLEAKS_CONFIG)" \
 		--gitleaks-ignore-path /dev/null \
-		git "$(APP_ROOT)" --redact --exit-code 2
+		--verbose --redact \
+		git "$(APP_ROOT)" --platform github --exit-code 2
 
 # FIXME: safety ignore file (https://github.com/pyupio/safety/issues/351)
 # ignored codes:
