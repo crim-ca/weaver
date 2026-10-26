@@ -29,7 +29,7 @@ flake8>=7.4.1
 flynt
 isort>=9.0.2
 # FIXME: pin 'marshmallow' dependency of 'safery' to fix compatibility (https://github.com/pyupio/safety/issues/711)
-marshmallow<4
+marshmallow<5
 mdformat
 mdformat-frontmatter
 mdformat-gfm
