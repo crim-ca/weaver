@@ -134,46 +134,35 @@ git diff origin/master weaver/cli.py | grep -A5 "def "
 
 #### 2. Identify affected skills
 
-```bash
-# Map CLI commands to skills
-# deploy        → process-deploy
-# execute       → job-execute
-# status        → job-status
-# logs          → job-logs
-# results       → job-results
-# etc.
-```
+Map commands to their related skills. For example, `deploy` maps to `process-deploy`, `execute` maps to
+`job-execute`, `status` maps to `job-status`, `logs` maps to `job-logs`, and `results` maps to `job-results`.
 
 #### 3. Update skill documentation
 
 For each affected skill:
 
-```bash
-# a. Update CLI Usage section
-# - Review command signature changes
-# - Update parameter descriptions
-# - Update example commands
-
-# b. Update Python Usage section
-# - Check WeaverClient method changes
-# - Update parameter names
-# - Update return value handling
-
-# c. Verify examples still work
-weaver <command> --help
-# Test command with example from skill
-```
+1. Update CLI Usage section
+   - Review command signature changes
+   - Update parameter descriptions
+   - Update example commands
+2. Update Python Usage section
+   - Check WeaverClient method changes
+   - Update parameter names
+   - Update return value handling
+3. Verify examples still work by testing skill commands
+   ```bash
+   weaver <command> --help
+   ```
 
 #### 4. Check for new CLI commands
 
-```bash
-# If new command found, create new skill:
-# - Determine category (job-*, process-*, provider-*, etc.)
-# - Create skill directory and SKILL.md
-# - Follow existing skill template
-# - Add cross-references
-# - Update .agents/README.md
-```
+If new command found, create new skill:
+
+- Determine category (`job-*`, `process-*`, `provider-*`, etc.)
+- Create skill directory and `SKILL.md`
+- Follow existing skill template
+- Add cross-references
+- Update `.agents/README.md`
 
 ### Procedure 2: Makefile Target Changes
 
@@ -193,13 +182,15 @@ git diff origin/master Makefile | grep "^+.*:" | grep -v "^+##"
 
 #### 2. Update weaver-install skill
 
-```bash
-# Update sections:
-# - "Install with Makefile Targets"
-# - "Makefile Reference"
-# - Installation procedure examples
+Update sections about:
 
-# Verify each target description:
+- Install with Makefile Targets
+- Makefile Reference
+- Installation procedure examples
+
+Verify each target description:
+
+```bash
 make help | grep "install"
 ```
 
@@ -230,36 +221,33 @@ git diff origin/master weaver/wps_restapi/ | grep -E "@.*\.(get|post|put|delete)
 
 #### 2. Map endpoints to skills
 
-```markdown
-GET /processes              → process-list
-GET /processes/{id}         → process-describe
-POST /processes             → process-deploy
-DELETE /processes/{id}      → process-undeploy
-POST /processes/{id}/execution → job-execute
-GET /jobs/{id}              → job-status
-GET /jobs/{id}/results      → job-results
-GET /jobs/{id}/logs         → job-logs
-etc.
-```
+| Endpoint                         | Skill              |
+| -------------------------------- | ------------------ |
+| `GET /processes`                 | `process-list`     |
+| `GET /processes/{id}`            | `process-describe` |
+| `POST /processes`                | `process-deploy`   |
+| `DELETE /processes/{id}`         | `process-undeploy` |
+| `POST /processes/{id}/execution` | `job-execute`      |
+| `GET /jobs/{id}`                 | `job-status`       |
+| `GET /jobs/{id}/results`         | `job-results`      |
+| `GET /jobs/{id}/logs`            | `job-logs`         |
 
 #### 3. Update affected skills
 
 For each affected skill:
 
-```bash
-# a. Update API Request section
-# - Verify endpoint path
-# - Check request parameters
-# - Update request body examples
-
-# b. Update Returns section
-# - Check response schema changes
-# - Update example responses
-# - Note new fields
-
-# c. Test endpoint
-curl -X GET "${WEAVER_URL}/endpoint" | jq
-```
+1. Update API Request section
+   - Verify endpoint path
+   - Check request parameters
+   - Update request body examples
+2. Update Returns section
+   - Check response schema changes
+   - Update example responses
+   - Note new fields
+3. Test the endpoint:
+   ```bash
+   curl -X GET "${WEAVER_URL}/endpoint" | jq
+   ```
 
 ### Procedure 4: Documentation Link Changes
 
@@ -279,15 +267,18 @@ git diff origin/master docs/source/*.rst | grep -E "^\+.*\.\. _"
 
 #### 2. Update documentation links in skills
 
-```bash
-# Find all documentation links
-grep -r "https://pavics-weaver.readthedocs.io" .agents/skills/*/SKILL.md
+Find documentation links with:
 
-# For each skill with doc links:
-# - Verify link still works
-# - Update path if file moved
-# - Keep base URLs without anchors (anchors are auto-generated)
+```bash
+grep -r "https://pavics-weaver.readthedocs.io" .agents/skills/*/SKILL.md
 ```
+
+For each skill with doc links:
+
+- Verify link still works
+- Update path if file moved
+- Keep base URLs without anchors (anchors are auto-generated)
+
 
 #### 3. Verify links
 
@@ -317,14 +308,12 @@ git diff origin/master config/data_sources.yml.example
 
 #### 2. Update weaver-install skill
 
-```bash
-# Update "Configuration" section
-# - New configuration options
-# - Changed defaults
-# - Deprecated options
+Update "Configuration" section
 
-# Update "Key Configuration Options" examples
-```
+- New configuration options
+- Changed defaults
+- Deprecated options
+
 
 ## Systematic Update Workflow
 
@@ -391,9 +380,9 @@ actual update procedures are documented in this SKILL.md file (see "Update Proce
 - Reports documentation changes (affects documentation links)
 - Provides update recommendations based on detected changes
 
-**Note**: This script only *detects* changes.
-To perform the actual updates, follow the procedures documented in the
-sections above (Procedure 1-5 under "Update Procedures").
+> [!NOTE]
+> This script only *detects* changes.
+> To perform the actual updates, follow Procedures 1–5 under "*Update Procedures*" above.
 
 ## Skill Quality Checklist
 
@@ -422,6 +411,7 @@ When updating skills, verify:
 - [ ] **API requests** use curl with `${WEAVER_URL}`
 - [ ] **Examples** are tested and working if deemed necessary
 - [ ] **Markdown** formatting is valid
+- [ ] **Notes and warnings** use GitHub-style alerts such as `> [!NOTE]` and `> [!WARNING]`, not bold labels in prose
 
 ### YAML Frontmatter Format
 
@@ -498,11 +488,11 @@ Minimal updates usually needed:
 
 ### Manual Testing (optional)
 
-> ⚠️ WARNING ️Unless a Weaver instance is running locally, the following tests will fail. Running an instance can be a
-> timely process. Therefore, consider whether this is actually needed and there are no simpler workarounds. If required,
-> ensure you have a test instance available before running these commands using
-> [weaver-install](../weaver-install/SKILL.md)
-> skill instructions.
+> [!WARNING]
+> Unless a Weaver instance is running locally, the following tests will fail. Running an instance can be a
+> timely process. Therefore, consider whether this is actually needed and there are no simpler workarounds.
+> If required, ensure you have a test instance available before running these commands using the
+> [weaver-install](../weaver-install/SKILL.md) skill instructions.
 
 ```bash
 # Test CLI examples
@@ -540,6 +530,9 @@ fix them and rerun the same checks until all are clean.
 - **YAML frontmatter**: Ensures all skills have valid YAML frontmatter between `---` markers
 - **Cross-references**: Checks that all relative links to other skills (`../skill-name/SKILL.md`)
   point to existing skill directories and their corresponding `SKILL.md` file.
+
+Successful output lists the validated skill files, confirms that cross-references were checked,
+and reports that all validations passed.
 
 **Example output**:
 
@@ -603,12 +596,8 @@ git diff origin/master weaver/wps_restapi/
 
 # Validate skills (automated detection)
 .agents/skills/weaver-skills-update/scripts/detect-skill-updates.sh "1 week ago"
-
-# Update and test
-# 1. Update affected skills
-# 2. Test examples
-# 3. Verify links
-# 4. Commit changes
 ```
+
+Update affected skills, test examples, verify links, and commit the changes.
 
 Keep skills synchronized with code to maintain their value for users and AI agents!
