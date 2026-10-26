@@ -129,7 +129,7 @@ help:	## print this help message (default)
 	@grep -E '\#\#.*$$' "$(APP_ROOT)/$(MAKEFILE_NAME)" \
 		| awk ' BEGIN {FS = "(:|\-\-\-)+.*?\#\# "}; \
 			/\--/ {printf "$(_SECTION)%s$(_NORMAL)\n", $$1;} \
-			/:/   {printf "    $(_TARGET)%-24s$(_NORMAL) %s\n", $$1, $$2} \
+			/:/   {printf "    $(_TARGET)%-32s$(_NORMAL) %s\n", $$1, $$2} \
 		'
 
 .PHONY: targets
