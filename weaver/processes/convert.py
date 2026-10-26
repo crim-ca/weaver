@@ -2015,9 +2015,8 @@ def convert_input_values_schema(inputs, schema):
                         input_item = {"id": input_id, "value": input_data}
                     input_list.append(input_item)
             elif isinstance(input_value, dict):
-                input_key = list(input_value)[0]
-                input_value = input_value[input_key]
-                input_list.append({"id": input_id, input_key: input_value})
+                # preserve all fields (e.g.: 'format', 'type', 'schema' along 'href' or 'value')
+                input_list.append({"id": input_id, **input_value})
             else:
                 input_list.append({"id": input_id, "value": input_value})
         return input_list
@@ -3421,7 +3420,10 @@ def wps2json_io(io_wps, forced_fields=False):
     replace_func = {
         "maxOccurs": str,
         "minOccurs": str,
-        "metadata": lambda metadata: [metadata2json(meta) for meta in metadata]
+        # 'force=True' since pywps's own 'io_wps.json' representation already converted 'metadata' entries
+        # to plain dicts (losing any 'rel' attribute set dynamically on the original 'Metadata' object),
+        # and 'rel' must be resolved (fallback from 'title'/'role') even for plain dict entries in this case
+        "metadata": lambda metadata: [metadata2json(meta, force=True) for meta in metadata]
     }
     remove = [
         "data"  # string encoded value can cause confusion with default
@@ -3784,13 +3786,20 @@ def merge_io_fields(wps_io, cwl_io):
             ):
                 cwl_field = cwl_field[0] if isinstance(cwl_field, (list, tuple)) else cwl_field
                 wps_field = get_field(wps_io, "metadata", default=[])
-                if not any(meta.href == cwl_field.schema for meta in wps_field):
-                    wps_field.append(WPS_Metadata(
+                # skip if no actual schema reference available, otherwise an invalid empty 'href' metadata
+                # entry would be generated and fail later schema validation (silently dropping the I/O)
+                if cwl_field.schema and not any(meta.href == cwl_field.schema for meta in wps_field):
+                    schema_meta = WPS_Metadata(
                         title="Schema",
                         href=cwl_field.schema,
                         role=SchemaRole.JSON_SCHEMA,
                         type_=cwl_field.mime_type
-                    ))
+                    )
+                    # 'rel' is not supported by the 'pywps' 'Metadata' constructor, but is required by the
+                    # corresponding JSON schema representation, so set it explicitly as an extra attribute
+                    # (consistent with 'rel' resolution performed by 'metadata2json' for similar 'dict' entries)
+                    set_field(schema_meta, "rel", "schema")
+                    wps_field.append(schema_meta)
                     set_field(wps_io, "metadata", wps_field)
                 continue
             if field_type == "supported_formats" and cwl_field is not null:
