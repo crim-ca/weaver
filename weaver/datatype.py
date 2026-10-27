@@ -1562,6 +1562,7 @@ class Job(Base, LoggerHandler):
         _prov_path_mapping = {
             (None, None): prov_path,  # the directory itself with all metadata
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSON): f"{prov_meta_path}/primary.cwlprov.json",
+            (ProvenancePathType.PROV, ProvenanceFormat.PROV_OGC_JSON): f"{prov_meta_path}/primary.cwlprov.json",
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSONLD): f"{prov_meta_path}/primary.cwlprov.jsonld",
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_TURTLE): f"{prov_meta_path}/primary.cwlprov.ttl",
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_XML): f"{prov_meta_path}/primary.cwlprov.xml",
@@ -1584,13 +1585,7 @@ class Job(Base, LoggerHandler):
         """
         Read or retrieve data from the packaged :term:`Provenance` directory contents associated to the :term:`Job`.
         """
-        # For the alternative OGC PROV representation, load the JSON
-        # that cwlprov gives us, we will convert it below
-        if prov_format == ContentType.APP_PROV_OGC_JSON:
-            prov_path = self.prov_path(container=container, extra_path=extra_path,
-                                       prov_format=ProvenanceFormat.PROV_JSON)
-        else:
-            prov_path = self.prov_path(container=container, extra_path=extra_path, prov_format=prov_format)
+        prov_path = self.prov_path(container=container, extra_path=extra_path, prov_format=prov_format)
         if prov_path and os.path.isfile(prov_path):
             with open(prov_path, mode="r", encoding="utf-8") as prov_f:
                 data = prov_f.read()
