@@ -49,6 +49,7 @@ All located in `weaver/wps_restapi/examples/`, loaded automatically at import ti
 | ------------------- | ------------------------------------ | ------------- |
 | `job_prov.json`     | Main PROV document                   | `PROV-JSON`   |
 | `job_prov.jsonld`   | Main PROV document                   | `PROV-JSONLD` |
+| `job_prov_ogc.json` | Main PROV document                   | `PROV-OGC-JSON` |
 | `job_prov.xml`      | Main PROV document                   | `PROV-XML`    |
 | `job_prov.ttl`      | Main PROV document                   | `PROV-TURTLE` |
 | `job_prov.nt`       | Main PROV document                   | `PROV-NT`     |

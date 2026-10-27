@@ -3245,6 +3245,10 @@ Following is a table of available formats and corresponding endpoints offered by
       - ``application/json``
       - :term:`Provenance` metadata using :term:`JSON` representation.
     * - ``/jobs/{jobID}/prov``
+      - |PROV-OGC-JSON|_
+      - ``application/ogcprov+json``
+      - :term:`Provenance` metadata using OGC Provenance Chain :term:`JSON` representation.
+    * - ``/jobs/{jobID}/prov``
       - |PROV-JSONLD|_
       - ``application/ld+json``
       - :term:`Provenance` metadata using |JSON-LD|_ representation.

@@ -441,18 +441,23 @@ class WeaverResearchObject(ResearchObject):
         return weaver_fqdn, weaver_url
 
 
-# Map PROV relations to the names used in OGC Provenance Chain JSON
-# (which are taken from the PROV-O ontology).  Forward and inverse
-# relations are provided to allow rooted graphs to be built in the
-# "object" form of OGC Provenance.  Some inverse relations are not
-# officially part of PROV-O but "recommended" for specific
-# implementation cases such as this one. These are defined in
-# https://www.w3.org/ns/prov-o-inverses and were extracted with:
-#
-# SELECT ?rel ?inv WHERE { ?inv owl:inverseOf ?rel }
-#
-# Obviously, subj_role and obj_role are reversed for the inverses.
 class RelationHandler(NamedTuple):
+    """
+    Mapping of PROV relations to OGC Provenance Chain JSON properties.
+
+    Forward and inverse relations are provided to allow rooted graphs
+    to be built in the "object" form of OGC Provenance.  Some inverse
+    relations are not officially part of PROV-O but "recommended" for
+    specific implementation cases such as this one. These are defined
+    in https://www.w3.org/ns/prov-o-inverses and were extracted with
+    the following SPARQL query:
+
+        SELECT ?rel ?inv WHERE { ?inv owl:inverseOf ?rel }
+
+    The `subject_role` and `object_role` are reversed for the inverse
+    relations.
+
+    """
     forward: str
     inverse: str
     subject_role: str
@@ -549,8 +554,7 @@ def _ogc_prov_nested(objects_by_uri, root_obj, expanded):
 
 def convert_to_prov_chain(input_data, root_uri=None):
     # type: (str, str | None) -> str
-    """
-    Convert a PROV-JSON document (as text) to OGC Provenance Chain JSON.
+    """Convert a PROV-JSON document (as text) to OGC Provenance Chain JSON.
 
     Since OGC Provenance Chain has no notion of bundles, this operates
     on the flattened PROV document.  Only objects and relations
@@ -577,9 +581,13 @@ def convert_to_prov_chain(input_data, root_uri=None):
     - value
 
     :param root_uri: If not ``None``, return object provenance rooted
-    at the object with the given URI.  Otherwise, return array-form
-    provenance for all objects.
+        at the object with the given URI.  Otherwise, return
+        array-form provenance for all objects.
+    :return: OGC Provenance Chain in array or object form, according
+        to the value of `root_uri`.
 
+    .. seealso::
+        - `OGC Provenance Chain Schemas <https://ogcincubator.github.io/bblock-prov-schema/>_`
     """
     document = ProvDocument.deserialize(content=input_data, format="json")
     objects_by_uri = _ogc_prov_objects(document)
@@ -629,11 +637,12 @@ def convert_to_prov_chain(input_data, root_uri=None):
             continue
         _resolve_relation(obj_prov, handler.inverse, subj.uri)
 
-    if root_obj:
+    if root_obj is not None:
         # Object form: Traverse graph depth-first in document order
-        # replacing objects with their referents.
+        # replacing the first instance of an URI reference within this
+        # document with the object it references.
         expanded = set()
-        assert root_uri is not None  # we checked it above
+        assert root_uri is not None  # hello mypy, we checked it above
         expanded.add(root_uri)
         return json.dumps(_ogc_prov_nested(objects_by_uri, root_obj, expanded))
     else:
