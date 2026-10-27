@@ -507,14 +507,14 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 CHECKS_EXCLUDE ?=
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS_PY ?= pep8 imports fstring lint docstring security security-code security-deps dist-doc doc8 docf links
+CHECKS_PY ?= pep8 imports fstring lint docstring security security-code dist-doc doc8 docf links
 CHECKS_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_PY))
 CHECKS_PY := $(addprefix check-, $(CHECKS_PY))
 CHECKS_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_PY))
 
 # items that should not install python dev packages should be added here instead
 # they must provide their own target/only + with dependency install variants
-CHECKS_NO_PY ?= css md security-secrets
+CHECKS_NO_PY ?= css md security-deps security-secrets
 CHECKS_NO_PY := $(addprefix check-, $(CHECKS_NO_PY))
 CHECKS_NO_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_NO_PY))
 CHECKS_NO_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_NO_PY))
@@ -600,15 +600,22 @@ check-security-secrets-only:  ## run secret scan with an installed Betterleaks b
 #	42498: celery<5.2.0 bumps kombu>=5.2.1 with security fixes to {redis,sqs}  # mongo is used by default in Weaver
 #	43738: celery<5.2.2 CVE-2021-23727: trusts the messages and metadata stored in backends
 #	45185: pylint<2.13.0: unrelated doc extension (https://github.com/PyCQA/pylint/issues/5322)
+SAFETY_IMAGE ?= ghcr.io/pyupio/safety:latest
 SAFETY_IGNORE := 42194 42498 43738 45185
 SAFETY_IGNORE := $(addprefix "-i ",$(SAFETY_IGNORE))
 
+.PHONY: check-security-deps
+check-security-deps: check-security-deps-only  ## run dependency security checks with Docker
+
 .PHONY: check-security-deps-only
-check-security-deps-only: | mkdir-reports  ## run security checks on package dependencies
+check-security-deps-only: | mkdir-reports  ## run security checks on package dependencies with Docker
 	@echo "Running security checks of dependencies..."
 	@-rm -fr "$(REPORTS_DIR)/check-security-deps.txt"
-	@bash -c '$(CONDA_CMD) \
-		safety check \
+	@bash -c '\
+		docker run --rm \
+			-v "$(APP_ROOT):$(APP_ROOT):ro" \
+			-w "$(APP_ROOT)" \
+			"$(SAFETY_IMAGE)" check \
 			--full-report \
 			-r "$(APP_ROOT)/requirements.txt" \
 			-r "$(APP_ROOT)/requirements-dev.txt" \

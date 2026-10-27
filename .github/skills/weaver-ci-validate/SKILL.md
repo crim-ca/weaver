@@ -5,7 +5,7 @@ description: |
   Prefer `make check*`, `make fix*` and `make test*` commands over direct tool calls to stay
   aligned with project CI behavior and environment setup.
 license: Apache-2.0
-compatibility: Requires Make, Python environment dependencies, and Weaver repository access.
+compatibility: Requires Make, Python environment dependencies, Docker for dependency scans, and Weaver repository access.
 metadata:
   category: setup-operations
   version: "1.0.0"
@@ -65,6 +65,11 @@ make check-md-only
 ```
 
 `make check-only` runs all enabled check families through their `-only` variants.
+
+`make check-security-deps` and `make check-security-deps-only` require Docker, not a local Safety installation.
+They run `ghcr.io/pyupio/safety:latest` with the repository mounted read-only and preserve the dependency scan report
+in `reports/check-security-deps.txt`. Override `SAFETY_IMAGE` to select another image tag or digest.
+CI runs this check through the existing `check-only` job.
 
 Fix target counterparts for check targets that support automatic remediation:
 
