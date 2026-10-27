@@ -30,6 +30,8 @@ Changes:
   Inputs submitted with them are accepted by any `Process` that defines the official media-types, without explicitly
   listing them in its description. The legacy types are never selected when resolving media-types
   (e.g.: from file extensions).
+- Add keyless ``allratestoday`` option for ``weaver.quotation_currency_converter``, using the daily `ECB` reference
+  rates through an ``exchangeratesapi`` compatible ``convert`` response.
 
 Fixes:
 ------
@@ -62,6 +64,10 @@ Fixes:
   blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
   section, causing a ``ReferenceError`` when clicking them.
 - Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
+- Fix quote currency conversion failing with ``KeyError`` for every converter whose `URL` uses an ``{amount}``
+  template parameter (``currencylayer``, ``exchangeratesapi``, ``fixer``, ``scrapper``).
+- Fix ``fixer`` currency converter registered under the ``openexchangerates`` name, which made ``fixer`` unavailable
+  and replaced the actual ``openexchangerates`` converter.
 - Fix `BoundingBox` `I/O` description entries (`input`/`output`) being silently dropped entirely from `Process`
   ``GET`` describe responses whenever a mismatched `CWL`/`WPS` ``format``/``schema`` auto-generated an invalid
   ``metadata`` "Schema" link reference (empty ``href``, or missing required ``rel``), causing the corresponding
