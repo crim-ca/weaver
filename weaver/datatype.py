@@ -1620,12 +1620,7 @@ class Job(Base, LoggerHandler):
             data = OutputFormat.convert(data, to=OutputFormat.YAML)
         elif fmt == ContentType.APP_PROV_OGC_JSON:
             # Convert JSON from cwlprov to OGC PROV alternative representation
-            try:
-                data = convert_to_prov_chain(data, f"urn:uuid:{self.id}")
-            except ValueError:
-                LOGGER.error("Job activity urn:uuid:%s not found in provenance",
-                             self.id)
-                return None, None
+            data = convert_to_prov_chain(data, f"urn:uuid:{self.id}")
         # normalize media-type
         if fmt == ContentType.APP_JSON:
             fmt = ContentType.APP_PROV_JSON
