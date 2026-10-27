@@ -9,7 +9,7 @@ astroid
 # - https://github.com/pyupio/safety/issues/853
 # - https://github.com/authlib/authlib/pull/909
 # - https://github.com/pydantic/httpx2/issues/1162
-authlib<1.8.0
+authlib<1.10.0
 autopep8
 # pin bandit to avoid issues in early 1.8.x versions
 # - https://github.com/PyCQA/bandit/issues/1226
