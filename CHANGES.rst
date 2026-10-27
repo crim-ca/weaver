@@ -37,6 +37,10 @@ Fixes:
 - Fix `Job` results returned by-value for binary contents (e.g.: zipped `Zarr`) being decoded as `UTF-8` text, which
   failed for non-text bytes. Raw bytes are now returned as is for single result responses, and as ``base64`` encoded
   ``value`` (with ``encoding`` metadata) when embedded in the `JSON` results document.
+- Run ``safety`` dependency checks using its ``ghcr.io/pyupio/safety`` Docker image in the Makefile and CI.
+  Move vulnerability exclusions and their reasons into ``.safety-policy.yml``.
+  Remove the Python development dependency and its ``authlib``/``marshmallow`` compatibility pins
+  (relates to `pyupio/safety#822 <https://github.com/pyupio/safety/issues/822>`_).
 - Add `OGC API - Processes - Part 5: Provenance and Profiles` new ``metadata-profiles`` conformance class references
   which provides the semantics of ``metadata`` with ``role``, ``href`` and a profiled-term ``rel`` to annotate the
   `Process` itself or at granular I/O definitions, and aligns with ``dataClasses`` URIs along the I/O ``schema``
@@ -55,6 +59,8 @@ Fixes:
   Inputs submitted with them are accepted by any `Process` that defines the official media-types, without explicitly
   listing them in its description. The legacy types are never selected when resolving media-types
   (e.g.: from file extensions).
+- Add keyless ``allratestoday`` option for ``weaver.quotation_currency_converter``, using the daily `ECB` reference
+  rates through an ``exchangeratesapi`` compatible ``convert`` response.
 - Fix ``PATCH`` requests silently dropping per-``id`` ``inputs``/``outputs`` ``metadata``
   (e.g., to add ``role``/``profile`` links) submitted for update, by declaring ``keywords``/``metadata``
   fields on ``InputOutputDescriptionMeta`` schema-node definition.
@@ -84,6 +90,10 @@ Fixes:
   blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
   section, causing a ``ReferenceError`` when clicking them.
 - Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
+- Fix quote currency conversion failing with ``KeyError`` for every converter whose `URL` uses an ``{amount}``
+  template parameter (``currencylayer``, ``exchangeratesapi``, ``fixer``, ``scrapper``).
+- Fix ``fixer`` currency converter registered under the ``openexchangerates`` name, which made ``fixer`` unavailable
+  and replaced the actual ``openexchangerates`` converter.
 - Fix `BoundingBox` `I/O` description entries (`input`/`output`) being silently dropped entirely from `Process`
   ``GET`` describe responses whenever a mismatched `CWL`/`WPS` ``format``/``schema`` auto-generated an invalid
   ``metadata`` "Schema" link reference (empty ``href``, or missing required ``rel``), causing the corresponding

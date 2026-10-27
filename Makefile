@@ -129,7 +129,7 @@ help:	## print this help message (default)
 	@grep -E '\#\#.*$$' "$(APP_ROOT)/$(MAKEFILE_NAME)" \
 		| awk ' BEGIN {FS = "(:|\-\-\-)+.*?\#\# "}; \
 			/\--/ {printf "$(_SECTION)%s$(_NORMAL)\n", $$1;} \
-			/:/   {printf "    $(_TARGET)%-24s$(_NORMAL) %s\n", $$1, $$2} \
+			/:/   {printf "    $(_TARGET)%-32s$(_NORMAL) %s\n", $$1, $$2} \
 		'
 
 .PHONY: targets
@@ -221,13 +221,14 @@ conda-env-export:		## export the conda environment
 ## -- Build targets ------------------------------------------------------------------------------------------------- ##
 
 .PHONY: install
-install: install-all    ## alias for 'install-all' target
+install: install-run    ## alias for 'install-run' target
 
 .PHONY: install-run
-install-run: install-sys install-pkg install-raw install-dev ## install requirements and application to run locally
+install-run: install-sys install-pkg install-raw ## install requirements and application to run locally (no dev)
 
+override _INSTALL_ALL := install-sys install-pkg install-pip install-dev install-dev-npm install-betterleaks
 .PHONY: install-all
-install-all: install-sys install-pkg install-pip install-dev ## install application with all dependencies
+install-all: $(_INSTALL_ALL) ## install application dependencies and all dev utilities
 
 .PHONY: install-doc
 install-doc: install-pip	## install documentation dependencies
@@ -236,7 +237,7 @@ install-doc: install-pip	## install documentation dependencies
 	@echo "Install with pip complete. Run documentation generation with 'make docs' target."
 
 .PHONY: install-dev
-install-dev: install-pip install-transform 	## install development and test dependencies
+install-dev: install-pip install-transform 	## install development and test dependencies (Python only)
 	@echo "Installing development packages with pip..."
 	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-dev.txt"'
 	@echo "Install with pip complete. Test service with 'make test*' variations."
@@ -260,7 +261,7 @@ install-pip:	## install application as a package to allow import from another py
 	@echo "Install with pip complete."
 
 .PHONY: install-raw
-install-raw:	## install without any requirements or dependencies (suppose everything is setup)
+install-raw:	## install without any requirements or dependencies (editable source)
 	@echo "Installing package without dependencies..."
 	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -e "$(APP_ROOT)" --no-deps'
 	@echo "Install package complete."
@@ -506,14 +507,14 @@ coverage: test-coverage  ## alias to run test with coverage analysis
 CHECKS_EXCLUDE ?=
 
 # autogen check variants with pre-install of dependencies using the '-only' target references
-CHECKS_PY ?= pep8 imports fstring lint docstring security security-code security-deps dist-doc doc8 docf links
+CHECKS_PY ?= pep8 imports fstring lint docstring security security-code dist-doc doc8 docf links
 CHECKS_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_PY))
 CHECKS_PY := $(addprefix check-, $(CHECKS_PY))
 CHECKS_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_PY))
 
 # items that should not install python dev packages should be added here instead
 # they must provide their own target/only + with dependency install variants
-CHECKS_NO_PY ?= css md
+CHECKS_NO_PY ?= css md security-deps security-secrets
 CHECKS_NO_PY := $(addprefix check-, $(CHECKS_NO_PY))
 CHECKS_NO_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_NO_PY))
 CHECKS_NO_PY := $(filter-out $(CHECKS_EXCLUDE), $(CHECKS_NO_PY))
@@ -562,27 +563,60 @@ check-lint-only: | mkdir-reports  	## check linting of code style
 .PHONY: check-security-only
 check-security-only: check-security-code-only check-security-deps-only  ## run security checks
 
-# FIXME: safety ignore file (https://github.com/pyupio/safety/issues/351)
-# ignored codes:
-#	42194: https://github.com/kvesteri/sqlalchemy-utils/issues/166  # not fixed since 2015
-#	42498: celery<5.2.0 bumps kombu>=5.2.1 with security fixes to {redis,sqs}  # mongo is used by default in Weaver
-#	43738: celery<5.2.2 CVE-2021-23727: trusts the messages and metadata stored in backends
-#	45185: pylint<2.13.0: unrelated doc extension (https://github.com/PyCQA/pylint/issues/5322)
-SAFETY_IGNORE := 42194 42498 43738 45185
-SAFETY_IGNORE := $(addprefix "-i ",$(SAFETY_IGNORE))
+# Betterleaks release used by the repository secret scan.
+BETTERLEAKS_VERSION ?= 1.9.0
+BETTERLEAKS_SHA256 ?= f8b185a39ffcece2a1ca82bf3a4e7435cd81963ffd16b7a9128daf75f35f6de7
+BETTERLEAKS_CONFIG ?= $(APP_ROOT)/.github/.gitleaks.toml
+BETTERLEAKS_SOURCE ?= https://github.com/betterleaks/betterleaks/releases/download/v$(BETTERLEAKS_VERSION)/betterleaks_$(BETTERLEAKS_VERSION)_linux_x64.tar.gz
+BETTERLEAKS_CMD ?= $(DOWNLOAD_CACHE)/betterleaks-$(BETTERLEAKS_VERSION)/betterleaks
+
+.PHONY: check-security-secrets
+.NOTPARALLEL: check-security-secrets
+check-security-secrets: install-betterleaks check-security-secrets-only  ## install Betterleaks and scan repository history for secrets
+
+.PHONY: install-betterleaks
+install-betterleaks: $(BETTERLEAKS_CMD)  ## install Betterleaks for repository secret scanning
+
+$(BETTERLEAKS_CMD):
+	@set -eu; \
+		tmpdir="$$(mktemp -d)"; \
+		trap 'rm -rf "$$tmpdir"' EXIT; \
+		curl --fail --location --silent --show-error --output "$$tmpdir/betterleaks.tar.gz" "$(BETTERLEAKS_SOURCE)"; \
+		echo "$(BETTERLEAKS_SHA256)  $$tmpdir/betterleaks.tar.gz" | sha256sum --check; \
+		tar -xzf "$$tmpdir/betterleaks.tar.gz" -C "$$tmpdir" betterleaks; \
+		mkdir -p "$(dir $(BETTERLEAKS_CMD))"; \
+		install -m 0755 "$$tmpdir/betterleaks" "$(BETTERLEAKS_CMD)"
+
+.PHONY: check-security-secrets-only
+check-security-secrets-only:  ## run secret scan with an installed Betterleaks binary
+	@"$(BETTERLEAKS_CMD)" --config "$(BETTERLEAKS_CONFIG)" \
+		--gitleaks-ignore-path /dev/null \
+		--verbose --redact \
+		git "$(APP_ROOT)" --platform github --exit-code 2
+
+SAFETY_IMAGE ?= ghcr.io/pyupio/safety:latest
+# CLI ignores override the policy's vulnerability exclusions.
+SAFETY_IGNORE ?=
+
+.PHONY: check-security-deps
+check-security-deps: check-security-deps-only  ## run dependency security checks with Docker
 
 .PHONY: check-security-deps-only
-check-security-deps-only: | mkdir-reports  ## run security checks on package dependencies
+check-security-deps-only: | mkdir-reports  ## run security checks on package dependencies with Docker
 	@echo "Running security checks of dependencies..."
 	@-rm -fr "$(REPORTS_DIR)/check-security-deps.txt"
-	@bash -c '$(CONDA_CMD) \
-		safety check \
+	@bash -c '\
+		docker run --rm \
+			-v "$(APP_ROOT):$(APP_ROOT):ro" \
+			-w "$(APP_ROOT)" \
+			"$(SAFETY_IMAGE)" check \
 			--full-report \
+			--policy-file "$(APP_ROOT)/.safety-policy.yml" \
 			-r "$(APP_ROOT)/requirements.txt" \
 			-r "$(APP_ROOT)/requirements-dev.txt" \
 			-r "$(APP_ROOT)/requirements-doc.txt" \
 			-r "$(APP_ROOT)/requirements-sys.txt" \
-			$(SAFETY_IGNORE) \
+			$(foreach id,$(SAFETY_IGNORE),-i $(id)) \
 		1> >(tee "$(REPORTS_DIR)/check-security-deps.txt")'
 
 # FIXME: bandit excludes not working (https://github.com/PyCQA/bandit/issues/657), clean-src beforehand to avoid error

@@ -7,18 +7,23 @@
 
 name: Pull Request Labeler
 on:
-  pull_request:
+  # WARNING:
+  #   'pull_request_target' is used so that PRs from forks get a token with write permissions.
+  #   It is safe only because no PR code is checked out or executed.
+  #   Do not add 'actions/checkout' to these jobs.
+  #   Modified files are obtained by 'pulls.listFile' metadata for labeler config comparison.
+  pull_request_target:
     types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write  # required to set resolved labels on the PR
 
 # cancel the current workflow if another commit was pushed on the same PR or reference
 # uses the GitHub workflow name to avoid collision with other workflows running on the same PR/reference
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
-permissions:
-  contents: read
-  pull-requests: write
 
 jobs:
   labeler:
@@ -35,7 +40,7 @@ jobs:
 
   wip:
     # Skip for Dependabot - automated PRs are never marked as WIP, and we don't want re-trigger on other events
-    if: ${{ github.actor != 'dependabot[bot]' && github.event_name == 'pull_request' }}
+    if: ${{ github.actor != 'dependabot[bot]' && github.event_name == 'pull_request_target' }}
     runs-on: ubuntu-latest
     # reference: https://github.com/wip/action
     # mark PRs with following keywords in the title: wip, work in progress, :construction:

@@ -4,12 +4,6 @@
 # pylint>=2.5 requires astroid>=2.4
 # install/update sometime fails randomly, so enforce it
 astroid
-# pin authlib to patch broken safety dependency chain
-# - https://github.com/pyupio/safety/issues/822
-# - https://github.com/pyupio/safety/issues/853
-# - https://github.com/authlib/authlib/pull/909
-# - https://github.com/pydantic/httpx2/issues/1162
-authlib<1.8.0
 autopep8
 # pin bandit to avoid issues in early 1.8.x versions
 # - https://github.com/PyCQA/bandit/issues/1226
@@ -28,8 +22,6 @@ docformatter>=1.7.7,!=1.7.8
 flake8>=7.4.1
 flynt
 isort>=9.0.2
-# FIXME: pin 'marshmallow' dependency of 'safery' to fix compatibility (https://github.com/pyupio/safety/issues/711)
-marshmallow<4
 mdformat
 mdformat-frontmatter
 mdformat-gfm
@@ -37,7 +29,7 @@ mdformat-tables
 mock<6
 # AWS mock tests (against boto3)
 # (fix werkzeug>=2.2.2 dependency, see https://github.com/spulec/moto/issues/5341)
-moto>=5.2.3
+moto>=5.2.4
 mypy
 parameterized
 path!=16.12.0,!=17.0.0  # patch pytest-shutil (https://github.com/man-group/pytest-plugins/issues/224)
@@ -45,16 +37,15 @@ pluggy>=1.7.0
 pycodestyle>=2.11.0; python_version >= "3.12"
 pytest
 pytest-dependency
-pytest-httpserver>=1.1.5  # support werkzeug>=3
+pytest-httpserver>=1.2.0  # support werkzeug>=3
 pytest-profiling
 pytest-server-fixtures
 #pytest-rerunfailures
 pytest-retry
 pydocstyle
-pylint>=4.1.2,<5
+pylint>=4.1.3,<5
 pylint-per-file-ignores
 responses
-safety
 stopit
 twine
 typing_extensions
