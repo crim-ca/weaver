@@ -594,15 +594,9 @@ check-security-secrets-only:  ## run secret scan with an installed Betterleaks b
 		--verbose --redact \
 		git "$(APP_ROOT)" --platform github --exit-code 2
 
-# FIXME: safety ignore file (https://github.com/pyupio/safety/issues/351)
-# ignored codes:
-#	42194: https://github.com/kvesteri/sqlalchemy-utils/issues/166  # not fixed since 2015
-#	42498: celery<5.2.0 bumps kombu>=5.2.1 with security fixes to {redis,sqs}  # mongo is used by default in Weaver
-#	43738: celery<5.2.2 CVE-2021-23727: trusts the messages and metadata stored in backends
-#	45185: pylint<2.13.0: unrelated doc extension (https://github.com/PyCQA/pylint/issues/5322)
 SAFETY_IMAGE ?= ghcr.io/pyupio/safety:latest
-SAFETY_IGNORE := 42194 42498 43738 45185
-SAFETY_IGNORE := $(addprefix "-i ",$(SAFETY_IGNORE))
+# CLI ignores override the policy's vulnerability exclusions.
+SAFETY_IGNORE ?=
 
 .PHONY: check-security-deps
 check-security-deps: check-security-deps-only  ## run dependency security checks with Docker
@@ -617,11 +611,12 @@ check-security-deps-only: | mkdir-reports  ## run security checks on package dep
 			-w "$(APP_ROOT)" \
 			"$(SAFETY_IMAGE)" check \
 			--full-report \
+			--policy-file "$(APP_ROOT)/.safety-policy.yml" \
 			-r "$(APP_ROOT)/requirements.txt" \
 			-r "$(APP_ROOT)/requirements-dev.txt" \
 			-r "$(APP_ROOT)/requirements-doc.txt" \
 			-r "$(APP_ROOT)/requirements-sys.txt" \
-			$(SAFETY_IGNORE) \
+			$(foreach id,$(SAFETY_IGNORE),-i $(id)) \
 		1> >(tee "$(REPORTS_DIR)/check-security-deps.txt")'
 
 # FIXME: bandit excludes not working (https://github.com/PyCQA/bandit/issues/657), clean-src beforehand to avoid error

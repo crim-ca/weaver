@@ -69,6 +69,9 @@ make check-md-only
 `make check-security-deps` and `make check-security-deps-only` require Docker, not a local Safety installation.
 They run `ghcr.io/pyupio/safety:latest` with the repository mounted read-only and preserve the dependency scan report
 in `reports/check-security-deps.txt`. Override `SAFETY_IMAGE` to select another image tag or digest.
+Vulnerability exclusions and their reasons are configured in `.safety-policy.yml`.
+For quick tests, use `make check-security-deps-only SAFETY_IGNORE="42194 42498"`.
+CLI ignores replace the policy's vulnerability exclusions rather than extending them.
 CI runs this check through the existing `check-only` job.
 
 Fix target counterparts for check targets that support automatic remediation:

@@ -13,6 +13,7 @@ Changes
 Changes:
 --------
 - Run ``safety`` dependency checks using its ``ghcr.io/pyupio/safety`` Docker image in the Makefile and CI.
+  Move vulnerability exclusions and their reasons into ``.safety-policy.yml``.
   Remove the Python development dependency and its ``authlib``/``marshmallow`` compatibility pins
   (relates to `pyupio/safety#822 <https://github.com/pyupio/safety/issues/822>`_).
 - Add `OGC API - Processes - Part 5: Provenance and Profiles` new ``metadata-profiles`` conformance class references
