@@ -450,7 +450,7 @@ class RelationHandler(NamedTuple):
     relations are not officially part of PROV-O but "recommended" for
     specific implementation cases such as this one. These are defined
     in https://www.w3.org/ns/prov-o-inverses and were extracted with
-    the following SPARQL query:
+    the following SPARQL query::
 
         SELECT ?rel ?inv WHERE { ?inv owl:inverseOf ?rel }
 
@@ -554,7 +554,8 @@ def _ogc_prov_nested(objects_by_uri, root_obj, expanded):
 
 def convert_to_prov_chain(input_data, root_uri=None):
     # type: (str, str | None) -> str
-    """Convert a PROV-JSON document (as text) to OGC Provenance Chain JSON.
+    """
+    Convert a PROV-JSON document (as text) to OGC Provenance Chain JSON.
 
     Since OGC Provenance Chain has no notion of bundles, this operates
     on the flattened PROV document.  Only objects and relations
@@ -587,7 +588,7 @@ def convert_to_prov_chain(input_data, root_uri=None):
         to the value of `root_uri`.
 
     .. seealso::
-        - `OGC Provenance Chain Schemas <https://ogcincubator.github.io/bblock-prov-schema/>_`
+        - `OGC Provenance Chain Schemas <https://ogcincubator.github.io/bblock-prov-schema/>`_
     """
     document = ProvDocument.deserialize(content=input_data, format="json")
     objects_by_uri = _ogc_prov_objects(document)
@@ -642,7 +643,6 @@ def convert_to_prov_chain(input_data, root_uri=None):
         # replacing the first instance of an URI reference within this
         # document with the object it references.
         expanded = set()
-        assert root_uri is not None  # hello mypy, we checked it above
         expanded.add(root_uri)
         return json.dumps(_ogc_prov_nested(objects_by_uri, root_obj, expanded))
     else:
