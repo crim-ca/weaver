@@ -113,7 +113,7 @@ class ProvenanceFormat(Constants):
         ContentType.APP_XML: "https://www.w3.org/TR/prov-xml/",
         ContentType.APP_PROV_XML: "https://www.w3.org/TR/prov-xml/",
         ContentType.APP_NT: "https://www.w3.org/TR/prov-o/",
-        ContentType.APP_PROV_OGC_JSON: "https://docs.ogc.org/DRAFTS/26-038.html",
+        ContentType.APP_PROV_OGC_JSON: "https://ogcincubator.github.io/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json",
     }
 
     @classmethod
