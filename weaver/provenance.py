@@ -4,6 +4,7 @@ Definitions related to :term:`Provenance` features and the :term:`W3C` ``PROV`` 
 import datetime
 import hashlib
 import json
+from logging import getLogger
 from typing import TYPE_CHECKING, NamedTuple, cast
 from urllib.parse import urlparse
 
@@ -31,6 +32,8 @@ if TYPE_CHECKING:
     from weaver.typedefs import URL, AnyKey, AnySettingsContainer
 
     AnyProvenanceFormat = Union[AnyContentType, "ProvenanceFormat"]
+
+LOGGER = getLogger(__name__)
 
 
 class ProvenancePathType(Constants):
@@ -509,7 +512,9 @@ def _prov_value(value):
 def _ogc_prov_objects(document):
     # type: (ProvDocument) -> dict[str, dict[str, Any]]
     objects_by_uri = {}  # type: dict[str, dict[str, Any]]
-    for record in document.get_records():
+    # As noted below, there are no bundles in OGC Provenance Chain.
+    # We also unify the records to avoid having to do it ourselves.
+    for record in document.flattened().unified().get_records():
         record_type = record.get_type().localpart if record.get_type() else None
         if record_type not in _OBJECT_TYPES:  # only objects in the OGC schema
             continue
@@ -517,6 +522,9 @@ def _ogc_prov_objects(document):
             continue
         key = record.identifier.uri
         if key in objects_by_uri:
+            # This should actually never happen due to unification
+            LOGGER.warning("Duplicate %s record %d in unified PROV",
+                           record_type, key)
             continue
         objects_by_uri[key] = {"id": key, "provType": record_type}
         if record.value:
