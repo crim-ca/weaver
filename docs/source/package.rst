@@ -1143,8 +1143,9 @@ considerations specifically apply to :term:`Zarr` stores.
 Explicit Media-Type and Version
     `Weaver` does **NOT** inspect the contents of a directory (e.g.: presence of ``zarr.json``, ``.zgroup``,
     ``.zattrs``, etc.) to automatically detect that it corresponds to a :term:`Zarr` store, nor to infer which
-    :term:`Zarr` specification ``version`` it employs. The :term:`Application Package` developer **MUST** explicitly declare
-    ``application/vnd.zarr`` (with the applicable ``version`` parameter when relevant) under the :term:`WPS`/
+    :term:`Zarr` specification ``version`` it employs. The :term:`Application Package` developer **MUST**
+    explicitly declare ``application/vnd.zarr`` (with the applicable ``version`` parameter when relevant) under
+    the :term:`WPS`/
     :term:`OGC API - Processes` ``formats`` field (or ``format`` for a single-value output) of the corresponding
     input or output description, not the :term:`CWL` ``format`` field, which remains unsupported for ``Directory``
     as mentioned above. See :ref:`cwl-type` for an example of this ``formats`` field applied to a ``Complex``
@@ -1186,9 +1187,9 @@ Directory Naming
 Zarr vs Zarr+Zip
     ``application/zarr+zip`` represents a **single zipped archive** of a :term:`Zarr` store, and must therefore be
     mapped to a :term:`CWL` ``File`` (not ``Directory``), contrary to the directory-based ``application/vnd.zarr``
-    media-types. If an :term:`Application Package` directly produces an already-zipped :term:`Zarr` store, the corresponding
-    :term:`I/O` should be declared as a :term:`CWL` ``File`` with ``application/zarr+zip`` format, exactly as any
-    other file-based output, and `Weaver` will not attempt any additional zip operation in that case.
+    media-types. If an :term:`Application Package` directly produces an already-zipped :term:`Zarr` store, the
+    corresponding :term:`I/O` should be declared as a :term:`CWL` ``File`` with ``application/zarr+zip`` format,
+    exactly as any other file-based output, and `Weaver` will not attempt any additional zip operation in that case.
 
     .. note::
         The ``application/zarr+zip`` media-type **MUST** be declared explicitly in this case. Otherwise, the
@@ -1209,23 +1210,25 @@ Zarr vs Zarr+Zip
 
 Zipped Alternate Representation
     `Weaver` automatically advertises ``application/zarr+zip`` as an alternate representation of a :term:`Zarr`
-    directory :term:`Job` output, without requiring the :term:`Application Package` developer to declare it explicitly. The
-    zipped archive is generated **on-demand**, not ahead of time nor persisted across requests, only when the
-    :term:`Job` result is requested using that representation, either with the ``?f=application/zarr+zip`` query
-    parameter, or an equivalent ``Accept: application/zarr+zip`` header, as described in :ref:`proc_op_result`.
+    directory :term:`Job` output, without requiring the :term:`Application Package` developer to declare it
+    explicitly. The zipped archive is generated **on-demand**, not ahead of time nor persisted across requests,
+    only when the :term:`Job` result is requested using that representation, either with the
+    ``?f=application/zarr+zip`` query parameter, or an equivalent ``Accept: application/zarr+zip`` header, as
+    described in :ref:`proc_op_result`.
     Requesting the result using the native :term:`Zarr` directory media-type (or omitting the requested format)
     instead returns the original directory reference as is, without any transformation.
 
     .. warning::
         The reverse operation (unzipping ``application/zarr+zip`` back into a ``Directory`` representation) is
-        **NOT supported**. If the :term:`Application Package` produces the archive directly (see :ref:`cwl-zarr-vs-zip` above),
-        no directory-based alternate representation will be generated or offered for that output.
+        **NOT supported**. If the :term:`Application Package` produces the archive directly
+        (see :ref:`cwl-zarr-vs-zip` above), no directory-based alternate representation will be generated or
+        offered for that output.
 
     No conversion is performed between distinct :term:`Zarr` ``version`` parameters (e.g.: requesting ``version=2``
     representation of a :term:`Job` output produced using ``version=3``), since the underlying store structure
     differs between versions and cannot be transparently translated by `Weaver`. Only the generic
-    ``application/vnd.zarr`` (without ``version``) or the exact same declared ``version`` (see :ref:`cwl-zarr-media-type`)
-    are considered equivalent to the original type for this purpose.
+    ``application/vnd.zarr`` (without ``version``) or the exact same declared ``version``
+    (see :ref:`cwl-zarr-media-type`) are considered equivalent to the original type for this purpose.
 
 .. _cwl-file-format:
 
