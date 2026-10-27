@@ -576,8 +576,8 @@ def convert_to_prov_chain(input_data, root_uri=None):
     - label
     - value
 
-    :param root_id: If not ``None``, return object provenance rooted
-    at the object with the given ID.  Otherwise, return array-form
+    :param root_uri: If not ``None``, return object provenance rooted
+    at the object with the given URI.  Otherwise, return array-form
     provenance for all objects.
 
     """
