@@ -148,6 +148,36 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert ended_id is not None
 
     @parameterized.expand([
+        ({"f": "ogcprov+json"}, {}),
+        ({"f": "ogcprov%2Bjson"}, {}),
+        ({"f": ProvenanceFormat.PROV_OGC_JSON}, {}),
+        ({}, {"Accept": ContentType.APP_PROV_OGC_JSON}),
+        ({}, {"Accept": f"{ContentType.APP_PROV_OGC_JSON}; charset=utf-8"}),
+        ({}, {"Accept": f"{ContentType.APP_PROV_OGC_JSON}; profile=https://docs.ogc.org/DRAFTS/26-038.html"}),
+    ])
+    def test_job_prov_ogc_json(self, queries, headers):
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        assert resp.content_type == ContentType.APP_PROV_OGC_JSON
+        prov = resp.json
+        # Make sure it is an activity
+        assert isinstance(prov, dict)
+        assert "id" in prov
+        assert prov["id"] == f"urn:uuid:{self.job_id}"
+        assert "provType" in prov
+        assert prov["provType"] == "Activity"
+        # It should be nested
+        assert "wasAssociatedWith" in prov
+        assert (isinstance(prov["wasAssociatedWith"], dict)
+                or isinstance(prov["wasAssociatedWith"], list)
+                and all(isinstance(obj, dict) for obj in prov["wasAssociatedWith"]))
+        # It should contain reverse relations for otherwise unreachable objects
+        assert "generated" in prov
+        assert any(isinstance(obj, dict) for obj in prov["generated"])
+
+    @parameterized.expand([
         ({"f": "ld+json"}, {}),
         ({"f": "ld%2Bjson"}, {}),
         ({"f": "jsonld"}, {}),

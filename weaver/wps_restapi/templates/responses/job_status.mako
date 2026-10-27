@@ -250,6 +250,7 @@
                     prov_variants = [
                         ("n", "text", "PROV-N"),
                         ("nt", "text", "PROV-NT"),
+                        ("ogcprov+json", "json", "PROV-OGC-JSON"),
                         ("json", "json", "PROV-JSON"),
                         ("jsonld", "json", "PROV-JSONLD"),
                         ("yaml", "yaml", "PROV-YAML"),

@@ -1,9 +1,11 @@
 import itertools
+import json
 
 import pytest
 
+from tests import resources
 from weaver.formats import ContentType, OutputFormat
-from weaver.provenance import ProvenanceFormat, ProvenancePathType
+from weaver.provenance import ProvenanceFormat, ProvenancePathType, convert_to_prov_chain
 
 
 @pytest.mark.prov
@@ -58,6 +60,7 @@ def test_provenance_formats():
         ProvenanceFormat.PROV_XML,
         ProvenanceFormat.PROV_XML,
         ProvenanceFormat.PROV_NT,
+        ProvenanceFormat.PROV_OGC_JSON,
     ]
     assert set(result) == set(expect)
 
@@ -76,6 +79,7 @@ def test_provenance_media_types():
         ContentType.APP_XML,
         ContentType.APP_PROV_XML,
         ContentType.APP_NT,
+        ContentType.APP_PROV_OGC_JSON,
     ]
     assert set(result) == set(expect)
 
@@ -88,6 +92,7 @@ def test_provenance_media_types():
         ("prov-json", ProvenanceFormat.PROV_JSON),
         ("PROV-JSON", ProvenanceFormat.PROV_JSON),
         ("PROV-JSONLD", ProvenanceFormat.PROV_JSONLD),
+        ("PROV-OGC-JSON", ProvenanceFormat.PROV_OGC_JSON),
     ]
 )
 def test_provenance_format(provenance, expect):
@@ -102,6 +107,7 @@ def test_provenance_format(provenance, expect):
         (None, None),
         (ProvenanceFormat.PROV_JSON, ContentType.APP_PROV_JSON),
         (ProvenanceFormat.PROV_JSONLD, ContentType.APP_JSONLD),
+        (ProvenanceFormat.PROV_OGC_JSON, ContentType.APP_PROV_OGC_JSON),
         (ProvenanceFormat.PROV_XML, ContentType.APP_PROV_XML),
         (ProvenanceFormat.PROV_NT, ContentType.APP_NT),
         (ProvenanceFormat.PROV_N, ContentType.TEXT_PROVN),
@@ -188,3 +194,39 @@ def test_provenance_format_compatible(prov, prov_format, output_format, expect, 
     result, error = ProvenanceFormat.resolve_compatible_formats(prov, prov_format, output_format)
     assert result == expect
     assert error if is_error else error is None, "When an error is expected, a string detailing it should be returned."
+
+
+def test_convert_to_prov_list():
+    prov_data = resources.load_resource("job_prov.json", text=True)
+    prov_json = convert_to_prov_chain(prov_data)
+    assert prov_json
+    prov = json.loads(prov_json)
+    # It should be a prov chain as a list
+    assert isinstance(prov, list)
+    assert all("id" in obj for obj in prov)
+    assert all("provType" in obj for obj in prov)
+    # It should not be nested
+    assert all(isinstance(obj["wasGeneratedBy"], str)
+               for obj in prov
+               if "wasGeneratedBy" in obj)
+
+
+def test_convert_to_prov_object():
+    prov_data = resources.load_resource("job_prov.json", text=True)
+    # Could get this from the data (it is the workflow run object)
+    root_id = "urn:uuid:74e06198-faf8-404f-b905-c6f02361070d"
+    prov_json = convert_to_prov_chain(prov_data, root_id)
+    assert prov_json
+    prov = json.loads(prov_json)
+    # Make sure it is an activity
+    assert isinstance(prov, dict)
+    assert "id" in prov
+    assert prov["id"] == root_id
+    assert "provType" in prov
+    assert prov["provType"] == "Activity"
+    # It should be nested
+    assert "wasAssociatedWith" in prov
+    assert isinstance(prov["wasAssociatedWith"], dict)
+    # It should contain reverse relations for otherwise unreachable objects
+    assert "generated" in prov
+    assert any(isinstance(obj, dict) for obj in prov["generated"])

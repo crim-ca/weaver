@@ -60,7 +60,7 @@ from weaver.processes.constants import (
 )
 from weaver.processes.convert import get_field, json2oas_io, normalize_ordered_io, null, ows2json, wps2json_io
 from weaver.processes.types import ProcessType
-from weaver.provenance import ProvenanceFormat, ProvenancePathType
+from weaver.provenance import ProvenanceFormat, ProvenancePathType, convert_to_prov_chain
 from weaver.quotation.status import QuoteStatus
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreProcesses
@@ -1562,6 +1562,7 @@ class Job(Base, LoggerHandler):
         _prov_path_mapping = {
             (None, None): prov_path,  # the directory itself with all metadata
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSON): f"{prov_meta_path}/primary.cwlprov.json",
+            (ProvenancePathType.PROV, ProvenanceFormat.PROV_OGC_JSON): f"{prov_meta_path}/primary.cwlprov.json",
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSONLD): f"{prov_meta_path}/primary.cwlprov.jsonld",
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_TURTLE): f"{prov_meta_path}/primary.cwlprov.ttl",
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_XML): f"{prov_meta_path}/primary.cwlprov.xml",
@@ -1617,6 +1618,9 @@ class Job(Base, LoggerHandler):
         if fmt == ContentType.APP_YAML:
             data = json.loads(data)
             data = OutputFormat.convert(data, to=OutputFormat.YAML)
+        elif fmt == ContentType.APP_PROV_OGC_JSON:
+            # Convert JSON from cwlprov to OGC PROV alternative representation
+            data = convert_to_prov_chain(data, f"urn:uuid:{self.id}")
         # normalize media-type
         if fmt == ContentType.APP_JSON:
             fmt = ContentType.APP_PROV_JSON

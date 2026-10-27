@@ -48,6 +48,7 @@ fetch "$REST/prov/who" job_prov_who.txt
 fetch "$REST/prov/info" job_prov_info.txt
 fetch "$REST/prov/run" job_prov_run.txt
 fetch "$REST/prov" job_prov.json jq
+fetch "$REST/prov?f=PROV-OGC-JSON" job_prov_ogc.json jq
 fetch "$REST/prov?f=PROV-JSONLD" job_prov.jsonld jq
 fetch "$REST/prov?f=PROV-TURTLE" job_prov.ttl
 fetch "$REST/prov?f=PROV-XML" job_prov.xml
