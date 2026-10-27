@@ -34,7 +34,7 @@ Install and set up Weaver for development, testing, or production use.
 
 - **Git**: For cloning repository
 - **Conda/Miniconda**: For isolated environment management (recommended)
-- **Docker**: For containerized deployment (portable production/testing)
+- **Docker**: For containerized deployment and Safety dependency security scans
 
 **Note**: If you prefer to install directly in your current Python environment without conda, you can set `CONDA_CMD=""`
 (empty string) before running make commands. This bypasses conda creation/activation/detection and installs using the
@@ -682,9 +682,14 @@ make install-betterleaks # Betterleaks for repository secret scans
 ### Security Check Targets
 
 ```bash
+make check-security-deps          # Scan dependencies using the Safety GHCR image (requires Docker)
+make check-security-deps-only     # Same Docker scan
 make check-security-secrets       # Install Betterleaks, then scan repository history
 make check-security-secrets-only  # Scan using an already-installed Betterleaks binary
 ```
+
+Safety is not installed by `make install-dev`. Dependency scans use `ghcr.io/pyupio/safety:latest`.
+Override `SAFETY_IMAGE` to select another image tag or digest.
 
 ### Environment Targets
 
