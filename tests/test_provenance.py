@@ -200,14 +200,14 @@ def test_convert_to_prov_list():
     prov_data = resources.load_resource("job_prov.json", text=True)
     prov_json = convert_to_prov_chain(prov_data)
     assert prov_json
-    prov_chain = json.loads(prov_json)
+    prov = json.loads(prov_json)
     # It should be a prov chain as a list
-    assert isinstance(prov_chain, list)
-    assert all("id" in obj for obj in prov_chain)
-    assert all("provType" in obj for obj in prov_chain)
+    assert isinstance(prov, list)
+    assert all("id" in obj for obj in prov)
+    assert all("provType" in obj for obj in prov)
     # It should not be nested
     assert all(isinstance(obj["wasGeneratedBy"], str)
-               for obj in prov_chain
+               for obj in prov
                if "wasGeneratedBy" in obj)
 
 
@@ -217,16 +217,16 @@ def test_convert_to_prov_object():
     root_id = "urn:uuid:74e06198-faf8-404f-b905-c6f02361070d"
     prov_json = convert_to_prov_chain(prov_data, root_id)
     assert prov_json
-    prov_chain = json.loads(prov_json)
+    prov = json.loads(prov_json)
     # Make sure it is an activity
-    assert isinstance(prov_chain, dict)
-    assert "id" in prov_chain
-    assert prov_chain["id"] == root_id
-    assert "provType" in prov_chain
-    assert prov_chain["provType"] == "Activity"
+    assert isinstance(prov, dict)
+    assert "id" in prov
+    assert prov["id"] == root_id
+    assert "provType" in prov
+    assert prov["provType"] == "Activity"
     # It should be nested
-    assert "wasAssociatedWith" in prov_chain
-    assert isinstance(prov_chain["wasAssociatedWith"], dict)
+    assert "wasAssociatedWith" in prov
+    assert isinstance(prov["wasAssociatedWith"], dict)
     # It should contain reverse relations for otherwise unreachable objects
-    assert "generated" in prov_chain
-    assert any(isinstance(obj, dict) for obj in prov_chain["generated"])
+    assert "generated" in prov
+    assert any(isinstance(obj, dict) for obj in prov["generated"])
