@@ -1628,7 +1628,8 @@ class Job(Base, LoggerHandler):
             try:
                 data = convert_to_prov_chain(data, f"urn:uuid:{self.id}")
             except ValueError:
-                LOGGER.error(f"Job activity urn:uuid:{self.id} not found in provenance")
+                LOGGER.error("Job activity urn:uuid:%s not found in provenance",
+                             self.id)
                 return None, None
         # normalize media-type
         if fmt == ContentType.APP_JSON:
