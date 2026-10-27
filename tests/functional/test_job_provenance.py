@@ -162,8 +162,20 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.APP_PROV_OGC_JSON
         prov = resp.json
-        assert isinstance(prov, list)
-        assert all("id" in obj for obj in prov)
+        # Make sure it is an activity
+        assert isinstance(prov, dict)
+        assert "id" in prov
+        assert prov["id"] == f"urn:uuid:{self.job_id}"
+        assert "provType" in prov
+        assert prov["provType"] == "Activity"
+        # It should be nested
+        assert "wasAssociatedWith" in prov
+        assert (isinstance(prov["wasAssociatedWith"], dict)
+                or isinstance(prov["wasAssociatedWith"], list)
+                and all(isinstance(obj, dict) for obj in prov["wasAssociatedWith"]))
+        # It should contain reverse relations for otherwise unreachable objects
+        assert "generated" in prov
+        assert any(isinstance(obj, dict) for obj in prov["generated"])
 
     @parameterized.expand([
         ({"f": "ld+json"}, {}),
