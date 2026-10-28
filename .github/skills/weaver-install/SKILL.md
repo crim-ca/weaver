@@ -125,16 +125,12 @@ This aliases `make install-run` and is sufficient for:
 - Starting Weaver server locally
 - Deploying and executing processes
 
-It runs:
-
-- `install-sys` - Installs system dependencies
-- `install-pkg` - Installs application packages
-- `install-raw` - Installs Weaver without dependencies (editable source)
+This installs Weaver and its runtime dependencies.
 
 ##### Full Development Installation
 
 ```bash
-# Install all application and development dependencies
+# Install runtime and all development dependencies
 make install-all
 ```
 
@@ -147,17 +143,17 @@ This installs the complete set of application and development dependencies.
 ```bash
 # Install Python development and test dependencies
 make install-dev
-# Includes install-pip and install-transform
+# Also installs runtime dependencies through install-run
 
 # Install documentation dependencies only
 make install-doc
-# Includes install-pip
+# Also installs runtime dependencies through install-run
 
 # Install npm development dependencies
 make install-dev-npm
 
-# Install Betterleaks for secret scans
-make install-betterleaks
+# Install all Python and npm development dependencies
+make install-dev-all
 
 # Install application as editable package
 make install-pip
@@ -220,12 +216,13 @@ conda activate weaver
 # 2. Install the same runtime components as make install
 make install-sys
 make install-pkg
+make install-transform
 make install-raw
 ```
 
-`make install` runs these three installation targets but does not create or
-activate the conda environment. Use `make install-all` to also install Python
-development, npm development, and Betterleaks tools.
+`make install` installs Weaver and its runtime dependencies, but does not create or
+activate the conda environment. Use `make install-all` to also install all Python and
+npm development dependencies.
 
 ## Configuration
 
@@ -458,10 +455,8 @@ make install-sys
 make install-pkg
 make install-raw
 
-# For development tooling, also run:
-make install-dev
-make install-dev-npm
-make install-betterleaks
+# For all Python and npm development tooling, also run:
+make install-dev-all
 
 # Check for specific error messages and resolve
 ```
@@ -493,7 +488,7 @@ celery -A pyramid_celery.celery_app worker --ini config/weaver.ini
 **Only needed if you're modifying Weaver's code**:
 
 ```bash
-# Install all Python and npm development tools, plus Betterleaks
+# Install runtime and all development dependencies
 make install-all
 
 # Run linting
@@ -667,16 +662,18 @@ vim config/request_options.yml
 
 ```bash
 make install             # Alias for install-run (runtime installation)
-make install-run         # Runtime dependencies and Weaver without dependencies
-make install-all         # Runtime, Python dev, npm dev, and Betterleaks
+make install-run         # Runtime dependencies, transformations, and editable Weaver
+make install-all         # Runtime and all development dependencies
 make install-dev         # Python development/test dependencies
+make install-dev-all     # Python and npm development dependencies
+make install-dev-betterleaks # Betterleaks for repository secret scanning
 make install-dev-npm     # npm, Stylelint, and remark-lint dependencies
 make install-doc         # Documentation dependencies
 make install-pkg         # Application dependencies
 make install-sys         # System dependencies
 make install-pip         # Weaver as an editable package
 make install-raw         # Weaver without dependencies (editable source)
-make install-betterleaks # Betterleaks for repository secret scans
+make install-transform   # Transformation dependencies
 ```
 
 ### Security Check Targets
@@ -684,8 +681,8 @@ make install-betterleaks # Betterleaks for repository secret scans
 ```bash
 make check-security-deps          # Scan dependencies using the Safety GHCR image (requires Docker)
 make check-security-deps-only     # Same Docker scan
-make check-security-secrets       # Install Betterleaks, then scan repository history
-make check-security-secrets-only  # Scan using an already-installed Betterleaks binary
+make check-security-secrets       # Scan repository history for secrets
+make check-security-secrets-only  # Scan using an already-installed secret scanner
 ```
 
 Safety is not installed by `make install-dev`. Dependency scans use `ghcr.io/pyupio/safety:latest`.
