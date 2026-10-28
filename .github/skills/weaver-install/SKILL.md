@@ -661,19 +661,19 @@ vim config/request_options.yml
 ### Installation Targets
 
 ```bash
-make install             # Alias for install-run (runtime installation)
-make install-run         # Runtime dependencies, transformations, and editable Weaver
-make install-all         # Runtime and all development dependencies
-make install-dev         # Python development/test dependencies
-make install-dev-all     # Python and npm development dependencies
-make install-dev-betterleaks # Betterleaks for repository secret scanning
-make install-dev-npm     # npm, Stylelint, and remark-lint dependencies
-make install-doc         # Documentation dependencies
-make install-pkg         # Application dependencies
-make install-sys         # System dependencies
-make install-pip         # Weaver as an editable package
-make install-raw         # Weaver without dependencies (editable source)
-make install-transform   # Transformation dependencies
+make install                         # Alias for install-run (runtime installation)
+make install-run                     # Runtime dependencies, transformations, and editable Weaver
+make install-all                     # Runtime and all development dependencies
+make install-dev                     # Python development/test dependencies
+make install-dev-all                 # Python and npm development dependencies
+make install-dev-betterleaks         # Betterleaks for repository secret scanning
+make install-dev-npm                 # npm, Stylelint, and remark-lint dependencies
+make install-doc                     # Documentation dependencies
+make install-pkg                     # Application dependencies
+make install-sys                     # System dependencies
+make install-pip                     # Weaver as an editable package
+make install-raw                     # Weaver without dependencies (editable source)
+make install-transform               # Transformation dependencies
 ```
 
 ### Security Check Targets
