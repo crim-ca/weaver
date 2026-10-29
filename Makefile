@@ -224,23 +224,38 @@ conda-env-export:		## export the conda environment
 install: install-run    ## alias for 'install-run' target
 
 .PHONY: install-run
-install-run: install-sys install-pkg install-raw ## install requirements and application to run locally (no dev)
+install-run: install-sys install-pkg install-transform install-raw  ## install requirements and application to run locally (no dev)
 
-override _INSTALL_ALL := install-sys install-pkg install-pip install-dev install-dev-npm install-betterleaks
+# NOTE:
+#	Purposely omit 'install-doc' because dev includes it via requirements, it would just add unnecessary extra steps.
+#	This is done such that someone doing 'pip install' directly rather than through make still resolves all dev deps.
+#	On the other hand, 'install-sys' is explicitly done to allow resolving loose dependencies via 'setuptools',
+#	while the additional 'pyramid' constraint of 'setuptools' applies afterwards during 'install' including it.
+override _INSTALL_ALL := install-sys install-run install-dev-all
 .PHONY: install-all
 install-all: $(_INSTALL_ALL) ## install application dependencies and all dev utilities
 
 .PHONY: install-doc
-install-doc: install-pip	## install documentation dependencies
+install-doc: install-run	## install documentation dependencies
 	@echo "Installing development packages with pip..."
 	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-doc.txt"'
 	@echo "Install with pip complete. Run documentation generation with 'make docs' target."
 
 .PHONY: install-dev
-install-dev: install-pip install-transform 	## install development and test dependencies (Python only)
+install-dev: install-run 	## install development and test dependencies (Python only)
 	@echo "Installing development packages with pip..."
 	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-dev.txt"'
 	@echo "Install with pip complete. Test service with 'make test*' variations."
+
+.PHONY: install-dev-all
+install-dev-all: install-dev install-dev-npm install-dev-betterleaks	## install all test/checks development dependencies (Python, Node, etc.)
+
+.PHONY: install-dev-mdformat
+install-dev-mdformat:	## install mdformat dependencies to fix line wrapping
+	@pip install $(cat "$(APP_ROOT)/requirements-dev.txt" | grep mdformat)
+
+.PHONY: install-dev-npm
+install-dev-npm: install-npm install-npm-stylelint install-npm-remarklint	## install all npm development dependencies
 
 .PHONY: install-pkg
 install-pkg: install-pip	## install application package dependencies
@@ -257,7 +272,7 @@ install-sys:	## install system dependencies and required installers/runners
 .PHONY: install-pip
 install-pip:	## install application as a package to allow import from another python package
 	@echo "Installing package with pip..."
-	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) --upgrade -e "$(APP_ROOT)" --no-cache'
+	@-bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) --upgrade -e "$(APP_ROOT)"'
 	@echo "Install with pip complete."
 
 .PHONY: install-raw
@@ -284,14 +299,10 @@ install-npm-remarklint: install-npm		## install remark-lint dependency for 'chec
 	@echo "Install required dependencies for Markdown checks."
 	@npm install --save-dev
 
-.PHONY: install-pip-mdformat
-install-pip-mdformat:	## install mdformat dependencies to fix line wrapping
-	@pip install $(cat "$(APP_ROOT)/requirements-dev.txt" | grep mdformat)
-
 .PHONY: install-transform
 install-transform: install-cairo-dependencies       # install-transform dependencies
 	@echo "Installing transformation dependencies..."
-	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-transform.txt" --no-cache-dir'
+	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-transform.txt"'
 	@echo "Install with pip complete."
 
 .PHONY: install-cairo-dependencies
@@ -300,9 +311,6 @@ install-cairo-dependencies:   ## install required dependencies for Transformer
 		echo "Binary package manager cairo not found. Attempting to install it."; \
 		$(SUDO) apt-get install libpangocairo-1.0-0 \
 	)
-
-.PHONY: install-dev-npm
-install-dev-npm: install-npm install-npm-stylelint install-npm-remarklint	## install all npm development dependencies
 
 ## -- Cleanup targets ----------------------------------------------------------------------------------------------- ##
 
@@ -572,10 +580,10 @@ BETTERLEAKS_CMD ?= $(DOWNLOAD_CACHE)/betterleaks-$(BETTERLEAKS_VERSION)/betterle
 
 .PHONY: check-security-secrets
 .NOTPARALLEL: check-security-secrets
-check-security-secrets: install-betterleaks check-security-secrets-only  ## install Betterleaks and scan repository history for secrets
+check-security-secrets: install-dev-betterleaks check-security-secrets-only  ## install Betterleaks and scan repository history for secrets
 
-.PHONY: install-betterleaks
-install-betterleaks: $(BETTERLEAKS_CMD)  ## install Betterleaks for repository secret scanning
+.PHONY: install-dev-betterleaks
+install-dev-betterleaks: $(BETTERLEAKS_CMD)  ## install Betterleaks for repository secret scanning
 
 $(BETTERLEAKS_CMD):
 	@set -eu; \
@@ -807,7 +815,7 @@ fix-md-only: | mkdir-reports 	## fix Markdown linting problems automatically
 	@npm run format-markdown 2>&1 | tee -a "$(REPORTS_DIR)/fixed-md.txt"
 
 .PHONY: fix-md
-fix-md: install-npm-remarklint install-pip-mdformat fix-md-only	## fix Markdown linting problems after dependency installation
+fix-md: install-npm-remarklint install-dev-mdformat fix-md-only	## fix Markdown linting problems after dependency installation
 
 ## -- Documentation targets ----------------------------------------------------------------------------------------- ##
 
