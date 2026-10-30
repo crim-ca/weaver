@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from cwltool.cwlprov import provenance_constants as cwl_prov_const
 from cwltool.cwlprov.ro import ResearchObject
 from prov import constants as prov_const
+from prov.identifier import Identifier, QualifiedName
 from prov.model import ProvDocument, ProvRelation
 
 from weaver.__meta__ import __version__ as weaver_version
@@ -499,6 +500,8 @@ _PROV_TYPE_FIELD = {
 _PROV_ATTRIBUTES = {
     prov_const.PROV_ATTR_STARTTIME: "startedAtTime",
     prov_const.PROV_ATTR_ENDTIME: "endedAtTime",
+    prov_const.PROV_ATTR_TIME: "atTime",
+    prov_const.PROV_LOCATION: "atLocation",
 }
 
 
@@ -507,6 +510,8 @@ def _prov_value(value):
     """
     Convert a PROV attribute value into a JSON-serializable representation.
     """
+    if isinstance(value, (QualifiedName, Identifier)):
+        return value.uri
     if isinstance(value, datetime.datetime):
         return value.isoformat()
     if isinstance(value, (str, int, float, bool)) or value is None:
@@ -541,7 +546,7 @@ def _ogc_prov_objects(document):
         if record.value:
             prov_obj["value"] = list(record.value)
         if record.label != record.identifier:
-            prov_obj["label"] = record.label
+            prov_obj["name"] = record.label
         prov_types = [str(val) for val in record.get_attribute(prov_const.PROV_TYPE)]
         if prov_types:
             prov_obj["prov:type"] = prov_types[0] if len(prov_types) == 1 else prov_types
@@ -573,8 +578,6 @@ def _ogc_prov_objects(document):
 def _ogc_prov_nested(objects_by_uri, root_obj, expanded):
     # type: (dict[str, dict[str, Any]], dict[str, Any], set[str]) -> dict[str, Any]
     for attr, vals in root_obj.items():
-        if attr not in _RELATION_FIELDS:
-            continue
         if isinstance(vals, str):
             vals = [vals]
         for idx, uri in enumerate(vals):
@@ -608,19 +611,31 @@ def convert_to_prov_chain(input_data, root_uri=None):
     - Derivation
     - Delegation
 
-    Attributes in the PROV-O vocabulary are passed through as
-    primitive values (str, int, float) with the exception of the
-    `prov:startTime` and `prov:endTime` attributes, which are not
-    present in PROV-O and are therefore remapped to `startedAtTime`
-    and `endedAtTime`.  In conformance with the JSON schema and
-    PROV-JSONLD, the primary record type is returned in the `provType`
-    or `activityType` attribute, and `prov:type`, which is always
-    prefixed, is used for additional PROV types (e.g. `Person`,
-    `SoftwareAgent`).
+    When `root_uri` is not ``None``, provenance will be returned for
+    the specified object.  The first instance (in depth-first order)
+    of a referenced object will be nested in the graph, and subsequent
+    references will be included as IRIs.  Both forward and inverse
+    forms (using the recommended names from
+    https://www.w3.org/ns/prov-o-inverses) of PROV relations will be
+    added, in order to provide a complete graph when rooted at a
+    non-Entity.
 
-    Other PROV-O attributes are unprefixed, while attributes from
-    other namespaces (`foaf`, `wfprov`, etc) are returned as QNames
-    (e.g. `wfprov:wasEnactedBy`).
+    In conformance with the JSON schema and PROV-JSONLD, the primary
+    record type is returned in the ``provType`` or ``activityType``
+    attribute, and ``prov:type``, which is always prefixed, is used
+    for additional PROV types (e.g. ``Person``, ``SoftwareAgent``).
+    As with relations, if `root_uri` is not ``None``, attributes whose
+    values are references to objects in the graph will directly
+    include the those objects on the first reference.  The
+    ``prov:label`` property (equivalent to ``rdfs:label``) is returned
+    as ``name`` if it is distinct from the ``id`` property.
+
+    Other attributes in the PROV-O vocabulary are passed through as
+    primitive values (`str`, `int`, `float`).  Certain attributes are
+    remapped due to inconsistencies between PROV-JSONLD and PROV-O.
+    PROV attribute names are unprefixed, while attributes from other
+    namespaces (``foaf``, ``wfprov``, etc) are returned as QNames
+    (e.g. ``wfprov:wasEnactedBy``).
 
     :param root_uri: If not ``None``, return object provenance rooted
         at the object with the given URI.  Otherwise, return
