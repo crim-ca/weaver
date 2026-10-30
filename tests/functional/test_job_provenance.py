@@ -166,8 +166,11 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert isinstance(prov, dict)
         assert "id" in prov
         assert prov["id"] == f"urn:uuid:{self.job_id}"
-        assert "provType" in prov
-        assert prov["provType"] == "Activity"
+        assert "activityType" in prov
+        assert prov["activityType"] == "Activity"
+        # It should use startedAtTime, not startTime
+        assert "startTime" not in prov
+        assert "startedAtTime" in prov
         # It should be nested
         assert "wasAssociatedWith" in prov
         assert (isinstance(prov["wasAssociatedWith"], dict)

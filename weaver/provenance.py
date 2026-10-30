@@ -11,7 +11,6 @@ from urllib.parse import urlparse
 from cwltool.cwlprov import provenance_constants as cwl_prov_const
 from cwltool.cwlprov.ro import ResearchObject
 from prov import constants as prov_const
-from prov.identifier import Identifier, QualifiedName
 from prov.model import ProvDocument, ProvRelation
 
 from weaver.__meta__ import __version__ as weaver_version
@@ -116,7 +115,10 @@ class ProvenanceFormat(Constants):
         ContentType.APP_XML: "https://www.w3.org/TR/prov-xml/",
         ContentType.APP_PROV_XML: "https://www.w3.org/TR/prov-xml/",
         ContentType.APP_NT: "https://www.w3.org/TR/prov-o/",
-        ContentType.APP_PROV_OGC_JSON: "https://ogcincubator.github.io/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json",
+        ContentType.APP_PROV_OGC_JSON: (
+            "https://ogcincubator.github.io/bblock-prov-schema"
+            "/build/annotated/ogc-utils/prov-bundled/schema.json"
+        ),
     }
 
     @classmethod
@@ -484,15 +486,20 @@ _RELATION_HANDLERS = {
 }
 _RELATION_FIELDS = set([*(h.forward for h in _RELATION_HANDLERS.values()),
                         *(h.inverse for h in _RELATION_HANDLERS.values())])
-_OBJECT_TYPES = {
-    "Entity",
-    "Activity",
-    "Agent",
+# Specific field for the primary type (corresponding to @types in
+# PROV-JSONLD).  For some reason provType is only defined for Entity
+# and Activity.
+_PROV_TYPE_FIELD = {
+    "Entity": "provType",
+    "Activity": "activityType",
+    "Agent": "provType",
 }
-_PROV_ATTRS = (("startTime", prov_const.PROV_ATTR_STARTTIME),
-               ("endTime", prov_const.PROV_ATTR_ENDTIME),
-               ("time", prov_const.PROV_ATTR_TIME),
-               ("location", prov_const.PROV_LOCATION))
+# Specific mappings for certain PROV attributes that are mismatched
+# between PROV-JSON and PROV-O
+_PROV_ATTRIBUTES = {
+    prov_const.PROV_ATTR_STARTTIME: "startedAtTime",
+    prov_const.PROV_ATTR_ENDTIME: "endedAtTime",
+}
 
 
 def _prov_value(value):
@@ -500,8 +507,6 @@ def _prov_value(value):
     """
     Convert a PROV attribute value into a JSON-serializable representation.
     """
-    if isinstance(value, (QualifiedName, Identifier)):
-        return value.uri
     if isinstance(value, datetime.datetime):
         return value.isoformat()
     if isinstance(value, (str, int, float, bool)) or value is None:
@@ -512,11 +517,17 @@ def _prov_value(value):
 def _ogc_prov_objects(document):
     # type: (ProvDocument) -> dict[str, dict[str, Any]]
     objects_by_uri = {}  # type: dict[str, dict[str, Any]]
-    # As noted below, there are no bundles in OGC Provenance Chain.
-    # We also unify the records to avoid having to do it ourselves.
+
+    # The JSON schema for OGC Provenance Chain defines "Bundle" as an
+    # entity type, but doesn't define any schema for bundles, so we
+    # will use the flattened form here.  We also unify the records,
+    # similarly to other graph representations.
     for record in document.flattened().unified().get_records():
         record_type = record.get_type().localpart if record.get_type() else None
-        if record_type not in _OBJECT_TYPES:  # only objects in the OGC schema
+        if record_type is None:
+            continue
+        prov_type_field = _PROV_TYPE_FIELD.get(record_type)
+        if prov_type_field is None:  # only objects in the OGC schema
             continue
         if record.identifier is None:
             continue
@@ -526,18 +537,36 @@ def _ogc_prov_objects(document):
             LOGGER.warning("Duplicate %s record %d in unified PROV",
                            record_type, key)
             continue
-        objects_by_uri[key] = {"id": key, "provType": record_type}
+        prov_obj: dict[str, Any] = {"id": key, prov_type_field: record_type}
         if record.value:
-            objects_by_uri[key]["value"] = list(record.value)
+            prov_obj["value"] = list(record.value)
         if record.label != record.identifier:
-            objects_by_uri[key]["label"] = record.label
+            prov_obj["label"] = record.label
         prov_types = [str(val) for val in record.get_attribute(prov_const.PROV_TYPE)]
         if prov_types:
-            objects_by_uri[key]["prov:type"] = prov_types[0] if len(prov_types) == 1 else prov_types
-        for attr, prov_attr in _PROV_ATTRS:
-            values = [_prov_value(val) for val in record.get_attribute(prov_attr)]
-            if values:
-                objects_by_uri[key][attr] = values[0] if len(values) == 1 else values
+            prov_obj["prov:type"] = prov_types[0] if len(prov_types) == 1 else prov_types
+        # value, label, type have special handling above, other PROV-O
+        # attributes are simply passed through, modulo some remapping.
+        for attr, val in record.attributes:
+            if attr in (prov_const.PROV_VALUE, prov_const.PROV_LABEL,
+                        prov_const.PROV_TYPE):
+                continue
+            # Remap startTime/endTime to their PROV-O names
+            pkey = _PROV_ATTRIBUTES.get(attr)
+            if pkey is None:
+                # Omit prov: prefix on PROV attributes
+                if attr.namespace == prov_const.PROV:
+                    pkey = attr.localpart
+                else:
+                    pkey = str(attr)
+            pval = _prov_value(val)
+            if attr not in prov_obj:
+                prov_obj[pkey] = pval
+            elif isinstance(prov_obj[pkey], list):
+                prov_obj[pkey].append(pval)
+            else:
+                prov_obj[pkey] = [prov_obj[pkey], pval]
+        objects_by_uri[key] = prov_obj
     return objects_by_uri
 
 
@@ -579,15 +608,19 @@ def convert_to_prov_chain(input_data, root_uri=None):
     - Derivation
     - Delegation
 
-    Certain PROV attributes are also supported:
+    Attributes in the PROV-O vocabulary are passed through as
+    primitive values (str, int, float) with the exception of the
+    `prov:startTime` and `prov:endTime` attributes, which are not
+    present in PROV-O and are therefore remapped to `startedAtTime`
+    and `endedAtTime`.  In conformance with the JSON schema and
+    PROV-JSONLD, the primary record type is returned in the `provType`
+    or `activityType` attribute, and `prov:type`, which is always
+    prefixed, is used for additional PROV types (e.g. `Person`,
+    `SoftwareAgent`).
 
-    - prov:type (contains extra types not specified in ``provType``)
-    - startTime
-    - endTime
-    - time
-    - location
-    - label
-    - value
+    Other PROV-O attributes are unprefixed, while attributes from
+    other namespaces (`foaf`, `wfprov`, etc) are returned as QNames
+    (e.g. `wfprov:wasEnactedBy`).
 
     :param root_uri: If not ``None``, return object provenance rooted
         at the object with the given URI.  Otherwise, return
@@ -597,6 +630,7 @@ def convert_to_prov_chain(input_data, root_uri=None):
 
     .. seealso::
         - `OGC Provenance Chain Schemas <https://ogcincubator.github.io/bblock-prov-schema/>`_
+
     """
     document = ProvDocument.deserialize(content=input_data, format="json")
     objects_by_uri = _ogc_prov_objects(document)
