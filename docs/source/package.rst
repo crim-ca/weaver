@@ -1146,10 +1146,10 @@ Explicit Media-Type and Version
     :term:`Zarr` specification ``version`` it employs. The :term:`Application Package` developer **MUST**
     explicitly declare ``application/vnd.zarr`` (with the applicable ``version`` parameter when relevant) under
     the :term:`WPS`/
-    :term:`OGC API - Processes` ``formats`` field (or ``format`` for a single-value output) of the corresponding
-    input or output description, not the :term:`CWL` ``format`` field, which remains unsupported for ``Directory``
-    as mentioned above. See :ref:`cwl-type` for an example of this ``formats`` field applied to a ``Complex``
-    :term:`I/O`. This declaration must be provided at :ref:`deployment <proc_op_deploy>`. Omitting it causes
+    :term:`OGC API - Processes` ``formats`` field of the corresponding input or output description, not 
+    the :term:`CWL` ``format`` field, which remains unsupported for ``Directory`` as mentioned above.
+    See :ref:`cwl-type` for an example of this ``formats`` field applied to a ``Complex`` :term:`I/O`.
+    This declaration must be provided at :ref:`deployment <proc_op_deploy>`. Omitting it causes
     the :term:`I/O` to instead be reported using the generic ``application/directory`` media-type, even though
     the underlying :term:`CWL` ``Directory`` behaves identically. Automatic detection of the ``version`` from
     known :term:`Zarr` metadata files could be considered as
@@ -1163,7 +1163,7 @@ Directory Naming
     Although :term:`Zarr` stores are commonly named with a ``.zarr`` suffix by convention, this is not mandated by
     the :term:`Zarr` specification itself, and `Weaver` does not enforce nor validate this naming convention, since
     the declared media-type (see :ref:`cwl-zarr-media-type` above) is sufficient to resolve the applicable type.
-    However, when an explicit :term:`CWL` Application Package is **NOT** provided
+    However, when an explicit :term:`CWL` is **NOT** provided
     (i.e.: a remote :term:`WPS` process automatically wrapped by `Weaver`), the auto-generated ``outputBinding.glob``
     pattern relies on the ``.zarr`` extension (e.g.: ``*.zarr``) to locate produced results, in which case the
     produced directory must employ that extension for the pattern to match it. When an explicit :term:`CWL`
@@ -1200,21 +1200,16 @@ Zarr vs Zarr+Zip
     same :term:`I/O` is supported and does not cause a deployment error. When `Weaver` auto-generates the :term:`CWL`
     definition (e.g.: from a remote :term:`WPS`/:term:`OGC API - Processes` reference without its own :term:`CWL`),
     the :term:`I/O` resolves as a :term:`CWL` ``Directory``, and ``application/zarr+zip`` is entirely ignored for
-    that resolution (it contributes neither ``format`` nor ``outputBinding.glob`` extension). When an explicit
-    :term:`CWL` Application Package is supplied instead, its own ``type: Directory`` and ``outputBinding`` are used
-    as-is, and declaring ``application/zarr+zip`` alongside the :term:`Zarr` media-type in the :term:`WPS` ``formats``
-    is simply treated as an additional alternate representation (see :ref:`cwl-zarr-zip-alternate` below), without
-    altering the :term:`CWL` side.
+    that resolution (it contributes neither ``format`` nor ``outputBinding.glob`` extension).
 
 .. _cwl-zarr-zip-alternate:
 
 Zipped Alternate Representation
     `Weaver` automatically advertises ``application/zarr+zip`` as an alternate representation of a :term:`Zarr`
     directory :term:`Job` output, without requiring the :term:`Application Package` developer to declare it
-    explicitly. The zipped archive is generated **on-demand**, not ahead of time nor persisted across requests,
-    only when the :term:`Job` result is requested using that representation, either with the
-    ``?f=application/zarr+zip`` query parameter, or an equivalent ``Accept: application/zarr+zip`` header, as
-    described in :ref:`proc_op_result`.
+    explicitly. The zipped archive is generated **on-demand**, only when the :term:`Job` result is requested
+    using that representation, either with the ``?f=application/zarr+zip`` query parameter, or an equivalent 
+    ``Accept: application/zarr+zip`` header, as described in :ref:`proc_op_result`.
     Requesting the result using the native :term:`Zarr` directory media-type (or omitting the requested format)
     instead returns the original directory reference as is, without any transformation.
 
@@ -1949,7 +1944,7 @@ purposes.
 3. Because the above string-formatted ``uri`` are left out from definitions, it can instead be used explicitly in an
    :term:`I/O` specification to indicate to `Weaver` that the :term:`Process` uses a ``Literal`` URI string, that must
    not be fetched by `Weaver`, and must be passed down as plain string URI directly without modification or
-   interpretation to the underlying :term:`CWL` Application Package.
+   interpretation to the underlying CWL.
 
 To summarize, strings with ``format: uri`` will **NOT** be considered as ``Complex`` :term:`I/O` by `Weaver`. They will
 be seen as any other string ``Literal``, but this allows a :term:`Process` describing its :term:`I/O` as an external URI
