@@ -102,23 +102,26 @@ class ProvenanceFormat(Constants):
         ContentType.APP_XML: PROV_XML,
         ContentType.APP_PROV_XML: PROV_XML,
         ContentType.APP_NT: PROV_NT,
-        ContentType.APP_PROV_OGC_JSON: PROV_OGC_JSON,
     }
-    _rev_path_types = {_prov_type: _ctype for _ctype, _prov_type in _media_types.items()}
+    _prov_formats = {
+        PROV_JSON: ContentType.APP_PROV_JSON,
+        PROV_JSONLD: ContentType.APP_JSONLD,
+        PROV_XML: ContentType.APP_PROV_XML,
+        PROV_TURTLE: ContentType.TEXT_TURTLE,
+        PROV_N: ContentType.TEXT_PROVN,
+        PROV_NT: ContentType.APP_NT,
+        PROV_OGC_JSON: ContentType.APP_JSON,
+    }
     _profiles = {
-        ContentType.APP_YAML: "https://www.w3.org/submissions/prov-json/",
-        ContentType.APP_JSON: "https://www.w3.org/submissions/prov-json/",
-        ContentType.APP_PROV_JSON: "https://www.w3.org/submissions/prov-json/",
-        ContentType.APP_JSONLD: "https://www.w3.org/submissions/prov-jsonld/",
-        ContentType.TEXT_TURTLE: "https://www.w3.org/TR/prov-o/",
-        ContentType.TEXT_PROVN: "https://www.w3.org/TR/prov-n/",
-        ContentType.TEXT_XML: "https://www.w3.org/TR/prov-xml/",
-        ContentType.APP_XML: "https://www.w3.org/TR/prov-xml/",
-        ContentType.APP_PROV_XML: "https://www.w3.org/TR/prov-xml/",
-        ContentType.APP_NT: "https://www.w3.org/TR/prov-o/",
-        ContentType.APP_PROV_OGC_JSON: (
-            "https://ogcincubator.github.io/bblock-prov-schema"
-            "/build/annotated/ogc-utils/prov-bundled/schema.json"
+        PROV_JSON: "https://www.w3.org/submissions/prov-json/",
+        PROV_JSONLD: "https://www.w3.org/submissions/prov-jsonld/",
+        PROV_TURTLE: "https://www.w3.org/TR/prov-o/",
+        PROV_N: "https://www.w3.org/TR/prov-n/",
+        PROV_XML: "https://www.w3.org/TR/prov-xml/",
+        PROV_NT: "https://www.w3.org/TR/prov-o/",
+        PROV_OGC_JSON: (
+            "https://ogcincubator.github.io/"
+            "bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"
         ),
     }
 
@@ -148,12 +151,7 @@ class ProvenanceFormat(Constants):
     @classmethod
     def as_media_type(cls, prov_format, output_format=None):
         # type: (Optional[AnyProvenanceFormat], Optional[AnyOutputFormat]) -> Optional[AnyContentType]
-        ctype = cls._rev_path_types.get(prov_format)
-        # specialize types when identified with known representations
-        if ctype == ContentType.APP_JSON:
-            ctype = ContentType.APP_PROV_JSON
-        elif ctype in ContentType.ANY_XML:
-            ctype = ContentType.APP_PROV_XML
+        ctype = cls._prov_formats.get(prov_format)
         # YAML is not a distinct PROV representation on its own, but merely an alternate serialization of PROV-JSON.
         # When the desired 'output_format' is specifically YAML, request/report that exact media-type instead of the
         # generic PROV-JSON, such that the API can return the native YAML representation directly.
@@ -167,8 +165,7 @@ class ProvenanceFormat(Constants):
     @classmethod
     def as_profile(cls, prov_format, output_format=None):
         # type: (Optional[AnyProvenanceFormat], Optional[AnyOutputFormat]) -> Optional[URL]
-        ctype = cls.as_media_type(prov_format, output_format=output_format)
-        return cls._profiles.get(ctype)
+        return cls._profiles.get(prov_format)
 
     @classmethod
     def resolve_compatible_formats(
