@@ -1146,7 +1146,7 @@ Explicit Media-Type and Version
     :term:`Zarr` specification ``version`` it employs. The :term:`Application Package` developer **MUST**
     explicitly declare ``application/vnd.zarr`` (with the applicable ``version`` parameter when relevant) under
     the :term:`WPS`/
-    :term:`OGC API - Processes` ``formats`` field of the corresponding input or output description, not 
+    :term:`OGC API - Processes` ``formats`` field of the corresponding input or output description, not
     the :term:`CWL` ``format`` field, which remains unsupported for ``Directory`` as mentioned above.
     See :ref:`cwl-type` for an example of this ``formats`` field applied to a ``Complex`` :term:`I/O`.
     This declaration must be provided at :ref:`deployment <proc_op_deploy>`. Omitting it causes
@@ -1208,7 +1208,7 @@ Zipped Alternate Representation
     `Weaver` automatically advertises ``application/zarr+zip`` as an alternate representation of a :term:`Zarr`
     directory :term:`Job` output, without requiring the :term:`Application Package` developer to declare it
     explicitly. The zipped archive is generated **on-demand**, only when the :term:`Job` result is requested
-    using that representation, either with the ``?f=application/zarr+zip`` query parameter, or an equivalent 
+    using that representation, either with the ``?f=application/zarr+zip`` query parameter, or an equivalent
     ``Accept: application/zarr+zip`` header, as described in :ref:`proc_op_result`.
     Requesting the result using the native :term:`Zarr` directory media-type (or omitting the requested format)
     instead returns the original directory reference as is, without any transformation.
