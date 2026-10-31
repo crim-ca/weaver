@@ -1167,7 +1167,7 @@ Directory Naming
     (i.e.: a remote :term:`WPS` process automatically wrapped by `Weaver`), the auto-generated ``outputBinding.glob``
     pattern relies on the ``.zarr`` extension (e.g.: ``*.zarr``) to locate produced results, in which case the
     produced directory must employ that extension for the pattern to match it. When an explicit :term:`CWL`
-    Application Package is supplied instead, the developer fully controls the ``outputBinding.glob`` pattern, and can
+    is supplied instead, the developer fully controls the ``outputBinding.glob`` pattern, and can
     therefore employ any directory name, as illustrated below. As for any other ``Directory``, the resolved
     reference is still appended a trailing slash (``/``) by `Weaver` once resolved as the final :term:`Job` output
     location, regardless of the employed ``glob`` pattern.
