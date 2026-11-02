@@ -1590,9 +1590,9 @@ class Job(Base, LoggerHandler):
         if prov_path and os.path.isfile(prov_path):
             with open(prov_path, mode="r", encoding="utf-8") as prov_f:
                 data = prov_f.read()
-            # Convert to OGC PROV chain (as it is a derivative of PROV
-            # JSON not output by cwltool and thus doesn't have a
-            # unique prov_path)
+            # Convert to OGC PROV chain (as it is a derivative of the
+            # PROV JSON that is returned by cwltool, and thus doesn't
+            # have a unique prov_path)
             if prov_format == ProvenanceFormat.PROV_OGC_JSON:
                 data = convert_to_prov_chain(data, f"urn:uuid:{self.id}")
         elif extra_path in (None, ProvenancePathType.PROV):
