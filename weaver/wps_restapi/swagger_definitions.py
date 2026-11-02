@@ -8841,8 +8841,14 @@ class JobProvAcceptHeader(AcceptHeader):
     validator = OneOf(ProvenanceFormat.media_types())
 
 
+class JobProvAcceptProfileHeader(AcceptProfileHeader):
+    validator = ProfileOneOf(
+        choices= ProvenanceFormat.profiles()
+    )
+
 class JobProvRequestHeaders(RequestHeadersNoBody):
     accept = JobProvAcceptHeader()
+    accept_profile = JobProvAcceptProfileHeader(missing=drop)
 
 
 class JobProvEndpoint(JobPath):
