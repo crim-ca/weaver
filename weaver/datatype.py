@@ -1545,7 +1545,7 @@ class Job(Base, LoggerHandler):
     def prov_path(
         self,
         container=None,     # type: Optional[AnySettingsContainer]
-        extra_path=None,    # type: Optional[ProvenancePathType]
+        extra_path=None,    # type: Optional[Union[ProvenancePathType, str]]
         prov_format=None,   # type: Optional[AnyProvenanceFormat]
     ):                      # type: (...) -> Optional[Path]
         """
@@ -1568,7 +1568,7 @@ class Job(Base, LoggerHandler):
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_XML): f"{prov_meta_path}/primary.cwlprov.xml",
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_N): f"{prov_meta_path}/primary.cwlprov.provn",
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_NT): f"{prov_meta_path}/primary.cwlprov.nt",
-        }  # type: Dict[Tuple[Optional[ProvenancePathType], Optional[ProvenanceFormat]], Path]
+        }  # type: Dict[Tuple[Optional[Union[ProvenancePathType, str]], Optional[Union[ProvenanceFormat, str]]], Path]
         key = (extra_path, prov_format)
         resolved_path = _prov_path_mapping.get(key)
         if resolved_path:
@@ -1580,7 +1580,8 @@ class Job(Base, LoggerHandler):
         self,
         container=None,     # type: Optional[AnySettingsContainer]
         extra_path=None,    # type: Optional[Union[ProvenancePathType, str]]
-        prov_format=None,   # type: AnyContentType
+        prov_format=None,   # type: Optional[ProvenanceFormat]
+        content_type=None,  # type: Optional[AnyContentType]
     ):                      # type: (...) -> Tuple[Optional[str], Optional[AnyContentType]]
         """
         Read or retrieve data from the packaged :term:`Provenance` directory contents associated to the :term:`Job`.
@@ -1589,9 +1590,16 @@ class Job(Base, LoggerHandler):
         if prov_path and os.path.isfile(prov_path):
             with open(prov_path, mode="r", encoding="utf-8") as prov_f:
                 data = prov_f.read()
-            fmt = prov_format
-        # requested PROV format is unsupported/unresolvable (path was not matched above)
-        elif extra_path in [None, ProvenancePathType.PROV]:
+            # Convert to OGC PROV chain (as it is a derivative of PROV
+            # JSON not output by cwltool and thus doesn't have a
+            # unique prov_path)
+            if prov_format == ProvenanceFormat.PROV_OGC_JSON:
+                data = convert_to_prov_chain(data, f"urn:uuid:{self.id}")
+        elif extra_path in (None, ProvenancePathType.PROV):
+            # Requested PROV format is unsupported/unresolvable,
+            # because no path was matched above, and no extra_path was
+            # supplied from which we could dynamically load additional
+            # metadata.
             return None, None
         else:
             # dynamic resolution of addition provenance metadata
@@ -1614,19 +1622,16 @@ class Job(Base, LoggerHandler):
                 return None, None
             tool.output.seek(0)
             data = tool.output.read()
-            fmt = ContentType.TEXT_PLAIN
-        if fmt == ContentType.APP_YAML:
+            content_type = ContentType.TEXT_PLAIN
+        if content_type == ContentType.APP_YAML:
             data = json.loads(data)
             data = OutputFormat.convert(data, to=OutputFormat.YAML)
-        elif fmt == ContentType.APP_PROV_OGC_JSON:
-            # Convert JSON from cwlprov to OGC PROV alternative representation
-            data = convert_to_prov_chain(data, f"urn:uuid:{self.id}")
         # normalize media-type
-        if fmt == ContentType.APP_JSON:
-            fmt = ContentType.APP_PROV_JSON
-        if fmt in ContentType.ANY_XML:
-            fmt = ContentType.APP_PROV_XML
-        return data, fmt
+        if content_type == ContentType.APP_JSON and prov_format != ProvenanceFormat.PROV_OGC_JSON:
+            content_type = ContentType.APP_PROV_JSON
+        if content_type in ContentType.ANY_XML:
+            content_type = ContentType.APP_PROV_XML
+        return data, content_type
 
     def links(self, container=None, self_link=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> List[Link]
