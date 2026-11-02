@@ -3242,11 +3242,11 @@ Following is a table of available formats and corresponding endpoints offered by
       - Description
     * - ``/jobs/{jobID}/prov``
       - |PROV-JSON|_
-      - ``application/json``
+      - ``application/provenance+json``
       - :term:`Provenance` metadata using :term:`JSON` representation.
     * - ``/jobs/{jobID}/prov``
       - |PROV-OGC-JSON|_
-      - ``application/ogcprov+json``
+      - ``application/json``
       - :term:`Provenance` metadata using OGC Provenance Chain :term:`JSON` representation.
     * - ``/jobs/{jobID}/prov``
       - |PROV-JSONLD|_

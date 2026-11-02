@@ -30,7 +30,7 @@ Changes:
   Inputs submitted with them are accepted by any `Process` that defines the official media-types, without explicitly
   listing them in its description. The legacy types are never selected when resolving media-types
   (e.g.: from file extensions).
-- Add ``application/ogcprov+json`` and ``PROV-OGC-JSON`` formats returning `OGC Provenance Chain JSON
+- Add ``PROV-OGC-JSON`` format and associated profile returning `OGC Provenance Chain JSON
   <https://ogcincubator.github.io/bblock-prov-schema/bblock/ogc.ogc-utils.prov/json-schema>`_, a simplified
   graph-centric JSON representation of provenance for OGC Processes workflows (resolves `#1017
   <https://github.com/crim-ca/weaver/issues/1017>`_)
@@ -88,6 +88,9 @@ Fixes:
 - Remove inconsistent and redundant timestamps from the generated PROV.
 - Ensure that the user agent in the PROV document is created as a ``SoftwareAgent`` not a ``Person`` with recent
   versions of ``prov`` that more strongly enforce update-only ``ProvRecord``.
+- Correct record types in the generated PROV and remove inconsistent relations.
+- Correct `Swagger-UI` to show the correct profiles for the provenance endpoint.
+- Ensure that the compatible version of ``setuptools`` is installed during ``make check`` to avoid crashing.
 
 .. _changes_6.16.0:
 
