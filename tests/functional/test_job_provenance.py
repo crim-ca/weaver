@@ -105,7 +105,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({}, {"Accept": ContentType.APP_JSON}),
         ({}, {"Accept": ContentType.APP_PROV_JSON}),
         ({}, {"Accept": f"{ContentType.APP_PROV_JSON}; charset=utf-8"}),
-        ({}, {"Accept": f"{ContentType.APP_JSON}; profile=https://www.w3.org/ns/prov"}),
+        ({}, {"Accept": f"{ContentType.APP_JSON}; profile=https://www.w3.org/submissions/prov-json/"}),
     ])
     def test_job_prov_json(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -186,7 +186,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({"f": "jsonld"}, {}),
         ({"f": ProvenanceFormat.PROV_JSONLD}, {}),
         ({}, {"Accept": ContentType.APP_JSONLD}),
-        ({}, {"Accept": f"{ContentType.APP_JSONLD}; profile=https://www.w3.org/TR/prov-jsonld/"}),
+        ({}, {"Accept": f"{ContentType.APP_JSONLD}; profile=https://www.w3.org/submissions/prov-jsonld/"}),
     ])
     def test_job_prov_json_ld(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
