@@ -549,6 +549,8 @@ def _ogc_prov_objects(document):
             continue
         prov_obj: dict[str, Any] = {"id": key, prov_type_field: record_type}
         if record.value:
+            # This is always a `set`, which is why we convert it to a
+            # `list` (to make it serializable as JSON)
             prov_obj["value"] = list(record.value)
         if record.label != record.identifier:
             prov_obj["name"] = record.label
@@ -583,7 +585,7 @@ def _ogc_prov_objects(document):
 def _ogc_prov_nested(objects_by_uri, root_obj, expanded):
     # type: (dict[str, dict[str, Any]], dict[str, Any], set[str]) -> dict[str, Any]
     for attr, vals in root_obj.items():
-        if isinstance(vals, str):
+        if not isinstance(vals, list):
             vals = [vals]
         for idx, uri in enumerate(vals):
             if not isinstance(uri, str):

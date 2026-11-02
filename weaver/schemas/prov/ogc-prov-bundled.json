@@ -143,7 +143,8 @@
         "prov:PrimarySource",
         "wfdesc:Process",
         "wfprov:Artifact",
-        "wf4ever:File"
+        "wf4ever:File",
+        "schema:SoftwareSourceCode"
       ]
     },
     "EntityTypes": {
