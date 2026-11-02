@@ -365,7 +365,7 @@ class WeaverResearchObject(ResearchObject):
                 (prov_const.PROV_TYPE, prov_const.PROV["Organization"]),
                 (prov_const.PROV_LABEL, "Server Provider"),
             ])
-            server_provider_agent = document.entity(
+            server_provider_agent = document.agent(
                 server_provider_sha1,
                 server_provider_meta,
             )
