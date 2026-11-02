@@ -304,7 +304,7 @@ class WeaverResearchObject(ResearchObject):
         weaver_code_entity = document.entity(
             weaver_code_sha1,
             {
-                prov_const.PROV_TYPE: prov_const.PROV["PrimarySource"],
+                prov_const.PROV_TYPE: cwl_prov_const.SCHEMA["SoftwareSourceCode"],
                 prov_const.PROV_LABEL: "Source code repository",
                 prov_const.PROV_LOCATION: weaver_code_url,
             },
@@ -328,7 +328,7 @@ class WeaverResearchObject(ResearchObject):
 
         crim_name = "Computer Research Institute of Montréal"
         crim_sha1 = self.sha1_uuid(document, crim_name)
-        crim_entity = document.entity(
+        crim_agent = document.agent(
             crim_sha1,
             {
                 prov_const.PROV_TYPE: prov_const.PROV["Organization"],
@@ -336,11 +336,13 @@ class WeaverResearchObject(ResearchObject):
                 cwl_prov_const.SCHEMA["name"]: crim_name,
             }
         )
+        # Define PROV relation linking CRIM to Weaver code
+        document.wasAttributedTo(weaver_code_entity, agent=crim_agent)
 
         server_provider_name = self.settings.get("weaver.wps_metadata_provider_name")
         server_provider_url = self.settings.get("weaver.wps_metadata_provider_url")
         server_provider_meta = []
-        server_provider_entity = None
+        server_provider_agent = None
         if server_provider_name:
             server_provider_meta.extend([
                 (cwl_prov_const.FOAF["name"], server_provider_name),
@@ -357,7 +359,7 @@ class WeaverResearchObject(ResearchObject):
                 (prov_const.PROV_TYPE, prov_const.PROV["Organization"]),
                 (prov_const.PROV_LABEL, "Server Provider"),
             ])
-            server_provider_entity = document.entity(
+            server_provider_agent = document.entity(
                 server_provider_sha1,
                 server_provider_meta,
             )
@@ -405,14 +407,14 @@ class WeaverResearchObject(ResearchObject):
         user_types.add(prov_const.PROV["SoftwareAgent"])
         user_types.add(cwl_prov_const.SCHEMA["SoftwareApplication"])
 
-        # Define PROV relations
-        document.hadPrimarySource(generatedEntity=weaver_instance_agent, usedEntity=weaver_code_entity)
+        # Define PROV relations linking weaver instance to user agent
+        # and server provider (also an agent)
         document.actedOnBehalfOf(delegate=weaver_instance_agent, responsible=user_agent)
-        document.wasAttributedTo(entity=crim_entity, agent=weaver_code_entity)
-        if server_provider_entity:
-            document.wasDerivedFrom(generatedEntity=server_provider_entity,
-                                    usedEntity=weaver_instance_agent)
-            document.wasAttributedTo(entity=server_provider_entity, agent=weaver_instance_agent)
+        if server_provider_agent:
+            document.actedOnBehalfOf(delegate=weaver_instance_agent,
+                                     responsible=server_provider_agent)
+        # Relate Weaver code to everything else via the job activity
+        document.used(activity=job_activity, entity=weaver_code_entity)
 
         return prov_profile
 
