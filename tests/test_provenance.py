@@ -240,10 +240,9 @@ def test_convert_to_prov_object():
 def test_validate_prov_list():
     prov_data = resources.load_resource("job_prov.json", text=True)
     prov_json = convert_to_prov_chain(prov_data)
-    with open("wtf.json", "w") as fh:
-        fh.write(prov_json)
     prov = json.loads(prov_json)
-    with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov-bundled.json") as fh:
+    with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov-bundled.json",
+              encoding="utf-8") as fh:
         prov_schema = json.load(fh)
     jsonschema.validate(prov, prov_schema)
 
@@ -253,6 +252,7 @@ def test_validate_prov_object():
     root_id = "urn:uuid:b3de0240-663b-4003-86c6-1004173fa711"
     prov_json = convert_to_prov_chain(prov_data, root_id)
     prov = json.loads(prov_json)
-    with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov-bundled.json") as fh:
+    with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov-bundled.json",
+              encoding="utf-8") as fh:
         prov_schema = json.load(fh)
     jsonschema.validate(prov, prov_schema)
