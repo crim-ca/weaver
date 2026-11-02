@@ -572,7 +572,7 @@ def _ogc_prov_objects(document):
                 else:
                     pkey = str(attr)
             pval = _prov_value(val)
-            if attr not in prov_obj:
+            if pkey not in prov_obj:
                 prov_obj[pkey] = pval
             elif isinstance(prov_obj[pkey], list):
                 prov_obj[pkey].append(pval)
