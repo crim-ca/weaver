@@ -150,6 +150,11 @@ class ProvenanceFormat(Constants):
         return cls.values()
 
     @classmethod
+    def profiles(cls):
+        # type: () -> List[str]
+        return list(cls._profiles.values())
+
+    @classmethod
     def as_media_type(cls, prov_format, output_format=None):
         # type: (Optional[AnyProvenanceFormat], Optional[AnyOutputFormat]) -> Optional[AnyContentType]
         ctype = cls._prov_formats.get(prov_format)
