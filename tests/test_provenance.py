@@ -1,9 +1,12 @@
 import itertools
 import json
+from pathlib import Path
 
+import jsonschema
 import pytest
 
 from tests import resources
+from weaver import WEAVER_SCHEMA_DIR
 from weaver.formats import ContentType, OutputFormat
 from weaver.provenance import ProvenanceFormat, ProvenancePathType, convert_to_prov_chain
 
@@ -213,7 +216,7 @@ def test_convert_to_prov_list():
 def test_convert_to_prov_object():
     prov_data = resources.load_resource("job_prov.json", text=True)
     # Could get this from the data (it is the workflow run object)
-    root_id = "urn:uuid:74e06198-faf8-404f-b905-c6f02361070d"
+    root_id = "urn:uuid:588705a4-ddeb-4821-ad2a-5ef9f9aa4423"
     prov_json = convert_to_prov_chain(prov_data, root_id)
     assert prov_json
     prov = json.loads(prov_json)
@@ -227,8 +230,29 @@ def test_convert_to_prov_object():
     assert "startTime" not in prov
     assert "startedAtTime" in prov
     # It should be nested
-    assert "wasAssociatedWith" in prov
-    assert isinstance(prov["wasAssociatedWith"], dict)
+    assert "wfprov:wasEnactedBy" in prov
+    assert isinstance(prov["wfprov:wasEnactedBy"], dict)
     # It should contain reverse relations for otherwise unreachable objects
     assert "generated" in prov
     assert any(isinstance(obj, dict) for obj in prov["generated"])
+
+
+def test_validate_prov_list():
+    prov_data = resources.load_resource("job_prov.json", text=True)
+    prov_json = convert_to_prov_chain(prov_data)
+    with open("wtf.json", "w") as fh:
+        fh.write(prov_json)
+    prov = json.loads(prov_json)
+    with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov-bundled.json") as fh:
+        prov_schema = json.load(fh)
+    jsonschema.validate(prov, prov_schema)
+
+
+def test_validate_prov_object():
+    prov_data = resources.load_resource("job_prov.json", text=True)
+    root_id = "urn:uuid:588705a4-ddeb-4821-ad2a-5ef9f9aa4423"
+    prov_json = convert_to_prov_chain(prov_data, root_id)
+    prov = json.loads(prov_json)
+    with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov-bundled.json") as fh:
+        prov_schema = json.load(fh)
+    jsonschema.validate(prov, prov_schema)
