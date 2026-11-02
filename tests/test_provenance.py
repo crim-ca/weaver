@@ -216,7 +216,7 @@ def test_convert_to_prov_list():
 def test_convert_to_prov_object():
     prov_data = resources.load_resource("job_prov.json", text=True)
     # Could get this from the data (it is the workflow run object)
-    root_id = "urn:uuid:588705a4-ddeb-4821-ad2a-5ef9f9aa4423"
+    root_id = "urn:uuid:b3de0240-663b-4003-86c6-1004173fa711"
     prov_json = convert_to_prov_chain(prov_data, root_id)
     assert prov_json
     prov = json.loads(prov_json)
@@ -250,7 +250,7 @@ def test_validate_prov_list():
 
 def test_validate_prov_object():
     prov_data = resources.load_resource("job_prov.json", text=True)
-    root_id = "urn:uuid:588705a4-ddeb-4821-ad2a-5ef9f9aa4423"
+    root_id = "urn:uuid:b3de0240-663b-4003-86c6-1004173fa711"
     prov_json = convert_to_prov_chain(prov_data, root_id)
     prov = json.loads(prov_json)
     with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov-bundled.json") as fh:
