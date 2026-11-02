@@ -149,6 +149,7 @@ class TestJobProvenance(TestJobProvenanceBase):
 
     @parameterized.expand([
         ({"f": ProvenanceFormat.PROV_OGC_JSON}, {}),
+        ({"f": "ogc-json"}, {}),
         ({}, {"Accept": f"{ContentType.APP_JSON}; "
               "profile=https://ogcincubator.github.io"
               "/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"}),
