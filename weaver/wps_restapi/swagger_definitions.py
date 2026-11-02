@@ -8843,8 +8843,9 @@ class JobProvAcceptHeader(AcceptHeader):
 
 class JobProvAcceptProfileHeader(AcceptProfileHeader):
     validator = ProfileOneOf(
-        choices= ProvenanceFormat.profiles()
+        choices=ProvenanceFormat.profiles()
     )
+
 
 class JobProvRequestHeaders(RequestHeadersNoBody):
     accept = JobProvAcceptHeader()
