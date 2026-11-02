@@ -179,6 +179,24 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert any(isinstance(obj, dict) for obj in prov["generated"])
 
     @parameterized.expand([
+        ({},
+         {"Accept": ContentType.APP_YAML,
+          "Accept-Profile": "https://ogcincubator.github.io"
+          "/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"}),
+        ({"f": "ogc-json"},
+         {"Accept-Profile": "https://ogcincubator.github.io"
+          "/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"}),
+    ])
+    def test_job_prov_ogc_yaml(self, queries, headers):
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        prov = resp.text
+        # Ensure that we got actual YAML
+        assert "id:" in prov
+
+    @parameterized.expand([
         ({"f": "ld+json"}, {}),
         ({"f": "ld%2Bjson"}, {}),
         ({"f": "jsonld"}, {}),
