@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Extended/corrected version of https://ogcincubator.github.io/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json",
   "description": "Provenance Chain using PROV-O core model supporting both an ID based object graph and nesting",
   "$defs": {
     "objectref": {
@@ -135,9 +136,14 @@
         "Entity",
         "Bundle",
         "Plan",
+        "prov:Collection",
         "prov:Entity",
         "prov:Bundle",
-        "prov:Plan"
+        "prov:Plan",
+        "prov:PrimarySource",
+        "wfdesc:Process",
+        "wfprov:Artifact",
+        "wf4ever:File"
       ]
     },
     "EntityTypes": {
@@ -156,6 +162,8 @@
     "Entity": {
       "type": "object",
       "properties": {
+        "activityType": false,
+        "agentType": false,
         "id": {
           "$ref": "#/$defs/objectref",
           "x-jsonld-id": "@id"
@@ -447,26 +455,24 @@
       "format": "date-time",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})?$"
     },
+    "ActivityType": {
+      "type": "string",
+      "enum": [
+        "Activity",
+        "prov:Activity",
+        "wfprov:ProcessRun",
+        "wfprov:WorkflowRun"
+      ]
+    },
     "ActivityTypes": {
       "oneOf": [
         {
-          "type": "string",
-          "enum": [
-            "Activity",
-            "prov:Activity"
-          ]
+          "$ref": "#/$defs/ActivityType"
         },
         {
           "type": "array",
           "contains": {
-            "type": "string",
-            "enum": [
-              "Activity",
-              "prov:Activity"
-            ]
-          },
-          "items": {
-            "type": "string"
+            "$ref": "#/$defs/ActivityType"
           }
         }
       ]
@@ -474,6 +480,9 @@
     "Activity": {
       "type": "object",
       "properties": {
+        "entityType": false,
+        "featureType": false,
+        "agentType": false,
         "id": {
           "$ref": "#/$defs/objectref",
           "x-jsonld-id": "@id"
@@ -481,6 +490,10 @@
         "activityType": {
           "$ref": "#/$defs/oneOrMoreObjectref",
           "x-jsonld-id": "@type"
+        },
+        "name": {
+          "type": "string",
+          "x-jsonld-id": "http://www.w3.org/2000/01/rdf-schema#label"
         },
         "prov:type": {
           "$ref": "#/$defs/ActivityTypes",
@@ -631,8 +644,17 @@
           "x-jsonld-type": "@id"
         }
       },
+      "required": [
+        "id"
+      ],
       "anyOf": [
         {
+          "properties": {
+            "activityType": {
+              "$ref": "#/$defs/ActivityType",
+              "x-jsonld-id": "@type"
+            }
+          },
           "required": [
             "activityType"
           ]
@@ -693,7 +715,10 @@
         "prov:Person",
         "prov:SoftwareAgent",
         "prov:SoftwareDescription",
-        "prov:DirectQueryService"
+        "prov:DirectQueryService",
+        "wfprov:WorkflowEngine",
+        "schema:SoftwareApplication",
+        "foaf:OnlineAccount"
       ]
     },
     "AgentType": {
@@ -714,6 +739,9 @@
     "Agent": {
       "type": "object",
       "properties": {
+        "activityType": false,
+        "entityType": false,
+        "featureType": false,
         "agentType": {
           "$ref": "#/$defs/oneOrMoreObjectref",
           "x-jsonld-id": "@type"
@@ -762,18 +790,16 @@
           "x-jsonld-type": "@id"
         }
       },
-      "oneOf": [
-        {
-          "required": [
-            "name"
-          ]
-        },
-        {
-          "required": [
-            "id"
-          ]
-        }
+      "required": [
+        "id"
       ],
+      "not": {
+        "properties": {
+          "provType": {
+            "$ref": "#/$defs/EntityType"
+          }
+        }
+      },
       "anyOf": [
         {
           "properties": {
@@ -1626,6 +1652,11 @@
     "xsd": "http://www.w3.org/2001/XMLSchema#",
     "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
     "dct": "http://purl.org/dc/terms/",
-    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "foaf": "http://xmlns.com/foaf/0.1/",
+    "schema": "https://schema.org/",
+    "wfprov": "http://purl.org/wf4ever/wfprov#",
+    "wfdesc": "http://purl.org/wf4ever/wfdesc#",
+    "wf4ever": "http://purl.org/wf4ever/wf4ever#"
   }
 }
