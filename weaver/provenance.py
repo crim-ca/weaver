@@ -124,6 +124,7 @@ class ProvenanceFormat(Constants):
             "bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"
         ),
     }
+    _profile_formats = {v: k for k, v in _profiles.items()}
 
     @classmethod
     def get(                        # pylint: disable=W0221,W0237  # arguments differ/renamed for clarity
@@ -166,6 +167,11 @@ class ProvenanceFormat(Constants):
     def as_profile(cls, prov_format, output_format=None):
         # type: (Optional[AnyProvenanceFormat], Optional[AnyOutputFormat]) -> Optional[URL]
         return cls._profiles.get(prov_format)
+
+    @classmethod
+    def from_profile(cls, profile):
+        # type: (str) -> Optional["ProvenanceFormat"]
+        return cls._profile_formats.get(profile)
 
     @classmethod
     def resolve_compatible_formats(
