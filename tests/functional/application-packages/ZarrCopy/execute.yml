@@ -1,0 +1,4 @@
+inputs:
+  zarr_in:
+    href: "https://mocked-file-server.com/input.zarr/"
+    type: "application/vnd.zarr; version=3"
