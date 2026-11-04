@@ -1943,13 +1943,10 @@ def get_job_prov_response(request):
     if profile:
         # will raise JobProvenanceUnsupportedFormat on unknown profile
         prov_fmt = ProvenanceFormat.from_profile(profile)
-    if prov_fmt is None:
-        prov_data, prov_content_type = None, None
-    else:
-        content_type_requested = prov_content_type
-        # Pass both the requested media type and the specific format
-        prov_data, prov_content_type = job.prov_data(request, prov_path,
-                                                     prov_fmt, content_type_requested)
+    content_type_requested = prov_content_type
+    # Pass both the requested media type and the specific format
+    prov_data, prov_content_type = job.prov_data(request, prov_path,
+                                                 prov_fmt, content_type_requested)
     if not prov_data:
         prov_dir = job.prov_path(request)
         prov_exists = prov_dir and os.path.isdir(prov_dir)
