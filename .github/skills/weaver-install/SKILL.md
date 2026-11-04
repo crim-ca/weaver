@@ -34,7 +34,7 @@ Install and set up Weaver for development, testing, or production use.
 
 - **Git**: For cloning repository
 - **Conda/Miniconda**: For isolated environment management (recommended)
-- **Docker**: For containerized deployment (portable production/testing)
+- **Docker**: For containerized deployment and Safety dependency security scans
 
 **Note**: If you prefer to install directly in your current Python environment without conda, you can set `CONDA_CMD=""`
 (empty string) before running make commands. This bypasses conda creation/activation/detection and installs using the
@@ -112,65 +112,51 @@ git checkout X.Y.Z
 
 The Makefile provides several installation targets for different use cases:
 
-##### Standard Installation (Recommended)
+##### Runtime Installation
 
 ```bash
-# Install everything needed to run Weaver commands
+# Install Weaver and its runtime dependencies
 make install
 ```
 
-**This is sufficient for**:
+This aliases `make install-run` and is sufficient for:
 
 - Running Weaver CLI commands (`weaver deploy`, `weaver execute`, etc.)
 - Starting Weaver server locally
 - Deploying and executing processes
-- General usage and testing
 
-This is an alias for `make install-all` and runs:
+This installs Weaver and its runtime dependencies.
 
-- `conda-env` - Creates conda environment
-- `conda-install` - Installs conda packages (proj, etc.)
-- `install-sys` - Installs system dependencies
-- `install-pkg` - Installs application packages
-- `install-pip` - Installs application as editable package
-- `install-dev` - Installs development/test dependencies
-
-##### Runtime-Only Installation (Minimal)
+##### Full Development Installation
 
 ```bash
-# Install only runtime dependencies (no development tools)
-make install-run
+# Install runtime and all development dependencies
+make install-all
 ```
 
-**Use this if you only need**:
-
-- To run Weaver server in production
-- Minimal installation footprint
-- No testing or development capabilities
-
-This runs:
-
-- `conda-install` - Installs conda packages
-- `install-sys` - Installs system dependencies
-- `install-pkg` - Installs application packages
-- `install-raw` - Installs application without dependencies
+This installs the complete set of application and development dependencies.
 
 ##### Development-Specific Targets
 
 **These are only needed for Weaver development** (not required for using Weaver):
 
 ```bash
-# Install development/test dependencies only
+# Install Python development and test dependencies
 make install-dev
-# Required for: make test, make lint, make check-types
+# Also installs runtime dependencies through install-run
 
 # Install documentation dependencies only
 make install-doc
-# Required for: make docs
+# Also installs runtime dependencies through install-run
 
-# Install application as editable package only
+# Install npm development dependencies
+make install-dev-npm
+
+# Install all Python and npm development dependencies
+make install-dev-all
+
+# Install application as editable package
 make install-pip
-# Required for: development with code changes reflected immediately
 ```
 
 ##### Individual Component Targets
@@ -185,8 +171,11 @@ make install-sys
 # Install application package dependencies
 make install-pkg
 
-# Install application without dependencies
+# Install application without dependencies (editable source)
 make install-raw
+
+# Install npm package manager if needed, then CSS and Markdown check dependencies
+make install-dev-npm
 ```
 
 #### Quick Installation
@@ -194,11 +183,10 @@ make install-raw
 **For most users** (running Weaver commands and processes):
 
 ```bash
-# One command does it all (with conda)
-make install
-
-# Activate environment
+# Create and activate the environment, then install runtime dependencies
+make conda-env
 conda activate weaver
+make install
 
 # You're ready to use Weaver
 weaver --version
@@ -221,26 +209,20 @@ pserve config/weaver.ini
 If you prefer to understand each step:
 
 ```bash
-# 1. Create conda environment
+# 1. Create and activate the conda environment
 make conda-env
-
-# 2. Activate environment
 conda activate weaver
 
-# 3. Install system dependencies
+# 2. Install the same runtime components as make install
 make install-sys
-
-# 4. Install application dependencies
 make install-pkg
-
-# 5. Install application itself
-make install-pip
-
-# 6. (Recommended) Install development tools for testing
-make install-dev
+make install-transform
+make install-raw
 ```
 
-**Note**: `make install` does all of the above automatically.
+`make install` installs Weaver and its runtime dependencies, but does not create or
+activate the conda environment. Use `make install-all` to also install all Python and
+npm development dependencies.
 
 ## Configuration
 
@@ -471,7 +453,10 @@ make conda-env
 conda activate weaver
 make install-sys
 make install-pkg
-make install-pip
+make install-raw
+
+# For all Python and npm development tooling, also run:
+make install-dev-all
 
 # Check for specific error messages and resolve
 ```
@@ -485,11 +470,10 @@ make install-pip
 git clone https://github.com/crim-ca/weaver.git
 cd weaver
 
-# Install everything needed to use Weaver
-make install
-
-# Activate environment
+# Create and activate the environment before installing runtime dependencies
+make conda-env
 conda activate weaver
+make install
 
 # Start development server
 pserve config/weaver.ini --reload
@@ -504,8 +488,8 @@ celery -A pyramid_celery.celery_app worker --ini config/weaver.ini
 **Only needed if you're modifying Weaver's code**:
 
 ```bash
-# After make install, you already have everything
-# Additional tools are included in install-dev (part of make install)
+# Install runtime and all development dependencies
+make install-all
 
 # Run linting
 make lint
@@ -677,16 +661,32 @@ vim config/request_options.yml
 ### Installation Targets
 
 ```bash
-make install           # Alias for install-all
-make install-all       # Full development installation
-make install-run       # Runtime-only installation
-make install-dev       # Development dependencies only
-make install-doc       # Documentation dependencies only
-make install-pkg       # Application packages only
-make install-sys       # System dependencies only
-make install-pip       # Application as editable package
-make install-raw       # Application without dependencies
+make install                         # Alias for install-run (runtime installation)
+make install-run                     # Runtime dependencies, transformations, and editable Weaver
+make install-all                     # Runtime and all development dependencies
+make install-dev                     # Python development/test dependencies
+make install-dev-all                 # Python and npm development dependencies
+make install-dev-betterleaks         # Betterleaks for repository secret scanning
+make install-dev-npm                 # npm, Stylelint, and remark-lint dependencies
+make install-doc                     # Documentation dependencies
+make install-pkg                     # Application dependencies
+make install-sys                     # System dependencies
+make install-pip                     # Weaver as an editable package
+make install-raw                     # Weaver without dependencies (editable source)
+make install-transform               # Transformation dependencies
 ```
+
+### Security Check Targets
+
+```bash
+make check-security-deps          # Scan dependencies using the Safety GHCR image (requires Docker)
+make check-security-deps-only     # Same Docker scan
+make check-security-secrets       # Scan repository history for secrets
+make check-security-secrets-only  # Scan using an already-installed secret scanner
+```
+
+Safety is not installed by `make install-dev`. Dependency scans use `ghcr.io/pyupio/safety:latest`.
+Override `SAFETY_IMAGE` to select another image tag or digest.
 
 ### Environment Targets
 
@@ -738,11 +738,12 @@ make docs              # Generate documentation
 docker pull pavics/weaver:latest
 docker run -p 4001:4001 pavics/weaver:latest
 
-# Method 2: From source (for running weaver commands)
+# Method 2: From source (for running Weaver commands)
 git clone https://github.com/crim-ca/weaver.git
 cd weaver
-make install
+make conda-env
 conda activate weaver
+make install
 pserve config/weaver.ini
 
 # Verify

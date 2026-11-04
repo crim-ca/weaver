@@ -61,8 +61,8 @@ client = WeaverClient(url="https://weaver.example.com")
 prov = client.provenance(job_reference="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 
 # Access provenance entities
-for entity in prov.body.get("entities", []):
-    print(f"Entity: {entity['id']}")
+for entity_id, entity in prov.body.get("entity", {}).items():
+    print(f"Entity: {entity_id}")
 
 # Get provenance in specific format
 prov_turtle = client.provenance(
@@ -153,24 +153,30 @@ W3C PROV-JSONLD document, for example:
 # Extract complete workflow lineage
 prov = client.provenance(job_reference="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 
-# Document software versions used
-for agent in prov.body.get("agents", []):
-    print(f"Software: {agent['label']} v{agent['version']}")
+# Document software packages used
+def as_list(value):
+    return value if isinstance(value, list) else [value]
+
+for agent_id, agent in prov.body.get("agent", {}).items():
+    for item in as_list(agent):
+        for prov_type in as_list(item.get("prov:type", [])):
+            if prov_type.get("$") == "prov:SoftwareAgent":
+                print(f"{agent_id}: {item.get('prov:label')}")
 ```
 
 ### Data Lineage Tracking
 
 ```python
 # Trace data derivation chain
-for derivation in prov.body.get("wasDerivedFrom", []):
-    print(f"{derivation['entity']} derived from {derivation['source']}")
+for derivation in prov.body.get("wasDerivedFrom", {}).values():
+    print(f"{derivation['prov:generatedEntity']} derived from {derivation['prov:usedEntity']}")
 ```
 
 ### Compliance and Auditing
 
 ```bash
 # Export provenance for archival
-weaver provenance -u $WEAVER_URL -j $JOB_ID --format xml > compliance/job-$JOB_ID-prov.xml
+weaver provenance -u $WEAVER_URL -j $JOB_ID --prov-format PROV-XML > compliance/job-$JOB_ID-prov.xml
 ```
 
 ## Related Skills

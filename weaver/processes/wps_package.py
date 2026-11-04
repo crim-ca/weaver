@@ -71,6 +71,8 @@ from weaver.formats import (
     get_cwl_file_format,
     get_extension,
     get_format,
+    is_directory_media_type,
+    is_zarr_media_type,
     map_cwl_media_type,
     repr_json
 )
@@ -1381,9 +1383,12 @@ def format_extension_validator(data_input, mode):
     if mode == MODE.NONE or data_input.data_format is None:
         return True
     extensions = get_extension(data_input.data_format.mime_type, dot=True, variants=True)
+    extensions = [extensions] if isinstance(extensions, str) else extensions
     ref = getattr(data_input._iohandler, "_file") or getattr(data_input._iohandler, "_url")
-    ref_ext = os.path.splitext(ref)[-1].lower()
-    return not ref_ext or ref_ext in extensions  # allow anonymous URL without extension
+    ref = ref.lower()
+    ref_ext = os.path.splitext(ref)[-1]
+    # compare complete suffixes since some extensions are compound (e.g.: '.zarr.zip')
+    return not ref_ext or any(ref.endswith(ext) for ext in extensions)  # allow anonymous URL without extension
 
 
 class DirectoryNestedStorage(CachedStorage):
@@ -2734,7 +2739,12 @@ class WpsPackage(Process):
             input_location = f"file://{input_location}"
 
         location = {"location": input_location, "class": cwl_input_def.type}
-        if input_definition.data_format is not None and input_definition.data_format.mime_type:
+        # CWL 'format' is File-only, a Directory (e.g.: Zarr) must not receive it
+        if (
+            cwl_input_def.type == PACKAGE_FILE_TYPE
+            and input_definition.data_format is not None
+            and input_definition.data_format.mime_type
+        ):
             fmt = get_cwl_file_format(input_definition.data_format.mime_type, make_reference=True)
             if fmt is not None:
                 # in certain cases, the input format might not have been mapped to the exact one in the process
@@ -2940,6 +2950,14 @@ class WpsPackage(Process):
         When the media-type is resolved, ensure that an appropriate format validator is applied to perform relevant
         checks, or omit them when not implemented.
         """
+        if is_directory_media_type(result_cwl_format):
+            # CWL Directory has no 'format', so a Zarr type can only come from the process definition
+            zarr_formats = [fmt for fmt in output.supported_formats if is_zarr_media_type(fmt.mime_type)]
+            if zarr_formats:
+                if not is_zarr_media_type(output.data_format.mime_type):
+                    output.data_format = zarr_formats[0]
+                output.valid_mode = MODE.NONE  # store name is not required to match the extension
+                return
         result_ctype = map_cwl_media_type(result_cwl_format)
         if not result_ctype:
             # fallback attempt using extension if available

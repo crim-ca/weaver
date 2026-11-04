@@ -125,6 +125,10 @@ class ContentType(Constants):
     TEXT_YAML = "text/yaml"             # deprecated
     APP_XYZ = "application/x-xyz"       # raw 3D points / LiDAR
     APP_ZIP = "application/zip"
+    APP_ZARR = "application/vnd.zarr"                  # directory-based store, any version
+    APP_ZARR_V2 = "application/vnd.zarr; version=2"
+    APP_ZARR_V3 = "application/vnd.zarr; version=3"
+    APP_ZARR_ZIP = "application/zarr+zip"              # zipped store, distinct from plain application/zip
     IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
     IMAGE_OGC_GEOTIFF = "image/tiff; application=geotiff"
     IMAGE_COG = "image/tiff; application=geotiff; profile=cloud-optimized"
@@ -155,6 +159,8 @@ class ContentType(Constants):
     ANY_LEGACY = {APP_OGC_GEOTIFF, APP_JPEG2000}
     ANY_GEOJSON = {APP_GEOJSON, APP_VDN_GEOJSON}
     ANY_YAML = {APP_YAML, APP_X_YAML, TEXT_YAML, TEXT_X_YAML}
+    # 'APP_ZARR_ZIP' is excluded on purpose: it is a single ZIP file (CWL 'File'), not a directory (CWL 'Directory')
+    ANY_ZARR = {APP_ZARR, APP_ZARR_V2, APP_ZARR_V3}
     ANY_JSON = {
         APP_JSON, *ANY_YAML, *ANY_GEOJSON,
         APP_CWL, APP_CWL_JSON, APP_CWL_X, APP_CWL_YAML,
@@ -493,6 +499,10 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_FORM: "",
     ContentType.MULTIPART_FORM: "",
     ContentType.IMAGE_SVG_XML: ".svg",
+    ContentType.APP_ZARR: ".zarr",
+    ContentType.APP_ZARR_V2: ".zarr",
+    ContentType.APP_ZARR_V3: ".zarr",
+    ContentType.APP_ZARR_ZIP: ".zarr.zip",
 }
 _CONTENT_TYPE_FORMAT_OVERRIDES = {
     # align encoding with PyWPS variant
@@ -867,6 +877,47 @@ def get_content_type(extension, charset=None, default=None):
     if not ctype:
         return default
     return add_content_type_charset(ctype, charset)
+
+
+ZARR_METADATA_FILES = frozenset(["zarr.json", ".zgroup", ".zarray", ".zattrs", ".zmetadata"])  # v3, v2
+"""
+Known Zarr metadata file names, which also allow detecting a Zarr directory store from its listing.
+"""
+
+
+def is_zarr_media_type(media_type):
+    # type: (Any) -> bool
+    """
+    Indicates if the media-type is a Zarr directory store of any version (parameters ignored).
+    """
+    if not media_type or not isinstance(media_type, str):
+        return False
+    return clean_media_type_format(media_type, strip_parameters=True) == ContentType.APP_ZARR
+
+
+def get_zarr_version(media_type):
+    # type: (Any) -> Optional[str]
+    """
+    Obtains the ``version`` parameter of a Zarr media-type, or ``None`` for the generic type without any version.
+    """
+    if not is_zarr_media_type(media_type):
+        return None
+    for param in str(media_type).split(";")[1:]:
+        key, _, value = param.partition("=")
+        if key.strip().lower() == "version":
+            return value.strip().strip("\"") or None
+    return None
+
+
+def is_directory_media_type(media_type):
+    # type: (Any) -> bool
+    """
+    Indicates if the media-type represents a directory structure rather than a single file.
+    """
+    if not media_type or not isinstance(media_type, str):
+        return False
+    ctype = clean_media_type_format(media_type, strip_parameters=True)
+    return ctype in [ContentType.APP_DIR, ContentType.APP_ZARR]
 
 
 @cache

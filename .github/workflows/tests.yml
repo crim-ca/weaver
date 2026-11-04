@@ -44,7 +44,7 @@ jobs:
       CONDA_CMD: ""
       DOCKER_TEST_EXEC_ARGS: "-T"
       # globally excluded 'checks', to be re-executed by dedicated job
-      CHECKS_EXCLUDE: "links"
+      CHECKS_EXCLUDE: "links check-security-secrets"
     services:
       # Label used to access the service container
       mongodb:

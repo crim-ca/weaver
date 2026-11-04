@@ -68,7 +68,15 @@ from yaml.scanner import ScannerError
 from weaver.base import Constants, ExtendedEnum
 from weaver.compat import Version
 from weaver.exceptions import WeaverException
-from weaver.formats import ContentType, get_content_type, get_extension, get_format, repr_json
+from weaver.formats import (
+    ZARR_METADATA_FILES,
+    ContentType,
+    get_content_type,
+    get_extension,
+    get_format,
+    is_zarr_media_type,
+    repr_json
+)
 from weaver.status import map_status
 from weaver.warning import TimeZoneInfoAlreadySetWarning, UndefinedContainerWarning
 from weaver.xml_util import HTML_TREE_BUILDER, XML
@@ -1485,7 +1493,8 @@ def get_href_headers(
     :param content_type:
         Explicit ``Content-Type`` to provide.
         Otherwise, use default guessed by file system (often ``application/octet-stream``).
-        If the reference is a directory, this parameter is ignored and ``application/directory`` will be enforced.
+        If the reference is a directory, ``application/directory`` is enforced, unless the specified media-type
+        is a Zarr variant (``application/vnd.zarr``), which is preserved.
         Requires that :paramref:`content_headers` is enabled.
     :param content_disposition_type:
         Whether ``inline`` or ``attachment`` should be used.
@@ -1536,7 +1545,7 @@ def get_href_headers(
             f_size = sum(int(get_header("Content-Length", meta, default=0)) for meta in listing)
         else:  # either empty directory, filtered contents, or failed to retrieve listing
             f_size = "0"
-        f_type = ContentType.APP_DIR
+        f_type = content_type if is_zarr_media_type(content_type) else ContentType.APP_DIR
 
     # handle single file
     else:
@@ -2594,8 +2603,8 @@ def get_secure_path(location):
     return secure_loc
 
 
-def download_file_http(file_reference, file_outdir, settings=None, callback=None, **request_kwargs):
-    # type: (str, str, Optional[AnySettingsContainer], Optional[Callable[[str], None]], **Any) -> str
+def download_file_http(file_reference, file_outdir, settings=None, callback=None, keep_name=False, **request_kwargs):
+    # type: (str, str, Optional[AnySettingsContainer], Optional[Callable[[str], None]], bool, **Any) -> str
     """
     Downloads the file referenced by an HTTP URL location.
 
@@ -2609,6 +2618,9 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
     :param callback:
         Function that gets called progressively with incoming chunks from downloaded file.
         Can be used to monitor download progress or raise an exception to abort it.
+    :param keep_name:
+        Preserve the file name from the URL as is, without adding a default extension resolved from ``Content-Type``.
+        Required when the name is meaningful without extension (e.g.: chunk files of a `Zarr` directory).
     :param request_kwargs: Additional keywords to forward to request call (if needed).
     :return: Path of the local copy of the fetched file.
     :raises HTTPException: applicable HTTP-based exception if any unrecoverable problem occurred during fetch request.
@@ -2666,8 +2678,14 @@ def download_file_http(file_reference, file_outdir, settings=None, callback=None
     # Check secure name/extension components individually since a default extension could be resolved if not explicitly
     # provided through 'Content-Disposition' header. Consider that explicitly provided no-extension file name is valid.
     file_name, file_ext = os.path.splitext(file_name)
-    file_name = get_secure_filename(file_name)
-    file_ext = get_secure_filename(file_ext) if file_ext or file_url is None else get_secure_filename(content_type_ext)
+    if not (keep_name and file_name in ZARR_METADATA_FILES):  # sanitization strips the leading dot of '.zgroup', etc.
+        file_name = get_secure_filename(file_name)
+    if file_ext or file_url is None:
+        file_ext = get_secure_filename(file_ext)
+    elif keep_name:
+        file_ext = ""  # extensionless Zarr chunk (e.g.: 'c/0', often application/zstd data) must keep its name as is
+    else:
+        file_ext = get_secure_filename(content_type_ext)
     if not FILE_NAME_LOOSE_PATTERN.match(file_name):
         raise ValueError(
             f"Invalid file name [{file_name!s}] resolved from URL [{file_reference}]. "
@@ -2934,6 +2952,7 @@ def fetch_file(file_reference,                      # type: str
                out_method=OutputMethod.AUTO,        # type: OutputMethod
                settings=None,                       # type: Optional[AnySettingsContainer]
                callback=None,                       # type: Optional[Callable[[str], None]]
+               keep_name=False,                     # type: bool
                **option_kwargs,                     # type: Unpack[Union[SchemeOptions, RequestOptions]]
                ):                                   # type: (...) -> Path
     """
@@ -2962,6 +2981,8 @@ def fetch_file(file_reference,                      # type: str
     :param out_method:
         Method employed to handle the generation of the output file.
         Only applicable when the file reference is local. Remote location always generates a local copy.
+    :param keep_name:
+        Preserve the remote file name as is, without adding a default extension (see :func:`download_file_http`).
     :param option_kwargs:
         Additional keywords to forward to the relevant handling method by scheme.
         Keywords should be defined as ``{scheme}_{option}`` with one of the known :data:`SUPPORTED_FILE_SCHEMES`.
@@ -3005,6 +3026,7 @@ def fetch_file(file_reference,                      # type: str
             file_outdir,
             settings=settings,
             callback=callback,
+            keep_name=keep_name,
             **options["http"],
             **kwargs
         )
@@ -3380,6 +3402,13 @@ def fetch_files_url(file_references,                    # type: Iterable[str]
     file_refs_relative = {os.path.join(base_url, path) for path in file_refs_relative}
     file_references = sorted(list(set(file_refs_relative) | set(file_refs_absolute)))
 
+    # Zarr chunk/metadata files have no extension (or only a dot-prefix), which must not be altered by a default one.
+    # Strip any query (e.g.: signed URL tokens) to match the file name itself.
+    keep_names = any(
+        os.path.basename(get_url_without_query(path)) in ZARR_METADATA_FILES
+        for path in file_references
+    )
+
     if out_method == OutputMethod.META:
         return [
             get_href_headers(
@@ -3424,7 +3453,7 @@ def fetch_files_url(file_references,                    # type: Iterable[str]
             _out_file = os.path.join(out_dir, os.path.split(_file_path)[-1])
         _out_dir = os.path.split(_out_file)[0]
         try:
-            return fetch_file(_file_path, _out_dir, out_method=out_method,
+            return fetch_file(_file_path, _out_dir, out_method=out_method, keep_name=keep_names,
                               settings=settings, callback=_abort_callback, **option_kwargs)
         except Exception as exc:
             LOGGER.error("Error raised in download worker for [%s]: [%s]", _file_path, exc, exc_info=exc)

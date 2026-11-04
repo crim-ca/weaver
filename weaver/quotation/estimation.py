@@ -101,6 +101,7 @@ class CurrencyConverter(object):
                 "from": from_currency.upper(),
                 "to": to_currency.upper(),
                 "value": currency,
+                "amount": currency,
                 "token": self.token,
             }
         )
@@ -147,8 +148,14 @@ CURRENCY_CONVERTERS = {cvt.name: cvt for cvt in [
     ),
     # https://fixer.io/documentation (see "Convert Endpoint" section)
     CurrencyConverter(
-        "openexchangerates",
+        "fixer",
         url="https://data.fixer.io/api/convert?access_key={token}&from={from}&to={to}&amount={amount}",
+        parser=lambda _json: _json["result"],
+    ),
+    # https://allratestoday.com/open-api/ (keyless ECB reference rates, "exchangeratesapi" compatible response)
+    CurrencyConverter(
+        "allratestoday",
+        url="https://allratestoday.com/api/compat/exchangeratesapi/convert?from={from}&to={to}&amount={amount}",
         parser=lambda _json: _json["result"],
     ),
     # https://www.x-rates.com/calculator/?from=USD&to=EUR&amount=1
