@@ -277,6 +277,11 @@ class WeaverResearchObject(ResearchObject):
         )
         document = prov_profile.document
 
+        # following agents are expected to exist (created by inherited class)
+        user_uuid = self.orcid or cwl_prov_const.USER_UUID
+        user_agent = document.get_record(user_uuid)[0]
+        wf_agent = document.get_record(self.engine_uuid)[0]  # current job run aligned with cwl workflow
+
         doi_ns = document.add_namespace("doi", "https://doi.org/")
 
         weaver_full_name = f"crim-ca/weaver:{weaver_version}"
@@ -343,19 +348,12 @@ class WeaverResearchObject(ResearchObject):
                 server_provider_meta,
             )
 
-        job_entity = document.entity(
-            self.job.uuid.urn,
-            {
-                prov_const.PROV_TYPE: cwl_prov_const.WFDESC["ProcessRun"],
-                prov_const.PROV_LOCATION: self.job.job_url(self.settings),
-                prov_const.PROV_LABEL: "Job Information",
-            }
-        )
         proc_url = self.job.process_url(self.settings)
         proc_id = f"{self.job.service}:{self.job.process}" if self.job.service else self.job.process
         proc_uuid = f"{weaver_instance_sha1}:{proc_id}"
+        proc_sha1 = self.sha1_uuid(document, proc_uuid)
         proc_entity = document.entity(
-            proc_uuid,
+            proc_sha1,
             {
                 prov_const.PROV_TYPE: cwl_prov_const.WFDESC["Process"],
                 prov_const.PROV_LOCATION: proc_url,
@@ -363,35 +361,44 @@ class WeaverResearchObject(ResearchObject):
             }
         )
 
-        # following agents are expected to exist (created by inherited class)
-        cwltool_agent = document.get_record(cwl_prov_const.ACCOUNT_UUID)[0]
-        user_uuid = self.orcid or cwl_prov_const.USER_UUID
-        user_agent = document.get_record(user_uuid)[0]
-        wf_agent = document.get_record(self.engine_uuid)[0]  # current job run aligned with cwl workflow
+        # NOTE: Since prov 3.0.0 enforces PROV-CONSTRAINTS, this must
+        # be an activity, not an entity, as it shares the ID of the
+        # WorkflowRun.
+        job_url = self.job.job_url(self.settings)
+        job_activity = document.activity(
+            self.job.uuid.urn,
+            other_attributes={
+                prov_const.PROV_TYPE: cwl_prov_const.WFPROV["ProcessRun"],
+                prov_const.PROV_LOCATION: job_url,
+                prov_const.PROV_LABEL: "Job Information",
+                cwl_prov_const.WFPROV["wasEnactedBy"]: wf_agent,
+                cwl_prov_const.WFPROV["describedByProcess"]: proc_entity,
+            }
+        )
+        # Add a wasStartedBy relation (this is redundant for
+        # single-process jobs, but will unify in RDF or JSONLD)
+        document.wasStartedBy(activity=job_activity, starter=wf_agent)
 
-        # adjust user agent as software rather than person (see 'resolve_user'), and leave any other types untouched
-        user_types = cast(set, user_agent.get_attribute(prov_const.PROV_TYPE))
-        user_types.symmetric_difference_update({
-            prov_const.PROV["Person"],
-            cwl_prov_const.SCHEMA["Person"],
-            prov_const.PROV["SoftwareAgent"],
-            cwl_prov_const.SCHEMA["SoftwareApplication"],
-        })
+        # NOTE: This is a somewhat fragile workaround for cwlprov
+        # unconditionally creating the user agent as a Person.  The
+        # intent of PROV is that records should be update-only to
+        # ensure their integrity, but the only other way to solve this
+        # would be to duplicate all of the functionality in
+        # `ResearchObject.user_provenance`.
+        user_types = user_agent._attributes[prov_const.PROV_TYPE]
+        user_types.discard(prov_const.PROV["Person"])
+        user_types.discard(cwl_prov_const.SCHEMA["Person"])
+        user_types.add(prov_const.PROV["SoftwareAgent"])
+        user_types.add(cwl_prov_const.SCHEMA["SoftwareApplication"])
 
-        # define relationships cross-references: https://wf4ever.github.io/ro/wfprov.owl
-        document.primary_source(weaver_instance_agent, weaver_code_entity)
-        document.actedOnBehalfOf(weaver_instance_agent, user_agent)
-        document.specializationOf(weaver_instance_agent, cwltool_agent)
-        document.attribution(crim_entity, weaver_code_entity)
-        document.wasDerivedFrom(cwltool_agent, weaver_instance_agent)
-        document.wasStartedBy(job_entity, weaver_instance_agent)
-        document.wasStartedBy(wf_agent, job_entity, time=self.job.created)
-        document.specializationOf(wf_agent, job_entity)
-        document.alternateOf(wf_agent, job_entity)
-        document.wasGeneratedBy(job_entity, proc_entity)
+        # Define PROV relations
+        document.hadPrimarySource(generatedEntity=weaver_instance_agent, usedEntity=weaver_code_entity)
+        document.actedOnBehalfOf(delegate=weaver_instance_agent, responsible=user_agent)
+        document.wasAttributedTo(entity=crim_entity, agent=weaver_code_entity)
         if server_provider_entity:
-            document.derivation(server_provider_entity, weaver_instance_agent)
-            document.attribution(server_provider_entity, weaver_instance_agent)
+            document.wasDerivedFrom(generatedEntity=server_provider_entity,
+                                    usedEntity=weaver_instance_agent)
+            document.wasAttributedTo(entity=server_provider_entity, agent=weaver_instance_agent)
 
         return prov_profile
 
