@@ -314,7 +314,7 @@ class WeaverResearchObject(ResearchObject):
         weaver_code_sha1 = self.sha1_uuid(document, weaver_code_url)
         weaver_code_entity = document.entity(
             weaver_code_sha1,
-            {
+            other_attributes={
                 prov_const.PROV_TYPE: cwl_prov_const.SCHEMA["SoftwareSourceCode"],
                 prov_const.PROV_LABEL: "Source code repository",
                 prov_const.PROV_LOCATION: weaver_code_url,
@@ -341,7 +341,7 @@ class WeaverResearchObject(ResearchObject):
         crim_sha1 = self.sha1_uuid(document, crim_name)
         crim_agent = document.agent(
             crim_sha1,
-            {
+            other_attributes={
                 prov_const.PROV_TYPE: prov_const.PROV["Organization"],
                 cwl_prov_const.FOAF["name"]: crim_name,
                 cwl_prov_const.SCHEMA["name"]: crim_name,
@@ -372,7 +372,7 @@ class WeaverResearchObject(ResearchObject):
             ])
             server_provider_agent = document.agent(
                 server_provider_sha1,
-                server_provider_meta,
+                other_attributes=server_provider_meta,
             )
 
         proc_url = self.job.process_url(self.settings)
@@ -381,7 +381,7 @@ class WeaverResearchObject(ResearchObject):
         proc_sha1 = self.sha1_uuid(document, proc_uuid)
         proc_entity = document.entity(
             proc_sha1,
-            {
+            other_attributes={
                 prov_const.PROV_TYPE: cwl_prov_const.WFDESC["Process"],
                 prov_const.PROV_LOCATION: proc_url,
                 prov_const.PROV_LABEL: "Process Description",
@@ -398,8 +398,8 @@ class WeaverResearchObject(ResearchObject):
                 prov_const.PROV_TYPE: cwl_prov_const.WFPROV["ProcessRun"],
                 prov_const.PROV_LOCATION: job_url,
                 prov_const.PROV_LABEL: "Job Information",
-                cwl_prov_const.WFPROV["wasEnactedBy"]: wf_agent,
-                cwl_prov_const.WFPROV["describedByProcess"]: proc_entity,
+                cwl_prov_const.WFPROV["wasEnactedBy"]: wf_agent.identifier,
+                cwl_prov_const.WFPROV["describedByProcess"]: proc_entity.identifier,
             }
         )
         # Add a wasStartedBy relation (this is redundant for
@@ -424,7 +424,7 @@ class WeaverResearchObject(ResearchObject):
         if server_provider_agent:
             document.actedOnBehalfOf(delegate=weaver_instance_agent,
                                      responsible=server_provider_agent)
-        # Relate Weaver code to everything else via the job activity
+        # Relate Weaver code to job activity
         document.used(activity=job_activity, entity=weaver_code_entity)
 
         return prov_profile
@@ -547,7 +547,7 @@ def _ogc_prov_objects(document):
         key = record.identifier.uri
         if key in objects_by_uri:
             # This should actually never happen due to unification
-            LOGGER.warning("Duplicate %s record %d in unified PROV",
+            LOGGER.warning("Duplicate %s record %s in unified PROV",
                            record_type, key)
             continue
         prov_obj: dict[str, Any] = {"id": key, prov_type_field: record_type}
@@ -555,7 +555,7 @@ def _ogc_prov_objects(document):
             # This is always a `set`, which is why we convert it to a
             # `list` (to make it serializable as JSON)
             prov_obj["value"] = list(record.value)
-        if record.label != record.identifier:
+        if record.label != str(record.identifier):
             prov_obj["name"] = record.label
         prov_types = [str(val) for val in record.get_attribute(prov_const.PROV_TYPE)]
         if prov_types:
