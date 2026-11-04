@@ -495,8 +495,6 @@ _RELATION_HANDLERS = {
     prov_const.PROV_SPECIALIZATION: RelationHandler("generalEntity", "specificEntity",
                                                     "specificEntity", "generalEntity"),
 }
-_RELATION_FIELDS = set([*(h.forward for h in _RELATION_HANDLERS.values()),
-                        *(h.inverse for h in _RELATION_HANDLERS.values())])
 # Specific field for the primary type (corresponding to @types in
 # PROV-JSONLD).  For some reason provType is only defined for Entity
 # and Activity.
@@ -628,12 +626,12 @@ def convert_to_prov_chain(input_data, root_uri=None):
 
     When `root_uri` is not ``None``, provenance will be returned for
     the specified object.  The first instance (in depth-first order)
-    of a referenced object will be nested in the graph, and subsequent
-    references will be included as IRIs.  Both forward and inverse
-    forms (using the recommended names from
-    https://www.w3.org/ns/prov-o-inverses) of PROV relations will be
-    added, in order to provide a complete graph when rooted at a
-    non-Entity.
+    of an object referenced in any relation or property of this object
+    will be nested in the graph, and subsequent references will be
+    included as IRIs.  Both forward and inverse forms (using the
+    recommended names from https://www.w3.org/ns/prov-o-inverses) of
+    PROV relations will be added, in order to provide a complete graph
+    when rooted at a non-Entity.
 
     In conformance with the JSON schema and PROV-JSONLD, the primary
     record type is returned in the ``provType`` or ``activityType``
