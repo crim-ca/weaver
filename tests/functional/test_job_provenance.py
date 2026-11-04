@@ -384,6 +384,23 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert "detail" in resp.json
 
     @parameterized.expand([
+        ({"f": ProvenanceFormat.PROV_XML}, ContentType.APP_PROV_XML),
+        ({"f": ProvenanceFormat.PROV_JSON}, ContentType.APP_PROV_JSON),
+    ])
+    def test_job_prov_format_query_precedence_over_profile(self, queries, expected_content_type):
+        """
+        Test that an explicit ``f`` query takes precedence over any ``Accept-Profile``, even unknown ones.
+        """
+        prov_url = f"{self.job_url}/prov"
+        for profile in [
+            "https://ogcincubator.github.io/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json",
+            "http://example.org/unknown",
+        ]:
+            resp = self.app.get(prov_url, params=queries, headers={"Accept-Profile": profile})
+            assert resp.status_code == 200
+            assert resp.content_type == expected_content_type
+
+    @parameterized.expand([
         ({}, {}),
         ({"f": OutputFormat.JSON}, {}),
         ({}, {"Accept": ContentType.APP_JSON}),
