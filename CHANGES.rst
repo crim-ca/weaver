@@ -60,6 +60,13 @@ Fixes:
   Inputs submitted with them are accepted by any `Process` that defines the official media-types, without explicitly
   listing them in its description. The legacy types are never selected when resolving media-types
   (e.g.: from file extensions).
+- Add ``PROV-OGC-JSON`` format and associated profile returning `OGC Provenance Chain JSON
+  <https://ogcincubator.github.io/bblock-prov-schema/bblock/ogc.ogc-utils.prov/json-schema>`_, a simplified
+  graph-centric JSON representation of provenance for OGC Processes workflows (resolves `#1017
+  <https://github.com/crim-ca/weaver/issues/1017>`_)
+
+Fixes:
+------
 - Add keyless ``allratestoday`` option for ``weaver.quotation_currency_converter``, using the daily `ECB` reference
   rates through an ``exchangeratesapi`` compatible ``convert`` response.
 - Fix ``PATCH`` requests silently dropping per-``id`` ``inputs``/``outputs`` ``metadata``
@@ -116,6 +123,8 @@ Fixes:
 - Remove inconsistent and redundant timestamps from the generated PROV.
 - Ensure that the user agent in the PROV document is created as a ``SoftwareAgent`` not a ``Person`` with recent
   versions of ``prov`` that more strongly enforce update-only ``ProvRecord``.
+- Correct record types in the generated PROV and remove inconsistent relations.
+- Correct `Swagger-UI` to show the correct profiles for the provenance endpoint.
 
 .. _changes_6.16.0:
 

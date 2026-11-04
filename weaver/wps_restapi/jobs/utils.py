@@ -1879,8 +1879,14 @@ def get_job_prov_response(request):
 
     prov_path = request.path.rsplit("/prov", 1)[-1]
     prov_path = f"/prov{prov_path}"
+    prov_fmt = None  # type: Union[ProvenanceFormat, None]
 
     def prov_format_handler(fmt):
+        # guess_target_format() returns a general media type, which
+        # doesn't permit us to distinguish different "flavors" of
+        # provenance in JSON format, so we need to "capture" the
+        # explicitly requested provenance format, if any.
+        nonlocal prov_fmt
         if isinstance(fmt, str):
             fmt = fmt.strip()
             # special case of 'application/ld+json'
@@ -1916,17 +1922,32 @@ def get_job_prov_response(request):
                 "detail": "Job provenance format could not be identified or is not supported.",
                 "cause": str(fmt),
             })
-        return prov_fmt
+        # No override to content type
+        return None
 
-    prov_type = guess_target_format(
+    prov_content_type = guess_target_format(
         request,
         override_user_agent=True,
-        default=ContentType.APP_PROV_JSON,
+        default=ContentType.APP_JSON,
         format_handler=prov_format_handler,
     )
-    prov_type = clean_media_type_format(prov_type, strip_parameters=True)
-    prov_type_requested = prov_type
-    prov_data, prov_type = job.prov_data(request, prov_path, prov_type_requested)
+    prov_content_type = clean_media_type_format(prov_content_type, strip_parameters=True)
+    # explicit format=/f= takes precedence over a requested profile, itself taking precedence over the media-type
+    profile = get_response_profile(request) if prov_fmt is None else None
+    if profile:
+        prov_fmt = ProvenanceFormat.from_profile(profile)
+        if prov_fmt is None:
+            raise HTTPNotAcceptable(json={
+                "title": "JobProvenanceUnsupportedFormat",
+                "type": sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI,
+                "detail": "Job provenance format could not be identified or is not supported.",
+                "cause": str(profile),
+            })
+    if prov_fmt is None:
+        prov_fmt = ProvenanceFormat.get(prov_content_type, allow_media_type=True)
+    content_type_requested = prov_content_type
+    prov_data, prov_content_type = job.prov_data(request, prov_path,
+                                                 prov_fmt, content_type_requested)
     if not prov_data:
         prov_dir = job.prov_path(request)
         prov_exists = prov_dir and os.path.isdir(prov_dir)
@@ -1954,16 +1975,17 @@ def get_job_prov_response(request):
                 "title": "JobProvenanceUnsupportedFormat",
                 "type": sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI,
                 "detail": "Job provenance format could not be identified or is not supported.",
-                "cause": str(prov_type_requested),
+                "cause": str(content_type_requested),
             }
         prov_body["status"] = prov_err.code
         return prov_err(json=prov_body, content_type=ContentType.APP_JSON)
 
     links = job.links(container=request, self_link="provenance")
     headers = []
-    if prov_type != ContentType.TEXT_PLAIN:
-        profile = ProvenanceFormat.as_profile(prov_type)
+    if prov_content_type != ContentType.TEXT_PLAIN:
         headers = [("Content-Profile", sd.OGC_API_PROC_PROFILE_RESULTS_URI)]
-        links.append({"href": profile, "rel": "profile", "title": "Profile of the provenance metadata."})
+        profile = ProvenanceFormat.as_profile(prov_fmt)
+        if profile is not None:
+            links.append({"href": profile, "rel": "profile", "title": "Profile of the provenance metadata."})
     headers.extend([("Link", make_link_header(link)) for link in links])
-    return HTTPOk(body=prov_data, headers=headers, content_type=prov_type, charset="utf-8")
+    return HTTPOk(body=prov_data, headers=headers, content_type=prov_content_type, charset="utf-8")
