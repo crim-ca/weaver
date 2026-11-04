@@ -2,10 +2,12 @@
 # Fetch every W3C PROV representation and metadata view of a completed Weaver Job, and save them as the
 # example files consumed by weaver/wps_restapi/swagger_definitions.py (EXAMPLES / SCHEMA_EXAMPLE_DIR).
 #
-# Usage: job_prov_examples.sh JOBID
+# Usage: job_prov_examples.sh JOBID [WEAVER_URL]
 #
 # Run this script from the "weaver/wps_restapi/examples/" directory so that the generated
 # "job_prov*" files land next to the other examples. Requires "curl" and "jq".
+#
+# JOBID is required, WEAVER_URL is the URL of the Weaver instance, and defaults to http://localhost:4001.
 
 fix_urls() {
     sed -e "s,$WEAVER_URL,https://hirondelle.crim.ca/weaver,g" \

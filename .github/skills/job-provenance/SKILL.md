@@ -61,7 +61,7 @@ client = WeaverClient(url="https://weaver.example.com")
 prov = client.provenance(job_reference="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 
 # Access provenance entities
-for entity in prov.body.get("entities", []):
+for entity in prov.body.get("entity", []):
     print(f"Entity: {entity['id']}")
 
 # Get provenance in specific format
@@ -154,7 +154,7 @@ W3C PROV-JSONLD document, for example:
 prov = client.provenance(job_reference="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 
 # Document software versions used
-for agent in prov.body.get("agents", []):
+for agent in prov.body.get("agent", []):
     print(f"Software: {agent['label']} v{agent['version']}")
 ```
 
