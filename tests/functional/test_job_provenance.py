@@ -367,6 +367,23 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert "detail" in resp.json
 
     @parameterized.expand([
+        ({}, {"Accept-Profile": "http://example.org/unknown"}),
+        ({}, {"Accept": ContentType.APP_JSON,
+              "Accept-Profile": "http://example.org/unknown"}),
+    ])
+    def test_job_prov_unsupported_profile(self, queries, headers):
+        """
+        Test unsupported profile returns 406 Not Acceptable with proper error type.
+        """
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers, expect_errors=True)
+        assert resp.status_code == 406, f"Expected 406, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        assert "type" in resp.json, "Error response must include 'type' field"
+        assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI
+        assert "detail" in resp.json
+
+    @parameterized.expand([
         ({}, {}),
         ({"f": OutputFormat.JSON}, {}),
         ({}, {"Accept": ContentType.APP_JSON}),
