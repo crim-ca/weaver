@@ -169,8 +169,8 @@ class ProvenanceFormat(Constants):
         return ctype
 
     @classmethod
-    def as_profile(cls, prov_format, output_format=None):
-        # type: (Optional[AnyProvenanceFormat], Optional[AnyOutputFormat]) -> Optional[URL]
+    def as_profile(cls, prov_format):
+        # type: (Optional[AnyProvenanceFormat]) -> Optional[URL]
         return cls._profiles.get(prov_format)
 
     @classmethod
