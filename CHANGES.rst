@@ -125,7 +125,6 @@ Fixes:
   versions of ``prov`` that more strongly enforce update-only ``ProvRecord``.
 - Correct record types in the generated PROV and remove inconsistent relations.
 - Correct `Swagger-UI` to show the correct profiles for the provenance endpoint.
-- Ensure that the compatible version of ``setuptools`` is installed during ``make check`` to avoid crashing.
 
 .. _changes_6.16.0:
 

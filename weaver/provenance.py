@@ -347,7 +347,6 @@ class WeaverResearchObject(ResearchObject):
                 cwl_prov_const.SCHEMA["name"]: crim_name,
             }
         )
-        # Define PROV relation linking CRIM to Weaver code
         document.wasAttributedTo(weaver_code_entity, agent=crim_agent)
 
         server_provider_name = self.settings.get("weaver.wps_metadata_provider_name")
@@ -418,13 +417,10 @@ class WeaverResearchObject(ResearchObject):
         user_types.add(prov_const.PROV["SoftwareAgent"])
         user_types.add(cwl_prov_const.SCHEMA["SoftwareApplication"])
 
-        # Define PROV relations linking weaver instance to user agent
-        # and server provider (also an agent)
         document.actedOnBehalfOf(delegate=weaver_instance_agent, responsible=user_agent)
         if server_provider_agent:
             document.actedOnBehalfOf(delegate=weaver_instance_agent,
                                      responsible=server_provider_agent)
-        # Relate Weaver code to job activity
         document.used(activity=job_activity, entity=weaver_code_entity)
 
         return prov_profile
@@ -662,7 +658,6 @@ def convert_to_prov_chain(input_data, root_uri=None):
     """
     document = ProvDocument.deserialize(content=input_data, format="json")
     objects_by_uri = _ogc_prov_objects(document)
-    # Fail fast if an unknown root URI is requested
     root_obj = None
     if root_uri is not None:
         root_obj = objects_by_uri.get(root_uri)
@@ -680,7 +675,6 @@ def convert_to_prov_chain(input_data, root_uri=None):
         elif existing != uri:
             prov[prop] = [existing, uri]
 
-    # Add recognized relations to recognized subjects
     for record in document.get_records(ProvRelation):
         handler = _RELATION_HANDLERS.get(record.get_type())
         if handler is None:
@@ -693,7 +687,6 @@ def convert_to_prov_chain(input_data, root_uri=None):
         obj = formal.get(handler.object_role)
         if obj is None:
             continue
-        # For list form, resolve only forward relations for subjects
         subj_prov = objects_by_uri.get(subj.uri)
         if subj_prov is None:
             # Relation referencing a record not declared in this document
@@ -701,7 +694,6 @@ def convert_to_prov_chain(input_data, root_uri=None):
         _resolve_relation(subj_prov, handler.forward, obj.uri)
         if root_obj is None:
             continue
-        # For object form, resolve inverse relations for objects as well
         obj_prov = objects_by_uri.get(obj.uri)
         if obj_prov is None:
             # Relation referencing a record not declared in this document
@@ -716,5 +708,4 @@ def convert_to_prov_chain(input_data, root_uri=None):
         expanded.add(root_uri)
         return json.dumps(_ogc_prov_nested(objects_by_uri, root_obj, expanded))
     else:
-        # List form: Output resolved objects in document order
         return json.dumps([objects_by_uri[key] for key in objects_by_uri])

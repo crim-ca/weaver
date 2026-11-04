@@ -1925,16 +1925,13 @@ def get_job_prov_response(request):
         # No override to content type
         return None
 
-    # Despite its name this actually returns a media type, not a format
     prov_content_type = guess_target_format(
         request,
         override_user_agent=True,
         default=ContentType.APP_JSON,
         format_handler=prov_format_handler,
     )
-    # Base media type (with subtype but without parameters)
     prov_content_type = clean_media_type_format(prov_content_type, strip_parameters=True)
-    # If we did not have an explicitly requested format then find one from media type
     if prov_fmt is None:
         prov_fmt = ProvenanceFormat.get(prov_content_type, allow_media_type=True)
     # In addition to the explicit format=/f= parameter the user can
@@ -1944,7 +1941,6 @@ def get_job_prov_response(request):
         # will raise JobProvenanceUnsupportedFormat on unknown profile
         prov_fmt = ProvenanceFormat.from_profile(profile)
     content_type_requested = prov_content_type
-    # Pass both the requested media type and the specific format
     prov_data, prov_content_type = job.prov_data(request, prov_path,
                                                  prov_fmt, content_type_requested)
     if not prov_data:
