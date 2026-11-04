@@ -119,7 +119,6 @@ Fixes:
   such as on non-Linux systems.
 - Avoid linting installed virtual environments in ``make check``.
 - Correct `Swagger-UI` to show the correct profiles for the provenance endpoint.
-- Ensure that the compatible version of ``setuptools`` is installed during ``make check`` to avoid crashing.
 
 .. _changes_6.16.0:
 
