@@ -20,7 +20,7 @@ from weaver.formats import ContentType, OutputFormat
 from weaver.utils import get_weaver_url
 
 if TYPE_CHECKING:
-    from typing import Any, List, Optional, Tuple, Union
+    from typing import Any, List, Optional, Set, Tuple, Union
     from uuid import UUID
 
     from cwltool.cwlprov.provenance_profile import ProvenanceProfile
@@ -588,19 +588,22 @@ def _ogc_prov_objects(document):
 
 
 def _ogc_prov_nested(objects_by_uri, root_obj, expanded):
-    # type: (dict[str, dict[str, Any]], dict[str, Any], set[str]) -> dict[str, Any]
-    for attr, vals in root_obj.items():
-        if not isinstance(vals, list):
-            vals = [vals]
-        for idx, uri in enumerate(vals):
+    # type: (dict[str, dict[str, Any]], dict[str, Any], Set[Union[str, None]]) -> dict[str, Any]
+    for attr in list(root_obj):
+        if attr == "id":
+            continue
+        value = root_obj[attr]
+        is_list = isinstance(value, list)
+        items = value if is_list else [value]
+        for idx, uri in enumerate(items):
             if not isinstance(uri, str):
                 continue
             obj = objects_by_uri.get(uri)
             if uri in expanded or obj is None:
                 continue
             expanded.add(uri)
-            vals[idx] = _ogc_prov_nested(objects_by_uri, obj, expanded)
-        root_obj[attr] = vals[0] if len(vals) == 1 else vals
+            items[idx] = _ogc_prov_nested(objects_by_uri, obj, expanded)
+        root_obj[attr] = items if is_list else items[0]
     return root_obj
 
 
