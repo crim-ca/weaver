@@ -153,12 +153,16 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({}, {"Accept": f"{ContentType.APP_JSON}; "
               "profile=https://ogcincubator.github.io"
               "/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"}),
+        ({}, {"Accept-Profile": "https://ogcincubator.github.io"
+              "/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"}),
     ])
     def test_job_prov_ogc_json(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
         resp = self.app.get(prov_url, params=queries, headers=headers)
         assert resp.status_code == 200
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        # Make sure it is application/json and not application/provenance+json
+        assert resp.content_type == ContentType.APP_JSON
         prov = resp.json
         # Make sure it is an activity
         assert isinstance(prov, dict)
@@ -183,17 +187,16 @@ class TestJobProvenance(TestJobProvenanceBase):
          {"Accept": ContentType.APP_YAML,
           "Accept-Profile": "https://ogcincubator.github.io"
           "/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"}),
-        ({"f": "ogc-json"},
-         {"Accept-Profile": "https://ogcincubator.github.io"
-          "/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"}),
     ])
     def test_job_prov_ogc_yaml(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
         resp = self.app.get(prov_url, params=queries, headers=headers)
         assert resp.status_code == 200
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        # Ensure that we declare the result as YAML
+        assert resp.content_type == ContentType.APP_YAML
         prov = resp.text
-        # Ensure that we got actual YAML
+        # Ensure that we get actual YAML
         assert "id:" in prov
 
     @parameterized.expand([

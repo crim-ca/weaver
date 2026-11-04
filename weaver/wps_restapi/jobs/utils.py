@@ -1929,7 +1929,7 @@ def get_job_prov_response(request):
     prov_content_type = guess_target_format(
         request,
         override_user_agent=True,
-        default=ContentType.APP_PROV_JSON,
+        default=ContentType.APP_JSON,
         format_handler=prov_format_handler,
     )
     # Base media type (with subtype but without parameters)
