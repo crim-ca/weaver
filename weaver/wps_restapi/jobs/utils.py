@@ -1941,11 +1941,15 @@ def get_job_prov_response(request):
     # also request a provenance format using a profile
     profile = get_response_profile(request)
     if profile:
+        # will raise JobProvenanceUnsupportedFormat on unknown profile
         prov_fmt = ProvenanceFormat.from_profile(profile)
-    content_type_requested = prov_content_type
-    # Pass both the requested media type and the specific format
-    prov_data, prov_content_type = job.prov_data(request, prov_path,
-                                                 prov_fmt, content_type_requested)
+    if prov_fmt is None:
+        prov_data, prov_content_type = None, None
+    else:
+        content_type_requested = prov_content_type
+        # Pass both the requested media type and the specific format
+        prov_data, prov_content_type = job.prov_data(request, prov_path,
+                                                     prov_fmt, content_type_requested)
     if not prov_data:
         prov_dir = job.prov_path(request)
         prov_exists = prov_dir and os.path.isdir(prov_dir)
@@ -1981,8 +1985,9 @@ def get_job_prov_response(request):
     links = job.links(container=request, self_link="provenance")
     headers = []
     if prov_content_type != ContentType.TEXT_PLAIN:
-        profile = ProvenanceFormat.as_profile(prov_fmt)
         headers = [("Content-Profile", sd.OGC_API_PROC_PROFILE_RESULTS_URI)]
-        links.append({"href": profile, "rel": "profile", "title": "Profile of the provenance metadata."})
+        profile = ProvenanceFormat.as_profile(prov_fmt)
+        if profile is not None:
+            links.append({"href": profile, "rel": "profile", "title": "Profile of the provenance metadata."})
     headers.extend([("Link", make_link_header(link)) for link in links])
     return HTTPOk(body=prov_data, headers=headers, content_type=prov_content_type, charset="utf-8")
