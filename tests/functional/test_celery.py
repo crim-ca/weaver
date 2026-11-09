@@ -166,6 +166,7 @@ def test_celery_registry_resolution():
                 stderr=subprocess.PIPE,
                 env=subprocess_env,
                 timeout=5,
+                check=False,
             )
             inspect_output = inspect_ping.stdout + inspect_ping.stderr
             if inspect_ping.returncode == 0 and "pong" in inspect_output.lower():
