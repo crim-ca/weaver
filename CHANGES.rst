@@ -99,6 +99,11 @@ Fixes:
   ``metadata`` "Schema" link reference (empty ``href``, or missing required ``rel``), causing the corresponding
   `AllOf`/`OneOf` schema validation to fail and the whole `I/O` entry to be discarded instead of rendered.
 - Make test SVG profiling creation configurable and install Graphviz through the Makefile when the option is enabled.
+- Fix the Celery registry-resolution test failure seen with ``celery==5.7.0``/``kombu==5.7.0``. It also reproduces
+  with ``celery==5.6.3``/``kombu==5.6.2``, indicating a test setup issue rather than a ``_store_result`` regression.
+  The detached worker could be queried before it was ready, and its configuration pointed to the default ``weaver``
+  database instead of the test database, leaving task metadata unavailable. Wait for worker readiness and task
+  completion, configure the worker with the test database, and handle nullable traceback metadata.
 
 .. _changes_6.16.0:
 
