@@ -12,7 +12,9 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add Python 3.14 official support.
+- Add Python 3.15 as experimental support in CI.
+- Drop Python 3.10 EOL support.
 
 Fixes:
 ------

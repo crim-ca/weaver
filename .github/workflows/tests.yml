@@ -56,21 +56,20 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
         allow-failure: [false]
         test-server: [false]
         test-case: [test-unit-only, test-func-only]
         include:
           # experimental python
-          # not yet ready due to pywps->fiona dependency missing (https://github.com/Toblerity/Fiona/issues/1504)
-          #- os: ubuntu-latest
-          #  python-version: "3.14"
-          #  allow-failure: true
-          #  test-case: test-unit-only
-          #- os: ubuntu-latest
-          #  python-version: "3.14"
-          #  allow-failure: true
-          #  test-case: test-func-only
+          - os: ubuntu-latest
+            python-version: "3.15"
+            allow-failure: true
+            test-case: test-unit-only
+          - os: ubuntu-latest
+            python-version: "3.15"
+            allow-failure: true
+            test-case: test-func-only
           # linter tests
           # performs all 'check' targets except the 'CHECKS_EXCLUDE' ones (that should be defined by dedicated jobs)
           - os: ubuntu-latest
