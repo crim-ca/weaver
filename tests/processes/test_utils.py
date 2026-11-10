@@ -8,7 +8,7 @@ from typing import cast
 import mock
 import pytest
 import yaml
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented, HTTPUnprocessableEntity
 
 from tests import resources
 from tests.utils import (
@@ -23,10 +23,13 @@ from weaver.processes.constants import CWL_NAMESPACE_WEAVER_ID, CWL_REQUIREMENT_
 from weaver.processes.utils import (  # noqa: W0212
     _check_package_file,
     _classify_multipart_part,
+    _deploy_process_multi_cwl,
     _extract_multipart_profile,
     _extract_multipart_start_parameter,
     _get_multipart_content,
     _interpret_multipart_part,
+    _link_process_descriptions,
+    _merge_process_description,
     _organize_deploy_parts,
     _organize_job_execution_parts,
     _parse_multipart_message,
@@ -662,7 +665,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "test-tool"
-        assert process_desc is None
+        assert process_desc == []
 
     def test_parse_multipart_deploy_missing_boundary(self):
         """
@@ -733,7 +736,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "remote-tool"
-        assert process_desc is None
+        assert process_desc == []
 
     def test_parse_multipart_deploy_content_location_weaver_package(self, monkeypatch):
         """
@@ -774,7 +777,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "weaver-workflow"
-        assert process_desc is None
+        assert process_desc == []
 
     def test_parse_multipart_deploy_content_location_wps_endpoint(self, monkeypatch):
         """
@@ -814,7 +817,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "wps-process"
-        assert process_desc is None
+        assert process_desc == []
 
     def test_parse_multipart_deploy_content_location_relative_url(self, monkeypatch):
         """
@@ -867,7 +870,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "relative-tool"
-        assert process_desc is None
+        assert process_desc == []
 
     def test_parse_multipart_deploy_content_location_relative_url_no_request(self):
         """
@@ -946,7 +949,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "static-tool"
-        assert process_desc is None
+        assert process_desc == []
 
     def test_parse_multipart_deploy_content_location_failure(self, monkeypatch):
         """
@@ -1083,7 +1086,7 @@ class TestMultipartDeployment:
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "test-tool"
         assert cwl_packages[0]["class"] == "CommandLineTool"
-        assert process_desc is None
+        assert process_desc == []
 
     def test_parse_multipart_deploy_unicode_decode_error(self):
         """
@@ -1247,8 +1250,8 @@ class TestMultipartDeployment:
         cwl_packages, parsed_desc = parse_multipart_deploy(content, content_type, request=None)
 
         assert len(cwl_packages) == 1
-        assert parsed_desc is not None
-        assert parsed_desc.get("processDescription", {}).get("id") == "test-tool"
+        assert len(parsed_desc) == 1
+        assert parsed_desc[0].get("processDescription", {}).get("id") == "test-tool"
 
     def test_create_multipart_deploy_empty_list(self):
         """
@@ -1553,7 +1556,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "test-tool"
-        assert process_desc is None
+        assert process_desc == []
 
     def test_parse_multipart_message_valid(self):
         """
@@ -1726,7 +1729,7 @@ class TestMultipartDeployment:
         cwl_packages, process_desc = _organize_deploy_parts(interpreted_parts, root_workflow_cid="workflow-1")
 
         assert len(cwl_packages) == 2
-        assert process_desc is None
+        assert process_desc == []
         # Workflow should be last due to root_workflow_cid
         assert cwl_packages[-1]["class"] == "Workflow"
 
@@ -1764,8 +1767,98 @@ class TestMultipartDeployment:
         cwl_packages, process_desc = _organize_deploy_parts(interpreted_parts, root_workflow_cid=None)
 
         assert len(cwl_packages) == 1
-        assert process_desc is not None
-        assert process_desc["processDescription"]["title"] == "Test Tool"
+        assert len(process_desc) == 1
+        assert process_desc[0]["processDescription"]["title"] == "Test Tool"
+
+    def test_organize_deploy_parts_many_process_descriptions(self):
+        """
+        Test that each CWL can have its own description, and that a ``Content-ID`` can resolve a missing CWL ``id``.
+        """
+        tool_no_id = {"cwlVersion": "v1.2", "class": "CommandLineTool"}
+        interpreted_parts = [
+            (ContentType.APP_CWL_JSON, "tool-1@localhost", "", "", tool_no_id),
+            (ContentType.APP_CWL_JSON, "workflow-1@localhost", "", "", {
+                "cwlVersion": "v1.2",
+                "class": "Workflow",
+                "id": "workflow-1",
+            }),
+            (ContentType.APP_JSON, "", "", "", {"processDescription": {"title": "Main"}}),
+            (ContentType.APP_JSON, "", "", "", {"processDescription": {"id": "tool-1", "title": "Tool"}}),
+        ]
+
+        cwl_packages, descriptions = _organize_deploy_parts(interpreted_parts, root_workflow_cid=None)
+
+        assert len(cwl_packages) == 2
+        assert len(descriptions) == 2
+        assert tool_no_id["id"] == "tool-1"
+        linked = _link_process_descriptions(cwl_packages, descriptions)
+        assert linked["workflow-1"]["processDescription"]["title"] == "Main"
+        assert linked["tool-1"]["processDescription"]["title"] == "Tool"
+
+    def test_organize_deploy_parts_deploy_profile(self):
+        """
+        Test that a single part with deploy profile is equivalent to distinct CWL and description parts.
+        """
+        cwl_tool = {"cwlVersion": "v1.2", "class": "CommandLineTool"}
+        interpreted_parts = [
+            (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_DEPLOY_URI, {
+                "processDescription": {"id": "tool-1", "title": "Tool"},
+                "executionUnit": [{"unit": cwl_tool}],
+            }),
+        ]
+
+        cwl_packages, descriptions = _organize_deploy_parts(interpreted_parts, root_workflow_cid=None)
+
+        assert cwl_packages == [{"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "tool-1"}]
+        assert descriptions == [{"processDescription": {"id": "tool-1", "title": "Tool"}}]
+
+    def test_organize_deploy_parts_deploy_profile_invalid(self):
+        interpreted_parts = [(ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_DEPLOY_URI, {"title": "x"})]
+        with pytest.raises(HTTPBadRequest):
+            _organize_deploy_parts(interpreted_parts, root_workflow_cid=None)
+
+    def test_link_process_descriptions(self):
+        tool = {"class": "CommandLineTool", "id": "#tool-1"}
+        workflow = {"class": "Workflow", "id": "workflow-1"}
+        no_id = {"processDescription": {"title": "Main"}}
+        with_id = {"processDescription": {"process": {"id": "tool-1"}}}
+
+        linked = _link_process_descriptions([tool, workflow], [no_id, with_id])
+        assert linked == {"workflow-1": no_id, "tool-1": with_id}
+
+        merged = _merge_process_description(tool, with_id)
+        assert merged["processDescription"] == with_id["processDescription"]
+        assert merged["executionUnit"] == [{"unit": tool}]
+        assert _merge_process_description(tool, None) is tool
+
+    def test_link_process_descriptions_errors(self):
+        tool = {"class": "CommandLineTool", "id": "tool-1"}
+        workflow = {"class": "Workflow", "id": "workflow-1"}
+
+        with pytest.raises(HTTPUnprocessableEntity):
+            _link_process_descriptions([tool, workflow], [{"processDescription": {"id": "unknown"}}])
+        with pytest.raises(HTTPUnprocessableEntity):
+            _link_process_descriptions([tool, workflow], [
+                {"processDescription": {"title": "A"}},
+                {"processDescription": {"id": "workflow-1"}},
+            ])
+
+    def test_deploy_multi_cwl_with_process_descriptions(self):
+        tool = {"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "tool-1"}
+        workflow = {"cwlVersion": "v1.2", "class": "Workflow", "id": "workflow-1", "steps": {}}
+        descriptions = {
+            "tool-1": {"processDescription": {"id": "tool-1", "title": "Tool"}},
+            "workflow-1": {"processDescription": {"title": "Main"}},
+        }
+
+        with mock.patch("weaver.processes.utils.deploy_process_from_payload") as mocked_deploy:
+            _deploy_process_multi_cwl([tool, workflow], mock.MagicMock(), False, descriptions)
+
+        tool_call, workflow_call = mocked_deploy.call_args_list
+        assert tool_call.args[0]["processDescription"]["title"] == "Tool"
+        assert tool_call.args[0]["executionUnit"][0]["unit"]["id"] == "tool-1"
+        assert workflow_call.args[0]["processDescription"]["title"] == "Main"
+        assert workflow_call.args[0]["executionUnit"][0]["unit"]["id"] == "workflow-1"
 
     def test_parse_multipart_deploy_no_start_parameter_non_workflow(self, caplog):
         """
