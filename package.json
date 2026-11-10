@@ -47,7 +47,12 @@
             "!tip",
             "!important",
             "!warning",
-            "!caution"
+            "!caution",
+            "!NOTE",
+            "!TIP",
+            "!IMPORTANT",
+            "!WARNING",
+            "!CAUTION"
           ]
         }
       ],
@@ -76,10 +81,6 @@
       [
         "remark-lint-table-cell-padding",
         "padded"
-      ],
-      [
-        "remark-lint-no-undefined-references",
-        { "allow" : ["!NOTE"] }
       ]
     ]
   },
