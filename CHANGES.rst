@@ -94,12 +94,12 @@ Fixes:
   template parameter (``currencylayer``, ``exchangeratesapi``, ``fixer``, ``scrapper``).
 - Fix ``fixer`` currency converter registered under the ``openexchangerates`` name, which made ``fixer`` unavailable
   and replaced the actual ``openexchangerates`` converter.
-- Make the Celery registry-resolution functional test wait for a ready worker and terminal task results.
-  Configure the worker with the test database to avoid consuming jobs from a different Weaver database.
 - Fix `BoundingBox` `I/O` description entries (`input`/`output`) being silently dropped entirely from `Process`
   ``GET`` describe responses whenever a mismatched `CWL`/`WPS` ``format``/``schema`` auto-generated an invalid
   ``metadata`` "Schema" link reference (empty ``href``, or missing required ``rel``), causing the corresponding
   `AllOf`/`OneOf` schema validation to fail and the whole `I/O` entry to be discarded instead of rendered.
+- Make the Celery registry-resolution functional test wait for a ready worker and terminal task results.
+  Configure the worker with the test database to avoid consuming jobs from a different Weaver database.
 
 .. _changes_6.16.0:
 
