@@ -98,7 +98,7 @@ Fixes:
   ``GET`` describe responses whenever a mismatched `CWL`/`WPS` ``format``/``schema`` auto-generated an invalid
   ``metadata`` "Schema" link reference (empty ``href``, or missing required ``rel``), causing the corresponding
   `AllOf`/`OneOf` schema validation to fail and the whole `I/O` entry to be discarded instead of rendered.
-- Install Graphviz in GitHub Actions test jobs to support generation of profiling SVG reports.
+- Make test SVG profiling creation configurable and install Graphviz through the Makefile when the option is enabled.
 
 .. _changes_6.16.0:
 
