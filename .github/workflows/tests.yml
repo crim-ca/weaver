@@ -43,8 +43,6 @@ jobs:
       # override make command to install directly in active python
       CONDA_CMD: ""
       DOCKER_TEST_EXEC_ARGS: "-T"
-      # Keep .prof outputs but skip SVG rendering, which requires the Graphviz `dot` executable.
-      TEST_PROFILE_SVG: "false"
       # globally excluded 'checks', to be re-executed by dedicated job
       CHECKS_EXCLUDE: "links check-security-secrets"
     services:
@@ -135,6 +133,9 @@ jobs:
         with:
           python-version: "${{ matrix.python-version }}"
           cache: 'pip'
+      - name: Install Graphviz for profile SVGs
+        if: ${{ steps.should_skip_test.outputs.skip != 'true' && matrix.test-case != 'test-docker' }}
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes graphviz
       - name: Parse Python Version
         if: ${{ steps.should_skip_test.outputs.skip != 'true' }}
         id: python-semver

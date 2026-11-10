@@ -401,13 +401,8 @@ ifeq ($(filter $(TEST_VERBOSITY),"--capture"),)
 endif
 
 TEST_PROFILE ?= true
-# Disable SVG generation when the Graphviz `dot` executable is unavailable.
-TEST_PROFILE_SVG ?= true
-ifneq ($(filter "$(TEST_PROFILE_SVG)","true"),)
-  override TEST_PROFILE_SVG_ARGS = --profile-svg
-endif
 ifneq ($(filter "$(TEST_PROFILE)","true"),)
-  override TEST_PROFILE_ARGS = --profile $(TEST_PROFILE_SVG_ARGS) --pstats-dir "$(REPORTS_DIR)/profiling" --durations 100
+  override TEST_PROFILE_ARGS = --profile --profile-svg --pstats-dir "$(REPORTS_DIR)/profiling" --durations 100
 endif
 
 TEST_XARGS ?=
