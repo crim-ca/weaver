@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.17.0:
+
+`6.17.0 <https://github.com/crim-ca/weaver/tree/6.17.0>`_ (2026-11-10)
+====================================================================================================================
+
+Changes:
+--------
 - Add `Zarr` media-types ``application/vnd.zarr`` (including ``version=2`` and ``version=3`` parameters) for directory
   stores, and ``application/zarr+zip`` for zipped stores, with their ``.zarr`` and ``.zarr.zip`` extensions.
   The zipped variant is distinguished from a plain ``application/zip``
