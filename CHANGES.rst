@@ -15,6 +15,7 @@ Changes:
 - Add Python 3.14 official support.
 - Add Python 3.15 as experimental support in CI.
 - Drop Python 3.10 EOL support.
+- Use an upstream `cwltool` release with the rootless EUID/EGID fix instead of the conflicting fork dependency.
 
 Fixes:
 ------
