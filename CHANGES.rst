@@ -100,15 +100,8 @@ Fixes:
   ``GET`` describe responses whenever a mismatched `CWL`/`WPS` ``format``/``schema`` auto-generated an invalid
   ``metadata`` "Schema" link reference (empty ``href``, or missing required ``rel``), causing the corresponding
   `AllOf`/`OneOf` schema validation to fail and the whole `I/O` entry to be discarded instead of rendered.
-- Update to upcoming version of ``cwlprov`` to produce `PROV-JSONLD <https://www.w3.org/submissions/prov-jsonld/>`_
+- Update to ``prov`` 3.3 to produce `PROV-JSONLD <https://www.w3.org/submissions/prov-jsonld/>`_
   rather than PROV-O as JSON-LD (fixes `#1009 <https://github.com/crim-ca/weaver/issues/1009>`_).
-- Fix `Job` provenance ``PROV-JSONLD`` output incorrectly encoding ``foaf:account``, ``wfprov:wasEnactedBy`` and
-  ``wfprov:describedByProcess`` reference values as ``xsd:QName``-typed literals instead of proper ``@id`` node
-  references, by extending the ``prov`` library JSON-LD serializer's internal set of ``@id``-typed terms, since
-  neither `cwltool` nor ``prov`` expose any public option to control this behavior otherwise. Also inject matching
-  ``"@type": "@id"`` term definitions into the generated ``@context`` so that generic/conformant JSON-LD and RDF
-  processors (e.g.: ``rdflib``, ``pyld``), not just ``prov`` itself, correctly resolve these values as IRI node
-  references instead of opaque string literals.
 - Create ``ProcessRun`` as an ``Activity`` rather than an ``Entity`` to satisfy
   `PROV-CONSTRAINTS <https://www.w3.org/TR/2013/REC-prov-constraints-20130430/#entity-activity-disjoint_text>`_
   requirement for disjoint activity and entity (as of ``prov>=3.0.0``).

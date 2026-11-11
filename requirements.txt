@@ -36,22 +36,12 @@ cornice
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
 cryptography>=50.0.2
-# FIXME: properly support GPU execution
-#   - https://github.com/crim-ca/weaver/issues/104
-#   - https://github.com/crim-ca/weaver/issues/138
-# use cwltool gpu-enabled support until integrated within the original tool
-# (https://github.com/common-workflow-language/common-workflow-language/issues/587)
-### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool
-# FIXME: https://github.com/common-workflow-language/cwltool/pull/2207 to allow rootless execution with user namespaces
-# ~3.1.20260108082145 + PR#2207
-cwltool @ git+https://github.com/crim-ca/cwltool.git@prov-jsonld-fix-associations
-# cwltool>=3.1.20241217163858,<3.2  # first version that provides CWLProv, required across all Python versions
-cwltool>=3.1.20250925164626; python_version >= "3.14"  # first version available
-# Although cwltool includes cwlprov (see above), we also need the command-line tool, so we install it
-cwlprov @ git+https://github.com/crim-ca/cwlprov-py.git@backport-cwltool-prov
+# cwltool with updates for docker and prov
+cwltool @ git+https://github.com/crim-ca/cwltool.git@update_prov_33
+# Although cwltool includes cwlprov, we also need the command-line tool
+cwlprov @ git+https://github.com/dhdqa/cwlprov-py.git@update_prov_33
 cwl-utils>=0.45
-# Until prov 3.3.0 is released, get the fix for JSON-LD IRI references
-prov @ git+https://github.com/trungdong/prov@87d68909ac9db6ce07b7430f2bcb6c20dbc39c27
+prov>=3.3
 dnspython>=2.8.0  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
 docker>=7.2.0
 duration
