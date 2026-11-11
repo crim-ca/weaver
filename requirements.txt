@@ -36,12 +36,13 @@ cornice
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
 cryptography>=50.0.2
-# cwltool with updates for docker and prov
-cwltool @ git+https://github.com/crim-ca/cwltool.git@update_prov_33
-# Although cwltool includes cwlprov, we also need the command-line tool
-cwlprov @ git+https://github.com/dhdqa/cwlprov-py.git@update_prov_33
-cwl-utils>=0.45
-prov>=3.3
+# https://github.com/common-workflow-language/cwltool/pull/2207 adds rootless EUID/EGID support in upstream cwltool.
+# Add suport for prov 3.3.0
+cwltool @ git+https://github.com/crim-ca/cwltool.git@a614d47c701922604c82faeb507f6d7d75122633
+# cwlprov-py fork with updated prov version (needed for the command-line tool)
+cwlprov @ git+https://github.com/dhdqa/cwlprov-py.git@3ac5c740d7fbc68c24655c7c601fa70996d7d004
+cwl-utils>=0.47
+prov==3.3.0
 dnspython>=2.8.0  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
 docker>=7.2.0
 duration
