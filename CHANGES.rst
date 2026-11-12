@@ -19,7 +19,6 @@ Changes:
   using ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-deploy-process``, equivalent to a distinct
   `CWL` part and `Process` description part of matching ``id``
   (relates to `opengeospatial/ogcapi-processes#616 <https://github.com/opengeospatial/ogcapi-processes/issues/616>`_).
-- No change.
 
 Fixes:
 ------
