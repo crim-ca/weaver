@@ -9,7 +9,7 @@ boto3-stubs[s3]
 # windows fixes until
 # https://github.com/celery/billiard/issues/260
 # https://github.com/celery/billiard/issues/313
-billiard>=4.3.1; sys_platform != "win32"  # avoid issue with use_2to3
+billiard>=4.3.2; sys_platform != "win32"  # avoid issue with use_2to3
 billiard>3.2,<3.4; sys_platform == "win32"
 # pymongo>=4 breaks for some kombu combinations corresponding to pinned Celery
 # - https://github.com/crim-ca/weaver/issues/386
@@ -50,7 +50,7 @@ cwltool>=3.1.20250925164626; python_version >= "3.14"  # first version available
 # for some reason, not the same release number,
 # but same code as https://github.com/common-workflow-language/cwlprov/tree/0.6.0
 cwlprov==0.2.1
-cwl-utils>=0.45
+cwl-utils>=0.47
 dnspython>=2.8.0  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
 docker>=7.2.0
 duration
@@ -69,7 +69,7 @@ jsonschema>=4.26.0
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
 # - https://github.com/celery/celery/pull/7834
-kombu>=5.6.2,<6
+kombu>=5.7.0,<6
 # FIXME: https://github.com/lark-parser/lark/issues/1565
 lark==1.2.2
 lxml

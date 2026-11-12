@@ -1,4 +1,4 @@
-VERSION ?= 6.16.0
+VERSION ?= 6.17.0
 
 # Included custom configs change the value of MAKEFILE_LIST
 # Extract the required reference beforehand so we can use it for help target
@@ -91,6 +91,17 @@ endif
 # Tests
 REPORTS_DIR := $(APP_ROOT)/reports
 ARCHIVE_DIR := $(APP_ROOT)/archive
+
+# Profiling options
+# SVG profiling requires Graphviz's system `dot` executable.
+TEST_PROFILE ?= true
+TEST_PROFILE_SVG ?= true
+ifneq ($(filter "$(TEST_PROFILE)","true"),)
+  ifneq ($(filter "$(TEST_PROFILE_SVG)","true"),)
+    override TEST_PROFILE_SVG_ARGS = --profile-svg
+    override TEST_PROFILE_SVG_INSTALL = install-graphviz
+  endif
+endif
 
 # end of configuration
 
@@ -242,10 +253,21 @@ install-doc: install-run	## install documentation dependencies
 	@echo "Install with pip complete. Run documentation generation with 'make docs' target."
 
 .PHONY: install-dev
-install-dev: install-run 	## install development and test dependencies (Python only)
+install-dev: install-run $(TEST_PROFILE_SVG_INSTALL)	## install development and test dependencies
 	@echo "Installing development packages with pip..."
 	@bash -c '$(CONDA_CMD) pip install $(PIP_XARGS) -r "$(APP_ROOT)/requirements-dev.txt"'
 	@echo "Install with pip complete. Test service with 'make test*' variations."
+
+.PHONY: install-graphviz
+install-graphviz:	## install Graphviz for profile SVG generation (use SUDO=sudo if needed)
+	@command -v dot >/dev/null 2>&1 || ( \
+		echo "Graphviz 'dot' not found. Attempting to install it."; \
+		case "$(OS_NAME)" in \
+			Linux) $(SUDO) apt-get update && $(SUDO) apt-get install --no-install-recommends --yes graphviz ;; \
+			Darwin) brew install graphviz ;; \
+			*) echo "Automatic Graphviz installation is unsupported on $(OS_NAME)." >&2; exit 1 ;; \
+		esac \
+	)
 
 .PHONY: install-dev-all
 install-dev-all: install-dev install-dev-npm install-dev-betterleaks	## install all test/checks development dependencies (Python, Node, etc.)
@@ -400,9 +422,8 @@ ifeq ($(filter $(TEST_VERBOSITY),"--capture"),)
   endif
 endif
 
-TEST_PROFILE ?= true
 ifneq ($(filter "$(TEST_PROFILE)","true"),)
-  override TEST_PROFILE_ARGS = --profile --profile-svg --pstats-dir "$(REPORTS_DIR)/profiling" --durations 100
+  override TEST_PROFILE_ARGS = --profile $(TEST_PROFILE_SVG_ARGS) --pstats-dir "$(REPORTS_DIR)/profiling" --durations 100
 endif
 
 TEST_XARGS ?=

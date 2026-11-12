@@ -15,7 +15,6 @@
     "remark-preset-lint-recommended": "^7.0.1",
     "stylelint": "^17.9.0",
     "stylelint-config-standard": "^40.0.0",
-    "stylelint-scss": "^7.0.0",
     "stylelint-csstree-validator": "^4.0.0",
     "@stylistic/stylelint-plugin": "^5.1.0"
   },
@@ -82,13 +81,15 @@
   "stylelint": {
     "extends": "stylelint-config-standard",
     "plugins": [
-      "@stylistic/stylelint-plugin"
+      "@stylistic/stylelint-plugin",
+      "stylelint-csstree-validator"
     ],
     "ignoreFiles": [
       "docs/_build/**",
       "docs/build/**"
     ],
     "rules": {
+      "csstree/validator": true,
       "block-no-empty": null,
       "color-no-invalid-hex": true,
       "color-hex-length": "long",

@@ -19,6 +19,19 @@ Changes:
   using ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-deploy-process``, equivalent to a distinct
   `CWL` part and `Process` description part of matching ``id``
   (relates to `opengeospatial/ogcapi-processes#616 <https://github.com/opengeospatial/ogcapi-processes/issues/616>`_).
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.17.0:
+
+`6.17.0 <https://github.com/crim-ca/weaver/tree/6.17.0>`_ (2026-11-10)
+====================================================================================================================
+
+Changes:
+--------
 - Add `Zarr` media-types ``application/vnd.zarr`` (including ``version=2`` and ``version=3`` parameters) for directory
   stores, and ``application/zarr+zip`` for zipped stores, with their ``.zarr`` and ``.zarr.zip`` extensions.
   The zipped variant is distinguished from a plain ``application/zip``
@@ -105,6 +118,12 @@ Fixes:
   ``GET`` describe responses whenever a mismatched `CWL`/`WPS` ``format``/``schema`` auto-generated an invalid
   ``metadata`` "Schema" link reference (empty ``href``, or missing required ``rel``), causing the corresponding
   `AllOf`/`OneOf` schema validation to fail and the whole `I/O` entry to be discarded instead of rendered.
+- Make test SVG profiling creation configurable and install Graphviz through the Makefile when the option is enabled.
+- Fix the Celery registry-resolution test failure seen with ``celery==5.7.0``/``kombu==5.7.0``. It also reproduces
+  with ``celery==5.6.3``/``kombu==5.6.2``, indicating a test setup issue rather than a ``_store_result`` regression.
+  The detached worker could be queried before it was ready, and its configuration pointed to the default ``weaver``
+  database instead of the test database, leaving task metadata unavailable. Wait for worker readiness and task
+  completion, configure the worker with the test database, and handle nullable traceback metadata.
 
 .. _changes_6.16.0:
 
