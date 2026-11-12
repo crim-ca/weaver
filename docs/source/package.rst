@@ -603,10 +603,30 @@ described above (``start`` parameter, ``Workflow`` class, ``#main`` identifier, 
 Additional Metadata
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. fixme: support process meta multipart (https://github.com/crim-ca/weaver/issues/990)
-.. warning::
-    Process description metadata in multipart requests is not yet implemented
-    (see `crim-ca/weaver#990 <https://github.com/crim-ca/weaver/issues/990>`_).
+Each :term:`CWL` part (the main :term:`Workflow` and any sub-:term:`CWL`) can be accompanied by its own
+:term:`Process` description provided as an ``application/json`` part. Descriptions are linked to their :term:`CWL`
+using the ``id`` field, matching either the :term:`CWL` ``id`` or the ``Content-ID``/``Content-Location``
+of the :term:`CWL` part. A description without an ``id`` applies to the main :term:`Workflow`.
+
+Alternatively, a ``processDescription`` and its ``executionUnit`` can be submitted together as a single
+``application/json`` part when providing the ``Content-Profile`` header with the value
+``https://www.opengis.net/def/profile/OGC/0/ogc-deploy-process``. This is equivalent to submitting a distinct
+:term:`CWL` part and :term:`Process` description part of matching ``id``.
+
+.. code-block:: http
+
+    Content-Type: application/json
+    Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-deploy-process
+    Content-ID: <echo-tool@weaver.example.com>
+
+    {
+      "processDescription": {"id": "echo-tool", "title": "Echo Tool"},
+      "executionUnit": [{"unit": {"class": "CommandLineTool", "id": "echo-tool", ...}}]
+    }
+
+.. note::
+    The ``ogc-deploy-process`` profile is a work in progress
+    (see `opengeospatial/ogcapi-processes#616 <https://github.com/opengeospatial/ogcapi-processes/issues/616>`_).
 
 Example Multipart Request
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
