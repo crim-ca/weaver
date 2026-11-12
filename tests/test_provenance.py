@@ -1,9 +1,14 @@
 import itertools
+import json
+from pathlib import Path
 
+import jsonschema
 import pytest
 
+from tests import resources
+from weaver import WEAVER_SCHEMA_DIR
 from weaver.formats import ContentType, OutputFormat
-from weaver.provenance import ProvenanceFormat, ProvenancePathType
+from weaver.provenance import ProvenanceFormat, ProvenancePathType, convert_to_prov_chain
 
 
 @pytest.mark.prov
@@ -58,6 +63,7 @@ def test_provenance_formats():
         ProvenanceFormat.PROV_XML,
         ProvenanceFormat.PROV_XML,
         ProvenanceFormat.PROV_NT,
+        ProvenanceFormat.PROV_OGC_JSON,
     ]
     assert set(result) == set(expect)
 
@@ -88,6 +94,7 @@ def test_provenance_media_types():
         ("prov-json", ProvenanceFormat.PROV_JSON),
         ("PROV-JSON", ProvenanceFormat.PROV_JSON),
         ("PROV-JSONLD", ProvenanceFormat.PROV_JSONLD),
+        ("PROV-OGC-JSON", ProvenanceFormat.PROV_OGC_JSON),
     ]
 )
 def test_provenance_format(provenance, expect):
@@ -188,3 +195,64 @@ def test_provenance_format_compatible(prov, prov_format, output_format, expect, 
     result, error = ProvenanceFormat.resolve_compatible_formats(prov, prov_format, output_format)
     assert result == expect
     assert error if is_error else error is None, "When an error is expected, a string detailing it should be returned."
+
+
+def test_convert_to_prov_list():
+    prov_data = resources.load_resource("job_prov.json", text=True)
+    prov_json = convert_to_prov_chain(prov_data)
+    assert prov_json
+    prov = json.loads(prov_json)
+    # It should be a prov chain as a list
+    assert isinstance(prov, list)
+    assert all("id" in obj for obj in prov)
+    assert all(("provType" in obj or "activityType" in obj)
+               for obj in prov)
+    # It should not be nested
+    assert all(isinstance(obj["wasGeneratedBy"], str)
+               for obj in prov
+               if "wasGeneratedBy" in obj)
+
+
+def test_convert_to_prov_object():
+    prov_data = resources.load_resource("job_prov.json", text=True)
+    # Could get this from the data (it is the workflow run object)
+    root_id = "urn:uuid:b3de0240-663b-4003-86c6-1004173fa711"
+    prov_json = convert_to_prov_chain(prov_data, root_id)
+    assert prov_json
+    prov = json.loads(prov_json)
+    # Make sure it is an activity
+    assert isinstance(prov, dict)
+    assert "id" in prov
+    assert prov["id"] == root_id
+    assert "activityType" in prov
+    assert prov["activityType"] == "Activity"
+    # It should use startedAtTime, not startTime
+    assert "startTime" not in prov
+    assert "startedAtTime" in prov
+    # It should be nested
+    assert "wfprov:wasEnactedBy" in prov
+    assert isinstance(prov["wfprov:wasEnactedBy"], dict)
+    # It should contain reverse relations for otherwise unreachable objects
+    assert "generated" in prov
+    assert any(isinstance(obj, dict) for obj in prov["generated"])
+
+
+def test_validate_prov_list():
+    prov_data = resources.load_resource("job_prov.json", text=True)
+    prov_json = convert_to_prov_chain(prov_data)
+    prov = json.loads(prov_json)
+    with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov-bundled.json",
+              encoding="utf-8") as fh:
+        prov_schema = json.load(fh)
+    jsonschema.validate(prov, prov_schema)
+
+
+def test_validate_prov_object():
+    prov_data = resources.load_resource("job_prov.json", text=True)
+    root_id = "urn:uuid:b3de0240-663b-4003-86c6-1004173fa711"
+    prov_json = convert_to_prov_chain(prov_data, root_id)
+    prov = json.loads(prov_json)
+    with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov-bundled.json",
+              encoding="utf-8") as fh:
+        prov_schema = json.load(fh)
+    jsonschema.validate(prov, prov_schema)

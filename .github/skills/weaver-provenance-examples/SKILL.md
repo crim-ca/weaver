@@ -45,17 +45,18 @@ All located in `weaver/wps_restapi/examples/`, loaded automatically at import ti
 `SCHEMA_EXAMPLE_DIR`/`EXAMPLES` in `weaver/wps_restapi/swagger_definitions.py` and referenced by
 `get_job_prov_responses` / `get_job_prov_metadata_responses`:
 
-| File                | Content                              | PROV format   |
-| ------------------- | ------------------------------------ | ------------- |
-| `job_prov.json`     | Main PROV document                   | `PROV-JSON`   |
-| `job_prov.jsonld`   | Main PROV document                   | `PROV-JSONLD` |
-| `job_prov.xml`      | Main PROV document                   | `PROV-XML`    |
-| `job_prov.ttl`      | Main PROV document                   | `PROV-TURTLE` |
-| `job_prov.nt`       | Main PROV document                   | `PROV-NT`     |
-| `job_prov.provn`    | Main PROV document                   | `PROV-N`      |
-| `job_prov_info.txt` | `/prov/info` research object summary | plain text    |
-| `job_prov_run.txt`  | `/prov/run` execution timeline       | plain text    |
-| `job_prov_who.txt`  | `/prov/who` agents summary           | plain text    |
+| File                | Content                              | PROV format     |
+| ------------------- | ------------------------------------ | --------------- |
+| `job_prov.json`     | Main PROV document                   | `PROV-JSON`     |
+| `job_prov.jsonld`   | Main PROV document                   | `PROV-JSONLD`   |
+| `job_prov_ogc.json` | OGC Provenance Chain                 | `PROV-OGC-JSON` |
+| `job_prov.xml`      | Main PROV document                   | `PROV-XML`      |
+| `job_prov.ttl`      | Main PROV document                   | `PROV-TURTLE`   |
+| `job_prov.nt`       | Main PROV document                   | `PROV-NT`       |
+| `job_prov.provn`    | Main PROV document                   | `PROV-N`        |
+| `job_prov_info.txt` | `/prov/info` research object summary | plain text      |
+| `job_prov_run.txt`  | `/prov/run` execution timeline       | plain text      |
+| `job_prov_who.txt`  | `/prov/who` agents summary           | plain text      |
 
 ## Prerequisites
 

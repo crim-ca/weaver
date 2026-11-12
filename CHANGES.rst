@@ -41,6 +41,10 @@ Changes:
   versions of ``prov`` that more strongly enforce update-only ``ProvRecord``.
 - Add a skill with example input data (in ``weaver/wps_restapi/examples``) for the ``EchoProcess`` and a script to
   regenerate the PROV example data for the OpenAPI definition.
+- Add ``PROV-OGC-JSON`` format and associated profile returning `OGC Provenance Chain JSON
+  <https://ogcincubator.github.io/bblock-prov-schema/bblock/ogc.ogc-utils.prov/json-schema>`_, a simplified
+  graph-centric JSON representation of provenance for OGC Processes workflows (resolves `#1017
+  <https://github.com/crim-ca/weaver/issues/1017>`_)
 
 Fixes:
 ------
@@ -114,6 +118,7 @@ Fixes:
 - Correct the ``install-cairo-dependencies`` check in the Makefile to avoid failure if ``ldconfig`` is not available,
   such as on non-Linux systems.
 - Avoid linting installed virtual environments in ``make check``.
+- Correct `Swagger-UI` to show the correct profiles for the provenance endpoint.
 
 .. _changes_6.16.0:
 
