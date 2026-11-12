@@ -665,7 +665,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "test-tool"
-        assert process_desc == []
+        assert not process_desc
 
     def test_parse_multipart_deploy_missing_boundary(self):
         """
@@ -736,7 +736,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "remote-tool"
-        assert process_desc == []
+        assert not process_desc
 
     def test_parse_multipart_deploy_content_location_weaver_package(self, monkeypatch):
         """
@@ -777,7 +777,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "weaver-workflow"
-        assert process_desc == []
+        assert not process_desc
 
     def test_parse_multipart_deploy_content_location_wps_endpoint(self, monkeypatch):
         """
@@ -817,7 +817,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "wps-process"
-        assert process_desc == []
+        assert not process_desc
 
     def test_parse_multipart_deploy_content_location_relative_url(self, monkeypatch):
         """
@@ -870,7 +870,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "relative-tool"
-        assert process_desc == []
+        assert not process_desc
 
     def test_parse_multipart_deploy_content_location_relative_url_no_request(self):
         """
@@ -949,7 +949,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "static-tool"
-        assert process_desc == []
+        assert not process_desc
 
     def test_parse_multipart_deploy_content_location_failure(self, monkeypatch):
         """
@@ -1086,7 +1086,7 @@ class TestMultipartDeployment:
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "test-tool"
         assert cwl_packages[0]["class"] == "CommandLineTool"
-        assert process_desc == []
+        assert not process_desc
 
     def test_parse_multipart_deploy_unicode_decode_error(self):
         """
@@ -1556,7 +1556,7 @@ class TestMultipartDeployment:
 
         assert len(cwl_packages) == 1
         assert cwl_packages[0]["id"] == "test-tool"
-        assert process_desc == []
+        assert not process_desc
 
     def test_parse_multipart_message_valid(self):
         """
@@ -1729,7 +1729,7 @@ class TestMultipartDeployment:
         cwl_packages, process_desc = _organize_deploy_parts(interpreted_parts, root_workflow_cid="workflow-1")
 
         assert len(cwl_packages) == 2
-        assert process_desc == []
+        assert not process_desc
         # Workflow should be last due to root_workflow_cid
         assert cwl_packages[-1]["class"] == "Workflow"
 
