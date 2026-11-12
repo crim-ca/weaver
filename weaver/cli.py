@@ -3714,7 +3714,8 @@ def make_parser():
     # use regex to handle cases where argparse wraps arguments across multiple lines based on terminal width
     op_deploy.add_formatter(
         lambda _help: re.sub(
-            r"\[-T TOKEN\]\s+\[-U USERNAME\]\s+\[-P PASSWORD\]",
+            r"\[-T TOKEN\]\s+\[-U USERNAME\]\s+\[-P PASSWORD\]"
+            r"|\[-T TOKEN \| -P PASSWORD\]\s+\[-U USERNAME\]",
             "[-T TOKEN | ( -U USERNAME -P PASSWORD )]",
             _help
         )
