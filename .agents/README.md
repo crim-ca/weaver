@@ -94,6 +94,8 @@ All skills are organized by category for easy discovery:
 - **[weaver-ci-validate](skills/weaver-ci-validate/SKILL.md)** - Run code test and lint checks with Makefile targets
 - **[weaver-skill-create](skills/weaver-skill-create/SKILL.md)** - Create new Agent Skills
 - **[weaver-skills-update](skills/weaver-skills-update/SKILL.md)** - Maintain and update skills documentation
+- **[weaver-provenance-examples](skills/weaver-provenance-examples/SKILL.md)** - Update provenance example files under
+  wps_restapi/examples
 
 ### Vault Operations
 

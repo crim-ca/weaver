@@ -27,47 +27,47 @@ Retrieve W3C PROV provenance metadata for tracking execution lineage and data de
 
 ### Required
 
-- **job_id** (string): Job identifier
+- **job_reference** (string): UUID or full URL of a completed job
 
 ### Optional
 
 - **format** (string): Provenance format
-  - `json`: JSON-LD format (default)
-  - `xml`: PROV-XML format
-  - `turtle`: RDF Turtle format
-  - `rdf`: RDF/XML format
+  - `PROV-JSON`: PROV-JSON format (default)
+  - `PROV-JSONLD`: PROV-JSONLD format
+  - `PROV-TURTLE`: RDF Turtle format
+  - `PROV-N`: PROV-N human-readable (Prolog-like) provenance notation format
+  - `PROV-XML`: PROV-XML format
+  - `PROV-NT`: RDF NTriples format
 
 ## CLI Usage
 
 ```bash
-# Get provenance in JSON-LD
+# Get provenance in JSON
 weaver provenance -u $WEAVER_URL -j a1b2c3d4-e5f6-7890-abcd-ef1234567890
 
 # Get provenance in RDF Turtle
-weaver provenance -u $WEAVER_URL -j a1b2c3d4-e5f6-7890-abcd-ef1234567890 -f turtle
-
-# Save to file
-weaver provenance -u $WEAVER_URL -j a1b2c3d4-e5f6-7890-abcd-ef1234567890 -o provenance.jsonld
+weaver provenance -u $WEAVER_URL -j a1b2c3d4-e5f6-7890-abcd-ef1234567890 --prov-format PROV-TURTLE
 ```
 
 ## Python Usage
 
 ```python
 from weaver.cli import WeaverClient
+from weaver.provenance import ProvenanceFormat
 
 client = WeaverClient(url="https://weaver.example.com")
 
 # Get provenance
-prov = client.provenance(job_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+prov = client.provenance(job_reference="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 
 # Access provenance entities
-for entity in prov.body.get("entities", []):
-    print(f"Entity: {entity['id']}")
+for entity_id, entity in prov.body.get("entity", {}).items():
+    print(f"Entity: {entity_id}")
 
 # Get provenance in specific format
 prov_turtle = client.provenance(
-    job_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    format="turtle"
+    job_reference="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    prov_format=ProvenanceFormat.PROV_TURTLE
 )
 ```
 
@@ -80,32 +80,36 @@ Accept: application/ld+json
 
 ## Returns
 
-W3C PROV document with:
+W3C PROV-JSONLD document, for example:
 
 ```json
 {
-  "@context": "https://www.w3.org/ns/prov",
-  "entity": [
+  "@context": [
     {
+      "": "http://example.com"
+    },
+    "https://openprovenance.org/prov-jsonld/context.jsonld"
+  ],
+  "@graph": [
+    {
+      "@type": "Entity",
       "@id": "input-file-1",
-      "@type": "prov:Entity",
-      "prov:atLocation": "https://example.com/input.nc",
-      "prov:generatedAtTime": "2026-02-19T10:00:00Z"
-    }
-  ],
-  "activity": [
+      "location": [
+        {
+          "@value": "https://example.com/input.nc"
+        }
+      ]
+    },
     {
+      "@type": "Activity",
       "@id": "execution-1",
-      "@type": "prov:Activity",
-      "prov:startedAtTime": "2026-02-19T10:00:05Z",
-      "prov:endedAtTime": "2026-02-19T10:05:20Z",
-      "prov:used": {"@id": "input-file-1"}
-    }
-  ],
-  "wasGeneratedBy": [
+      "startTime": "2026-02-19T10:00:05+00:00",
+      "endTime": "2026-02-19T10:05:20+00:00"
+    },
     {
-      "prov:entity": {"@id": "output-file-1"},
-      "prov:activity": {"@id": "execution-1"}
+      "@type": "Generation",
+      "entity": "input-file-1",
+      "activity": "execution-1"
     }
   ]
 }
@@ -147,26 +151,32 @@ W3C PROV document with:
 
 ```python
 # Extract complete workflow lineage
-prov = client.provenance(job_id="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+prov = client.provenance(job_reference="a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 
-# Document software versions used
-for agent in prov.body.get("agents", []):
-    print(f"Software: {agent['label']} v{agent['version']}")
+# Document software packages used
+def as_list(value):
+    return value if isinstance(value, list) else [value]
+
+for agent_id, agent in prov.body.get("agent", {}).items():
+    for item in as_list(agent):
+        for prov_type in as_list(item.get("prov:type", [])):
+            if prov_type.get("$") == "prov:SoftwareAgent":
+                print(f"{agent_id}: {item.get('prov:label')}")
 ```
 
 ### Data Lineage Tracking
 
 ```python
 # Trace data derivation chain
-for derivation in prov.body.get("wasDerivedFrom", []):
-    print(f"{derivation['entity']} derived from {derivation['source']}")
+for derivation in prov.body.get("wasDerivedFrom", {}).values():
+    print(f"{derivation['prov:generatedEntity']} derived from {derivation['prov:usedEntity']}")
 ```
 
 ### Compliance and Auditing
 
 ```bash
 # Export provenance for archival
-weaver provenance -u $WEAVER_URL -j $JOB_ID -f xml -o compliance/job-$JOB_ID-prov.xml
+weaver provenance -u $WEAVER_URL -j $JOB_ID --prov-format PROV-XML > compliance/job-$JOB_ID-prov.xml
 ```
 
 ## Related Skills

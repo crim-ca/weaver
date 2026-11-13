@@ -16,10 +16,24 @@ Changes:
 - Add Python 3.15 as experimental support in CI.
 - Drop Python 3.10 EOL support.
 - Use an upstream `cwltool` release with the rootless EUID/EGID fix instead of the conflicting fork dependency.
+- Update to ``prov`` 3.3 to produce `PROV-JSONLD <https://www.w3.org/submissions/prov-jsonld/>`_
+  rather than PROV-O as JSON-LD (fixes `#1009 <https://github.com/crim-ca/weaver/issues/1009>`_).
+- Create ``ProcessRun`` as an ``Activity`` rather than an ``Entity`` to satisfy
+  `PROV-CONSTRAINTS <https://www.w3.org/TR/2013/REC-prov-constraints-20130430/#entity-activity-disjoint_text>`_
+  requirement for disjoint activity and entity (as of ``prov>=3.0.0``).
+- Remove relationships in the generated PROV that are inconsistent with the changes to ``ProcessRun``, since they are
+  not defined for ``Activity``.
+- Remove inconsistent and redundant timestamps from the generated PROV.
+- Ensure that the user agent in the PROV document is created as a ``SoftwareAgent`` not a ``Person`` with recent
+  versions of ``prov`` that more strongly enforce update-only ``ProvRecord``.
+- Add a skill with example input data (in ``weaver/wps_restapi/examples``) for the ``EchoProcess`` and a script to
+  regenerate the PROV example data for the OpenAPI definition.
 
 Fixes:
 ------
-- No change.
+- Correct the ``install-cairo-dependencies`` check in the Makefile to avoid failure if ``ldconfig`` is not available,
+  such as on non-Linux systems.
+- Avoid linting installed virtual environments in ``make check``.
 
 .. _changes_6.17.0:
 
