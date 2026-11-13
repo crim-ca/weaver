@@ -3545,14 +3545,20 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
         if file is None:
             formatter = super(WeaverArgumentParser, self)._get_formatter()
         else:
-            formatter = super(WeaverArgumentParser, self)._get_formatter(file=file)
+            # Python 3.15 added the ``file`` keyword to argparse's formatter method, older Pyhton don't know about it.
+            formatter = super(WeaverArgumentParser, self)._get_formatter(file=file)  # pylint: disable=E1123
         setattr(formatter, "parser", self)
         return formatter
 
-    def format_help(self):
-        # type: () -> str
+    def format_help(self, formatter=None):
+        # type: (Optional[argparse.HelpFormatter]) -> str
         self.help_mode = True
-        text = f"{super(WeaverArgumentParser, self).format_help()}\n"
+        if formatter is None:
+            text = super(WeaverArgumentParser, self).format_help()
+        else:
+            # Python 3.15 added the ``formatter`` keyword to argparse's help method, older Pyhton don't know about it.
+            text = super(WeaverArgumentParser, self).format_help(formatter=formatter)  # pylint: disable=E1123
+        text = f"{text}\n"
         for fmt in self._formatters:
             text = fmt(text)
         self.help_mode = False
