@@ -3540,9 +3540,12 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
         """
         self._formatters.add(formatter)
 
-    def _get_formatter(self):
-        # type: () -> argparse.HelpFormatter
-        formatter = super(WeaverArgumentParser, self)._get_formatter()
+    def _get_formatter(self, file=None):
+        # type: (Optional[Any]) -> argparse.HelpFormatter
+        if file is None:
+            formatter = super(WeaverArgumentParser, self)._get_formatter()
+        else:
+            formatter = super(WeaverArgumentParser, self)._get_formatter(file=file)
         setattr(formatter, "parser", self)
         return formatter
 
