@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.18.0:
+
+`6.18.0 <https://github.com/crim-ca/weaver/tree/6.18.0>`_ (2026-11-13)
+====================================================================================================================
+
+Changes:
+--------
 - Add Python 3.14 official support.
 - Add Python 3.15 as experimental support in CI.
 - Drop Python 3.10 EOL support.
