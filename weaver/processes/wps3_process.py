@@ -157,12 +157,12 @@ class Wps3Process(OGCAPIRemoteProcessBase):
             )
         return {"Authorization": f"Bearer {access_token}"} if access_token else {}
 
-    def get_auth_headers(self):
-        # type: () -> AnyHeadersContainer
+    def get_auth_headers(self, url):
+        # type: (str) -> AnyHeadersContainer
         """
         Add specific user access headers for :term:`ADES` if provided in :ref:`Configuration Settings`.
         """
-        headers = super(Wps3Process, self).get_auth_headers()
+        headers = super(Wps3Process, self).get_auth_headers(url)
         headers.update(self.get_user_auth_header())
         return headers
 
