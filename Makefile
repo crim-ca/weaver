@@ -173,7 +173,7 @@ fixme-list-only: | mkdir-reports  	## list all FIXME/TODO/HACK items that requir
 	@echo '[MISCELLANEOUS]\nnotes=FIXME,TODO,HACK' > "$(REPORTS_DIR)/fixmerc"
 	@bash -c '$(CONDA_CMD) \
 		pylint \
-			--disable=all,use-symbolic-message-instead --enable=miscellaneous,W0511 \
+			--disable=all,W0012 --enable=W0511 \
 			--score n --persistent n \
 			--rcfile="$(REPORTS_DIR)/fixmerc" \
 			-f colorized \
@@ -576,6 +576,12 @@ check-pep8-only: | mkdir-reports 		## check for PEP8 code style issues
 	@-rm -fr "$(REPORTS_DIR)/check-pep8.txt"
 	@bash -c '$(CONDA_CMD) \
 		flake8 --config="$(APP_ROOT)/setup.cfg" --output-file="$(REPORTS_DIR)/check-pep8.txt" --tee'
+
+# FIXME: Pylint parallel serialization fails on Python 3.15
+# (https://github.com/pylint-dev/pylint/issues/11528).
+ifeq ($(PYTHON_VERSION_MAJOR).$(PYTHON_VERSION_MINOR),3.15)
+  PYLINT_XARGS += --jobs=1
+endif
 
 .PHONY: check-lint-only
 check-lint-only: | mkdir-reports  	## check linting of code style

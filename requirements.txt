@@ -36,17 +36,10 @@ cornice
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
 cryptography>=50.0.2
-# FIXME: properly support GPU execution
-#   - https://github.com/crim-ca/weaver/issues/104
-#   - https://github.com/crim-ca/weaver/issues/138
-# use cwltool gpu-enabled support until integrated within the original tool
-# (https://github.com/common-workflow-language/common-workflow-language/issues/587)
-### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool
-# FIXME: https://github.com/common-workflow-language/cwltool/pull/2207 to allow rootless execution with user namespaces
-# ~3.1.20260108082145 + PR#2207
-cwltool @ git+https://github.com/crim-ca/cwltool.git@allow-uid-gid-rootless
+# https://github.com/common-workflow-language/cwltool/pull/2207 adds rootless EUID/EGID support in upstream cwltool.
+# cwltool>=3.1.20260315121657 is the first upstream release that includes it.
+cwltool>=3.1.20260315121657
 # cwltool>=3.1.20241217163858,<3.2  # first version that provides CWLProv, required across all Python versions
-cwltool>=3.1.20250925164626; python_version >= "3.14"  # first version available
 # for some reason, not the same release number,
 # but same code as https://github.com/common-workflow-language/cwlprov/tree/0.6.0
 cwlprov==0.2.1

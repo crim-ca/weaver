@@ -18,7 +18,12 @@ doc8>=2.0.0
 # - https://github.com/PyCQA/docformatter/issues/343
 # - https://github.com/PyCQA/docformatter/issues/344
 # - https://github.com/PyCQA/docformatter/issues/345
-docformatter>=1.7.7,!=1.7.8
+# - https://github.com/PyCQA/docformatter/issues/408
+# - https://github.com/PyCQA/docformatter/issues/414
+# python>=3.14 not supported because of https://github.com/PyCQA/docformatter/issues/327
+# which cannot be integrated without all the above 1.7.8 problems
+# if higher python version is employed, use 'make CHECKS_EXCLUDE=docf check-only'
+docformatter>=1.7.7,!=1.7.8; python_version < "3.14"
 flake8>=7.4.1
 flynt
 isort>=9.0.2
