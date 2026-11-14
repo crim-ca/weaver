@@ -11,6 +11,7 @@ import tempfile
 import warnings
 from datetime import date
 from typing import TYPE_CHECKING, cast
+from urllib.parse import urlsplit
 
 import colander
 import mock
@@ -379,6 +380,23 @@ class WpsRestApiJobsTest(JobUtils):
         assert "table-jobs" in resp.text
         jobs = [line for line in resp.text.splitlines() if "job-list-item" in line]
         assert len(jobs) == 6
+
+    @pytest.mark.html
+    def test_get_jobs_html_table_resizes_to_content_width(self):
+        """
+        Tests that the HTML jobs table uses responsive sizing and wraps long cell values.
+        """
+        resp = self.app.get(sd.jobs_service.path, headers=self.html_headers)
+        stylesheet = resp.html.find("link", href=lambda href: href and "style.css" in href)
+        assert stylesheet
+
+        css_path = urlsplit(stylesheet["href"]).path
+        css_resp = self.app.get(css_path)
+        assert css_resp.status_code == 200
+        assert ".table-jobs {" in css_resp.text
+        assert "width: 100%;" in css_resp.text
+        assert "table-layout: fixed;" in css_resp.text
+        assert "overflow-wrap: anywhere;" in css_resp.text
 
     @pytest.mark.html
     def test_get_jobs_groups_html_unsupported(self):
