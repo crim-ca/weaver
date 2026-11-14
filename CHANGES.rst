@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Replace the ``Redoc`` viewer in generated API documentation with ``Swagger UI``
+  (resolves `#732 <https://github.com/crim-ca/weaver/issues/732>`_).
 
 Fixes:
 ------
