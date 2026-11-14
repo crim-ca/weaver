@@ -616,7 +616,7 @@ class Tag(ExtendedSchemaNode):
     # ranges used to remove starting/ending ^$ characters
     pattern = re.compile(
         rf"{SLUG.pattern.pattern[:-1]}"
-        rf"(:{SemanticVersion(v_prefix=False, rc_suffix=False).pattern[1:-1]})?$"
+        rf"(:{SemanticVersion(v_prefix=False).pattern[1:-1]})?$"
     )
 
 

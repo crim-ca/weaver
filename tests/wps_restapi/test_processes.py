@@ -589,6 +589,78 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         expect = list(zip(revisions, versions))
         assert result == expect
 
+    @pytest.mark.oap_part5
+    def test_process_links_with_semver_suffix(self):
+        """
+        Tests process links and revision listing for a version with a semantic suffix.
+        """
+        p_id = "test-process-version-links"
+        old_version = "0.1.3.dev10"
+        latest_version = "0.1.4.dev1"
+        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version=old_version)
+        response = self.app.patch_json(
+            f"/processes/{p_id}",
+            params={"title": "Latest revision", "version": latest_version},
+            headers=self.json_headers
+        )
+        assert response.status_code == 200
+        old_tagged_id = f"{p_id}:{old_version}"
+        latest_tagged_id = f"{p_id}:{latest_version}"
+        proc_url = f"https://localhost/processes/{p_id}"
+
+        response = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert response.status_code == 200
+        links = {link["rel"]: link for link in response.json["links"]}
+        assert links["self"]["href"] == proc_url
+        assert links["current"]["href"] == proc_url
+        assert links["latest-version"]["href"] == f"{proc_url}:{latest_version}"
+        assert links["working-copy-of"]["href"] == f"{proc_url}:{latest_version}"
+        alternate_links = {
+            (link["href"], link.get("type")) for link in response.json["links"] if link["rel"] == "alternate"
+        }
+        assert (f"{proc_url}?f=html", ContentType.TEXT_HTML) in alternate_links
+
+        revision = self.app.get(f"/processes/{old_tagged_id}", headers=self.json_headers)
+        assert revision.status_code == 200
+        revision_links = {link["rel"]: link for link in revision.json["links"]}
+        assert revision_links["self"]["href"] == f"{proc_url}:{old_version}"
+        assert revision_links["working-copy"]["href"] == proc_url
+        assert revision_links["latest-version"]["href"] == f"{proc_url}:{latest_version}"
+        assert "working-copy-of" not in revision_links
+        revision_alternates = {
+            link["href"] for link in revision.json["links"] if link["rel"] == "alternate"
+        }
+        assert f"{proc_url}:{old_version}?f=xml" in revision_alternates
+        assert f"{proc_url}:{old_version}?f=html" in revision_alternates
+
+        query_revision = self.app.get(
+            f"/processes/{p_id}?version={old_version}",
+            headers=self.json_headers
+        )
+        assert query_revision.status_code == 200
+        query_links = {link["rel"]: link for link in query_revision.json["links"]}
+        assert query_links["self"]["href"] == f"{proc_url}:{old_version}"
+        assert query_links["working-copy"]["href"] == proc_url
+
+        history_url = urllib.parse.urlparse(links["version-history"]["href"])
+        history_path = f"{history_url.path}?{history_url.query}"
+        history_json = self.app.get(history_path, headers=self.json_headers)
+        assert history_json.status_code == 200
+        assert history_json.json["processes"] == [old_tagged_id, latest_tagged_id]
+        listing_links = {link["rel"]: link for link in history_json.json["links"]}
+        assert listing_links["latest-version"]["href"] == f"{proc_url}:{latest_version}"
+        history = self.app.get(
+            history_path,
+            headers={"Accept": ContentType.TEXT_HTML}
+        )
+        assert history.status_code == 200
+        assert history.content_type == ContentType.TEXT_HTML
+        assert old_tagged_id in history.text and latest_tagged_id in history.text
+
+        html = self.app.get(f"/processes/{p_id}?f=html")
+        assert html.status_code == 200
+        assert f'href="{proc_url}?f=json"' in html.text
+
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
