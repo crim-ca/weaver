@@ -121,6 +121,11 @@ deployed in `Weaver` using an URL reference to an WPS-1/2 process through the us
 locally. This allows a remote server offering limited functionalities (e.g.: no REST or `OGC API` bindings supported)
 to provide them through `Weaver`.
 
+The WPS-1/2 endpoint is a single configured URL where requests select operations such as ``GetCapabilities``,
+``DescribeProcess`` or ``Execute`` using WPS parameters. OGC API - Processes instead exposes separate resource URLs
+and uses JSON bodies for process descriptions and job submissions. Weaver can expose both interfaces for the same
+local process; details and request examples are in :ref:`wps_endpoint` and the :ref:`tutorial`.
+
 A minimal :ref:`Deploy <proc_op_deploy>` request body for this kind of process could be as follows:
 
 .. code-block:: JSON
@@ -2320,8 +2325,25 @@ input where ``EOImage`` was specified and will be forwarded to the underlying :t
 BoundingBox Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: provide example and details, (crs, dimensions, etc.)
-.. todo:: cross-reference :ref:`cwl-io-types` for more details/examples
+A bounding box is a spatial extent represented by four coordinates in two dimensions or six coordinates in three
+dimensions. For an OGC API - Processes execution, submit it as an inline ``bbox`` input. The coordinates use the
+order required by the specified CRS; the example uses the OGC CRS84 longitude/latitude order:
+
+.. code-block:: json
+
+    {
+      "inputs": {
+        "area": {
+          "bbox": [-120.0, 30.0, -110.0, 40.0],
+          "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+        }
+      }
+    }
+
+The process must declare ``area`` as a bounding-box input and support the selected CRS. If ``crs`` is omitted, the
+service applies its default CRS. WPS clients provide the same extent through the WPS ``BoundingBoxData`` input
+representation. Since CWL has no native bounding-box type, Weaver maps it to JSON content in a CWL ``File`` with the
+``ogc-bbox`` format. See :ref:`CWL I/O Types <cwl-io-types>` for the mapping and its limitations.
 
 .. _proc_col_inputs:
 
@@ -2543,7 +2565,24 @@ Collection Outputs
 Multiple Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: repeating IDs example for WPS multi-inputs
+When a process input allows multiple occurrences, OGC API - Processes represents them as an array under one input ID.
+For example, a process input named ``files`` can receive two file references as follows:
+
+.. code-block:: json
+
+    {
+      "inputs": {
+        "files": [
+          {"href": "https://example.org/first.nc"},
+          {"href": "https://example.org/second.nc"}
+        ]
+      }
+    }
+
+In WPS XML, submit one ``wps:Input`` element for each value and repeat the same ``ows:Identifier``. The input's
+``minOccurs`` and ``maxOccurs`` constraints still apply to the total number of submitted values. This differs from
+the CWL package definition, where the multiple values are declared as one ``array`` input. See
+:ref:`Multiple and Optional Values <cwl-array-null-values>` for the deployment-time mapping.
 
 .. seealso::
     - :ref:`Multiple and Optional Values`
@@ -3702,7 +3741,14 @@ but are still available for use when requested.
 Workflow (Chaining Step Processes)
 --------------------------------------
 
-.. todo:: add details, explanation done in below reference
+An OGC API - Processes workflow is deployed as a CWL ``Workflow``. Each step's ``run`` field identifies a separate,
+already-deployed Weaver process, by process ID or by a supported process/package URL. Deploy the step processes before
+deploying the workflow so Weaver can resolve and validate their input and output definitions. Inputs and outputs
+between connected steps must have compatible types and formats.
+
+When the workflow is executed, Weaver runs each step on the ADES selected for its inputs by the configured data sources,
+then passes the step results to dependent steps. This requires an EMS or HYBRID configuration. See
+:ref:`CWL Workflow <app_pkg_workflow>` for step reference formats, package examples and deployment requirements.
 
 .. seealso::
 

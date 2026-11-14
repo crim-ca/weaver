@@ -592,6 +592,17 @@ configuration folder based on the default example (if missing).
 Custom configurations can be placed in the expected location or can also be provide with an alternative path
 using the ``Weaver.data_sources`` configuration setting.
 
+Each top-level key names a data source. Its configuration identifies the matching location and the ADES URL to which
+matching process executions can be dispatched. The ``default`` flag selects the fallback source for unmatched
+references. OpenSearch sources can also define fields such as ``collection_id``, ``rootdir`` and ``osdd_url``; their
+use depends on the process input definitions. Refer to the example above for the supported fields and to
+:ref:`OpenSearch Data Source` for the EOImage-specific behavior.
+
+``weaver.data_sources`` accepts a configuration file path, not a directory. If omitted or set to the default filename,
+Weaver uses ``data_sources.yml`` in its configuration directory and creates it from ``data_sources.yml.example`` when
+needed. An explicit path is resolved from the process working directory, with the configuration-directory default
+used if the requested file is not found. The file may be YAML or JSON.
+
 .. note::
     As presented in the above example, the :term:`Data Source` file can also refer to :ref:`opensearch_data_source`
     which imply additional pre-processing steps.
@@ -615,6 +626,13 @@ of processes under a common WPS server to iteratively register, using a :ref:`Ge
 endpoint.
 Please refer to `wps_processes.yml.example`_ for explicit format, keywords supported, and their resulting behaviour.
 
+The file has optional top-level ``processes`` and ``providers`` lists. Entries can be URL strings or mappings with
+fields such as ``url``, ``name``, ``id`` and ``visible``. Entries under ``processes`` register process snapshots;
+``providers`` register remote providers whose process listings are resolved from the remote service. The example file
+shows the supported combinations. The loader accepts JSON as well as YAML. ``weaver.wps_processes_file`` selects one
+file, not a directory; the default filename resolves in the configuration directory, while other relative paths are
+resolved from the application working directory.
+
 .. note::
     Processes defined under ``processes`` section registered into `Weaver` will correspond to a local snapshot of
     the remote resource at that point in time, and will not update if the reference changes. On the other hand, their
@@ -635,9 +653,9 @@ Please refer to `wps_processes.yml.example`_ for explicit format, keywords suppo
   | Defines a custom :term:`YAML` file corresponding to `wps_processes.yml.example`_ schema to pre-load :term:`WPS`
     processes and/or providers for registration at application startup.
   |
-  | The value defined by this setting will look for the provided path as absolute location, then will attempt to
-    resolve relative path (corresponding to where the application is started from), and will also look within
-    the |weaver-config|_ directory. If none of the files can be found, the operation is skipped.
+  | Absolute paths are used directly. Other paths are resolved relative to the application working directory.
+    The default filename resolves in the |weaver-config|_ directory. If the requested file is not found,
+    `Weaver` falls back to the default filename there. If no file can be found, registration is skipped.
   |
   | To ensure that this feature is disabled and to avoid any unexpected auto-deployment provided by this functionality,
     simply set setting ``weaver.wps_processes_file`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
@@ -727,6 +745,24 @@ etc. on a per-request basis, leave other requests unaffected and generally more 
 .. seealso::
     Please refer to :func:`weaver.utils.request_extra` documentation directly for supported parameters and capabilities.
 
+For example, the following entry applies a longer timeout and retries only to matching ``GET`` requests. Entries are
+checked in order, and only the first matching URL and method entry is used:
+
+.. code-block:: yaml
+
+    requests:
+      - url: "https://data.example.org/catalog/*"
+        method: GET
+        timeout: 30
+        retries: 2
+        backoff: 0.5
+        verify: true
+
+The ``url`` value may be one pattern or a list of patterns. ``method`` is optional and may be a method, a list, or
+comma-separated methods. Other keys are passed as options to the request handler, including options supported by
+``requests`` and ``weaver.utils.request_extra`` such as ``timeout``, ``verify``, ``retries``, ``backoff`` and
+``cache_enabled``. Use restrictive URL patterns, especially for authentication and TLS settings.
+
 .. note::
     To define a match of *any URL*, the ``http://*`` and/or ``https://*`` patterns can be used as the ``url`` field.
 
@@ -753,6 +789,29 @@ etc. on a per-request basis, leave other requests unaffected and generally more 
     access or personal user data references. This should be employed only for quickly resolving issues during
     development. Consider fixing SSL certificates on problematic servers, or disable the verification on a per-request
     basis using :term:`Request Options` for acceptable cases.
+
+.. _conf_caching:
+
+Caching
+=======================================
+
+The ``cache.*`` settings in ``weaver.ini`` configure cache regions. Each region has an ``enabled`` flag and an
+``expire`` time in seconds. The example configuration uses an in-memory cache and configures ``doc`` for API
+documentation responses, ``request`` for cached outbound requests, ``result`` and ``quotation``. In that example,
+documentation and quotation caching are enabled, while request and result caching are disabled.
+
+.. code-block:: ini
+
+    cache.type = memory
+    cache.request.enabled = false
+    cache.request.expire = 60
+
+For example, enable the request region by setting ``cache.request.enabled = true``. A matching outbound request can
+bypass cache lookup by setting ``cache_enabled: false`` in its :ref:`Request Options <conf_request_options>`, or by
+including a ``Cache-Control: no-cache`` header in the outbound request. Entries expire according to the region's
+``expire`` setting, and restarting an application instance clears its in-memory cache. Weaver does not expose a
+cache-management HTTP endpoint. With the default in-memory backend, cache contents are not shared across application
+instances.
 
 .. _conf_quotation:
 
