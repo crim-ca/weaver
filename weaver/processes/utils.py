@@ -60,6 +60,7 @@ from weaver.utils import (
     VersionFormat,
     VersionLevel,
     as_version_major_minor_patch,
+    create_content_id,
     fully_qualified_name,
     generate_diff,
     get_any_id,
@@ -490,7 +491,7 @@ def _get_multipart_content(content, request):
 
 
 def create_multipart_deploy(cwl_files, url, process_description=None, boundary=None):
-    # type: (List[Union[str, CWL]], URL, Optional[JSON], Optional[str]) -> Tuple[bytes, str]
+    # type: (List[Union[str, CWL]], URL, Optional[Union[JSON, List[JSON]]], Optional[str]) -> Tuple[bytes, str]
     """
     Create ``multipart/related`` deployment content from a ``list`` of :term:`CWL` files.
 
@@ -500,7 +501,10 @@ def create_multipart_deploy(cwl_files, url, process_description=None, boundary=N
         - A file path (``str``) to a :term:`CWL` file (will be loaded)
         - A :term:`CWL` ``dict`` (already parsed)
     :param url: Domain or hostname for ``Content-ID`` header generation
-    :param process_description: Optional :term:`Process` description metadata to include
+    :param process_description:
+        Optional :term:`Process` description metadata to include.
+        Can be a ``list`` to provide a description for multiple :term:`CWL` (matched by their ``id``).
+        A description without ``id`` is considered to be for the main :term:`Workflow`.
     :param boundary: Optional custom ``boundary`` ``str`` (auto-generated if not provided)
     :returns:
         ``tuple`` of (multipart content ``bytes``, full ``Content-Type`` header with ``boundary``)
@@ -548,12 +552,17 @@ def create_multipart_deploy(cwl_files, url, process_description=None, boundary=N
 
     # Add process description if provided
     if process_description:
-        desc_json = json.dumps(process_description, indent=2)
-        desc_part = MIMEText(desc_json, _subtype="json", _charset="utf-8")
-        # Replace the default Content-Type (text/json) with application/json
-        desc_part.replace_header("Content-Type", ContentType.APP_JSON)
-        desc_part.add_header("Content-ID", "<process-description>")
-        msg.attach(desc_part)
+        descriptions = process_description if isinstance(process_description, list) else [process_description]
+        for desc_idx, description in enumerate(descriptions):
+            desc_json = json.dumps(description, indent=2)
+            desc_part = MIMEText(desc_json, _subtype="json", _charset="utf-8")
+            # Replace the default Content-Type (text/json) with application/json
+            desc_part.replace_header("Content-Type", ContentType.APP_JSON)
+            if len(descriptions) == 1:
+                desc_part.add_header("Content-ID", "<process-description>")
+            else:
+                desc_part.add_header("Content-ID", create_content_id(f"process-description-{desc_idx}", url))
+            msg.attach(desc_part)
 
     multipart_content = msg.as_bytes()
 
@@ -819,25 +828,111 @@ def _interpret_multipart_part(part, request=None):
     return None
 
 
-def _organize_deploy_parts(interpreted_parts, root_workflow_cid):
-    # type: (List[Tuple[str, str, str, str, JSON]], Optional[str]) -> Tuple[List[CWL], Optional[JSON]]
+def _strip_cwl_id(cwl_id):
+    # type: (Optional[str]) -> Optional[str]
     """
-    Organize interpreted multipart parts into CWL packages and process description.
+    Remove the ``#`` prefix employed by :term:`CWL` identifiers within a ``$graph``.
+    """
+    return cwl_id.lstrip("#") if isinstance(cwl_id, str) and cwl_id else None
+
+
+def get_process_description_id(description):
+    # type: (JSON) -> Optional[str]
+    """
+    Obtain the :term:`Process` identifier from a deployment description, considering the supported formats.
+    """
+    proc_id = get_process_information(description).get("id") or description.get("id")
+    return proc_id if isinstance(proc_id, str) and proc_id else None
+
+
+def _normalize_process_description(description):
+    # type: (JSON) -> JSON
+    """
+    Ensure the :term:`Process` description is nested under ``processDescription`` as in a deployment payload.
+    """
+    if "processDescription" in description:
+        return description
+    return {"processDescription": description}
+
+
+def _expand_deploy_profile_part(part_data):
+    # type: (JSON) -> Tuple[Optional[JSON], List[CWL]]
+    """
+    Split a single-part deployment body (``processDescription``/``executionUnit``) into its description and CWL.
+
+    The result is equivalent to providing distinct :term:`CWL` and :term:`Process` description parts of matching ``id``.
+
+    :param part_data: Contents of a part provided with the ``ogc-deploy-process`` profile.
+    :returns: ``tuple`` of (optional :term:`Process` description, ``list`` of :term:`CWL` packages)
+    :raises HTTPBadRequest: If the part provides neither a description nor an execution unit.
+    """
+    units = part_data.get("executionUnit")
+    if isinstance(units, dict):
+        units = [units if "unit" in units or "href" in units else {"unit": units}]
+    packages = resolve_multi_execution_units(units) if isinstance(units, list) else []
+    description = {key: val for key, val in part_data.items() if key != "executionUnit"}
+    description = description if "processDescription" in description else None
+    if not description and not packages:
+        raise HTTPBadRequest(json={
+            "title": "Invalid deployment part",
+            "description": (
+                f"Part with profile [{sd.OGC_API_PROC_PROFILE_DEPLOY_URI}] "
+                "must provide 'processDescription' and/or 'executionUnit'."
+            ),
+        })
+
+    # a single CWL without 'id' can only be the one this description refers to
+    desc_id = get_process_description_id(description) if description else None
+    if desc_id and len(packages) == 1 and "class" in packages[0] and not packages[0].get("id"):
+        packages[0] = {**packages[0], "id": desc_id}
+    return description, packages
+
+
+def _organize_deploy_parts(interpreted_parts, root_workflow_cid):
+    # type: (List[Tuple[str, str, str, str, JSON]], Optional[str]) -> Tuple[List[CWL], List[JSON]]
+    """
+    Organize interpreted multipart parts into CWL packages and their process descriptions.
+
+    Process descriptions are cross-linked later with their :term:`CWL` using their matching ``id``.
+    A :term:`CWL` without ``id`` is resolved from the ``Content-ID`` or ``Content-Location`` of its part
+    when a description refers to it.
 
     :param interpreted_parts:
         ``list`` of interpreted parts ``(content_type, content_id, content_location, profile, data)``
     :param root_workflow_cid: ``Content-ID`` of root workflow from ``start`` parameter (if any)
-    :returns: ``tuple`` of (``list`` of :term:`CWL` packages, optional process description)
+    :returns: ``tuple`` of (``list`` of :term:`CWL` packages, ``list`` of process descriptions)
     :raises HTTPBadRequest: If no CWL packages found or root workflow validation fails
     """
     cwl_packages = []
-    process_description = None
+    process_descriptions = []
     parts_by_cid = {}
+    part_refs = []  # CWL with the alternate identifiers of their part
 
-    for _, content_id, _, _, part_data in interpreted_parts:
-        process_description = _classify_multipart_part(
-            part_data, cwl_packages, parts_by_cid, content_id, process_description
-        )
+    for _, content_id, content_location, profile, part_data in interpreted_parts:
+        if (
+            isinstance(part_data, dict) and
+            profile and sd.OGC_API_PROC_PROFILE_DEPLOY_URI in profile
+        ):
+            description, packages = _expand_deploy_profile_part(part_data)
+            if description:
+                process_descriptions.append(description)
+            cwl_packages.extend(packages)
+            continue
+
+        pkg_count = len(cwl_packages)
+        description = _classify_multipart_part(part_data, cwl_packages, parts_by_cid, content_id, None)
+        if description is not None:
+            process_descriptions.append(_normalize_process_description(description))
+        # interpreted 'Content-ID' has its brackets stripped, and its context part is optional
+        resource_id, _ = parse_content_id(create_content_id(content_id, ""))
+        refs = {ref for ref in [resource_id, content_location] if ref}
+        part_refs.extend((pkg, refs) for pkg in cwl_packages[pkg_count:])
+
+    for description in process_descriptions:
+        desc_id = get_process_description_id(description)
+        for pkg, refs in part_refs:
+            if desc_id in refs and not pkg.get("id"):
+                pkg["id"] = desc_id
 
     if not cwl_packages:
         raise HTTPBadRequest(json={
@@ -848,7 +943,7 @@ def _organize_deploy_parts(interpreted_parts, root_workflow_cid):
 
     cwl_packages = _validate_and_reorder_multipart_workflow(cwl_packages, root_workflow_cid, parts_by_cid)
 
-    return cwl_packages, process_description
+    return cwl_packages, process_descriptions
 
 
 def _organize_job_execution_parts(interpreted_parts, root_workflow_cid):
@@ -957,16 +1052,18 @@ def _organize_job_execution_parts(interpreted_parts, root_workflow_cid):
 
 
 def parse_multipart_deploy(content, content_type, request=None):
-    # type: (Union[str, bytes], str, Optional[AnyRequestType]) -> Tuple[List[CWL], Optional[JSON]]
+    # type: (Union[str, bytes], str, Optional[AnyRequestType]) -> Tuple[List[CWL], List[JSON]]
     """
     Parse ``multipart/mixed`` or ``multipart/related`` deployment content.
 
-    Extracts :term:`CWL` packages and optional :term:`Process` description from multipart request.
+    Extracts :term:`CWL` packages and optional :term:`Process` descriptions from multipart request.
+    A single part provided with the ``ogc-deploy-process`` profile can combine ``processDescription``
+    and ``executionUnit``, which is equivalent to distinct :term:`CWL` and description parts of matching ``id``.
 
     :param content: Raw multipart content (``str`` or ``bytes``)
     :param content_type: ``Content-Type`` header value (must include ``boundary`` parameter)
     :param request: Optional request object for extracting body
-    :returns: ``tuple`` of (``list`` of :term:`CWL` packages, optional :term:`Process` description metadata)
+    :returns: ``tuple`` of (``list`` of :term:`CWL` packages, ``list`` of :term:`Process` description metadata)
     :raises HTTPBadRequest: If multipart content is malformed or invalid
     """
     msg = _parse_multipart_message(content, content_type, request)
@@ -1014,15 +1111,74 @@ def parse_multipart_job_execution(content, content_type, request=None):
     return _organize_job_execution_parts(interpreted_parts, root_workflow_cid)
 
 
+def _link_process_descriptions(cwl_packages, descriptions):
+    # type: (List[CWL], List[JSON]) -> Dict[Optional[str], JSON]
+    """
+    Cross-link :term:`Process` descriptions with the :term:`CWL` packages using their matching ``id``.
+
+    A description without ``id`` is meant for the main :term:`CWL` (backward compatible with a single description).
+
+    :param cwl_packages: :term:`CWL` packages to deploy.
+    :param descriptions: :term:`Process` descriptions provided along the :term:`CWL`.
+    :returns: Mapping of :term:`CWL` ``id`` (without ``#``) to their description.
+    :raises HTTPUnprocessableEntity: If a description refers to an unknown :term:`CWL` or many refer to the same one.
+    """
+    linked = {}
+    if not descriptions:
+        return linked
+
+    main = cwl_packages[0] if len(cwl_packages) == 1 else resolve_deployment_order(cwl_packages)[1]
+    main_id = _strip_cwl_id(main.get("id")) if main else None
+    cwl_ids = {_strip_cwl_id(pkg.get("id")) for pkg in cwl_packages}
+    for description in descriptions:
+        desc_id = _strip_cwl_id(get_process_description_id(description))
+        if desc_id and desc_id in cwl_ids:
+            target = desc_id
+        elif not desc_id or main_id is None:
+            target = main_id
+        else:
+            raise HTTPUnprocessableEntity(json={
+                "title": "Unknown process description identifier",
+                "description": f"Process description [{desc_id}] does not match the id of any provided CWL.",
+                "cause": {"id": desc_id},
+                "value": sorted(cwl_id for cwl_id in cwl_ids if cwl_id),
+            })
+        if target in linked:
+            raise HTTPUnprocessableEntity(json={
+                "title": "Duplicate process description",
+                "description": f"Multiple process descriptions refer to the same CWL [{target}].",
+                "cause": {"id": target},
+            })
+        linked[target] = description
+    return linked
+
+
+def _merge_process_description(package, description):
+    # type: (CWL, Optional[JSON]) -> Union[JSON, CWL]
+    """
+    Combine a :term:`CWL` with its :term:`Process` description as a typical ``processDescription``/``executionUnit``.
+    """
+    if not description:
+        return package
+    payload = deepcopy(description)
+    payload["executionUnit"] = [{"unit": package}]
+    return payload
+
+
 def parse_process_deploy_content(
     request=None,                                       # type: Optional[AnyRequestType]
     content=None,                                       # type: Optional[Union[JSON, str]]
     content_schema=None,                                # type: Optional[colander.SchemaNode]
     content_type=sd.RequestContentTypeHeader.default,   # type: Optional[ContentType]
     content_type_schema=sd.RequestContentTypeHeader,    # type: Optional[colander.SchemaNode]
+    process_descriptions=None,                          # type: Optional[Dict[Optional[str], JSON]]
 ):                                                      # type: (...) -> Union[JSON, CWL]
     """
     Load the request content with validation of expected content type and their schema.
+
+    For multipart content with multiple :term:`CWL`, the provided ``process_descriptions`` mapping is filled with
+    the :term:`Process` description linked to each :term:`CWL` ``id`` (``None`` for a main :term:`CWL` without ``id``).
+    For a single :term:`CWL`, the description is directly merged in the returned deployment payload.
     """
 
     # Get full Content-Type header (including parameters like boundary) from request if available
@@ -1042,19 +1198,25 @@ def parse_process_deploy_content(
         clean_media_type_format(content_type, strip_parameters=True).lower() in ContentType.ANY_MULTIPART
     ):
         LOGGER.info("Detected multipart deployment request")
-        cwl_packages, _ = parse_multipart_deploy(
+        cwl_packages, descriptions = parse_multipart_deploy(
             content=content if content is not None else request.body,
             content_type=content_type,
             request=request
         )
+        linked_descriptions = _link_process_descriptions(cwl_packages, descriptions)
 
         if len(cwl_packages) == 1:
             # Single CWL package - use as-is
             # This avoids double-wrapping if the package already contains a $graph
-            content = cwl_packages[0]
+            content = _merge_process_description(
+                cwl_packages[0],
+                linked_descriptions.get(_strip_cwl_id(cwl_packages[0].get("id")))
+            )
         else:
             # Multiple packages - return as list to be wrapped in $graph
             content = cwl_packages
+            if process_descriptions is not None:
+                process_descriptions.update(linked_descriptions)
         # Content is now parsed, skip to validation
     else:
         # Non-multipart content: parse from request or string
@@ -1127,11 +1289,13 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
 
     # use deepcopy of to remove any circular dependencies before writing to mongodb or any updates to the payload
     # For multipart requests, we need to pass the request object to access the raw body
+    linked_descriptions = {}
     payload = parse_process_deploy_content(
         request=container if hasattr(container, 'body') else None,
         content=payload,
         content_type=c_type_full,  # Pass full Content-Type with parameters (e.g., boundary)
         content_type_schema=sd.DeployContentTypeAny,
+        process_descriptions=linked_descriptions,
     )
 
     # Extract process ID from Content-ID header if provided (RFC 2392)
@@ -1179,7 +1343,7 @@ def deploy_process_from_payload(payload, container, overwrite=False):  # pylint:
     # tools remain in the database without rollback. Retry attempts will skip already-deployed tools.
     if isinstance(payload, list):
         LOGGER.info("Detected multi-CWL deployment (multipart) with %d packages", len(payload))
-        return _deploy_process_multi_cwl(payload, container, overwrite)
+        return _deploy_process_multi_cwl(payload, container, overwrite, linked_descriptions)
 
     payload_copy = deepcopy(payload)
     payload = _check_deploy(payload)
@@ -1387,6 +1551,7 @@ def _deploy_process_multi_cwl(
     cwl_packages,   # type: List[CWL]
     container,      # type: Union[AnySettingsContainer, AnyRequestType]
     overwrite,      # type: Union[bool, Process]
+    descriptions=None,  # type: Optional[Dict[Optional[str], JSON]]
 ):                  # type: (...) -> HTTPException
     """
     Deploy multiple :term:`CWL` packages from a ``$graph`` definition using recursive deployment calls.
@@ -1406,9 +1571,13 @@ def _deploy_process_multi_cwl(
     :param cwl_packages: ``list`` of resolved :term:`CWL` package definitions.
     :param container: Application container.
     :param overwrite: Whether to overwrite existing processes. Note: only applies to main process, not child tools.
+    :param descriptions:
+        Mapping of :term:`CWL` ``id`` (without ``#``) to their :term:`Process` description.
+        Each :term:`CWL` with a corresponding description is deployed with it.
     :returns: HTTP response with deployment result from the main process.
     """
     LOGGER.info("Deploying multi-CWL package with %d definitions", len(cwl_packages))
+    descriptions = descriptions or {}
 
     # Resolve deployment order (tools first, main process last)
     # main_process is either the Workflow or the tool with id "#main"/"main"
@@ -1437,7 +1606,8 @@ def _deploy_process_multi_cwl(
         # NOTE: Child tools are always deployed with overwrite=False to preserve existing dependencies.
         # This means retrying a failed multi-CWL deployment will skip already-deployed tools.
         try:
-            response = deploy_process_from_payload(tool_pkg_deploy, container, overwrite=False)
+            tool_payload = _merge_process_description(tool_pkg_deploy, descriptions.get(_strip_cwl_id(tool_id)))
+            response = deploy_process_from_payload(tool_payload, container, overwrite=False)
             deployed_processes.append(response.json["processSummary"])
             LOGGER.info("Successfully deployed CWL tool: %s", tool_id)
         except HTTPConflict:
@@ -1466,7 +1636,8 @@ def _deploy_process_multi_cwl(
 
     # Pass CWL package directly
     LOGGER.info("Deploying main CWL process: %s", main_process_id)
-    response = deploy_process_from_payload(main_pkg_deploy, container, overwrite)
+    main_payload = _merge_process_description(main_pkg_deploy, descriptions.get(_strip_cwl_id(main_process_id)))
+    response = deploy_process_from_payload(main_payload, container, overwrite)
 
     LOGGER.info("Successfully deployed multi-CWL package: main process %s with %d child processes",
                 main_process_id, len(deployed_processes))
