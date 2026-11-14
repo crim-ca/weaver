@@ -5514,6 +5514,37 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "Dispatching execution of nested process" in logs
         assert "Abort execution." in logs
 
+    def test_get_processes_filter_by_search_queries(self):
+        """
+        Tests that ``GET /processes`` filters by ``keywords``, ``title``, ``description``, ``q`` and ``version``.
+        """
+        p_id = "test-process-search-queries"
+        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version="1.2.3")
+        data = {"title": "Regional Subset", "description": "Extracts a region", "keywords": ["climate", "netcdf"]}
+        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+
+        def get_ids(**query):
+            query["links"] = "false"
+            resp = self.app.get("/processes", params=query, headers=self.json_headers)
+            assert resp.status_code == 200, resp.text
+            return [proc["id"] for proc in resp.json["processes"]]
+
+        assert p_id in get_ids(keywords="climate,netcdf")
+        assert p_id in get_ids(keywords="CLIMATE,grib|netcdf")
+        assert p_id not in get_ids(keywords="climate,grib")
+        assert p_id in get_ids(title="regional")
+        assert p_id not in get_ids(title="other")
+        assert p_id in get_ids(description="a REGION")
+        assert p_id not in get_ids(description="other")
+        assert p_id in get_ids(q="other,subset")
+        assert p_id in get_ids(q="netcdf")
+        assert p_id in get_ids(q="extracts")
+        assert p_id not in get_ids(q="other,unknown")
+        assert p_id in get_ids(version="1.2.4")  # PATCH bumped version
+        assert p_id not in get_ids(version="1.2.3")
+        assert get_ids(q="subset", title="other") == []
+
     @pytest.mark.oap_part5
     def test_get_processes_filter_by_metadata_profile(self):
         """
