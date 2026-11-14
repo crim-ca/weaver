@@ -39,6 +39,7 @@ from pywps.response.describe import DescribeResponse
 from werkzeug.wrappers import Request as WerkzeugRequest
 
 from weaver import xml_util
+from weaver.compat import Version
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import (
     ExecuteControlOption,
@@ -47,7 +48,7 @@ from weaver.execute import (
     ExecuteReturnPreference,
     ExecuteTransmissionMode
 )
-from weaver.formats import AcceptLanguage, ContentType, OutputFormat, repr_json
+from weaver.formats import AcceptLanguage, ContentType, OutputFormat, guess_target_format, repr_json
 from weaver.processes.constants import (
     CWL_NAMESPACE_WEAVER_ID,
     CWL_REQUIREMENT_APP_DOCKER,
@@ -72,6 +73,7 @@ from weaver.utils import (
     VersionFormat,
     apply_number_with_unit,
     as_version_major_minor_patch,
+    as_version_string,
     extend_instance,
     fully_qualified_name,
     get_job_log_msg,
@@ -2323,7 +2325,11 @@ class Process(Base):
         if not len(result) == 2:
             return process_id, None
         p_id, version = result
-        return (p_id, version) if all(str.isnumeric(part) for part in version.split(".")) else (process_id, None)
+        try:
+            version = sd.Version().deserialize(version)
+        except colander.Invalid:
+            return process_id, None
+        return p_id, version
 
     @property
     def latest(self):
@@ -2356,7 +2362,7 @@ class Process(Base):
         # on next (if any) update request, this revision will be updated with a default version
         if self.version is None:
             return proc_id
-        version = as_version_major_minor_patch(self.version, VersionFormat.STRING)
+        version = as_version_string(self.version)
         return f"{proc_id}:{version}"
 
     @property
@@ -2822,20 +2828,33 @@ class Process(Base):
 
         proc_desc = self.href(container)
         proc_list = proc_desc.rsplit("/", 1)[0]
+        proc_base = f"{proc_list}/{self.name}"
+        request_process_id = getattr(container, "matchdict", {}).get("process_id")
+        request_version = getattr(container, "params", {}).get("version")
+        if request_process_id and request_version and ":" not in request_process_id:
+            request_process_id = f"{request_process_id}:{as_version_string(request_version)}"
+        request_process_id = request_process_id or self.id
+        is_versioned_request = self.split_version(request_process_id)[1] is not None
+        proc_self = f"{proc_list}/{request_process_id}"
         jobs_list = proc_desc + sd.jobs_service.path
         proc_exec = f"{proc_desc}/execution"
-        proc_self = f"{proc_list}/{self.tag}" if self.version else proc_desc
         links = [
             {"href": proc_self, "rel": "self", "title": "Current process description."},
             {"href": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "rel": "profile", "title": "Process response profile."},
-            {"href": f"{proc_desc}?f=xml", "rel": "alternate",
+            {"href": f"{proc_self}?f=xml", "rel": "alternate",
              "title": "Alternate process description.", "type": ContentType.APP_XML},
         ]
-        if self.service:
-            links.append(
-                {"href": f"{proc_desc}?f=html", "rel": "alternate",
-                 "title": "Alternate process description.", "type": ContentType.TEXT_HTML}
-            )
+        request_format = (
+            guess_target_format(container, default=ContentType.APP_JSON)
+            if hasattr(container, "params") and hasattr(container, "headers")
+            else ContentType.APP_JSON
+        )
+        alternate_format = "json" if request_format == ContentType.TEXT_HTML else "html"
+        alternate_type = ContentType.APP_JSON if alternate_format == "json" else ContentType.TEXT_HTML
+        links.append({
+            "href": f"{proc_self}?f={alternate_format}", "rel": "alternate",
+            "title": "Alternate process description.", "type": alternate_type
+        })
         links.extend([
             {"href": proc_desc, "rel": "process-meta", "title": "Process definition."},
             {"href": proc_exec, "rel": sd.OGC_API_PROC_REL_EXECUTE_URI,
@@ -2849,24 +2868,37 @@ class Process(Base):
         if self.version:
             # OGC API - Processes - 'Part 5: Versioning' (unofficial)
             # (see https://github.com/opengeospatial/ogcapi-processes/pull/578)
-            proc_tag = f"{proc_list}/{self.tag}"
-            proc_hist = f"{proc_list}?detail=false&revisions=true&process={self.id}"
+            versions = sorted(get_db(container).get_store(StoreProcesses).find_versions(
+                self.name, VersionFormat.OBJECT
+            ))
+            latest_version = as_version_string(versions[-1]) if versions else as_version_string(self.version)
+            latest_tag = f"{self.name}:{latest_version}"
+            proc_hist = get_path_kvp(proc_list, detail=False, revisions=True, process=self.name)
             links.extend([
-                {"href": proc_tag, "rel": "working-copy", "title": "Tagged version of this process description."},
-                {"href": proc_desc, "rel": "latest-version", "title": "Most recent revision of this process."},
+                {"href": proc_base, "rel": "current", "title": "Current process (latest version)."},
+                {"href": f"{proc_list}/{latest_tag}", "rel": "latest-version",
+                 "title": "Most recent revision of this process."},
                 {"href": proc_hist, "rel": "version-history", "title": "Listing of all revisions of this process."},
             ])
-            versions = get_db(container).get_store(StoreProcesses).find_versions(self.name, VersionFormat.OBJECT)
-            proc_ver = as_version_major_minor_patch(self.version, VersionFormat.OBJECT)
+            if is_versioned_request:
+                links.append({
+                    "href": proc_base, "rel": "working-copy", "title": "Working copy of this process."
+                })
+            else:
+                links.append({
+                    "href": f"{proc_list}/{latest_tag}", "rel": "working-copy-of",
+                    "title": "Versioned process represented by this working copy."
+                })
+            proc_ver = Version(as_version_string(self.version))
             prev_ver = list(filter(lambda ver: ver < proc_ver, versions))
             next_ver = list(filter(lambda ver: ver > proc_ver, versions))
             if prev_ver:
-                proc_prev = f"{proc_desc}:{prev_ver[-1]!s}"
+                proc_prev = f"{proc_base}:{as_version_string(prev_ver[-1])}"
                 links.append(
                     {"href": proc_prev, "rel": "predecessor-version", "title": "Previous revision of this process."}
                 )
             if next_ver:
-                proc_next = f"{proc_desc}:{next_ver[0]!s}"
+                proc_next = f"{proc_base}:{as_version_string(next_ver[0])}"
                 links.append(
                     {"href": proc_next, "rel": "successor-version", "title": "Next revision of this process."}
                 )
@@ -2951,7 +2983,7 @@ class Process(Base):
             return self.xml(request)
 
         process = copy.deepcopy(self.dict())
-        links = self.links()
+        links = self.links(container=request)
         process.update({
             "deploymentProfile": self.deployment_profile,
             "links": links

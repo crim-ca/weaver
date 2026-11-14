@@ -213,6 +213,7 @@ def test_process_io_schema_ignore_uri():
     ("urn:test:random-test:1.3.4", ("urn:test:random-test", "1.3.4")),
     ("random-test:1", ("random-test", "1")),
     ("random-test:1.3.4", ("random-test", "1.3.4")),
+    ("random-test:0.1.3.dev10", ("random-test", "0.1.3.dev10")),
     ("random-test:not.a.version", ("random-test:not.a.version", None)),
 ])
 def test_process_split_version(process_id, result):

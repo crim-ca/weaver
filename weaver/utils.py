@@ -1061,6 +1061,25 @@ def as_version_major_minor_patch(version, version_format=VersionFormat.PARTS):
     return ver_tuple
 
 
+def as_version_string(version):
+    # type: (Optional[AnyVersion]) -> str
+    """
+    Generates a normalized version string with a padded ``MAJOR.MINOR.PATCH`` and any suffix preserved.
+    """
+    if version is None:
+        return "0.0.0"
+    if isinstance(version, (list, tuple)):
+        release = [int(part) for part in version[:3]]
+        release += [0] * (3 - len(release))
+        return ".".join(str(part) for part in release)
+    version_str = str(version)
+    parsed_version = Version(version_str)
+    release = list(parsed_version.release[:3])
+    suffix = version_str[len(".".join(str(part) for part in parsed_version.release)):]
+    release += [0] * (3 - len(release))
+    return ".".join(str(part) for part in release) + suffix
+
+
 def is_update_version(version, taken_versions, version_level=VersionLevel.PATCH):
     # type: (AnyVersion, Iterable[AnyVersion], VersionLevel) -> TypeGuard[AnyVersion]
     """

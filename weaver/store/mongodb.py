@@ -13,6 +13,7 @@ from pymongo.errors import DuplicateKeyError
 from pyramid.request import Request
 from pywps import Process as ProcessWPS
 
+from weaver.compat import Version
 from weaver.datatype import Bill, Job, Process, Quote, Service, VaultFile
 from weaver.exceptions import (
     BillInstanceError,
@@ -46,6 +47,7 @@ from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes
 from weaver.utils import (
     VersionFormat,
     as_version_major_minor_patch,
+    as_version_string,
     fully_qualified_name,
     get_base_url,
     get_sane_name,
@@ -535,7 +537,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         if not status or not len(revisions) > 1 or not process.version:
             return status
         # if process was the latest revision, fallback to previous one as new latest
-        version = as_version_major_minor_patch(process.version, VersionFormat.STRING)
+        version = as_version_string(process.version)
         if version == revisions[-1]:
             latest = revisions[-2]  # prior version
             proc_latest = f"{process_id}:{latest}"
@@ -704,7 +706,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         search = {"identifier": sane_name}
         if version:
-            version = as_version_major_minor_patch(version, VersionFormat.STRING)  # make sure it is padded
+            version = as_version_string(version)
             sane_tag = f"{sane_name}:{version}"
             search = {"$or": [{"identifier": sane_tag}, {"identifier": sane_name, "version": version}]}
         return search, version
@@ -748,13 +750,17 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         process_id = self._get_process_id(process_id)
         process_id = Process.split_version(process_id)[0]  # version never needed to fetch all revisions
         sane_name = get_sane_name(process_id, **self.sane_name_config)
-        version_name = rf"^{sane_name}(:[0-9]+\.[0-9]+.[0-9]+)?$"
+        version_name = rf"^{sane_name}(:.*)?$"
         versions = self.collection.find(
             filter={"identifier": {"$regex": version_name}},
             projection={"_id": False, "version": True},
-            sort=[(Sort.VERSION, pymongo.ASCENDING)],
         )
-        return [as_version_major_minor_patch(ver["version"], version_format) for ver in versions]
+        versions = sorted((as_version_string(ver["version"]) for ver in versions), key=Version)
+        if version_format == VersionFormat.OBJECT:
+            return [Version(version) for version in versions]
+        if version_format == VersionFormat.STRING:
+            return versions
+        return [as_version_major_minor_patch(version, version_format) for version in versions]
 
     def update_version(self, process_id, version):
         # type: (AnyProcessRef, AnyVersion) -> Process
@@ -768,7 +774,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         """
         process_id = self._get_process_id(process_id)
         sane_name = get_sane_name(process_id, **self.sane_name_config)
-        version = as_version_major_minor_patch(version, VersionFormat.STRING)
+        version = as_version_string(version)
         # update ID to allow direct fetch by ID using tagged version
         # this also clears the unique ID index requirement
         new_name = f"{sane_name}:{version}"

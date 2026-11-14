@@ -18,7 +18,7 @@ from weaver.formats import ContentType, OutputFormat, clean_media_type_format, g
 from weaver.ogc_definitions import normalize as normalize_ogc_uri
 from weaver.store.base import StoreProcesses
 from weaver.typedefs import MetadataQueryScope, PreferHeaderHandling
-from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
+from weaver.utils import VersionFormat, get_header, get_path_kvp, get_settings, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
@@ -358,9 +358,13 @@ def get_process_list_links(request, paging, total, provider=None):
                 "type": ContentType.APP_JSON, "title": "Next page of processes query listing."
             })
     process = kvp_params.get("process")
-    if process and ":" not in str(process):
-        proc_hist = f"{proc_url}?detail=false&revisions=true&process={process}"
-        proc_desc = f"{proc_url}/{process}"
+    if process:
+        process_id = str(process).split(":", 1)[0]
+        versions = get_db(request).get_store(StoreProcesses).find_versions(process_id, VersionFormat.STRING)
+        if not versions:
+            return links
+        proc_hist = get_path_kvp(proc_url, detail=False, revisions=True, process=process_id)
+        proc_desc = f"{proc_url}/{process_id}:{versions[-1]}"
         links.extend([
             {"href": proc_desc, "rel": "latest-version",
              "type": ContentType.APP_JSON, "title": "Most recent revision of this process."},
