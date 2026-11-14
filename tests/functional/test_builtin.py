@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from owslib.crs import Crs
+from parameterized import parameterized
 from pywps.inout.outputs import MetaFile, MetaLink4
 
 from tests.functional.utils import WpsConfigBase
@@ -855,6 +856,51 @@ class BuiltinAppTest(WpsConfigBase):
             job_url = resp.json["location"]
             results = self.monitor_job(job_url)
             self.validate_echo_process_results(results, body["inputs"], body["outputs"])
+
+    @parameterized.expand(
+        [
+            (ExecuteMode.SYNC, "?response=collection", None, True),
+            (ExecuteMode.SYNC, "", ExecuteResponse.COLLECTION, True),
+            (ExecuteMode.ASYNC, "?response=collection", None, True),
+            (ExecuteMode.ASYNC, "", ExecuteResponse.COLLECTION, True),
+            (ExecuteMode.SYNC, "", ExecuteResponse.DOCUMENT, False),
+            (ExecuteMode.ASYNC, "", ExecuteResponse.DOCUMENT, False),
+        ]
+    )
+    def test_echo_process_execute_response_collection(self, mode, query, body_response, expect_collection):
+        """
+        Tests that the results collection is generated only when requested by the query or body ``response``.
+        """
+        with contextlib.ExitStack() as stack_exec:
+            body = self.setup_echo_process_execution_body(stack_exec)
+            body["mode"] = mode
+            body["response"] = body_response
+            body = {key: val for key, val in body.items() if val is not None}
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            headers = {"Prefer": "wait=10"} if mode == ExecuteMode.SYNC else {}
+            headers.update(self.json_headers)
+            path = f"/processes/EchoProcess/jobs{query}"
+            resp = mocked_sub_requests(self.app, "post_json", path,
+                                       data=body, headers=headers, only_local=True, expect_errors=True)
+            if mode == ExecuteMode.SYNC:
+                assert resp.status_code == (303 if expect_collection else 200), f"Error: {resp.text}"
+                job_id = [lnk for hdr, lnk in resp.headerlist if hdr == "Link" and "rel=\"status\"" in lnk]
+                job_id = job_id[0].split("/jobs/")[-1].split(">")[0]
+            else:
+                assert resp.status_code == 201, f"Error: {resp.text}"
+                job_url = resp.json["location"]
+                self.monitor_job(job_url, return_status=True)
+                job_id = job_url.rsplit("/", 1)[-1]
+            coll_path = os.path.join(self.settings["weaver.wps_output_dir"], f"{job_id}-collection")
+            if expect_collection:
+                assert os.path.isfile(os.path.join(coll_path, "collection.json"))
+                assert os.path.isfile(os.path.join(coll_path, "items", "index.json"))
+                assert resp.status_code == 303 or mode == ExecuteMode.ASYNC
+                if mode == ExecuteMode.SYNC:
+                    assert resp.headers["Location"].endswith(f"{job_id}-collection/collection.json")
+            else:
+                assert not os.path.exists(coll_path), "collection must not be generated unless requested"
 
 
 def test_jsonarray2netcdf_process():

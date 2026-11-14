@@ -12,7 +12,37 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add static `STAC` Collections and Items for successful `Job` results under ``{jobID}-collection/``.
+  The directory contains a STAC ``collection.json``, ``items/index.json`` (*GeoJSON FeatureCollection*)
+  and one STAC Item per aligned result instance.
+  The documents conform to `STAC Core 1.1.0 <https://docs.ogc.org/cs/25-004/25-004.html>`_ and derive their extents
+  from the results (partial implementation of `#683 <https://github.com/crim-ca/weaver/issues/683>`_).
+- Aggregate aligned outputs into each STAC Item, broadcasting scalar outputs and retaining arrays of unmatched
+  cardinality as Collection assets. Reject ambiguous geo-like array cardinalities with HTTP 422 Problem Details
+  and represent Processing Extension inputs, outputs, parameters and results using the suggested asset roles
+  (`processing extension PR #46 <https://github.com/stac-extensions/processing/pull/46>`_).
+- Add `STAC Processing Extension <https://github.com/stac-extensions/processing>`_,
+  `STAC Application Extension <https://github.com/stac-extensions/application>`_ and
+  `STAC File Extension <https://github.com/stac-extensions/file>`_ metadata to associate
+  collection items with the `Job`, `Process`, `CWL` package, `Provenance` and result files
+  (relates to `#103 <https://github.com/crim-ca/weaver/issues/103>`_
+  and `#910 <https://github.com/crim-ca/weaver/issues/910>`_).
+- Generate the collection on request with ``response=collection`` (query parameter or body alias) during process
+  execution or through ``/jobs`` and ``GET /jobs/{jobID}/results``. Redirect to the generated collection, reuse it if
+  it already exists, and regenerate it when ``Cache-Control: no-cache`` is provided
+  (relates to `#1063 <https://github.com/crim-ca/weaver/issues/1063>`_).
+- Advertise the collection in `Job` status with a ``collection`` link to
+  ``/jobs/{jobID}/results?response=collection`` and in `Job` results with an ``alternate`` link.
+  Both links identify the new *Collection Output* result by leveraging the dynamic profile and generation procedure.
+- Record the collection in `Provenance` as an alternate representation of the `Job` results.
+- Remove the local static collection when the `Job` is dismissed (``DELETE``) if managed by `Weaver` as static files.
+- Add ``weaver.job_collection`` setting to enable or disable the generation of the `Job` results `STAC` collection.
+- Add ``weaver.job_collection_stac_api_public_url`` and ``weaver.job_collection_stac_api_staging_url`` settings to
+  publish `Job` results collections to a `STAC API` instead of static files, with dynamic conformance classes.
+- Add ``response=landingPage`` (only with a configured `STAC API`) redirecting to the `STAC API` root.
+- Add dynamic ``dataAccessAPIs`` reporting of process outputs in the process description.
+- Return HTTP 406 ``application/problem+json`` when an unsupported collection profile is requested with
+  ``Accept-Profile`` or ``response[profile]``.
 
 Fixes:
 ------
