@@ -34,7 +34,7 @@
 
 <div class="format-link">
     (<a href="${util.get_process_link(id, provider_id=provider_id, query='f=json')}">OGC JSON</a>,
-     <a href="${util.get_process_link(id, provider_id=provider_id, query='f=xml')}">WPS XML</a>)
+     <a href="${util.get_process_link(id, provider_id=provider_id, query='f=xml')}">WPS XML</a>,
      <a href="${util.get_process_link(id, provider_id=provider_id)}/package?f=json">CWL JSON</a>,
      <a href="${util.get_process_link(id, provider_id=provider_id)}/package?f=yaml">CWL YAML</a>)
 </div>
