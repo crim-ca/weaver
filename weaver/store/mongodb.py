@@ -3,6 +3,7 @@ Stores to read/write data to from/to `MongoDB` using pymongo.
 """
 import copy
 import logging
+import re
 import uuid
 from typing import TYPE_CHECKING, cast
 
@@ -552,6 +553,11 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                        process=None,        # type: Optional[str]
                        identifiers=None,    # type: Optional[List[str]]
                        metadata=None,       # type: Optional[List[Tuple[MetadataQueryScope, str, str]]]
+                       keywords=None,       # type: Optional[str]
+                       title=None,          # type: Optional[str]
+                       description=None,    # type: Optional[str]
+                       query=None,          # type: Optional[str]
+                       version=None,        # type: Optional[str]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         """
         Lists all processes in database, optionally filtered by `visibility`.
@@ -573,6 +579,14 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             :data:`weaver.wps_restapi.swagger_definitions.OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI`) are
             considered for the ``role``/``href`` matching
             (`OGC API - Processes - Part 5` ``metadata-profiles`` query filtering).
+        :param keywords:
+            Comma-separated keywords that must all be matched (AND).
+            Alternatives for a given keyword can be provided with ``|`` (OR).
+        :param title: Case-insensitive text that must be contained in the process title.
+        :param description: Case-insensitive text that must be contained in the process description.
+        :param query:
+            Comma-separated free-text terms (OR), each looked up in the process title, description or keywords.
+        :param version: Exact process version to match.
         :returns:
             List of sorted, and possibly page-filtered, processes matching queries.
             If ``total`` was requested, return a tuple of this list and the number of processes.
@@ -651,6 +665,32 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                 else:  # "inputs" or "outputs"
                     metadata_conditions.append({scope: {"$elemMatch": {"metadata": {"$elemMatch": elem_match}}}})
             search_filters["$and"] = metadata_conditions
+
+        def _contains(text):
+            # type: (str) -> MongodbAggregateExpression
+            return {"$regex": re.escape(text.strip()), "$options": "i"}
+
+        text_conditions = []  # type: List[MongodbAggregateExpression]
+        if keywords:
+            for term in filter(None, (kw.strip() for kw in keywords.split(","))):
+                alternatives = [{"keywords": {"$regex": f"^{re.escape(alt.strip())}$", "$options": "i"}}
+                                for alt in term.split("|") if alt.strip()]
+                if alternatives:
+                    text_conditions.append({"$or": alternatives})
+        if title:
+            text_conditions.append({"title": _contains(title)})
+        if description:
+            text_conditions.append({"$or": [{"abstract": _contains(description)},
+                                            {"description": _contains(description)}]})
+        if query:
+            fields = ["title", "abstract", "description", "keywords"]
+            terms = [term for term in (term.strip() for term in query.split(",")) if term]
+            if terms:
+                text_conditions.append({"$or": [{field: _contains(term)} for term in terms for field in fields]})
+        if version:
+            text_conditions.append({"version": as_version_major_minor_patch(version, VersionFormat.STRING)})
+        if text_conditions:
+            search_filters.setdefault("$and", []).extend(text_conditions)
 
         # processes do not have 'created', but ObjectID in '_id' has the particularity of embedding creation time
         if sort == Sort.CREATED:

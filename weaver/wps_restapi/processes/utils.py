@@ -91,12 +91,15 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
             "value": list(paging_names.intersection(request.params))
         })
 
+    search_param = sd.ProcessSearchQuery(unknown="ignore").deserialize(request.params)
+    search_param["query"] = search_param.pop("q", None)
     metadata_filters = parse_metadata_query_filters(request)
     store = get_db(request).get_store(StoreProcesses)
     processes, total_local_processes = store.list_processes(
         visibility=Visibility.PUBLIC,
         total=True,
         metadata=metadata_filters,
+        **search_param,
         **revisions_param,
         **paging_param
     )

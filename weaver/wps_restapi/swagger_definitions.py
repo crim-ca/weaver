@@ -8530,7 +8530,33 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     body = ProviderProcessesSchema()
 
 
-class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuery, ProcessRevisionsQuery):
+class ProcessSearchQuery(ExtendedMappingSchema):
+    keywords = ExtendedSchemaNode(
+        String(), missing=drop, example="climate,netcdf|grib", description=(
+            "Filter processes by 'keywords'. Comma-separated terms must all be matched (AND). "
+            "Alternatives within a term can be provided using the pipe character (OR)."
+        )
+    )
+    title_search = ExtendedSchemaNode(
+        String(), name="title", missing=drop, example="Subset",
+        description="Filter processes with a 'title' containing the text (case-insensitive)."
+    )
+    description_search = ExtendedSchemaNode(
+        String(), name="description", missing=drop, example="Extracts a region",
+        description="Filter processes with a 'description' containing the text (case-insensitive)."
+    )
+    q = ExtendedSchemaNode(
+        String(), missing=drop, example="subset,netcdf", description=(
+            "Free-text search. Comma-separated terms (OR) are looked up (case-insensitive) "
+            "in the process 'title', 'description' and 'keywords'."
+        )
+    )
+    version = Version(missing=drop, example="1.2.3", description="Filter processes matching this exact version.")
+
+
+class GetProcessesQuery(
+    ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuery, ProcessRevisionsQuery, ProcessSearchQuery
+):
     metadata = ExtendedSchemaNode(
         colander.String(), missing=drop, default=None, name="metadata[process|inputs|outputs][<role>]",
         example="metadata[inputs][https://www.opengis.net/def/profile]=urn:ogc:def:profile:OGC::text-plain",
