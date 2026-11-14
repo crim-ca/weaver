@@ -47,59 +47,57 @@ they are optional and which default value or operation is applied in each situat
     Refer to `weaver.ini.example`_ for the extended list of applicable settings.
     Some advanced configuration settings are also described in other sections of this page.
 
-.. _weaver-configuration:
 
-- | ``weaver.configuration = ADES|EMS|HYBRID|DEFAULT``
-  | (default: ``DEFAULT``)
-  |
-  | Tells the application in which mode to run.
-  |
-  | Enabling ``ADES`` for instance will disable some ``EMS``-specific operations such as dispatching :ref:`Workflow`
-    process steps to known remote ``ADES`` servers. ``ADES`` should be used to *only* run processes locally
-    (as the working unit). ``EMS`` will *always* dispatch execution of jobs to other ``ADES`` except for :ref:`Workflow`
-    processes that chains them.
-  |
-  | When ``HYBRID`` is specified, `Weaver` will assume both ``ADES`` and ``EMS`` roles simultaneously, meaning it will
-    be able to execute local processes by itself and monitor dispatched execution of registered remote providers.
-  |
-  | Finally, ``DEFAULT`` configuration will provide very minimalistic operations as all other modes will be unavailable.
+.. confval:: weaver.configuration
+   :type: ``ADES`` | ``EMS`` | ``HYBRID`` | ``DEFAULT``
+   :default: ``DEFAULT``
 
-- | ``weaver.url = <url>``
-  | (default: ``http://localhost:4001``)
-  |
-  | Defines the full URL (including HTTP protocol/scheme, hostname and optionally additional path suffix) that will
-    be used as base URL for all other URL settings of `Weaver`.
+   Tells the application in which mode to run.
 
-  .. note::
+   Enabling ``ADES`` for instance will disable some ``EMS``-specific operations such as dispatching :ref:`Workflow`
+   process steps to known remote ``ADES`` servers. ``ADES`` should be used to *only* run processes locally
+   (as the working unit). ``EMS`` will *always* dispatch execution of jobs to other ``ADES`` except for :ref:`Workflow`
+   processes that chains them.
+
+   When ``HYBRID`` is specified, `Weaver` will assume both ``ADES`` and ``EMS`` roles simultaneously, meaning it will
+   be able to execute local processes by itself and monitor dispatched execution of registered remote providers.
+
+   Finally, ``DEFAULT`` configuration will provide very minimalistic operations as all other modes will be unavailable.
+
+.. confval:: weaver.url
+   :type: URL
+   :default: ``http://localhost:4001``
+
+   Defines the full URL (including HTTP protocol/scheme, hostname and optionally additional path suffix) that will
+   be used as base URL for all other URL settings of `Weaver`.
+
+   .. note::
 
     This is the URL that you want displayed in responses (e.g.: ``processDescriptionURL`` or job ``location``).
     For the effective URL employed by the WSGI HTTP server, refer to ``[server:main]`` section of `weaver.ini.example`_.
 
-.. _weaver-schema-url:
+.. confval:: weaver.schema_url
+   :type: URL
+   :default: ``${weaver.url}/json#/definitions``
 
-- | ``weaver.schema_url = <url>``
-  | (default: ``${weaver.url}/json#/definitions``)
-  |
-  | Defines the base URL of schemas to be reported in responses.
-  |
-  | When not provided, the running Web Application instance OpenAPI JSON path will be employed to refer to the
-    schema ``definitions`` section. The configuration setting is available to override this endpoint by another
-    static URL location where the corresponding schemas can be found if desired.
+   Defines the base URL of schemas to be reported in responses.
 
-  .. versionadded:: 4.0
+   When not provided, the running Web Application instance OpenAPI JSON path will be employed to refer to the
+   schema ``definitions`` section. The configuration setting is available to override this endpoint by another
+   static URL location where the corresponding schemas can be found if desired.
 
-.. |weaver-cwl-euid| replace:: ``weaver.cwl_euid``
-.. _weaver-cwl-euid:
+   .. versionadded:: 4.0
 
-- | ``weaver.cwl_euid = <int>`` [:class:`int`, *experimental*]
-  | (default: ``None``, auto-resolved by :term:`CWL` with effective machine user)
-  |
-  | Define the effective machine user ID to be used for running the :term:`Application Package`.
+.. confval:: weaver.cwl_euid
+   :type: int, experimental
+   :default: ``None``, auto-resolved by CWL with effective machine user
 
-  .. note::
+   Define the effective machine user ID to be used for running the :term:`Application Package`.
+
+   .. note::
 
      When a :term:`Docker` container is employed for running the :term:`Application Package`,
-     the effective user ID (and group ID, see |weaver-cwl-egid|_) will also take into consideration any relevant
+     the effective user ID (and group ID, see :confval:`weaver.cwl_egid`) will also take into consideration any relevant
      user-namespace mapping, whether using |docker-rootless|_ or |docker-userns-remap|_ security features which
      will take effect according to existing ``/etc/subuid`` and ``/etc/subgid`` configuration on the host machine.
      Therefore, the effective user ID and group ID must take into consideration the values with these mappings
@@ -110,391 +108,378 @@ they are optional and which default value or operation is applied in each situat
      File system permissions to read and write :term:`I/O` of the :term:`Process` should be adapted accordingly
      to each situation.
 
-  .. note::
+   .. note::
     Can also be configured using the :envvar:`WEAVER_CWL_EUID` environment variable.
 
-  .. seealso::
+   .. seealso::
     - `weaver.ini.example`_
     - :func:`weaver.processes.wps_package.WpsPackage.update_effective_user`
 
-  .. versionadded:: 1.9
-  .. versionchanged:: 6.9
+   .. versionadded:: 1.9
+   .. versionchanged:: 6.9
     Using ``0`` will now be explicitly set to allow |docker-rootless|_ that performs the user/group mapping itself.
-    Also, settings will be applied whether |weaver-cwl-euid|_ or |weaver-cwl-egid|_ are detected to differ from
+    Also, settings will be applied whether :confval:`weaver.cwl_euid` or :confval:`weaver.cwl_egid` are detected to differ from
     the running process, rather than requiring both to be defined explicitly simultaneously. Missing entries (if any)
     will use the corresponding value from the running process as default.
 
-.. |weaver-cwl-egid| replace:: ``weaver.cwl_egid``
-.. _weaver-cwl-egid:
+.. confval:: weaver.cwl_egid
+   :type: int, experimental
+   :default: ``None``, auto-resolved by CWL with the group of the effective user
 
-- | ``weaver.cwl_egid = <int>`` [:class:`int`, *experimental*]
-  | (default: ``None``, auto-resolved by :term:`CWL` with the group of the effective user)
-  |
-  | Define the effective machine group ID to be used for running the :term:`Application Package`.
+   Define the effective machine group ID to be used for running the :term:`Application Package`.
 
-  .. note::
+   .. note::
     Can also be configured using the :envvar:`WEAVER_CWL_EGID` environment variable.
 
-  .. seealso::
-    Refer to |weaver-cwl-euid|_ about additional details and implications of this setting.
+   .. seealso::
+    Refer to :confval:`weaver.cwl_euid` about additional details and implications of this setting.
 
-  .. versionadded:: 1.9
-  .. versionchanged:: 6.9
-    See |weaver-cwl-euid|_ for details.
+   .. versionadded:: 1.9
+   .. versionchanged:: 6.9
+    See :confval:`weaver.cwl_euid` for details.
 
-.. |weaver-cwl-no-match-user| replace:: ``weaver.cwl_no_match_user``
-.. _weaver-cwl-no-match-user:
+.. confval:: weaver.cwl_no_match_user
+   :type: bool-like, experimental
+   :default: ``false``
 
-- | ``weaver.cwl_no_match_user = true|false`` [:class:`bool`-like, *experimental*]
-  | (default: ``false``)
-  |
-  | If activated, avoids the ``--user`` parameter being passed to Docker-based :term:`Application Package`.
-  |
-  | The containers will be executed using the user resolved by Docker context.
-    Other effective user and group ID settings (|weaver-cwl-euid|_ and |weaver-cwl-egid|_) will be ignored.
-    Can be employed for cases like |docker-rootless|_ or |docker-userns-remap|_ where the user and group mapping
-    is performed by Docker itself, therefore avoiding redundant and potentially conflicting settings.
+   If activated, avoids the ``--user`` parameter being passed to Docker-based :term:`Application Package`.
 
-  .. note::
+   The containers will be executed using the user resolved by Docker context.
+   Other effective user and group ID settings (:confval:`weaver.cwl_euid` and :confval:`weaver.cwl_egid`) will be ignored.
+   Can be employed for cases like |docker-rootless|_ or |docker-userns-remap|_ where the user and group mapping
+   is performed by Docker itself, therefore avoiding redundant and potentially conflicting settings.
+
+   .. note::
     Can also be configured using the :envvar:`WEAVER_CWL_NO_MATCH_USER` environment variable.
 
-  .. seealso::
-    Refer to |weaver-cwl-euid|_ and |weaver-cwl-egid|_.
+   .. seealso::
+    Refer to :confval:`weaver.cwl_euid` and :confval:`weaver.cwl_egid`.
 
-  .. versionadded:: 6.9
+   .. versionadded:: 6.9
 
-.. _weaver-cwl-prov:
+.. confval:: weaver.cwl_prov
+   :type: bool-like
+   :default: ``true``
 
-- | ``weaver.cwl_prov = true|false`` [:class:`bool`-like]
-  | (default: ``true``)
-  |
-  | Configure whether :term:`W3C` |PROV|_ functionality using the :ref:`proc_op_job_prov` endpoints should be enabled
-    to collect :term:`Provenance` metadata when executing the underlying :term:`CWL` of a given :term:`Process`
-    or :term:`Workflow`.
+   Configure whether :term:`W3C` |PROV|_ functionality using the :ref:`proc_op_job_prov` endpoints should be enabled
+   to collect :term:`Provenance` metadata when executing the underlying :term:`CWL` of a given :term:`Process`
+   or :term:`Workflow`.
 
-  .. note::
+   .. note::
 
      Any pre-existing :term:`Job` that was created when this option did not yet exist or that was executed while
      it was disabled will not offer :term:`Provenance` metadata. This is intrinsic to the functionality that must obtain
      timely metadata *while* executing to properly represent operational steps and :term:`Job` updates as they occur.
 
-  .. versionadded:: 6.1
+   .. versionadded:: 6.1
 
-.. _weaver-wps:
+.. confval:: weaver.wps
+   :type: bool-like
+   :default: ``true``
 
-- | ``weaver.wps = true|false`` [:class:`bool`-like]
-  | (default: ``true``)
-  |
-  | Enables the WPS-1/2 endpoint.
+   Enables the WPS-1/2 endpoint.
 
-  .. seealso::
+   .. seealso::
     :ref:`wps_endpoint`
 
-  .. warning::
+   .. warning::
 
      At the moment, this setting must be ``true`` to allow :term:`Job` execution as the worker monitors this endpoint.
      This could change with future developments (see issue `#21 <https://github.com/crim-ca/weaver/issues/21>`_).
 
-.. _weaver-wps-path:
+.. confval:: weaver.wps_path
+   :type: URL path
+   :default: *path* ``/ows/wps``
 
-- | ``weaver.wps_path = <url-path>``
-  | ``weaver.wps_url = <full-url>``
-  | (default: *path* ``/ows/wps``)
-  |
-  | Defines the URL to employ as WPS-1/2 endpoint.
-  |
-  | It can either be the explicit *full URL* to use or the *path* relative to ``weaver.url``.
-  | Setting ``weaver.wps_path`` is ignored if its URL equivalent is defined.
-  | The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
-    not strictly enforced.
+   Defines the URL to employ as WPS-1/2 endpoint.
 
-.. _weaver-wps-output-s3-bucket:
+   It can either be the explicit *full URL* to use or the *path* relative to ``weaver.url``.
+   Setting ``weaver.wps_path`` is ignored if its URL equivalent is defined.
+   The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
+   not strictly enforced.
 
-- | ``weaver.wps_output_s3_bucket = <s3-bucket-name>``
-  | (default: ``None``)
-  |
-  | AWS S3 bucket where to store WPS outputs. Used in conjunction with ``weaver.wps_output_s3_region``.
-  |
-  | When this parameter is defined, any job result generated by a process execution will be stored (uploaded)
-    to that location. If no bucket is specified, the outputs fall back to using the location specified by
-    ``weaver.wps_output_dir``.
+.. confval:: weaver.wps_url
+   :type: URL
+   :default: ``None``
 
-  .. versionadded:: 1.13
-  .. seealso::
+   Overrides :confval:`weaver.wps_path` when defined.
+
+.. confval:: weaver.wps_output_s3_bucket
+   :type: S3 bucket name
+   :default: ``None``
+
+   AWS S3 bucket where to store WPS outputs. Used in conjunction with ``weaver.wps_output_s3_region``.
+
+   When this parameter is defined, any job result generated by a process execution will be stored (uploaded)
+   to that location. If no bucket is specified, the outputs fall back to using the location specified by
+   ``weaver.wps_output_dir``.
+
+   .. versionadded:: 1.13
+   .. seealso::
     :ref:`conf_s3_buckets`
 
-.. _weaver-wps-output-s3-region:
+.. confval:: weaver.wps_output_s3_region
+   :type: S3 region name
+   :default: ``None``, any S3 region amongst ``mypy_boto3_s3.literals.RegionName``
 
-- | ``weaver.wps_output_s3_region = <s3-region-name>``
-  | (default: ``None``, any :term:`S3` |region| amongst :data:`mypy_boto3_s3.literals.RegionName`)
-  |
-  | AWS S3 region to employ for storing WPS outputs. Used in conjunction with ``weaver.wps_output_s3_bucket``.
-  |
-  | When this parameter is defined as well as ``weaver.wps_output_s3_bucket``, it is employed to define which :term:`S3`
-    to write output files to. If not defined but ``weaver.wps_output_s3_bucket`` is specified, `Weaver` attempt to
-    retrieve the region from the profile defined in :term:`AWS` configuration files or environment variables.
+   AWS S3 region to employ for storing WPS outputs. Used in conjunction with ``weaver.wps_output_s3_bucket``.
 
-  .. versionadded:: 1.13
-  .. seealso::
+   When this parameter is defined as well as ``weaver.wps_output_s3_bucket``, it is employed to define which :term:`S3`
+   to write output files to. If not defined but ``weaver.wps_output_s3_bucket`` is specified, `Weaver` attempt to
+   retrieve the region from the profile defined in :term:`AWS` configuration files or environment variables.
+
+   .. versionadded:: 1.13
+   .. seealso::
     :ref:`conf_s3_buckets`
 
-.. _weaver-wps-output-dir:
+.. confval:: weaver.wps_output_dir
+   :type: directory path
+   :default: *path* ``/tmp``
 
-- | ``weaver.wps_output_dir = <directory-path>``
-  | (default: *path* ``/tmp``)
-  |
-  | Location where WPS outputs (results from :term:`Job`) will be stored for stage-out.
-  |
-  | When ``weaver.wps_output_s3_bucket`` is specified, only :term:`WPS` :term:`XML` status and log files are stored
-    under this path. Otherwise, :term:`Job` results are also located under this directory with a sub-directory named
-    with the :term:`Job` ID.
-  | This directory should be mapped to `Weaver`'s :term:`WPS` output URL to serve them externally as needed.
+   Location where WPS outputs (results from :term:`Job`) will be stored for stage-out.
 
-  .. versionchanged:: 4.3
+   When ``weaver.wps_output_s3_bucket`` is specified, only :term:`WPS` :term:`XML` status and log files are stored
+   under this path. Otherwise, :term:`Job` results are also located under this directory with a sub-directory named
+   with the :term:`Job` ID.
+   This directory should be mapped to `Weaver`'s :term:`WPS` output URL to serve them externally as needed.
+
+   .. versionchanged:: 4.3
     The output directory could be nested under a *contextual directory* if requested during :term:`Job` submission.
     See :ref:`exec_output_location` and below ``weaver.wps_output_context`` parameter for more details.
 
-.. _weaver-wps-output-context:
+.. confval:: weaver.wps_output_context
+   :type: sub-directory path
+   :default: ``None``
 
-- | ``weaver.wps_output_context = <sub-directory-path>``
-  | (default: ``None``)
-  |
-  | Default sub-directory hierarchy location to nest :term:`WPS` outputs (:term:`Job` results) under.
-  |
-  | If defined, this parameter is used as substitute *context* when ``X-WPS-Output-Context`` header is omitted.
-    When not defined, ``X-WPS-Output-Context`` header can still take effect, but omitting it will store results
-    directly under ``weaver.wps_output_dir`` instead of default *context* location.
+   Default sub-directory hierarchy location to nest :term:`WPS` outputs (:term:`Job` results) under.
 
-  .. versionadded:: 4.3
+   If defined, this parameter is used as substitute *context* when ``X-WPS-Output-Context`` header is omitted.
+   When not defined, ``X-WPS-Output-Context`` header can still take effect, but omitting it will store results
+   directly under ``weaver.wps_output_dir`` instead of default *context* location.
 
-  .. versionchanged:: 4.27
+   .. versionadded:: 4.3
+
+   .. versionchanged:: 4.27
     Nesting of the *context* directory from ``X-WPS-Output-Context`` or ``weaver.wps_output_dir`` will
     also take effect when storing :term:`Job` results under :term:`S3` when ``weaver.wps_output_s3_bucket``
     and ``weaver.wps_output_s3_region`` are also defined. Previous versions applied the *context* directory
     only for local storage using the other :term:`WPS` output settings.
 
-  .. seealso::
+   .. seealso::
     See :ref:`exec_output_location` for more details about this feature and implications of this setting.
 
-.. _weaver-wps-output-path:
-.. _weaver-wps-output-url:
+.. confval:: weaver.wps_output_path
+   :type: URL path
+   :default: *path* ``/wpsoutputs``
 
-- | ``weaver.wps_output_path = <url-path>``
-  | ``weaver.wps_output_url = <full-url>``
-  | (default: *path* ``/wpsoutputs``)
-  |
-  | Endpoint that will be employed as prefix to refer to :term:`WPS` outputs (:term:`Job` results).
-  |
-  | It can either be the explicit *full URL* to use or the *path* relative to ``weaver.url``.
-  | Setting ``weaver.wps_output_path`` is ignored if its URL equivalent is defined.
-  | The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
-    not strictly enforced.
+   Endpoint that will be employed as prefix to refer to :term:`WPS` outputs (:term:`Job` results).
 
-  .. note::
+   It can either be the explicit *full URL* to use or the *path* relative to ``weaver.url``.
+   Setting ``weaver.wps_output_path`` is ignored if its URL equivalent is defined.
+   The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
+   not strictly enforced.
+
+   .. note::
     The resulting ``weaver.wps_output_url`` endpoint, whether directly provided or indirectly
     resolved by ``weaver.url`` and ``weaver.wps_output_path`` will not be served by `Weaver` itself.
     This location is returned for reference in API responses, but it is up to the infrastructure that
     hosts `Weaver` service to make this location available online as deemed necessary.
 
-.. _weaver-wps-workdir:
+.. confval:: weaver.wps_output_url
+   :type: URL
+   :default: ``None``
 
-- | ``weaver.wps_workdir = <directory-path>``
-  | (default: uses automatically generated temporary directory if none specified)
-  |
-  | Prefix where process :term:`Job` worker should execute the :term:`Process` from.
+   Overrides :confval:`weaver.wps_output_path` when defined.
 
-.. _weaver-wps-max-request-size:
+.. confval:: weaver.wps_workdir
+   :type: directory path
+   :default: uses automatically generated temporary directory if none specified
 
-- | ``weaver.wps_max_request_size = <number-bytes>``
-  | (default: ``30MB``)
-  |
-  | Indicates the maximum allowed size for the contents of a :term:`WPS` request.
-  |
-  | The value can be indicated with ``xB``, ``xKB``, ``xMB``, ``xGB``, where ``x`` is an integer value.
+   Prefix where process :term:`Job` worker should execute the :term:`Process` from.
 
-  .. note::
+.. confval:: weaver.wps_max_request_size
+   :type: number of bytes
+   :default: ``30MB``
+
+   Indicates the maximum allowed size for the contents of a :term:`WPS` request.
+
+   The value can be indicated with ``xB``, ``xKB``, ``xMB``, ``xGB``, where ``x`` is an integer value.
+
+   .. note::
     The value applies for :term:`OGC API - Processes` requests as well when are they are transferred to the :term:`WPS`
     context. However, the limit will be applied only when executing the :term:`Job` through the :term:`WPS` server.
 
-  .. versionadded:: 5.6
+   .. versionadded:: 5.6
 
-.. _weaver-wps-max-single-input-size:
+.. confval:: weaver.wps_max_single_input_size
+   :type: number of bytes
+   :default: ``30MB``
 
-- | ``weaver.wps_max_single_input_size = <number-bytes>``
-  | (default: ``30MB``)
-  |
-  | Indicates the maximum allowed size for any given input's contents within a :term:`WPS` request.
-  |
-  | The value can be indicated with ``xB``, ``xKB``, ``xMB``, ``xGB``, where ``x`` is an integer value.
+   Indicates the maximum allowed size for any given input's contents within a :term:`WPS` request.
 
-  .. note::
+   The value can be indicated with ``xB``, ``xKB``, ``xMB``, ``xGB``, where ``x`` is an integer value.
+
+   .. note::
     The value applies for :term:`OGC API - Processes` requests as well when are they are transferred to the :term:`WPS`
     context. However, the limit will be applied only when executing the :term:`Job` through the :term:`WPS` server.
 
-  .. versionadded:: 5.6
+   .. versionadded:: 5.6
 
-.. _weaver-wps-client-headers-filter:
+.. confval:: weaver.wps_client_headers_filter
+   :type: comma-separated header names
+   :default: ``Host,``
 
-- | ``weaver.wps_client_headers_filter = <headers>``
-  | (default: ``Host,``)
-  |
-  | List of comma-separated case-insensitive headers that will be removed from incoming requests before
-  | passing them down to invoke an operation with the corresponding :term:`WPS` provider through the :term:`WPS` client.
+   List of comma-separated case-insensitive headers that will be removed from incoming requests before
+   passing them down to invoke an operation with the corresponding :term:`WPS` provider through the :term:`WPS` client.
 
-  .. versionadded:: 5.1.0
+   .. versionadded:: 5.1.0
 
-  .. seealso::
+   .. seealso::
     - :func:`weaver.wps.utils.get_wps_client_filtered_headers`
     - :func:`weaver.wps.utils.get_wps_client`
 
-.. _weaver-wps-restapi:
+.. confval:: weaver.wps_restapi
+   :type: bool-like
+   :default: ``true``
 
-- | ``weaver.wps_restapi = true|false`` [:class:`bool`-like]
-  | (default: ``true``)
-  |
-  | Enable the :term:`WPS-REST` (:term:`OGC API - Processes`) endpoint.
+   Enable the :term:`WPS-REST` (:term:`OGC API - Processes`) endpoint.
 
-  .. warning::
+   .. warning::
 
     `Weaver` looses most, if not all, of its useful features without this, and there won't be much point in using
     it without REST endpoint, but it should technically be possible to run it as :term:`WPS`-1/2 only if desired.
 
-.. |weaver-wps-restapi-html| replace:: ``weaver.wps_restapi_html``
-.. _weaver-wps-restapi-html:
+.. confval:: weaver.wps_restapi_html
+   :type: bool-like
+   :default: ``true``
 
-- | ``weaver.wps_restapi_html = true|false`` [:class:`bool`-like]
-  | (default: ``true``)
-  |
-  | Enable support of :term:`HTML` responses for :term:`WPS-REST` (:term:`OGC API - Processes`) endpoints.
-  |
-  | When enabled, endpoints will support ``Accept: text/html`` header and ``?f=html`` query to return contents
-    in :term:`HTML` instead of the default :term:`JSON` responses. Otherwise, HTTP ``406 Not Acceptable`` code
-    will be returned instead.
+   Enable support of :term:`HTML` responses for :term:`WPS-REST` (:term:`OGC API - Processes`) endpoints.
 
-  .. versionadded:: 5.7.0
+   When enabled, endpoints will support ``Accept: text/html`` header and ``?f=html`` query to return contents
+   in :term:`HTML` instead of the default :term:`JSON` responses. Otherwise, HTTP ``406 Not Acceptable`` code
+   will be returned instead.
 
-.. _weaver-wps-restapi-html-override-user-agent:
+   .. versionadded:: 5.7.0
 
-- | ``weaver.wps_restapi_html_override_user_agent = true|false`` [:class:`bool`-like]
-  | (default: ``false``)
-  |
-  | Allows override of the ``Accept`` header with "*visualization formats*" (:term:`HTML`, CSS, images, etc.) when the
-    request is detected to originate from a web browser ``User-Agent``.
-  |
-  | When enabled, requests toward the :term:`WPS-REST` (:term:`OGC API - Processes`) endpoints that support :term:`HTML`
-    rendering will still return :term:`JSON` (effectively ignoring the ``Accept`` header) when the request corresponds
-    to a web browser ``User-Agent`` (e.g.: Chrome, Firefox, Safari). This feature is provided to allow the :term:`API`
-    to respond using the default :term:`JSON` even when the request is performed through web browsers (rather than
-    terminals, servers, or programmatic clients). Since web browsers typically specify an ``Accept`` header with
-    visualization media-types that combines :term:`HTML` and a fallback ``*/*`` media-type, the responses obtained by
-    the :term:`API` can seemingly vary between :term:`JSON` and :term:`HTML` depending on which types each endpoint
-    supports. Since not all endpoints support :term:`HTML`, but all support :term:`JSON` which is employed by default
-    when both the ``Accept``/``f`` are omitted, the results might appear inconsistent depending from where the request
-    was sent from.
-  |
-  | Note that, when the ``f`` format query parameter is provided, it takes precedence over the ``Accept`` header
-    regardless of the ``User-Agent`` value. Therefore, enabling this functionality can still obtain the :term:`HTML`
-    rendering by explicitly requesting ``f=html`` in the request. Similarly, another ``User-Agent`` than one
-    corresponding to a web browser can also be employed in combination to ``Accept: text/html`` to obtain the
-    :term:`HTML` representation when this option is enabled.
-  |
-  | When this option is disabled (default), no special handling of ``User-Agent`` will be performed. Therefore, a
-    request performed through a web browser will typically respond by default in :term:`HTML` for rendering (provided
-    that browser indicated the relevant ``Accept: text/html``), whereas other clients will respond in :term:`JSON` by
-    default. Explicit response media-types can be requested in both cases using either an explicit ``Accept`` header
-    of the desired media-type, or their corresponding ``f`` query format.
-  |
-  | This option is only applicable when |weaver-wps-restapi-html|_ is enabled. Otherwise, :term:`JSON` responses are
-    always employed by default.
+.. confval:: weaver.wps_restapi_html_override_user_agent
+   :type: bool-like
+   :default: ``false``
 
-  .. versionadded:: 5.7.0
+   Allows override of the ``Accept`` header with "*visualization formats*" (:term:`HTML`, CSS, images, etc.) when the
+   request is detected to originate from a web browser ``User-Agent``.
 
-.. _weaver-wps-restapi-path:
-.. _weaver-wps-restapi-url:
+   When enabled, requests toward the :term:`WPS-REST` (:term:`OGC API - Processes`) endpoints that support :term:`HTML`
+   rendering will still return :term:`JSON` (effectively ignoring the ``Accept`` header) when the request corresponds
+   to a web browser ``User-Agent`` (e.g.: Chrome, Firefox, Safari). This feature is provided to allow the :term:`API`
+   to respond using the default :term:`JSON` even when the request is performed through web browsers (rather than
+   terminals, servers, or programmatic clients). Since web browsers typically specify an ``Accept`` header with
+   visualization media-types that combines :term:`HTML` and a fallback ``*/*`` media-type, the responses obtained by
+   the :term:`API` can seemingly vary between :term:`JSON` and :term:`HTML` depending on which types each endpoint
+   supports. Since not all endpoints support :term:`HTML`, but all support :term:`JSON` which is employed by default
+   when both the ``Accept``/``f`` are omitted, the results might appear inconsistent depending from where the request
+   was sent from.
 
-- | ``weaver.wps_restapi_path = <url-path>``
-  | ``weaver.wps_restapi_url = <full-url>``
-  | (default: *path* ``/``)
-  |
-  | Endpoint that will be employed as prefix to refer to :term:`WPS-REST` requests
-  | (including but not limited to |ogc-api-proc|_ schemas).
-  |
-  | It can either be the explicit *full URL* to use or the *path* relative to ``weaver.url``.
-  | Setting ``weaver.wps_restapi_path`` is ignored if its URL equivalent is defined.
-  | The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
-    not strictly enforced.
+   Note that, when the ``f`` format query parameter is provided, it takes precedence over the ``Accept`` header
+   regardless of the ``User-Agent`` value. Therefore, enabling this functionality can still obtain the :term:`HTML`
+   rendering by explicitly requesting ``f=html`` in the request. Similarly, another ``User-Agent`` than one
+   corresponding to a web browser can also be employed in combination to ``Accept: text/html`` to obtain the
+   :term:`HTML` representation when this option is enabled.
 
-.. _weaver-wps-restapi-doc:
+   When this option is disabled (default), no special handling of ``User-Agent`` will be performed. Therefore, a
+   request performed through a web browser will typically respond by default in :term:`HTML` for rendering (provided
+   that browser indicated the relevant ``Accept: text/html``), whereas other clients will respond in :term:`JSON` by
+   default. Explicit response media-types can be requested in both cases using either an explicit ``Accept`` header
+   of the desired media-type, or their corresponding ``f`` query format.
 
-- | ``weaver.wps_restapi_doc = <full-url>``
-  | (default: ``None``)
-  |
-  | Location that will be displayed as reference specification document for the service.
-  |
-  | Typically, this value would be set to a reference similar
-    to |ogc-api-proc-part1-spec-html|_ or |ogc-api-proc-part1-spec-pdf|_.
-    However, this value is left by default empty to let maintainers chose which specification document is more relevant
-    for their own deployment, considering that they might want to support different parts of the extended specification.
+   This option is only applicable when :confval:`weaver.wps_restapi_html` is enabled. Otherwise, :term:`JSON` responses are
+   always employed by default.
 
-.. _weaver-wps-restapi-ref:
+   .. versionadded:: 5.7.0
 
-- | ``weaver.wps_restapi_ref = <full-url>``
-  | (default: ``None``)
-  |
-  | Location that will be displayed as reference specification :term:`JSON` schema for the service.
-  |
-  | Typically, this value would be set to a reference similar to |ogc-api-proc-part1-spec-json|_.
-    However, this value is left by default empty to let maintainers chose which specification schema is more relevant
-    for their own deployment, considering that they might want to support different parts of the extended specification.
+.. confval:: weaver.wps_restapi_path
+   :type: URL path
+   :default: *path* ``/``
 
-.. _weaver-wps-metadata:
+   Endpoint that will be employed as prefix to refer to :term:`WPS-REST` requests
+   (including but not limited to |ogc-api-proc|_ schemas).
 
-- | ``weaver.wps_metadata_[...]`` (multiple settings) [:class:`str`]
-  |
-  | Metadata fields that will be rendered by either or both the :term:`WPS`-1/2 and :term:`WPS-REST` endpoints
-    (:ref:`GetCapabilities <proc_op_getcap>`).
+   It can either be the explicit *full URL* to use or the *path* relative to ``weaver.url``.
+   Setting ``weaver.wps_restapi_path`` is ignored if its URL equivalent is defined.
+   The *path* variant **SHOULD** start with ``/`` for appropriate concatenation with ``weaver.url``, although this is
+   not strictly enforced.
 
-.. _weaver-wps-email:
+.. confval:: weaver.wps_restapi_url
+   :type: URL
+   :default: ``None``
 
-- | ``weaver.wps_email_[...]`` (multiple settings)
-  |
-  | Defines configuration of email notification functionality on :term:`Job` status milestones.
-  |
-  | Encryption settings as well as custom email template locations are available.
-    The |default-notify-email-template|_ is employed if none is provided or when specified template
-    files or directory cannot be resolved.
-  |
-  | When looking up for templates within ``weaver.wps_email_notify_template_dir``, the following resolution order is
-    followed to attempt matching files. The first one that is found will be employed for the notification email.
-  |
-  | 1. file ``{TEMPLATE_DIR}/{PROCESS_ID}/{STATUS}.mako`` used for a specific :term:`Process` and :term:`Job` status
-  | 2. file ``{TEMPLATE_DIR}/{PROCESS_ID}.mako`` used for a specific :term:`Process` but any :term:`Job` status
-  | 3. file ``{TEMPLATE_DIR}/{weaver.wps_email_notify_template_default}`` used for any combination if specified
-  | 4. file ``{TEMPLATE_DIR}/default.mako`` used for any combination if an alternate default name was not specified
-  | 5. file |default-notify-email-template|_ as last resort
-  |
-  | Email notifications are sent only when corresponding :term:`Job` status milestones are reached and when
-    email(s) were provided in the :ref:`Execute <proc_op_execute>` request body. Emails will not be sent if
-    the request body did not include a subscription to those notifications, even if the templates were configured.
+   Overrides :confval:`weaver.wps_restapi_path` when defined.
 
-  .. seealso::
+.. confval:: weaver.wps_restapi_doc
+   :type: URL
+   :default: ``None``
+
+   Location that will be displayed as reference specification document for the service.
+
+   Typically, this value would be set to a reference similar
+   to |ogc-api-proc-part1-spec-html|_ or |ogc-api-proc-part1-spec-pdf|_.
+   However, this value is left by default empty to let maintainers chose which specification document is more relevant
+   for their own deployment, considering that they might want to support different parts of the extended specification.
+
+.. confval:: weaver.wps_restapi_ref
+   :type: URL
+   :default: ``None``
+
+   Location that will be displayed as reference specification :term:`JSON` schema for the service.
+
+   Typically, this value would be set to a reference similar to |ogc-api-proc-part1-spec-json|_.
+   However, this value is left by default empty to let maintainers chose which specification schema is more relevant
+   for their own deployment, considering that they might want to support different parts of the extended specification.
+
+.. confval:: weaver.wps_metadata_[...]
+   :type: str
+
+   Metadata fields that will be rendered by either or both the :term:`WPS`-1/2 and :term:`WPS-REST` endpoints
+   (:ref:`GetCapabilities <proc_op_getcap>`).
+
+.. confval:: weaver.wps_email_[...]
+   :type: str
+
+   Defines configuration of email notification functionality on :term:`Job` status milestones.
+
+   Encryption settings as well as custom email template locations are available.
+   The |default-notify-email-template|_ is employed if none is provided or when specified template
+   files or directory cannot be resolved.
+
+   When looking up for templates within ``weaver.wps_email_notify_template_dir``, the following resolution order is
+   followed to attempt matching files. The first one that is found will be employed for the notification email.
+
+   1. file ``{TEMPLATE_DIR}/{PROCESS_ID}/{STATUS}.mako`` used for a specific :term:`Process` and :term:`Job` status
+   2. file ``{TEMPLATE_DIR}/{PROCESS_ID}.mako`` used for a specific :term:`Process` but any :term:`Job` status
+   3. file ``{TEMPLATE_DIR}/{weaver.wps_email_notify_template_default}`` used for any combination if specified
+   4. file ``{TEMPLATE_DIR}/default.mako`` used for any combination if an alternate default name was not specified
+   5. file |default-notify-email-template|_ as last resort
+
+   Email notifications are sent only when corresponding :term:`Job` status milestones are reached and when
+   email(s) were provided in the :ref:`Execute <proc_op_execute>` request body. Emails will not be sent if
+   the request body did not include a subscription to those notifications, even if the templates were configured.
+
+   .. seealso::
     See :ref:`Notification Subscribers <proc_op_execute_subscribers>` for more details.
 
-  .. versionadded:: 4.15
-  .. versionchanged:: 4.34
+   .. versionadded:: 4.15
+   .. versionchanged:: 4.34
 
-.. _weaver-execute-sync-max-wait:
+.. confval:: weaver.execute_sync_max_wait
+   :type: int, seconds
+   :default: ``20``
 
-- | ``weaver.execute_sync_max_wait = <int>`` [:class:`int`, seconds]
-  | (default: ``20``)
-  |
-  | Defines the maximum duration allowed for running a :term:`Job` execution in `synchronous` mode.
-  |
-  | See :ref:`proc_exec_mode` for more details on the feature and how to employ it.
-  | Ensure `Celery`_ worker is configured as specified in :ref:`conf_celery`.
+   Defines the maximum duration allowed for running a :term:`Job` execution in `synchronous` mode.
 
-  .. versionadded:: 4.15
-  .. versionchanged:: 4.30
+   See :ref:`proc_exec_mode` for more details on the feature and how to employ it.
+   Ensure `Celery`_ worker is configured as specified in :ref:`conf_celery`.
+
+   .. versionadded:: 4.15
+   .. versionchanged:: 4.30
     Renamed from ``weaver.exec_sync_max_wait`` to ``weaver.execute_sync_max_wait``.
 
 .. _conf_celery:
@@ -627,23 +612,23 @@ Please refer to `wps_processes.yml.example`_ for explicit format, keywords suppo
     Using this registration method, the processes will always reflect the latest modification from the
     remote WPS provider.
 
-.. _weaver-wps-processes-file:
 
-- | ``weaver.wps_processes_file = <file-path>``
-  | (default: :py:data:`WEAVER_DEFAULT_WPS_PROCESSES_CONFIG` located in :py:data:`WEAVER_CONFIG_DIR`)
-  |
-  | Defines a custom :term:`YAML` file corresponding to `wps_processes.yml.example`_ schema to pre-load :term:`WPS`
-    processes and/or providers for registration at application startup.
-  |
-  | The value defined by this setting will look for the provided path as absolute location, then will attempt to
-    resolve relative path (corresponding to where the application is started from), and will also look within
-    the |weaver-config|_ directory. If none of the files can be found, the operation is skipped.
-  |
-  | To ensure that this feature is disabled and to avoid any unexpected auto-deployment provided by this functionality,
-    simply set setting ``weaver.wps_processes_file`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
-    The default value is employed if the setting is not defined at all.
+.. confval:: weaver.wps_processes_file
+   :type: file path
+   :default: ``WEAVER_DEFAULT_WPS_PROCESSES_CONFIG`` located in ``WEAVER_CONFIG_DIR``
 
-  .. seealso::
+   Defines a custom :term:`YAML` file corresponding to `wps_processes.yml.example`_ schema to pre-load :term:`WPS`
+   processes and/or providers for registration at application startup.
+
+   The value defined by this setting will look for the provided path as absolute location, then will attempt to
+   resolve relative path (corresponding to where the application is started from), and will also look within
+   the |weaver-config|_ directory. If none of the files can be found, the operation is skipped.
+
+   To ensure that this feature is disabled and to avoid any unexpected auto-deployment provided by this functionality,
+   simply set setting ``weaver.wps_processes_file`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
+   The default value is employed if the setting is not defined at all.
+
+   .. seealso::
     - `weaver.ini.example`_
     - `wps_processes.yml.example`_
 
@@ -662,46 +647,45 @@ configuration setting ``weaver.cwl_processes_dir``. Registration of a :term:`Pro
 in an identical definition as if it was :ref:`Deployed <proc_op_deploy>` using :term:`API` requests or using the
 :ref:`cli` interfaces.
 
-.. _weaver-cwl-processes-dir:
 
-- | ``weaver.cwl_processes_dir = <dir-path>``
-  | (default: :py:data:`WEAVER_CONFIG_DIR`)
-  |
-  | Defines the root directory where to *recursively* and *alphabetically* load any :term:`CWL` file
-    to deploy the corresponding :term:`Process` definitions. Files at higher levels are loaded first before moving
-    down into lower directories of the structure.
-  |
-  | Any failed deployment from a seemingly valid :term:`CWL` will be logged with the corresponding error message.
-    Loading will proceed by ignoring failing cases according to ``weaver.cwl_processes_register_error`` setting.
-    The number of successful :term:`Process` deployments will also be reported if any should occur.
-  |
-  | The value defined by this setting will look for the provided path as absolute location, then will attempt to
-    resolve relative path (corresponding to where the application is started from). If no :term:`CWL` file could be
-    found, the operation is skipped.
-  |
-  | To ensure that this feature is disabled and to avoid any unexpected auto-deployment provided by this functionality,
-    simply set setting ``weaver.cwl_processes_dir`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
-    The default value is employed if the setting is not defined at all.
+.. confval:: weaver.cwl_processes_dir
+   :type: directory path
+   :default: ``WEAVER_CONFIG_DIR``
 
-  .. note::
+   Defines the root directory where to *recursively* and *alphabetically* load any :term:`CWL` file
+   to deploy the corresponding :term:`Process` definitions. Files at higher levels are loaded first before moving
+   down into lower directories of the structure.
+
+   Any failed deployment from a seemingly valid :term:`CWL` will be logged with the corresponding error message.
+   Loading will proceed by ignoring failing cases according to ``weaver.cwl_processes_register_error`` setting.
+   The number of successful :term:`Process` deployments will also be reported if any should occur.
+
+   The value defined by this setting will look for the provided path as absolute location, then will attempt to
+   resolve relative path (corresponding to where the application is started from). If no :term:`CWL` file could be
+   found, the operation is skipped.
+
+   To ensure that this feature is disabled and to avoid any unexpected auto-deployment provided by this functionality,
+   simply set setting ``weaver.cwl_processes_dir`` as *undefined* (i.e.: nothing after ``=`` in ``weaver.ini``).
+   The default value is employed if the setting is not defined at all.
+
+   .. note::
     When registering processes using :term:`CWL`, it is mandatory for those definitions to provide an ``id`` within
     the file along other :term:`CWL` details to let `Weaver` know which :term:`Process` reference to use for deployment.
 
-  .. warning::
+   .. warning::
     If a :term:`Process` depends on another definition, such as in the case of a :ref:`proc_workflow` definition, all
     dependencies must be registered prior to this :term:`Process`. Consider naming your :term:`CWL` files to take
     advantage of loading order to resolve such situations.
 
-.. _weaver-cwl-processes-register-error:
+.. confval:: weaver.cwl_processes_register_error
+   :type: bool
+   :default: ``false``, *ignore failures*
 
-- | ``weaver.cwl_processes_register_error = true|false`` [:class:`bool`]
-  | (default: ``false``, *ignore failures*)
-  |
-  | Indicate if `Weaver` should ignore failing :term:`Process` deployments (when ``false``), due to unsuccessful
-    registration of :term:`CWL` files found within any sub-directory of ``weaver.cwl_processes_dir`` path, or
-    immediately fail (when ``true``) when an issue is raised during :term:`Process` deployment.
+   Indicate if `Weaver` should ignore failing :term:`Process` deployments (when ``false``), due to unsuccessful
+   registration of :term:`CWL` files found within any sub-directory of ``weaver.cwl_processes_dir`` path, or
+   immediately fail (when ``true``) when an issue is raised during :term:`Process` deployment.
 
-  .. seealso::
+   .. seealso::
     - `weaver.ini.example`_
 
 .. _conf_request_options:
@@ -733,21 +717,20 @@ etc. on a per-request basis, leave other requests unaffected and generally more 
 .. note::
     The :ref:`cli` also accepts similar arguments to define :term:`Request Options`.
 
-.. _weaver-request-options:
 
-- | ``weaver.request_options = <file-path>``
-  | (default: ``None``)
-  |
-  | Path of the :term:`Request Options` definitions to employ.
+.. confval:: weaver.request_options
+   :type: file path
+   :default: ``None``
 
-.. _weaver-ssl-verify:
+   Path of the :term:`Request Options` definitions to employ.
 
-- | ``weaver.ssl_verify = true|false`` [:class:`bool`-like]
-  | (default: ``true``)
-  |
-  | Toggle the SSL certificate verification across all requests.
+.. confval:: weaver.ssl_verify
+   :type: bool-like
+   :default: ``true``
 
-  .. warning::
+   Toggle the SSL certificate verification across all requests.
+
+   .. warning::
     It is **NOT** recommended to disable SSL verification across all requests for security reasons
     (avoid man-in-the-middle attacks). This is crucial for requests that involve any form of authentication, secured
     access or personal user data references. This should be employed only for quickly resolving issues during
@@ -765,153 +748,145 @@ Following parameters are relevant when using |ogc-proc-ext-quotation|_.
 If this feature is not desired, simply provide ``weaver.quotation = false`` in the ``weaver.ini`` configuration file,
 and all corresponding functionalities, including `API` endpoints, will be disabled.
 
-.. _weaver-quotation:
 
-- | ``weaver.quotation = true|false`` [:class:`bool`-like]
-  | (default: ``true``)
-  |
-  | Enable support of |ogc-proc-ext-quotation|_.
-  |
-  | See :ref:`quotation` for more details on the feature.
+.. confval:: weaver.quotation
+   :type: bool-like
+   :default: ``true``
 
-  .. versionadded:: 4.30
+   Enable support of |ogc-proc-ext-quotation|_.
 
-.. _weaver-quotation-docker-image:
+   See :ref:`quotation` for more details on the feature.
 
-- | ``weaver.quotation_docker_image = <image-reference>`` [:class:`str`]
-  |
-  | Specifies the :term:`Docker` image used for :ref:`quote_estimation` to evaluate a :term:`Quote`
-    for the eventual :term:`Process` execution.
-  |
-  | Required if ``weaver.quotation`` is enabled.
-  |
-  | See :ref:`quote_estimation` for more details on the feature.
+   .. versionadded:: 4.30
 
-  .. versionadded:: 4.30
+.. confval:: weaver.quotation_docker_image
+   :type: str
 
-.. _weaver-quotation-docker-username:
+   Specifies the :term:`Docker` image used for :ref:`quote_estimation` to evaluate a :term:`Quote`
+   for the eventual :term:`Process` execution.
 
-- | ``weaver.quotation_docker_username = <username>`` [:class:`str`]
-  |
-  | Username to employ for authentication when retrieving the :term:`Docker` image used as :ref:`quote_estimation`.
-  |
-  | Only required if the :term:`Docker` image is not accessible publicly or already
-    provided through some other means when requested by the :term:`Docker` daemon.
-    Should be combined with ``weaver.quotation_docker_password``.
-  |
-  | See :ref:`quotation_currency_conversion` for more details on the feature.
+   Required if ``weaver.quotation`` is enabled.
 
-  .. versionadded:: 4.30
+   See :ref:`quote_estimation` for more details on the feature.
 
-.. _weaver-quotation-docker-password:
+   .. versionadded:: 4.30
 
-- | ``weaver.quotation_docker_password = <username>`` [:class:`str`]
-  |
-  | Password to employ for authentication when retrieving the :term:`Docker` image used as :ref:`quote_estimation`.
-  |
-  | Only required if the :term:`Docker` image is not accessible publicly or already
-    provided through some other means when requested by the :term:`Docker` daemon.
-    Should be combined with ``weaver.quotation_docker_username``.
-  |
-  | See :ref:`quotation_currency_conversion` for more details on the feature.
+.. confval:: weaver.quotation_docker_username
+   :type: str
 
-  .. versionadded:: 4.30
+   Username to employ for authentication when retrieving the :term:`Docker` image used as :ref:`quote_estimation`.
 
-.. _weaver-quotation-currency-default:
+   Only required if the :term:`Docker` image is not accessible publicly or already
+   provided through some other means when requested by the :term:`Docker` daemon.
+   Should be combined with ``weaver.quotation_docker_password``.
 
-- | ``weaver.quotation_currency_default = <CURRENCY>`` [:class:`str`]
-  | (default: ``USD``)
-  |
-  | Currency code in `ISO-4217 <https://www.iso.org/iso-4217-currency-codes.html>`_ format used by default.
-  |
-  | It is up to the specified :ref:`quote_estimation` algorithm defined by ``weaver.quotation_docker_image`` and
-    employed by the various :term:`Process` to ensure that the returned :ref:`quote_estimation` cost makes
-    sense according to the specified default currency.
-  |
-  | See :ref:`quotation_currency_conversion` for more details on the feature.
+   See :ref:`quotation_currency_conversion` for more details on the feature.
 
-  .. versionadded:: 4.30
+   .. versionadded:: 4.30
 
-.. _weaver-quotation-currency-converter:
+.. confval:: weaver.quotation_docker_password
+   :type: str
 
-- | ``weaver.quotation_currency_converter = <converter>`` [:class:`str`]
-  |
-  | Reference currency converter to employ for retrieving conversion rates.
-  |
-  | Valid values are:
-  | - `openexchangerates <https://docs.openexchangerates.org/reference/convert>`_
-  | - `currencylayer <https://currencylayer.com/documentation>`_
-  | - `exchangeratesapi <https://exchangeratesapi.io/documentation/>`_
-  | - `fixer <https://fixer.io/documentation>`_
-  | - `allratestoday <https://allratestoday.com/open-api/>`_ (keyless, `ECB` reference rates)
-  | - `scrapper <https://www.x-rates.com/table/?from=USD&amount=1>`_
-  | - ``custom``
-  |
-  | In each case, requests will be attempted using ``weaver.quotation_currency_token`` to authenticate with the API.
-    The ``allratestoday`` converter does not require a token. It uses the daily European Central Bank reference rates
-    (about 30 currencies), and its terms ask for a visible link to `AllRatesToday <https://allratestoday.com>`__
-    where the converted amounts are shown.
-    Request caching of 1 hour will be used by default to limit chances of rate-limiting, but converter-specific plans
-    could block request at any moment depending on the amount of :ref:`quotation` requests accomplished.
-    In such case, the conversion will not be performed and will remain in the default currency.
-  |
-  | If a ``custom`` URL is desired, the ``weaver.quotation_currency_custom_url`` parameter should also be provided.
-  |
-  | If none is provided, conversion rates will not be applied and currencies
-    will always use ``weaver.quotation_currency_default``.
-  |
-  | See :ref:`quotation` for more details on the feature.
+   Password to employ for authentication when retrieving the :term:`Docker` image used as :ref:`quote_estimation`.
 
-  .. versionadded:: 4.30
+   Only required if the :term:`Docker` image is not accessible publicly or already
+   provided through some other means when requested by the :term:`Docker` daemon.
+   Should be combined with ``weaver.quotation_docker_username``.
 
-.. _weaver-quotation-currency-custom-url:
+   See :ref:`quotation_currency_conversion` for more details on the feature.
 
-- | ``weaver.quotation_currency_custom_url = <URL>`` [:class:`str`]
-  |
-  | Reference ``custom`` currency converter URL pattern to employ for retrieving conversion rates.
-  |
-  | This applies only when using ``weaver.quotation_currency_converter = custom``
-  |
-  | The specified URL will be used to perform a ``GET`` request.
-    This URL should contain the relevant query or path parameters to perform the request.
-    Parameters can be specified using templating (``{<param>}``), with parameters
-    names ``token``, ``from``, ``to`` and ``amount`` to perform the conversion.
-    The query parameter ``token`` will be filled by ``weaver.quotation_currency_token``, while remaining values will
-    be provided based on the source and target currency conversion requirements.
-    The response body should be in :term:`JSON` with minimally the conversion ``result`` field located at the root.
-    The same caching policy will be applied as for the other API references.
-  |
-  | If none is provided, conversion rates will not be applied and currencies
-    will always use ``weaver.quotation_currency_default``.
-  |
-  | See :ref:`quotation` for more details on the feature.
+   .. versionadded:: 4.30
 
-  .. versionadded:: 4.30
+.. confval:: weaver.quotation_currency_default
+   :type: str
+   :default: ``USD``
 
-.. _weaver-quotation-currency-token:
+   Currency code in `ISO-4217 <https://www.iso.org/iso-4217-currency-codes.html>`_ format used by default.
 
-- | ``weaver.quotation_currency_token = <API access token>`` [:class:`str`]
-  |
-  | Password to employ for authentication when retrieving the :term:`Docker` image used as :ref:`quote_estimation`.
-  |
-  | Only required if the :term:`Docker` image is not accessible publicly or already
-    provided through some other means when requested by the :term:`Docker` daemon.
-    Should be combined with ``weaver.quotation_docker_username``.
-  | See :ref:`quotation` for more details on the feature.
+   It is up to the specified :ref:`quote_estimation` algorithm defined by ``weaver.quotation_docker_image`` and
+   employed by the various :term:`Process` to ensure that the returned :ref:`quote_estimation` cost makes
+   sense according to the specified default currency.
 
-  .. versionadded:: 4.30
+   See :ref:`quotation_currency_conversion` for more details on the feature.
 
-.. _weaver-quotation-sync-max-wait:
+   .. versionadded:: 4.30
 
-- | ``weaver.quotation_sync_max_wait = <int>`` [:class:`int`, seconds]
-  | (default: ``20``)
-  |
-  | Defines the maximum duration allowed for running a :ref:`quote_estimation` in `synchronous` mode.
-  |
-  | See :ref:`proc_exec_mode` for more details on the feature and how to employ it.
-  | Ensure `Celery`_ worker is configured as specified in :ref:`conf_celery`.
+.. confval:: weaver.quotation_currency_converter
+   :type: str
 
-  .. versionchanged:: 4.30
+   Reference currency converter to employ for retrieving conversion rates.
+
+   Valid values are:
+   - `openexchangerates <https://docs.openexchangerates.org/reference/convert>`_
+   - `currencylayer <https://currencylayer.com/documentation>`_
+   - `exchangeratesapi <https://exchangeratesapi.io/documentation/>`_
+   - `fixer <https://fixer.io/documentation>`_
+   - `allratestoday <https://allratestoday.com/open-api/>`_ (keyless, `ECB` reference rates)
+   - `scrapper <https://www.x-rates.com/table/?from=USD&amount=1>`_
+   - ``custom``
+
+   In each case, requests will be attempted using ``weaver.quotation_currency_token`` to authenticate with the API.
+   The ``allratestoday`` converter does not require a token. It uses the daily European Central Bank reference rates
+   (about 30 currencies), and its terms ask for a visible link to `AllRatesToday <https://allratestoday.com>`__
+   where the converted amounts are shown.
+   Request caching of 1 hour will be used by default to limit chances of rate-limiting, but converter-specific plans
+   could block request at any moment depending on the amount of :ref:`quotation` requests accomplished.
+   In such case, the conversion will not be performed and will remain in the default currency.
+
+   If a ``custom`` URL is desired, the ``weaver.quotation_currency_custom_url`` parameter should also be provided.
+
+   If none is provided, conversion rates will not be applied and currencies
+   will always use ``weaver.quotation_currency_default``.
+
+   See :ref:`quotation` for more details on the feature.
+
+   .. versionadded:: 4.30
+
+.. confval:: weaver.quotation_currency_custom_url
+   :type: URL
+
+   Reference ``custom`` currency converter URL pattern to employ for retrieving conversion rates.
+
+   This applies only when using ``weaver.quotation_currency_converter = custom``
+
+   The specified URL will be used to perform a ``GET`` request.
+   This URL should contain the relevant query or path parameters to perform the request.
+   Parameters can be specified using templating (``{<param>}``), with parameters
+   names ``token``, ``from``, ``to`` and ``amount`` to perform the conversion.
+   The query parameter ``token`` will be filled by ``weaver.quotation_currency_token``, while remaining values will
+   be provided based on the source and target currency conversion requirements.
+   The response body should be in :term:`JSON` with minimally the conversion ``result`` field located at the root.
+   The same caching policy will be applied as for the other API references.
+
+   If none is provided, conversion rates will not be applied and currencies
+   will always use ``weaver.quotation_currency_default``.
+
+   See :ref:`quotation` for more details on the feature.
+
+   .. versionadded:: 4.30
+
+.. confval:: weaver.quotation_currency_token
+   :type: str
+
+   Password to employ for authentication when retrieving the :term:`Docker` image used as :ref:`quote_estimation`.
+
+   Only required if the :term:`Docker` image is not accessible publicly or already
+   provided through some other means when requested by the :term:`Docker` daemon.
+   Should be combined with ``weaver.quotation_docker_username``.
+   See :ref:`quotation` for more details on the feature.
+
+   .. versionadded:: 4.30
+
+.. confval:: weaver.quotation_sync_max_wait
+   :type: int, seconds
+   :default: ``20``
+
+   Defines the maximum duration allowed for running a :ref:`quote_estimation` in `synchronous` mode.
+
+   See :ref:`proc_exec_mode` for more details on the feature and how to employ it.
+   Ensure `Celery`_ worker is configured as specified in :ref:`conf_celery`.
+
+   .. versionchanged:: 4.30
     Renamed from ``weaver.quote_sync_max_wait`` to ``weaver.quotation_sync_max_wait``.
 
 .. _conf_vault:
@@ -930,21 +905,20 @@ below references for more details.
     - :ref:`vault_upload`
     - :ref:`file_vault_inputs`
 
-.. _weaver-vault:
 
-- | ``weaver.vault = true|false`` [:class:`bool`-like]
-  | (default: ``true``)
-  |
-  | Toggles the :term:`Vault` feature.
+.. confval:: weaver.vault
+   :type: bool-like
+   :default: ``true``
 
-.. _weaver-vault-dir:
+   Toggles the :term:`Vault` feature.
 
-- | ``weaver.vault_dir = <dir-path>``
-  | (default: ``/tmp/vault``)
-  |
-  | Defines the default location where to write :ref:`files uploaded to the Vault <vault_upload>`.
-  |
-  | If the directory does not exist, it is created on demand by the feature making use of it.
+.. confval:: weaver.vault_dir
+   :type: directory path
+   :default: ``/tmp/vault``
+
+   Defines the default location where to write :ref:`files uploaded to the Vault <vault_upload>`.
+
+   If the directory does not exist, it is created on demand by the feature making use of it.
 
 
 Starting the Application

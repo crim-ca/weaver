@@ -826,7 +826,7 @@ should be specified. If omitted, `Weaver` defaults to |asynchronous|_ execution.
 explicitly, ``Prefer: respond-async`` should be used. Otherwise, the |synchronous|_ execution can be requested
 with ``Prefer: wait=X`` where ``X`` is the duration in seconds to wait for a response. If no worker becomes available
 within that time, or if this value is greater than
-the ``weaver.execute_sync_max_wait`` setting (see :ref:`detail <weaver-execute-sync-max-wait>`), the :term:`Job` will
+the :confval:`weaver.execute_sync_max_wait` setting, the :term:`Job` will
 resume |asynchronously|_ and the response will be returned. Furthermore, |synchronous|_ and |asynchronous|_ execution of
 a :term:`Process` can only be requested for corresponding ``jobControlOptions`` it reports as supported in
 its :ref:`Process Description <proc_op_describe>`. It is important to provide the ``jobControlOptions`` parameter with
@@ -2676,7 +2676,7 @@ Notification Subscribers
 When submitting a :term:`Job` for execution, it is possible to provide the ``notification_email`` field.
 Doing so will tell `Weaver` to send an email to the specified address with *successful* or *failure* details
 upon :term:`Job` completion. The format of the email is configurable from `weaver.ini.example`_ file with
-email-specific settings (see: :ref:`Email Configuration <weaver-wps-email>`).
+email-specific settings (see: :confval:`Email Configuration <weaver.wps_email_[...]>`).
 
 Alternatively to ``notification_email``, the ``subscribers`` field of the :term:`API` can be employed during :term:`Job`
 submission. Using this field will take precedence over ``notification_email`` for corresponding email and status
@@ -3295,7 +3295,7 @@ Following is a table of available formats and corresponding endpoints offered by
 
 .. seealso::
     This feature is enabled by default. Its functionality and the corresponding :term:`API` endpoints
-    can be controlled using :ref:`Configuration Option <weaver-cwl-prov>` ``weaver.cwl_prov``.
+    can be controlled using the :confval:`weaver.cwl_prov` configuration option.
 
 .. note::
     Although not directly encoded within the above :ref:`Provenance Representations <table-job-prov>`, entities
