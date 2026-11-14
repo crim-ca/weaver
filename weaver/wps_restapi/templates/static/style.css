@@ -227,7 +227,17 @@ button.active {
     border-style: solid;
     border-width: 1px;
     border-collapse: collapse;
-    padding: 1em;
+    padding: 0.5em;
+}
+
+.table-jobs {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.table-jobs th,
+.table-jobs td {
+    overflow-wrap: anywhere;
 }
 
 .table-job-status,
