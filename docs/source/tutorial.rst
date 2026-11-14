@@ -35,6 +35,27 @@ By default, this value should be ``localhost:4001``.
 .. _processes: docs/source/processes.rst
 .. _package: docs/source/package.rst
 
+Service discovery
+-----------------
+
+The service landing page at ``${WEAVER_URL}/`` describes the running instance and provides links to its enabled
+interfaces. The same landing page can be requested as JSON or HTML. The ``/versions`` endpoint reports the Weaver
+software version, while ``/conformance`` lists the OGC API - Processes conformance classes implemented by the service.
+
+The interactive API reference is available at ``/api`` and the OpenAPI document as JSON at ``/json``. These paths,
+along with ``/processes`` and ``/jobs``, are relative to the configured OGC API - Processes base URL. Use the links
+from the landing page when that base URL or the endpoint paths have been customized.
+
+.. note::
+    Weaver exposes two process interfaces. The OGC API - Processes interface uses resource URLs and JSON request
+    bodies, for example ``POST /processes/{process_id}/jobs``. The traditional WPS-1/2 interface uses the configured
+    WPS endpoint (``/ows/wps`` by default) with operations such as ``GetCapabilities``, ``DescribeProcess`` and
+    ``Execute``. WPS requests and responses use the WPS XML or supported JSON representations. The OGC API interface
+    (also referred to as WPS-REST, WPS-T or WPS-3) is not a JSON encoding of the WPS query-string protocol.
+    OGC API - Processes also provides transactional process management operations, and Weaver can expose optional
+    quotation and billing operations. See :ref:`Deploy <proc_op_deploy>` and :ref:`Quotation and Billing <quotation>`
+    for details.
+
 WPS-1/2 requests
 --------------------
 
