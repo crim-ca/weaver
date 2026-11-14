@@ -54,7 +54,7 @@ sys.path.append(os.path.join(DOC_DIR_ROOT, "_extensions"))
 extensions = [
     "doc_redirect",         # redirect literal RST references -> built HTML page
     "sphinxarg.ext",        # render argparse CLI definitions
-    "sphinxcontrib.redoc",  # generate live OpenAPI with this doc
+    "swagger_plugin_for_sphinx",  # render the generated OpenAPI specification
     "sphinx.ext.autodoc",   # document code docstrings
     "sphinx.ext.autosectionlabel",  # help make cross-references to title/sections
     "sphinx.ext.githubpages",   # for publishing the doc to GitHub pages
@@ -99,7 +99,6 @@ config = Configurator(settings={"weaver.wps": True, "weaver.wps_restapi": True, 
 config.include("weaver")  # need to include package to apply decorators and parse routes
 config.commit()
 api_spec_file = os.path.join(DOC_BLD_ROOT, "api.json")
-# must disable references when using redoc (alpha version note rendering them correctly)
 api_spec_json = get_openapi_json(
     http_host="example",
     http_scheme="https",
@@ -111,19 +110,6 @@ if not os.path.isdir(DOC_BLD_ROOT):
     os.makedirs(DOC_BLD_ROOT)
 with open(api_spec_file, mode="w", encoding="utf-8") as f:
     json.dump(api_spec_json, f, use_decimal=True)
-
-redoc = [{
-    "name": __meta__.__title__,
-    "page": "api",  # rendered under '{root}/api.html'
-    "spec": api_spec_file,
-    "embed": True,
-    "opts": {
-        "lazy-rendering": True,
-        "hide-hostname": True
-    }
-}]
-# must use next version (2.x-alpha) because default 1.x does not support OpenAPIv3
-redoc_uri = "https://cdn.jsdelivr.net/npm/redoc@2.5.2/bundles/redoc.standalone.js"
 
 autoapi_type = "python"
 autoapi_dirs = [DOC_PKG_ROOT]
