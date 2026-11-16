@@ -12,7 +12,9 @@ Changes
 
 Changes:
 --------
-- No change.
+- Expand usage documentation with service discovery, configuration and caching, bounding-box and multiple-input
+  examples, workflow chaining, and quotation and billing operations. Resolves
+  `#61 <https://github.com/crim-ca/weaver/issues/61>`_.
 
 Fixes:
 ------
