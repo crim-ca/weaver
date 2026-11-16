@@ -36,7 +36,6 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
-from weaver.compat import Version
 from weaver.datatype import Job, Process, Service
 from weaver.execute import (
     ExecuteControlOption,
@@ -50,7 +49,7 @@ from weaver.notify import decrypt_email
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema, JobStatusType
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import compute_file_digest_multibase, explode_headers, get_path_kvp, now
+from weaver.utils import Version, compute_file_digest_multibase, explode_headers, get_path_kvp, now
 from weaver.visibility import Visibility
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps.utils import get_wps_output_url

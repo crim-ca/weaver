@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING
 from typing_extensions import get_args
 
 import colander
+from packaging.version import InvalidVersion
 from pyramid.httpexceptions import HTTPBadRequest, HTTPOk, HTTPUnprocessableEntity
 from pyramid.settings import asbool
 
-from weaver.compat import InvalidVersion
 from weaver.config import WeaverFeature, get_weaver_configuration
 from weaver.database import get_db
 from weaver.formats import ContentType, OutputFormat, clean_media_type_format, guess_target_format

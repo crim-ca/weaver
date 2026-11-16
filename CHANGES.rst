@@ -17,7 +17,8 @@ Changes:
 Fixes:
 ------
 - Fix process version links and version-history listings for semantic versions with suffixes such as ``0.1.3.dev10``,
-  including representation-aware alternate links (resolves `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
+  including representation-aware self and alternate links. Consolidate version normalization and prerelease update
+  validation in ``weaver.utils.Version`` (resolves `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 
 .. _changes_6.18.0:
 

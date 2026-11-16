@@ -39,7 +39,6 @@ from pywps.response.describe import DescribeResponse
 from werkzeug.wrappers import Request as WerkzeugRequest
 
 from weaver import xml_util
-from weaver.compat import Version
 from weaver.exceptions import ProcessInstanceError, ServiceParsingError
 from weaver.execute import (
     ExecuteControlOption,
@@ -70,10 +69,9 @@ from weaver.transform.utils import extend_alternate_formats
 from weaver.utils import localize_datetime  # for backward compatibility of previously saved jobs not time-locale-aware
 from weaver.utils import (
     LoggerHandler,
+    Version,
     VersionFormat,
     apply_number_with_unit,
-    as_version_major_minor_patch,
-    as_version_string,
     extend_instance,
     fully_qualified_name,
     get_job_log_msg,
@@ -2362,7 +2360,7 @@ class Process(Base):
         # on next (if any) update request, this revision will be updated with a default version
         if self.version is None:
             return proc_id
-        version = as_version_string(self.version)
+        version = Version(self.version).as_format(VersionFormat.STRING)
         return f"{proc_id}:{version}"
 
     @property
@@ -2426,7 +2424,7 @@ class Process(Base):
     def version(self, version):
         # type: (AnyVersion) -> None
         if not isinstance(version, str):
-            version = as_version_major_minor_patch(version, VersionFormat.STRING)
+            version = Version(version).as_format(VersionFormat.STRING)
         self["version"] = sd.Version().deserialize(version)
 
     @property
@@ -2832,23 +2830,24 @@ class Process(Base):
         request_process_id = getattr(container, "matchdict", {}).get("process_id")
         request_version = getattr(container, "params", {}).get("version")
         if request_process_id and request_version and ":" not in request_process_id:
-            request_process_id = f"{request_process_id}:{as_version_string(request_version)}"
+            request_process_id = f"{request_process_id}:{Version(request_version)}"
         request_process_id = request_process_id or self.id
         is_versioned_request = self.split_version(request_process_id)[1] is not None
         proc_self = f"{proc_list}/{request_process_id}"
         jobs_list = proc_desc + sd.jobs_service.path
         proc_exec = f"{proc_desc}/execution"
-        links = [
-            {"href": proc_self, "rel": "self", "title": "Current process description."},
-            {"href": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "rel": "profile", "title": "Process response profile."},
-            {"href": f"{proc_self}?f=xml", "rel": "alternate",
-             "title": "Alternate process description.", "type": ContentType.APP_XML},
-        ]
         request_format = (
             guess_target_format(container, default=ContentType.APP_JSON)
             if hasattr(container, "params") and hasattr(container, "headers")
             else ContentType.APP_JSON
         )
+        self_href = get_path_kvp(proc_self, f="html") if request_format == ContentType.TEXT_HTML else proc_self
+        links = [
+            {"href": self_href, "rel": "self", "title": "Current process description.", "type": request_format},
+            {"href": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, "rel": "profile", "title": "Process response profile."},
+            {"href": f"{proc_self}?f=xml", "rel": "alternate",
+             "title": "Alternate process description.", "type": ContentType.APP_XML},
+        ]
         alternate_format = "json" if request_format == ContentType.TEXT_HTML else "html"
         alternate_type = ContentType.APP_JSON if alternate_format == "json" else ContentType.TEXT_HTML
         links.append({
@@ -2866,12 +2865,12 @@ class Process(Base):
             {"href": proc_list, "rel": "up", "title": "List of processes registered under the service."},
         ])
         if self.version:
-            # OGC API - Processes - 'Part 5: Versioning' (unofficial)
-            # (see https://github.com/opengeospatial/ogcapi-processes/pull/578)
+            # OGC API - Processes - Versioning Proposal
+            # https://github.com/opengeospatial/ogcapi-processes/tree/master/extensions/versioning
             versions = sorted(get_db(container).get_store(StoreProcesses).find_versions(
                 self.name, VersionFormat.OBJECT
             ))
-            latest_version = as_version_string(versions[-1]) if versions else as_version_string(self.version)
+            latest_version = versions[-1] if versions else Version(self.version)
             latest_tag = f"{self.name}:{latest_version}"
             proc_hist = get_path_kvp(proc_list, detail=False, revisions=True, process=self.name)
             links.extend([
@@ -2889,16 +2888,16 @@ class Process(Base):
                     "href": f"{proc_list}/{latest_tag}", "rel": "working-copy-of",
                     "title": "Versioned process represented by this working copy."
                 })
-            proc_ver = Version(as_version_string(self.version))
+            proc_ver = Version(self.version)
             prev_ver = list(filter(lambda ver: ver < proc_ver, versions))
             next_ver = list(filter(lambda ver: ver > proc_ver, versions))
             if prev_ver:
-                proc_prev = f"{proc_base}:{as_version_string(prev_ver[-1])}"
+                proc_prev = f"{proc_base}:{prev_ver[-1]}"
                 links.append(
                     {"href": proc_prev, "rel": "predecessor-version", "title": "Previous revision of this process."}
                 )
             if next_ver:
-                proc_next = f"{proc_base}:{as_version_string(next_ver[0])}"
+                proc_next = f"{proc_base}:{next_ver[0]}"
                 links.append(
                     {"href": proc_next, "rel": "successor-version", "title": "Next revision of this process."}
                 )

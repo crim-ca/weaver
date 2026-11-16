@@ -614,9 +614,10 @@ class Tag(ExtendedSchemaNode):
     schema_type = String
     description = "Identifier with optional tagged version forming a unique reference."
     # ranges used to remove starting/ending ^$ characters
+    # Allow prerelease and development suffixes in tagged process references.
     pattern = re.compile(
         rf"{SLUG.pattern.pattern[:-1]}"
-        rf"(:{SemanticVersion(v_prefix=False).pattern[1:-1]})?$"
+        rf"(:{SemanticVersion(v_prefix=False, rc_suffix=True).pattern[1:-1]})?$"
     )
 
 

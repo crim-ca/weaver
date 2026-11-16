@@ -12,12 +12,12 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
-from weaver.compat import Version
 from weaver.config import WeaverConfiguration
 from weaver.datatype import Service
 from weaver.execute import ExecuteControlOption, ExecuteTransmissionMode
 from weaver.formats import ContentType, OutputFormat
 from weaver.processes.constants import CWL_REQUIREMENT_APP_WPS1, ProcessSchema
+from weaver.utils import Version
 
 
 class WpsProviderBase(GenericUtils):
