@@ -146,8 +146,8 @@ class Wps1Process(WpsProcessInterface):
         LOGGER.debug("Execute WPS-1 process: [%s]", self.process)
         try:
             headers = {}
-            headers.update(self.get_auth_cookies())
-            headers.update(self.get_auth_headers())
+            headers.update(self.get_auth_cookies(self.provider))
+            headers.update(self.get_auth_headers(self.provider))
             self.wps_provider = get_wps_client(self.provider, self.settings, headers=headers)
             raise_on_xml_exception(self.wps_provider._capabilities)  # noqa: W0212
         except Exception as ex:

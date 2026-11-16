@@ -30,9 +30,12 @@ from weaver.utils import (
     get_any_message,
     get_any_value,
     get_cookie_headers,
+    get_header,
     get_job_log_msg,
     get_log_monitor_msg,
     get_settings,
+    is_bearer_token_for_url,
+    is_weaver_url,
     request_extra,
     wait_secs
 )
@@ -46,10 +49,10 @@ if TYPE_CHECKING:
         AnyCookiesContainer,
         AnyHeadersContainer,
         AnyResponseType,
-        CookiesTupleType,
         CWL_ExpectedOutputs,
         CWL_Output_Type,
         CWL_WorkflowInputs,
+        HeadersType,
         JobCustomInputs,
         JobCustomOutputs,
         JobInputs,
@@ -266,33 +269,58 @@ class WpsProcessInterface(abc.ABC):
             except OSError:
                 LOGGER.warning("Ignore failure to clean up temporary staging path: [%s]", path)
 
-    def get_auth_headers(self):
-        # type: () -> AnyHeadersContainer
+    def get_auth_headers(self, url):
+        # type: (str) -> AnyHeadersContainer
         """
         Implementation dependent operation to retrieve applicable authorization headers.
 
         This method is employed for every :meth:`make_request` call to avoid manually providing them each time.
         Any overriding method should consider calling this method to retrieve authorization headers from WPS request.
-        """
-        headers = {}
-        if self.request and self.request.auth_headers:
-            headers = self.request.auth_headers.copy()
-        return Headers(headers)
 
-    def get_auth_cookies(self):
-        # type: () -> CookiesTupleType
+        To avoid the Confused Deputy Problem, credentials are restricted to the same ``weaver.url`` as this instance,
+        except for a Bearer JWT whose advertised ``aud`` matches the target host. Cookies are excluded from the
+        returned headers. They are retrieved by :meth:`get_auth_cookies`.
+
+        :param url: Target URL of the request for which authorization headers must be forwarded.
+        """
+        headers = Headers()
+        # SECURITY: local credentials are restricted to 'weaver.url'. The Confused Deputy Problem is mitigated
+        # for remote steps by forwarding only Bearer JWTs whose advertised audience matches the target host.
+        # Cookies are excluded since they are handled separately by 'get_auth_cookies'.
+        if self.request and self.request.auth_headers:
+            if is_weaver_url(url, self.settings):
+                for name, value in self.request.auth_headers.items():
+                    if name.lower() not in ["cookie", "set-cookie"]:
+                        headers.add(name, value)
+            else:
+                auth_value = get_header("Authorization", self.request.auth_headers)
+                if is_bearer_token_for_url(auth_value, url):
+                    headers["Authorization"] = auth_value
+        return headers
+
+    def get_auth_cookies(self, url):
+        # type: (str) -> HeadersType
         """
         Implementation dependent operation to retrieve applicable authorization cookies.
 
         This method is employed for every :meth:`make_request` call to avoid manually providing them each time.
         Any overriding method should consider calling this method to retrieve authorization cookies from WPS request.
+
+        Cookies of the original request are returned only if the target ``url`` is hosted by the same ``weaver.url``
+        as this instance. Cookies are never forwarded to a remote host based on a Bearer JWT audience.
+
+        :param url: Target URL of the request for which cookies must be forwarded.
+        :returns: ``Cookie`` header combining cookies of the original request, or empty if none applies.
         """
-        cookies = []
-        if self.request and self.request.http_request:
-            for name in ["Cookie", "Set-Cookie"]:
-                headers = get_cookie_headers(self.request.http_request, name)
-                cookies.extend([(key, value) for key, value in headers.items()])
-        return cookies
+        # SECURITY: forward user cookies only to 'weaver.url' to avoid the Confused Deputy Problem.
+        if not self.request or not is_weaver_url(url, self.settings):
+            return {}
+        headers = []
+        if self.request.http_request:
+            headers.extend(self.request.http_request.headers.items())
+        if self.request.auth_headers:
+            headers.extend(self.request.auth_headers.items())
+        return get_cookie_headers(headers)
 
     def make_request(self,
                      method,        # type: str
@@ -306,11 +334,10 @@ class WpsProcessInterface(abc.ABC):
         Sends the request with additional parameter handling for the current process definition.
         """
         retries = int(retry) if retry is not None else 0
-        cookies = Headers(cookies or {})
         headers = Headers(headers or {})
-        cookies.update(self.get_auth_cookies())
         headers.update(self.headers.copy())
-        headers.update(self.get_auth_headers())
+        headers.update(self.get_auth_headers(url))
+        headers.update(self.get_auth_cookies(url))
         response = request_extra(method, url=url, settings=self.settings, retries=retries,
                                  headers=headers, cookies=cookies, **kwargs)
         return response
