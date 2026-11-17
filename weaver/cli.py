@@ -4148,7 +4148,7 @@ def make_parser():
     op_replace.add_argument(
         "-m", "--metadata", dest="metadata", action="append",
         help=inspect.cleandoc(f"""
-            Process metadata fields to update based on semantic versining.
+            Process metadata fields to update based on semantic versioning.
 
             FORMATS:
               1. Key=value pairs (simple fields): -m title='New Title' -m description='Updated'
@@ -4167,18 +4167,21 @@ def make_parser():
                     Links require 'rel' field (IANA relation or URL), and it is recommented to provide an
                     additional 'role' using https://schema.org definitions for semantic meaning of these concepts.
                 Example:
-                  {{
-                    "metadata": [
-                      {{"role": "https://schema.org/author", "rel": "author",
-                       "href": "https://orcid.org/0000-0000-0000-0000", "title": "Author ORCID"}},
-                      {{"role": "https://schema.org/name", "value": "John Doe"}},
-                      {{"role": "https://schema.org/codeRepository", "rel": "repository",
-                       "href": "https://github.com/org/repo"}}
-                    ]
-                  }}
+                  -m '{{"metadata": [
+                    {{"role": "https://schema.org/author", "rel": "author",
+                      "href": "https://orcid.org/0000-0000-0000-0000", "title": "Author ORCID"}},
+                    {{"role": "https://schema.org/name", "value": "John Doe"}},
+                    {{"role": "https://schema.org/codeRepository", "rel": "repository",
+                      "href": "https://github.com/crim-ca/weaver"}}
+                  ]}}'
 
               - links: Additional links (appended). Each has rel and href.
-                Example: -m '{{"links": [{{"rel": "service-doc", "href": "https://docs", "type": "text/html"}}]}}'
+                Example:
+                  -m '{{"links": [
+                    {{"rel": "service-doc",
+                      "href": "https://pavics-weaver.readthedocs.io/",
+                      "type": "text/html"}}
+                  ]}}'
 
             MINOR-LEVEL FIELDS (capabilities, full override):
               - jobControlOptions: {ExecuteControlOption.values()}

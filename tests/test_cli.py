@@ -1818,8 +1818,11 @@ def test_cli_replace_additive_body_and_metadata():
     call_kwargs = mock_req.call_args[1]
     payload = call_kwargs["json"]
     # Verify metadata fields override body fields
-    assert payload["title"] == "Override Title"
-    assert payload["keywords"] == ["new-tag"]
+    process_payload = payload["processDescription"]
+    assert process_payload["id"] == "test-process"
+    assert process_payload["version"] == "2.0.0"
+    assert process_payload["title"] == "Override Title"
+    assert process_payload["keywords"] == ["new-tag"]
 
 
 @pytest.mark.cli
