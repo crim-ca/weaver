@@ -163,6 +163,30 @@ they are optional and which default value or operation is applied in each situat
 
   .. versionadded:: 6.9
 
+.. |weaver-job-collection| replace:: ``weaver.job_collection``
+.. _weaver-job-collection:
+
+- | ``weaver.job_collection = true|false`` [:class:`bool`-like]
+  | (default: ``true``)
+  |
+  | Configure whether the static :term:`STAC` Collection of successful :term:`Job` results should be generated
+    and advertised using alternate links. See :ref:`proc_op_job_collection` for details.
+
+  .. versionadded:: 6.17
+
+.. _weaver-job-collection-stac-api:
+
+- | ``weaver.job_collection_stac_api_public_url = <URL>``
+  | ``weaver.job_collection_stac_api_staging_url = <URL>``
+  | (default: not set)
+  |
+  | When ``weaver.job_collection`` is enabled, the :term:`STAC` Collection and Items are stored as static files by
+    default. If a :term:`STAC` API public URL is provided, ``POST`` requests with their contents are performed instead
+    to stage their results under this API. When a staging URL is also provided, it is employed for ``POST`` operations,
+    while the public URL remains employed for metadata links and the final redirect. See :ref:`proc_op_job_collection`.
+
+  .. versionadded:: 6.17
+
 .. _weaver-cwl-prov:
 
 - | ``weaver.cwl_prov = true|false`` [:class:`bool`-like]

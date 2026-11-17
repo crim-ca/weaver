@@ -11,8 +11,9 @@ from prov import constants as prov_const
 
 from weaver.__meta__ import __version__ as weaver_version
 from weaver.base import Constants
+from weaver.execute import ExecuteResponse
 from weaver.formats import ContentType, OutputFormat
-from weaver.utils import get_weaver_url
+from weaver.utils import get_path_kvp, get_weaver_url
 
 if TYPE_CHECKING:
     from typing import Any, List, Optional, Tuple, Union
@@ -363,6 +364,31 @@ class WeaverResearchObject(ResearchObject):
             }
         )
 
+        from weaver.collections.utils import collection_enabled
+
+        results_entity = None
+        collection_entity = None
+        if collection_enabled(self.settings):
+            results_entity = document.entity(
+                f"{self.job.uuid.urn}:results",
+                {
+                    prov_const.PROV_TYPE: prov_const.PROV["Collection"],
+                    prov_const.PROV_LOCATION: self.job.results_url(self.settings),
+                    prov_const.PROV_LABEL: "Job Results",
+                }
+            )
+            collection_entity = document.entity(
+                f"{self.job.uuid.urn}:collection",
+                {
+                    prov_const.PROV_TYPE: prov_const.PROV["Collection"],
+                    prov_const.PROV_LOCATION: get_path_kvp(
+                        self.job.results_url(self.settings),
+                        response=ExecuteResponse.COLLECTION,
+                    ),
+                    prov_const.PROV_LABEL: "Job Results STAC Collection",
+                }
+            )
+
         # following agents are expected to exist (created by inherited class)
         cwltool_agent = document.get_record(cwl_prov_const.ACCOUNT_UUID)[0]
         user_uuid = self.orcid or cwl_prov_const.USER_UUID
@@ -389,6 +415,10 @@ class WeaverResearchObject(ResearchObject):
         document.specializationOf(wf_agent, job_entity)
         document.alternateOf(wf_agent, job_entity)
         document.wasGeneratedBy(job_entity, proc_entity)
+        if results_entity and collection_entity:
+            document.wasGeneratedBy(results_entity, job_entity)
+            document.wasGeneratedBy(collection_entity, job_entity)
+            document.alternateOf(collection_entity, results_entity)
         if server_provider_entity:
             document.derivation(server_provider_entity, weaver_instance_agent)
             document.attribution(server_provider_entity, weaver_instance_agent)
