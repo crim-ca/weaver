@@ -68,6 +68,10 @@ extensions = [
     "sphinx_paramlinks",        # allow ':paramref:`<>`' references in docstrings
 ]
 
+swagger_present_uri = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.8/swagger-ui-standalone-preset.js"
+swagger_bundle_uri = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.8/swagger-ui-bundle.js"
+swagger_css_uri = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.8/swagger-ui.css"
+
 # note: see custom extension documentation
 doc_redirect_ignores = [
     re.compile(r"weaver\..*"),  # autoapi generated files
