@@ -1872,9 +1872,14 @@ def parse_search_query(value):
     lexer = shlex.shlex(value, posix=True, punctuation_chars="+-,")
     lexer.whitespace_split = True
     lexer.commenters = ""
+    lexemes = (
+        part
+        for lexeme in lexer
+        for part in (lexeme if lexeme and all(char in "+-," for char in lexeme) else [lexeme])
+    )
     groups = [[]]  # type: List[List[Tuple[str, bool]]]
     negative = pending = False
-    for lexeme in lexer:
+    for lexeme in lexemes:
         if lexeme == ",":
             if pending or not groups[-1]:
                 raise ValueError("Empty OR group in search query.")
@@ -1883,7 +1888,7 @@ def parse_search_query(value):
             if pending:
                 raise ValueError("Consecutive operators in search query.")
             negative, pending = lexeme == "-", True
-        elif not lexeme.strip() or all(char in "+-," for char in lexeme):
+        elif not lexeme.strip():
             raise ValueError("Invalid search query term.")
         else:
             groups[-1].append((lexeme, negative))
