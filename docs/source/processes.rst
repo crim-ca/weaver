@@ -613,6 +613,19 @@ to the following table. When a combination of the below items occur, the higher 
     +-------------+-----------+----------------------------+-----------------------------------------------------------+
 
 .. note::
+    Changes limited to additional version sub-parts, such as ``.dev0`` to ``.dev1``, are interpreted as ``PATCH``
+    semantic revisions. They follow the same procedure as regular ``PATCH`` updates. Submit an HTTP ``PATCH`` request
+    with an explicit ``version`` and changes permitted at the ``PATCH`` level in the table above. A suffix-only
+    change cannot satisfy an update that requires a ``MINOR`` or ``MAJOR`` revision.
+
+    The requested version must be unused and greater than every existing revision in the same ``MAJOR.MINOR``
+    branch. Development suffix numbers are compared numerically, so
+    ``1.2.3.dev0 < 1.2.3.dev1 < 1.2.3.dev2 < 1.2.3.dev10 < 1.2.3``.
+    Therefore, ``1.2.3.dev1`` cannot update an existing ``1.2.3``, or be added if ``1.2.4`` already exists.
+    Omitting ``version`` increments the regular numeric revision instead of the suffix. For a ``PATCH`` update
+    from ``1.2.3.dev0``, the automatically selected version is ``1.2.4``.
+
+.. note::
     For all applicable fields of updating a :term:`Process`, refer to the schema of |update-req|_.
     For replacing a :term:`Process`, refer instead to the schema of |replace-req|_. The replacement request contents
     are extremely similar to the :ref:`Deploy <proc_op_deploy>` schema since the full :term:`Process` definition must
