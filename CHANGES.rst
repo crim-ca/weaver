@@ -17,8 +17,9 @@ Changes:
 
 Fixes:
 ------
-- Fix process version links and version-history listings for semantic versions with suffixes such as ``0.1.3.dev10``,
-  including representation-aware self and alternate links
+- Fix process version links and version-history listings for semantic versions with suffixes such as ``0.1.3.dev10``.
+  Correct ``latest-version``, ``version-history``, ``predecessor-version``, ``successor-version`` and ``working-copy``
+  links. Add ``current`` and ``working-copy-of`` links and make ``self`` and ``alternate`` links representation-aware
   (resolves `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 
 .. _changes_6.18.0:
