@@ -1817,6 +1817,85 @@ class TestMultipartDeployment:
         with pytest.raises(HTTPBadRequest):
             _organize_deploy_parts(interpreted_parts, root_workflow_cid=None)
 
+    def test_organize_deploy_parts_deploy_profile_equivalent_to_separate_parts(self):
+        """
+        Test that a single deploy profile part gives the same deployment as distinct CWL and description parts.
+        """
+        def make_cwl():
+            return {"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "tool-1"}
+
+        def make_description():
+            return {"processDescription": {"id": "tool-1", "title": "Tool"}}
+
+        single_part = [
+            (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_DEPLOY_URI, {
+                **make_description(),
+                "executionUnit": [{"unit": make_cwl()}],
+            }),
+        ]
+        distinct_parts = [
+            (ContentType.APP_CWL_JSON, "tool-1@localhost", "", "", make_cwl()),
+            (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, make_description()),
+        ]
+
+        deployments = []
+        for parts in [single_part, distinct_parts]:
+            packages, descriptions = _organize_deploy_parts(parts, root_workflow_cid=None)
+            linked = _link_process_descriptions(packages, descriptions)
+            deployments.append([_merge_process_description(pkg, linked.get(pkg["id"])) for pkg in packages])
+
+        assert deployments[0] == deployments[1]
+        assert deployments[0][0]["processDescription"]["title"] == "Tool"
+        assert deployments[0][0]["executionUnit"] == [{"unit": make_cwl()}]
+
+    def test_organize_deploy_parts_process_description_profile(self):
+        """
+        Test that a description with I/O is not mistaken for a CWL when it provides the description profile.
+        """
+        interpreted_parts = [
+            (ContentType.APP_CWL_JSON, "tool-1", "", "", {"cwlVersion": "v1.2", "class": "CommandLineTool"}),
+            (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, {
+                "id": "tool-1",
+                "title": "Tool",
+                "inputs": {"message": {"schema": {"type": "string"}}},
+                "outputs": {"output": {"schema": {"type": "string"}}},
+            }),
+        ]
+
+        cwl_packages, descriptions = _organize_deploy_parts(interpreted_parts, root_workflow_cid=None)
+
+        assert len(cwl_packages) == 1
+        assert cwl_packages[0]["id"] == "tool-1"
+        assert len(descriptions) == 1
+        assert descriptions[0]["processDescription"]["title"] == "Tool"
+        assert "message" in descriptions[0]["processDescription"]["inputs"]
+
+    def test_organize_deploy_parts_process_description_profile_invalid(self):
+        """
+        Test that a part with the description profile is validated against the deployment schema.
+        """
+        interpreted_parts = [
+            (ContentType.APP_CWL_JSON, "tool-1", "", "", {"cwlVersion": "v1.2", "class": "CommandLineTool"}),
+            (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_PROC_DESC_URI, {"id": "not a valid id!"}),
+        ]
+        with pytest.raises(HTTPUnprocessableEntity) as exc_info:
+            _organize_deploy_parts(interpreted_parts, root_workflow_cid=None)
+
+        assert "Invalid process description" in exc_info.value.json["title"]
+
+    def test_create_multipart_deploy_yaml_process_description(self):
+        tool_cwl = {"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "tool-1", "inputs": {}, "outputs": {}}
+        description = {"processDescription": {"id": "tool-1", "title": "Tool"}}
+
+        content, content_type = create_multipart_deploy(
+            [tool_cwl], "localhost", process_description=description, description_type=ContentType.APP_YAML,
+        )
+        cwl_packages, descriptions = parse_multipart_deploy(content, content_type)
+
+        assert ContentType.APP_YAML.encode() in content
+        assert len(cwl_packages) == 1
+        assert descriptions == [description]
+
     def test_link_process_descriptions(self):
         tool = {"class": "CommandLineTool", "id": "#tool-1"}
         workflow = {"class": "Workflow", "id": "workflow-1"}

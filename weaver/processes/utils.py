@@ -51,7 +51,7 @@ from weaver.exceptions import (
     ServiceNotFound,
     log_unhandled_exceptions
 )
-from weaver.formats import ContentType, clean_media_type_format, repr_json
+from weaver.formats import ContentType, OutputFormat, clean_media_type_format, repr_json
 from weaver.processes.constants import PACKAGE_EXTENSIONS
 from weaver.processes.convert import get_field, normalize_ordered_io, set_field
 from weaver.processes.types import ProcessType
@@ -490,8 +490,13 @@ def _get_multipart_content(content, request):
         raise HTTPBadRequest(f"Invalid multipart content format: {exc}")
 
 
-def create_multipart_deploy(cwl_files, url, process_description=None, boundary=None):
-    # type: (List[Union[str, CWL]], URL, Optional[Union[JSON, List[JSON]]], Optional[str]) -> Tuple[bytes, str]
+def create_multipart_deploy(
+    cwl_files,                              # type: List[Union[str, CWL]]
+    url,                                    # type: URL
+    process_description=None,               # type: Optional[Union[JSON, List[JSON]]]
+    boundary=None,                          # type: Optional[str]
+    description_type=ContentType.APP_JSON,  # type: str
+):                                          # type: (...) -> Tuple[bytes, str]
     """
     Create ``multipart/related`` deployment content from a ``list`` of :term:`CWL` files.
 
@@ -506,6 +511,8 @@ def create_multipart_deploy(cwl_files, url, process_description=None, boundary=N
         Can be a ``list`` to provide a description for multiple :term:`CWL` (matched by their ``id``).
         A description without ``id`` is considered to be for the main :term:`Workflow`.
     :param boundary: Optional custom ``boundary`` ``str`` (auto-generated if not provided)
+    :param description_type:
+        ``Content-Type`` of the :term:`Process` description parts. When :term:`YAML`, contents are converted inline.
     :returns:
         ``tuple`` of (multipart content ``bytes``, full ``Content-Type`` header with ``boundary``)
     """
@@ -554,10 +561,13 @@ def create_multipart_deploy(cwl_files, url, process_description=None, boundary=N
     if process_description:
         descriptions = process_description if isinstance(process_description, list) else [process_description]
         for desc_idx, description in enumerate(descriptions):
-            desc_json = json.dumps(description, indent=2)
-            desc_part = MIMEText(desc_json, _subtype="json", _charset="utf-8")
-            # Replace the default Content-Type (text/json) with application/json
-            desc_part.replace_header("Content-Type", ContentType.APP_JSON)
+            if description_type in ContentType.ANY_YAML:
+                desc_body = OutputFormat.convert(description, OutputFormat.YAML)
+                desc_part = MIMEText(desc_body, _subtype="yaml", _charset="utf-8")
+            else:
+                desc_part = MIMEText(json.dumps(description, indent=2), _subtype="json", _charset="utf-8")
+            # Replace the default text/* Content-Type with the application/* one
+            desc_part.replace_header("Content-Type", description_type)
             if len(descriptions) == 1:
                 desc_part.add_header("Content-ID", "<process-description>")
             else:
@@ -855,6 +865,36 @@ def _normalize_process_description(description):
     return {"processDescription": description}
 
 
+def _validate_process_description_part(part_data):
+    # type: (JSON) -> JSON
+    """
+    Validate a part provided with the :term:`Process` description profile against the deployment schema.
+
+    :param part_data: Contents of a part provided with the ``ogc-process-description`` profile.
+    :returns: Description nested under ``processDescription`` as in a deployment payload.
+    :raises HTTPUnprocessableEntity: If the description does not respect :class:`sd.ProcessDeployment`.
+    """
+    description = _normalize_process_description(part_data)
+    info = get_process_information(description)
+    try:
+        # 'id' is optional for the main CWL in multipart, but required by the schema
+        sd.ProcessDeployment().deserialize({"id": "main", **info} if isinstance(info, dict) else info)
+    except colander.Invalid as exc:
+        raise HTTPUnprocessableEntity(json={
+            "type": "InvalidParameterValue",
+            "title": "Invalid process description part.",
+            "description": (
+                f"Part with Content-Profile [{sd.OGC_API_PROC_PROFILE_PROC_DESC_URI}] "
+                "does not respect the process deployment schema."
+            ),
+            "status": HTTPUnprocessableEntity.code,
+            "error": colander.Invalid.__name__,
+            "cause": exc.asdict(),
+            "value": repr_json(exc.value, force_string=False),
+        })
+    return description
+
+
 def _expand_deploy_profile_part(part_data):
     # type: (JSON) -> Tuple[Optional[JSON], List[CWL]]
     """
@@ -917,6 +957,13 @@ def _organize_deploy_parts(interpreted_parts, root_workflow_cid):
             if description:
                 process_descriptions.append(description)
             cwl_packages.extend(packages)
+            continue
+
+        if (
+            isinstance(part_data, dict) and
+            profile and sd.OGC_API_PROC_PROFILE_PROC_DESC_URI in profile
+        ):
+            process_descriptions.append(_validate_process_description_part(part_data))
             continue
 
         pkg_count = len(cwl_packages)

@@ -7724,6 +7724,12 @@ class DeployBodyCWL(Deploy):
 
 
 class DeployBodyMultipart(Deploy):
+    description = (
+        "Multipart deployment of related CWL parts, each optionally accompanied by a Process description part "
+        "(JSON or YAML). Parts can be annotated with 'Content-Profile' headers of either "
+        f"[{OGC_API_PROC_PROFILE_PROC_DESC_URI}] for a Process description, or "
+        f"[{OGC_API_PROC_PROFILE_DEPLOY_URI}] for a combined 'processDescription' and 'executionUnit' (WIP)."
+    )
     examples = {
         "DeployMultipartCWL": {
             "summary": "Deploy a workflow process from multipart CWL definition.",
