@@ -666,31 +666,9 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                     metadata_conditions.append({scope: {"$elemMatch": {"metadata": {"$elemMatch": elem_match}}}})
             search_filters["$and"] = metadata_conditions
 
-        def _contains(text):
-            # type: (str) -> MongodbAggregateExpression
-            return {"$regex": re.escape(text.strip()), "$options": "i"}
-
-        text_conditions = []  # type: List[MongodbAggregateExpression]
-        if keywords:
-            for term in filter(None, (kw.strip() for kw in keywords.split(","))):
-                alternatives = [{"keywords": {"$regex": f"^{re.escape(alt.strip())}$", "$options": "i"}}
-                                for alt in term.split("|") if alt.strip()]
-                if alternatives:
-                    text_conditions.append({"$or": alternatives})
-        if title:
-            text_conditions.append({"title": _contains(title)})
-        if description:
-            text_conditions.append({"$or": [{"abstract": _contains(description)},
-                                            {"description": _contains(description)}]})
-        if query:
-            fields = ["title", "abstract", "description", "keywords"]
-            terms = [term for term in (term.strip() for term in query.split(",")) if term]
-            if terms:
-                text_conditions.append({"$or": [{field: _contains(term)} for term in terms for field in fields]})
-        if version:
-            text_conditions.append({"version": as_version_major_minor_patch(version, VersionFormat.STRING)})
-        if text_conditions:
-            search_filters.setdefault("$and", []).extend(text_conditions)
+        search_conditions = self._apply_search_filter(keywords, title, description, query, version)
+        if search_conditions:
+            search_filters.setdefault("$and", []).extend(search_conditions)
 
         # processes do not have 'created', but ObjectID in '_id' has the particularity of embedding creation time
         if sort == Sort.CREATED:
@@ -730,6 +708,50 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             total = found[0]["total"]
             return items, total
         return [Process(item) for item in found]
+
+    @staticmethod
+    def _apply_search_filter(keywords,      # type: Optional[str]
+                             title,         # type: Optional[str]
+                             description,   # type: Optional[str]
+                             query,         # type: Optional[str]
+                             version,       # type: Optional[str]
+                             ):             # type: (...) -> List[MongodbAggregateExpression]
+        """
+        Builds process discovery conditions for the existing listing aggregation.
+        """
+        conditions = []  # type: List[MongodbAggregateExpression]
+        if keywords:
+            for term in keywords.split(","):
+                alternatives = [{"keywords": {"$regex": f"^{re.escape(alt.strip())}$", "$options": "i"}}
+                                for alt in term.split("|")]
+                conditions.append({"$or": alternatives})
+        for field, text in [("title", title), ("description", description)]:
+            if text:
+                conditions.append(MongodbProcessStore._apply_text_filter(field, text))
+        if query:
+            conditions.append({"$or": [
+                MongodbProcessStore._apply_text_filter(field, term)
+                for term in query.split(",") for field in ["title", "description", "keywords"]
+            ]})
+        if version:
+            conditions.append({"version": as_version_major_minor_patch(version, VersionFormat.STRING)})
+        return conditions
+
+    @staticmethod
+    def _apply_text_filter(field, text):
+        # type: (str, str) -> MongodbAggregateExpression
+        """
+        Matches literal text against the effective process description fields.
+        """
+        regex = re.escape(text.strip())
+        if field == "keywords":
+            return {field: {"$regex": regex, "$options": "i"}}
+        # Match the same fallback fields exposed by Process.title and Process.description.
+        if field == "title":
+            value = {"$ifNull": ["$title", "$identifier"]}
+        else:
+            value = {"$cond": ["$abstract", "$abstract", {"$ifNull": ["$description", ""]}]}
+        return {"$expr": {"$regexMatch": {"input": value, "regex": regex, "options": "i"}}}
 
     def _get_revision_search(self, process_id):
         # type: (str) -> Tuple[MongodbAggregateExpression, Optional[str]]

@@ -5514,36 +5514,155 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "Dispatching execution of nested process" in logs
         assert "Abort execution." in logs
 
-    def test_get_processes_filter_by_search_queries(self):
+    @parameterized.expand([
+        ("keywords_and", {"keywords": "climate,netcdf"}, True),
+        ("keywords_or", {"keywords": " CLIMATE , grib|netcdf "}, True),
+        ("keywords_no_match", {"keywords": "climate,grib"}, False),
+        ("keywords_whole_word", {"keywords": "clim"}, False),
+        ("keywords_literal", {"keywords": ".*"}, False),
+        ("title", {"title": "regional"}, True),
+        ("title_no_match", {"title": "other"}, False),
+        ("title_literal", {"title": "Regional.*"}, False),
+        ("description", {"description": "a REGION"}, True),
+        ("description_no_match", {"description": "other"}, False),
+        ("description_literal", {"description": ".*"}, False),
+        ("q_title", {"q": "other,subset"}, True),
+        ("q_keywords", {"q": "netcdf"}, True),
+        ("q_description", {"q": "extracts"}, True),
+        ("q_no_match", {"q": "other,unknown"}, False),
+        ("q_literal", {"q": ".*"}, False),
+        ("version", {"version": "1.2.3"}, True),
+        ("version_no_match", {"version": "9.9.9"}, False),
+        ("combined_match", {"q": "subset", "title": "regional", "version": "1.2.3"}, True),
+        ("combined_no_match", {"q": "subset", "title": "other"}, False),
+    ])
+    @pytest.mark.oap_part1
+    def test_get_processes_filter_by_search_queries(self, _, query, match):
+        # type: (str, JSON, bool) -> None
         """
-        Tests that ``GET /processes`` filters by ``keywords``, ``title``, ``description``, ``q`` and ``version``.
+        Tests process discovery with literal text, keyword expressions and exact versions.
         """
         p_id = "test-process-search-queries"
-        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version="1.2.3")
-        data = {"title": "Regional Subset", "description": "Extracts a region", "keywords": ["climate", "netcdf"]}
-        resp = self.app.patch_json(f"/processes/{p_id}", params=data, headers=self.json_headers)
+        self.process_store.save_process(Process(
+            id=p_id, package={}, visibility=Visibility.PUBLIC, version="1.2.3",
+            title="Regional Subset", abstract="Extracts a region", keywords=["climate", "netcdf"],
+        ))
+        query.update({"links": "false"})
+        resp = self.app.get("/processes", params=query, headers=self.json_headers)
         assert resp.status_code == 200, resp.text
+        assert (p_id in [proc["id"] for proc in resp.json["processes"]]) is match
 
-        def get_ids(**query):
-            query["links"] = "false"
-            resp = self.app.get("/processes", params=query, headers=self.json_headers)
-            assert resp.status_code == 200, resp.text
-            return [proc["id"] for proc in resp.json["processes"]]
+    @parameterized.expand([
+        ("keywords", " "), ("keywords", ",climate"), ("keywords", "climate,"),
+        ("keywords", "climate||netcdf"), ("keywords", "climate| "),
+        ("q", ","), ("q", "other,,subset"), ("q", "subset, "),
+        ("q", " "), ("title", " "), ("description", " "), ("version", "invalid"),
+    ])
+    @pytest.mark.oap_part1
+    def test_get_processes_filter_by_search_invalid(self, field, value):
+        # type: (str, str) -> None
+        """
+        Tests that malformed search expressions are rejected rather than broadening the search.
+        """
+        resp = self.app.get("/processes", params={field: value}, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400, resp.text
+        assert resp.json["code"] == "ProcessInvalidParameter"
 
-        assert p_id in get_ids(keywords="climate,netcdf")
-        assert p_id in get_ids(keywords="CLIMATE,grib|netcdf")
-        assert p_id not in get_ids(keywords="climate,grib")
-        assert p_id in get_ids(title="regional")
-        assert p_id not in get_ids(title="other")
-        assert p_id in get_ids(description="a REGION")
-        assert p_id not in get_ids(description="other")
-        assert p_id in get_ids(q="other,subset")
-        assert p_id in get_ids(q="netcdf")
-        assert p_id in get_ids(q="extracts")
-        assert p_id not in get_ids(q="other,unknown")
-        assert p_id in get_ids(version="1.2.4")  # PATCH bumped version
-        assert p_id not in get_ids(version="1.2.3")
-        assert get_ids(q="subset", title="other") == []
+    @parameterized.expand(["keywords", "title", "description", "q", "version"])
+    @pytest.mark.oap_part1
+    def test_get_processes_filter_by_search_providers(self, field):
+        # type: (str) -> None
+        """
+        Tests that local search filters cannot silently return unfiltered remote provider processes.
+        """
+        value = "1.2.3" if field == "version" else "subset"
+        resp = self.app.get(
+            "/processes", params={field: value, "providers": "true"}, headers=self.json_headers, expect_errors=True,
+        )
+        assert resp.status_code == 400, resp.text
+        assert resp.json["error"] == "ListingInvalidParameter"
+
+    @parameterized.expand([True, False])
+    @pytest.mark.oap_part1
+    def test_get_processes_filter_by_search_paging(self, detail):
+        # type: (bool) -> None
+        """
+        Tests that searches combine with metadata and visibility filters before pagination and total calculation.
+        """
+        role = "https://schema.org/encodingFormat"
+        profile = "https://www.iana.org/assignments/media-types/text/plain"
+        for suffix, visibility, metadata in [
+            ("a", Visibility.PUBLIC, True), ("b", Visibility.PUBLIC, True),
+            ("private", Visibility.PRIVATE, True), ("no-metadata", Visibility.PUBLIC, False),
+        ]:
+            self.process_store.save_process(Process(
+                id=f"test-search-{suffix}", package={}, visibility=visibility, title="Search subset",
+                metadata=[{"role": role, "href": profile, "rel": sd.OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI}]
+                if metadata else [],
+            ))
+        resp = self.app.get("/processes", params={
+            "q": "search subset", f"metadata[process][{role}]": profile,
+            "limit": 1, "page": 0, "detail": detail, "sort": "id",
+        }, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json["total"] == 2
+        assert resp.json["count"] == 1
+        processes = resp.json["processes"]
+        assert (processes[0]["id"] if detail else processes[0]) == "test-search-a"
+        links = get_links(resp.json["links"])
+        next_response = self.app.get(links["next"], headers=self.json_headers)
+        assert next_response.status_code == 200, next_response.text
+        assert next_response.json["total"] == 2
+        processes = next_response.json["processes"]
+        assert (processes[0]["id"] if detail else processes[0]) == "test-search-b"
+
+    @parameterized.expand([
+        ("title", {"title": "test-search-fallback"}, {}, True),
+        ("description", {"description": "modern"}, {"description": "Modern description"}, True),
+        ("legacy_description", {"description": "legacy"}, {"abstract": "Legacy description"}, True),
+        ("description_precedence", {"description": "modern"},
+         {"abstract": "Legacy description", "description": "Modern description"}, False),
+        ("q_description_precedence", {"q": "modern"},
+         {"abstract": "Legacy description", "description": "Modern description"}, False),
+    ])
+    @pytest.mark.oap_part1
+    def test_get_processes_filter_by_search_fallback(self, _, query, fields, match):
+        # type: (str, JSON, JSON, bool) -> None
+        """
+        Tests that searches use the effective title and description of existing process documents.
+        """
+        p_id = "test-search-fallback"
+        self.process_store.save_process(Process(id=p_id, package={}, visibility=Visibility.PUBLIC))
+        self.process_store.collection.update_one(
+            {"identifier": p_id}, {"$unset": {"title": "", "abstract": "", "description": ""}},
+        )
+        if fields:
+            self.process_store.collection.update_one({"identifier": p_id}, {"$set": fields})
+        resp = self.app.get("/processes", params=query, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert (p_id in [proc["id"] for proc in resp.json["processes"]]) is match
+
+    @parameterized.expand([False, True])
+    @pytest.mark.oap_part1
+    def test_get_processes_filter_by_search_version_revisions(self, revisions):
+        # type: (bool) -> None
+        """
+        Tests that exact version searches respect latest-only and revision listing semantics.
+        """
+        p_id = "test-search-versions"
+        self.process_store.save_process(Process(
+            id=p_id, package={}, visibility=Visibility.PUBLIC, version="1.0.0",
+        ))
+        self.process_store.update_version(p_id, "1.0.0")
+        self.process_store.save_process(Process(
+            id=p_id, package={}, visibility=Visibility.PUBLIC, version="2.0.0",
+        ))
+        resp = self.app.get("/processes", params={
+            "process": p_id, "revisions": revisions, "version": "1.0.0", "detail": "false",
+        }, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json["processes"] == ([f"{p_id}:1.0.0"] if revisions else [])
+        assert resp.json["total"] == int(revisions)
 
     @pytest.mark.oap_part5
     def test_get_processes_filter_by_metadata_profile(self):

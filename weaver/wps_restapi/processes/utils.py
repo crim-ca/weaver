@@ -92,6 +92,12 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
         })
 
     search_param = sd.ProcessSearchQuery(unknown="ignore").deserialize(request.params)
+    if with_providers and search_param:
+        raise HTTPBadRequest(json={
+            "description": "Cannot combine process search parameters with providers full listing query.",
+            "error": "ListingInvalidParameter",
+            "value": list(search_param),
+        })
     search_param["query"] = search_param.pop("q", None)
     metadata_filters = parse_metadata_query_filters(request)
     store = get_db(request).get_store(StoreProcesses)
@@ -342,22 +348,26 @@ def get_process_list_links(request, paging, total, provider=None):
         max_page = max(math.ceil(total / per_page) - 1, 0)
         if cur_page < 0 or cur_page > max_page:
             raise IndexError(f"Page index {cur_page} is out of range from [0,{max_page}].")
+        paging_params = {
+            urllib.parse.quote(key, safe=""): urllib.parse.quote(value, safe="")
+            for key, value in kvp_params.items()
+        }
         links.extend([
-            {"href": get_path_kvp(proc_url, page=cur_page, **kvp_params), "rel": "current",
+            {"href": get_path_kvp(proc_url, page=cur_page, **paging_params), "rel": "current",
              "type": ContentType.APP_JSON, "title": "Current page of processes query listing."},
-            {"href": get_path_kvp(proc_url, page=0, **kvp_params), "rel": "first",
+            {"href": get_path_kvp(proc_url, page=0, **paging_params), "rel": "first",
              "type": ContentType.APP_JSON, "title": "First page of processes query listing."},
-            {"href": get_path_kvp(proc_url, page=max_page, **kvp_params), "rel": "last",
+            {"href": get_path_kvp(proc_url, page=max_page, **paging_params), "rel": "last",
              "type": ContentType.APP_JSON, "title": "Last page of processes query listing."},
         ])
         if cur_page > 0:
             links.append({
-                "href": get_path_kvp(proc_url, page=cur_page - 1, **kvp_params), "rel": "prev",
+                "href": get_path_kvp(proc_url, page=cur_page - 1, **paging_params), "rel": "prev",
                 "type": ContentType.APP_JSON, "title": "Previous page of processes query listing."
             })
         if cur_page < max_page:
             links.append({
-                "href": get_path_kvp(proc_url, page=cur_page + 1, **kvp_params), "rel": "next",
+                "href": get_path_kvp(proc_url, page=cur_page + 1, **paging_params), "rel": "next",
                 "type": ContentType.APP_JSON, "title": "Next page of processes query listing."
             })
     process = kvp_params.get("process")

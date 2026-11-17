@@ -523,6 +523,25 @@ Available processes can all be listed using |getcap-req|_ request. This request 
 process summaries. Other return formats and filters are also available according to provided request query parameters.
 Note that processes not marked with *public visibility* will not be listed in this result.
 
+.. _proc_listing_search:
+
+The ``GET /processes`` listing supports the following search parameters for locally registered processes:
+
+- ``keywords`` matches whole keywords, case-insensitively. Comma-separated groups are combined with AND.
+  Alternatives within each group can be separated by ``|`` (OR).
+  For example, ``keywords=climate,netcdf|grib`` requires ``climate`` and either ``netcdf`` or ``grib``.
+- ``title`` and ``description`` match literal substrings, case-insensitively.
+- ``q`` matches comma-separated literal terms against the title, description and keywords, case-insensitively.
+  At least one term must match at least one of these fields.
+- ``version`` matches an exact semantic version. By default, only the latest revision of each process is searched.
+  Use ``revisions=true`` to include older revisions, optionally with ``process={processID}``.
+
+Different search parameters are combined with AND. They can be used with metadata filters, sorting, pagination and
+``detail=false``. Filtering occurs before pagination, and ``total`` counts all matching public processes.
+Terms are not regular expressions. Empty terms are invalid.
+These searches cannot be combined with ``providers=true``, since remote provider listings cannot apply the filters.
+Keyword negation, the ``query`` expression language, and version ranges are not implemented.
+
 For more specific process details, the |describe-req|_ request should be used. This will return all information
 that define the process references and expected inputs/outputs.
 

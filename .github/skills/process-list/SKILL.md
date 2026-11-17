@@ -45,6 +45,25 @@ weaver capabilities -u $WEAVER_URL -P my-provider
 weaver capabilities -u $WEAVER_URL --detail
 ```
 
+## API Search
+
+`GET /processes` supports these additional parameters for locally registered public processes:
+
+- **keywords** (string): Whole-keyword, case-insensitive matches. Use `,` for AND and `|` for OR within a group.
+- **title**, **description** (string): Case-insensitive literal substring searches.
+- **q** (string): Comma-separated literal terms (OR) searched across title, description and keywords.
+- **version** (string): Exact semantic version. Add **revisions=true** to search older revisions.
+
+Different filters combine with AND and apply before pagination. They cannot be combined with `providers=true`.
+Empty terms are invalid. Keyword negation, `query` expressions and version ranges are not supported.
+
+```bash
+curl --get "${WEAVER_URL}/processes" \
+  --data-urlencode "keywords=climate,netcdf|grib" \
+  --data-urlencode "q=regional subset" \
+  --data-urlencode "limit=10"
+```
+
 ## Python Usage
 
 ```python

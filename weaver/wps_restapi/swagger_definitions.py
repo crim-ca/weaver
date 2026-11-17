@@ -8532,26 +8532,37 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
 
 class ProcessSearchQuery(ExtendedMappingSchema):
     keywords = ExtendedSchemaNode(
-        String(), missing=drop, example="climate,netcdf|grib", description=(
+        String(), missing=drop, example="climate,netcdf|grib",
+        validator=Regex(r"^[^,|]*[^\s,|][^,|]*(?:[,|][^,|]*[^\s,|][^,|]*)*$"),
+        description=(
             "Filter processes by 'keywords'. Comma-separated terms must all be matched (AND). "
-            "Alternatives within a term can be provided using the pipe character (OR)."
+            "Alternatives within a term can be provided using the pipe character (OR). "
+            "Matches whole keywords (case-insensitive). Applicable only to locally registered processes."
         )
     )
     title_search = ExtendedSchemaNode(
-        String(), name="title", missing=drop, example="Subset",
-        description="Filter processes with a 'title' containing the text (case-insensitive)."
+        String(), name="title", missing=drop, example="Subset", validator=Regex(r"(?s)^.*\S.*$"),
+        description="Filter locally registered processes with a 'title' containing literal text (case-insensitive)."
     )
     description_search = ExtendedSchemaNode(
-        String(), name="description", missing=drop, example="Extracts a region",
-        description="Filter processes with a 'description' containing the text (case-insensitive)."
-    )
-    q = ExtendedSchemaNode(
-        String(), missing=drop, example="subset,netcdf", description=(
-            "Free-text search. Comma-separated terms (OR) are looked up (case-insensitive) "
-            "in the process 'title', 'description' and 'keywords'."
+        String(), name="description", missing=drop, example="Extracts a region", validator=Regex(r"(?s)^.*\S.*$"),
+        description=(
+            "Filter locally registered processes with a 'description' containing literal text (case-insensitive)."
         )
     )
-    version = Version(missing=drop, example="1.2.3", description="Filter processes matching this exact version.")
+    q = ExtendedSchemaNode(
+        String(), missing=drop, example="subset,netcdf",
+        validator=Regex(r"^[^,]*[^\s,][^,]*(?:,[^,]*[^\s,][^,]*)*$"),
+        description=(
+            "Free-text search. Comma-separated terms (OR) are looked up (case-insensitive) "
+            "in the process 'title', 'description' and 'keywords'. Terms are literal text, not regular expressions. "
+            "Applicable only to locally registered processes."
+        )
+    )
+    version = Version(missing=drop, example="1.2.3", description=(
+        "Filter locally registered processes matching this exact version. "
+        "Use 'revisions=true' to include older revisions. Version ranges are not supported."
+    ))
 
 
 class GetProcessesQuery(

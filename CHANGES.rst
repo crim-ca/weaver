@@ -17,7 +17,7 @@ Changes:
 - Add ``title`` and ``description`` query parameters on ``GET /processes`` for case-insensitive text search
   (partially resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
 - Add ``q`` query parameter on ``GET /processes`` for comma-separated free-text search over ``title``,
-  ``description`` and ``keywords`` (resolves `#644 <https://github.com/crim-ca/weaver/issues/644>`_).
+  ``description`` and ``keywords`` (partially resolves `#644 <https://github.com/crim-ca/weaver/issues/644>`_).
 - Add ``version`` query parameter on ``GET /processes`` to filter processes by exact version
   (partially resolves `#627 <https://github.com/crim-ca/weaver/issues/627>`_).
 
