@@ -12,14 +12,18 @@ Changes
 
 Changes:
 --------
-- Add ``keywords`` query parameter on ``GET /processes`` to filter by keywords, using ``,`` for AND and ``|`` for OR
+- Add ``keywords`` query parameter on ``GET /processes`` with ``,`` for AND, ``|`` for OR and ``!``/``~`` for NOT
   (partially resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
 - Add ``title`` and ``description`` query parameters on ``GET /processes`` for case-insensitive text search
   (partially resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
-- Add ``q`` query parameter on ``GET /processes`` for comma-separated free-text search over ``title``,
-  ``description`` and ``keywords`` (partially resolves `#644 <https://github.com/crim-ca/weaver/issues/644>`_).
-- Add ``version`` query parameter on ``GET /processes`` to filter processes by exact version
-  (partially resolves `#627 <https://github.com/crim-ca/weaver/issues/627>`_).
+- Add ``q`` text search and ``query`` expressions with ``+`` (AND), ``-`` (NOT) and ``,`` (OR) over process titles,
+  descriptions and keywords (partially resolves `#644 <https://github.com/crim-ca/weaver/issues/644>`_).
+- Add exact and inclusive ``lower/upper`` version range filtering on ``GET /processes``
+  (resolves `#627 <https://github.com/crim-ca/weaver/issues/627>`_).
+- Add ``sortby`` signed multi-field sorting and ``sort``/``order`` support on ``GET /processes``
+  (resolves `#643 <https://github.com/crim-ca/weaver/issues/643>`_).
+- Add ``/processes/queryables`` and ``/jobs/queryables`` descriptions generated from supported listing parameters,
+  with discovery links (partially resolves `#646 <https://github.com/crim-ca/weaver/issues/646>`_).
 
 Fixes:
 ------

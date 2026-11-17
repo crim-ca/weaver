@@ -84,9 +84,12 @@ from weaver.utils import (
     make_link_header,
     null,
     parse_content_id,
+    parse_keyword_query,
     parse_kvp,
     parse_link_header,
     parse_number_with_unit,
+    parse_search_query,
+    parse_version_range,
     pass_http_error,
     request_extra,
     resolve_s3_from_http,
@@ -2191,6 +2194,53 @@ def test_validate_s3_parameters(combo):
     else:
         if not valid:
             pytest.fail(f"Not raised expected exception for [{combo}]. (ValueError)")
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("climate+netcdf-grib,subset", [[("climate", False), ("netcdf", False), ("grib", True)], [("subset", False)]]),
+    ('"regional subset" -"out of date"', [[("regional subset", False), ("out of date", True)]]),
+    ('"net-cdf" + "a+b" -"x,y"', [[("net-cdf", False), ("a+b", False), ("x,y", True)]]),
+])
+def test_parse_search_query(value, expected):
+    # type: (str, List[List[Tuple[str, bool]]]) -> None
+    """
+    Tests text query grouping, negation and quoted literal operators.
+    """
+    assert parse_search_query(value) == expected
+
+
+@pytest.mark.parametrize("value", ["", ",", "x,,y", "+-", "x+", "x-", 'x "unfinished'])
+def test_parse_search_query_invalid(value):
+    # type: (str) -> None
+    """
+    Tests that incomplete expressions cannot silently alter search semantics.
+    """
+    with pytest.raises(ValueError):
+        parse_search_query(value)
+
+
+def test_parse_keyword_query():
+    # type: () -> None
+    """
+    Tests keyword AND groups with OR alternatives and either negation prefix.
+    """
+    assert parse_keyword_query(" climate , !grib|~netcdf ") == [
+        [("climate", False)], [("grib", True), ("netcdf", True)],
+    ]
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("1.2", ((1, 2, 0), (1, 2, 0))),
+    ("1.2.3/1.10.0", ((1, 2, 3), (1, 10, 0))),
+    ("../1.0", (None, (1, 0, 0))),
+    ("1/..", ((1, 0, 0), None)),
+])
+def test_parse_version_range(value, expected):
+    # type: (str, Tuple[Optional[Tuple[int, int, int]], Optional[Tuple[int, int, int]]]) -> None
+    """
+    Tests numeric interval bounds and normalization of abbreviated versions.
+    """
+    assert parse_version_range(value) == expected
 
 
 def test_get_path_kvp():

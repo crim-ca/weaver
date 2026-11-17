@@ -50,17 +50,24 @@ weaver capabilities -u $WEAVER_URL --detail
 `GET /processes` supports these additional parameters for locally registered public processes:
 
 - **keywords** (string): Whole-keyword, case-insensitive matches. Use `,` for AND and `|` for OR within a group.
+  Prefix a keyword with `!` or `~` for NOT.
 - **title**, **description** (string): Case-insensitive literal substring searches.
 - **q** (string): Comma-separated literal terms (OR) searched across title, description and keywords.
-- **version** (string): Exact semantic version. Add **revisions=true** to search older revisions.
+- **query** (string): OR groups separated by `,`, with `+`/whitespace for AND and `-` for NOT within a group.
+  Double quotes preserve phrases and literal operators.
+- **version** (string): Exact version or inclusive `lower/upper` interval. Use `..` for an open bound.
+  Add **revisions=true** to search older revisions.
+- **sortby** (string): Signed, comma-separated sorting fields, such as `+id,-version`.
+- **order** (string): `ASC` or `DESC` applied to **sort**. Cannot be combined with **sortby**.
 
 Different filters combine with AND and apply before pagination. They cannot be combined with `providers=true`.
-Empty terms are invalid. Keyword negation, `query` expressions and version ranges are not supported.
+Empty terms are invalid. URL-encode values, particularly `+` as `%2B`.
+`GET /processes/queryables` describes the supported listing parameters as JSON Schema.
 
 ```bash
 curl --get "${WEAVER_URL}/processes" \
   --data-urlencode "keywords=climate,netcdf|grib" \
-  --data-urlencode "q=regional subset" \
+  --data-urlencode "query=+climate+netcdf-grib,subset" \
   --data-urlencode "limit=10"
 ```
 

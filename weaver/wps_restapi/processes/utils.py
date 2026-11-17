@@ -92,13 +92,18 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
         })
 
     search_param = sd.ProcessSearchQuery(unknown="ignore").deserialize(request.params)
+    if "sortby" in search_param and any(param in request.params for param in ["sort", "order"]):
+        raise HTTPBadRequest(json={
+            "description": "Cannot combine 'sortby' with 'sort' or 'order'.",
+            "error": "ListingInvalidParameter",
+            "value": list(search_param),
+        })
     if with_providers and search_param:
         raise HTTPBadRequest(json={
             "description": "Cannot combine process search parameters with providers full listing query.",
             "error": "ListingInvalidParameter",
             "value": list(search_param),
         })
-    search_param["query"] = search_param.pop("q", None)
     metadata_filters = parse_metadata_query_filters(request)
     store = get_db(request).get_store(StoreProcesses)
     processes, total_local_processes = store.list_processes(

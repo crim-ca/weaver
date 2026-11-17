@@ -52,7 +52,10 @@ from weaver.utils import (
     get_sane_name,
     get_weaver_url,
     islambda,
-    now
+    now,
+    parse_keyword_query,
+    parse_search_query,
+    parse_version_range
 )
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
@@ -556,8 +559,11 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                        keywords=None,       # type: Optional[str]
                        title=None,          # type: Optional[str]
                        description=None,    # type: Optional[str]
+                       q=None,              # type: Optional[str]
                        query=None,          # type: Optional[str]
                        version=None,        # type: Optional[str]
+                       sortby=None,         # type: Optional[str]
+                       order=None,          # type: Optional[str]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         """
         Lists all processes in database, optionally filtered by `visibility`.
@@ -584,9 +590,12 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             Alternatives for a given keyword can be provided with ``|`` (OR).
         :param title: Case-insensitive text that must be contained in the process title.
         :param description: Case-insensitive text that must be contained in the process description.
-        :param query:
+        :param q:
             Comma-separated free-text terms (OR), each looked up in the process title, description or keywords.
-        :param version: Exact process version to match.
+        :param query: Text expression with comma-separated OR groups, AND (``+``) and NOT (``-``).
+        :param version: Exact process version or inclusive ``lower/upper`` range with ``..`` for open bounds.
+        :param sortby: Comma-separated fields prefixed with ``+`` (ascending) or ``-`` (descending).
+        :param order: Explicit ``ASC`` or ``DESC`` direction applied to ``sort``.
         :returns:
             List of sorted, and possibly page-filtered, processes matching queries.
             If ``total`` was requested, return a tuple of this list and the number of processes.
@@ -666,7 +675,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                     metadata_conditions.append({scope: {"$elemMatch": {"metadata": {"$elemMatch": elem_match}}}})
             search_filters["$and"] = metadata_conditions
 
-        search_conditions = self._apply_search_filter(keywords, title, description, query, version)
+        search_conditions = self._apply_search_filter(keywords, title, description, q, query, version)
         if search_conditions:
             search_filters.setdefault("$and", []).extend(search_conditions)
 
@@ -692,7 +701,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                 # is a revision that *should* have the 'version' value provided for the previous version to be created.
             ]
             sort_fields = {"identifier": pymongo.ASCENDING, "version": pymongo.ASCENDING}
-        sort_method = [{"$sort": sort_fields}]
+        sort_method = [{"$sort": self._apply_process_order(sort_fields, sortby, order)}]
 
         search_pipeline = insert_fields + [{"$match": search_filters}] + resolve_filter + sort_method
         paging_pipeline = self._apply_paging_pipeline(page, limit)
@@ -709,10 +718,33 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             return items, total
         return [Process(item) for item in found]
 
+    @classmethod
+    def _apply_process_order(cls, sort_fields, sortby, order):
+        # type: (MongodbAggregateSortOrder, Optional[str], Optional[str]) -> MongodbAggregateSortOrder
+        """
+        Applies explicit sorting directions without changing the existing default ordering.
+        """
+        if sortby:
+            ordered_fields = {}
+            for term in sortby.split(","):
+                field = term.lstrip("+-")
+                field = {Sort.ID: Sort.ID_LONG, Sort.PROCESS: Sort.ID_LONG, Sort.CREATED: "_id"}.get(field, field)
+                direction = pymongo.DESCENDING if term.startswith("-") else pymongo.ASCENDING
+                validated = cls._apply_sort_method(field, Sort.ID_LONG, list(SortMethods.PROCESS) + ["_id"])
+                ordered_fields.update({key: direction for key in validated})
+            return ordered_fields
+        if order:
+            if order.upper() not in ["ASC", "DESC"]:
+                raise ListingInvalidParameter(json={"description": "Invalid sorting order.", "value": order})
+            direction = pymongo.ASCENDING if order.upper() == "ASC" else pymongo.DESCENDING
+            return {key: direction for key in sort_fields}
+        return sort_fields
+
     @staticmethod
     def _apply_search_filter(keywords,      # type: Optional[str]
                              title,         # type: Optional[str]
                              description,   # type: Optional[str]
+                             q,             # type: Optional[str]
                              query,         # type: Optional[str]
                              version,       # type: Optional[str]
                              ):             # type: (...) -> List[MongodbAggregateExpression]
@@ -721,21 +753,60 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         """
         conditions = []  # type: List[MongodbAggregateExpression]
         if keywords:
-            for term in keywords.split(","):
-                alternatives = [{"keywords": {"$regex": f"^{re.escape(alt.strip())}$", "$options": "i"}}
-                                for alt in term.split("|")]
+            for group in parse_keyword_query(keywords):
+                alternatives = []
+                for term, negative in group:
+                    condition = {"keywords": {"$regex": f"^{re.escape(term)}$", "$options": "i"}}
+                    alternatives.append({"$nor": [condition]} if negative else condition)
                 conditions.append({"$or": alternatives})
         for field, text in [("title", title), ("description", description)]:
             if text:
                 conditions.append(MongodbProcessStore._apply_text_filter(field, text))
-        if query:
+        if q:
             conditions.append({"$or": [
                 MongodbProcessStore._apply_text_filter(field, term)
-                for term in query.split(",") for field in ["title", "description", "keywords"]
+                for term in q.split(",") for field in ["title", "description", "keywords"]
             ]})
+        if query:
+            conditions.append(MongodbProcessStore._apply_query_filter(query))
         if version:
-            conditions.append({"version": as_version_major_minor_patch(version, VersionFormat.STRING)})
+            conditions.append(MongodbProcessStore._apply_version_filter(version))
         return conditions
+
+    @staticmethod
+    def _apply_query_filter(query):
+        # type: (str) -> MongodbAggregateExpression
+        """
+        Applies OR groups of AND and NOT text terms within the existing listing filter.
+        """
+        alternatives = []
+        for group in parse_search_query(query):
+            terms = []
+            for text, negative in group:
+                condition = {"$or": [
+                    MongodbProcessStore._apply_text_filter(field, text)
+                    for field in ["title", "description", "keywords"]
+                ]}
+                terms.append({"$nor": [condition]} if negative else condition)
+            alternatives.append({"$and": terms})
+        return {"$or": alternatives}
+
+    @staticmethod
+    def _apply_version_filter(version):
+        # type: (str) -> MongodbAggregateExpression
+        """
+        Matches semantic version intervals numerically rather than comparing version strings alphabetically.
+        """
+        lower, upper = parse_version_range(version)
+        if lower == upper:
+            return {"version": as_version_major_minor_patch(lower, VersionFormat.STRING)}
+        version_parts = {"$map": {"input": {"$split": ["$version", "."]}, "in": {"$toInt": "$$this"}}}
+        conditions = []
+        for bound, operator in [(lower, "$gte"), (upper, "$lte")]:
+            if bound is not None:
+                conditions.append({operator: [version_parts, list(bound)]})
+        numeric_version = {"$regexMatch": {"input": {"$ifNull": ["$version", ""]}, "regex": r"^\d+\.\d+\.\d+$"}}
+        return {"$expr": {"$cond": [numeric_version, {"$and": conditions}, False]}}
 
     @staticmethod
     def _apply_text_filter(field, text):

@@ -13,13 +13,32 @@ from pyramid.httpexceptions import HTTPBadRequest, HTTPSuccessful, status_map
 from weaver import __meta__
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.colander_extras import OAS3TypeConversionDispatcher
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional
 
-    from weaver.typedefs import AnyCallableWrapped, AnySettingsContainer, HeadersType, Params, Return, SettingsType
+    from weaver.typedefs import (
+        AnyCallableWrapped,
+        AnySettingsContainer,
+        HeadersType,
+        JSON,
+        Params,
+        Return,
+        SettingsType
+    )
 
 LOGGER = logging.getLogger(__name__)
+
+
+def get_queryables_schema(schema, schema_id):
+    # type: (colander.SchemaNode, str) -> JSON
+    """
+    Describes supported collection parameters using the same schema that validates listing requests.
+    """
+    queryables = OAS3TypeConversionDispatcher()(schema)
+    queryables["$id"] = schema_id
+    return queryables
 
 
 class HTTPHeadFileResponse(HTTPSuccessful):

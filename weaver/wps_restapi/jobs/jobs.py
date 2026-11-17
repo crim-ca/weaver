@@ -63,6 +63,7 @@ from weaver.wps_restapi.jobs.utils import (
 )
 from weaver.wps_restapi.providers.utils import get_service
 from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
+from weaver.wps_restapi.utils import get_queryables_schema
 
 if TYPE_CHECKING:
     from typing import Iterable, List
@@ -72,6 +73,20 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnyResponseType, AnyViewResponse, JSON, PyramidRequest
 
 LOGGER = get_task_logger(__name__)
+
+
+@sd.jobs_queryables_service.get(
+    tags=[sd.TAG_JOBS],
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas={"200": sd.QueryablesResponseSchema()},
+)
+def get_job_queryables(request):
+    # type: (PyramidRequest) -> JSON
+    """
+    Describes supported job discovery parameters.
+    """
+    return get_queryables_schema(sd.GetJobsQueries(), request.path_url)
 
 
 @sd.provider_jobs_service.get(
@@ -1090,6 +1105,7 @@ def includeme(config):
     # type: (Configurator) -> None
     LOGGER.info("Adding WPS REST API jobs views...")
     config.add_cornice_service(sd.jobs_service)
+    config.add_cornice_service(sd.jobs_queryables_service)
     config.add_cornice_service(sd.job_service)
     config.add_cornice_service(sd.job_results_service)
     config.add_cornice_service(sd.job_result_value_service)

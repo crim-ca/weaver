@@ -13,6 +13,7 @@ from datetime import date
 from typing import TYPE_CHECKING, cast
 
 import colander
+import jsonschema
 import mock
 import pytest
 from dateutil import parser as date_parser
@@ -312,6 +313,23 @@ class WpsRestApiJobsTest(JobUtils):
         assert total == response.json["total"]
 
     @pytest.mark.oap_part1
+    @pytest.mark.oap_part4
+    def test_get_jobs_queryables(self):
+        # type: () -> None
+        """
+        Tests that job queryables advertise actual supported filters without a duplicate hand-maintained schema.
+        """
+        resp = self.app.get("/jobs/queryables", headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        jsonschema.Draft7Validator.check_schema(resp.json)
+        assert set(resp.json["properties"]) == {child.name for child in sd.GetJobsQueries().children}
+        landing = self.app.get("/", headers=self.json_headers)
+        assert any(
+            link["rel"] == "http://www.opengis.net/def/rel/ogc/1.0/queryables"
+            and link["href"].endswith("/jobs/queryables")
+            for link in landing.json["links"]
+        )
+
     def test_get_jobs_normal_paged(self):
         resp = self.app.get(sd.jobs_service.path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)

@@ -10,6 +10,7 @@ import logging
 import os
 import posixpath
 import re
+import shlex
 import shutil
 import sys
 import tempfile
@@ -1840,6 +1841,82 @@ def islambda(func):
 
 first_cap_re = re.compile(r"(.)([A-Z][a-z]+)")
 all_cap_re = re.compile(r"([a-z0-9])([A-Z])")
+
+
+def parse_keyword_query(value):
+    # type: (str) -> List[List[Tuple[str, bool]]]
+    """
+    Parses AND groups of OR keywords with optional ``!`` or ``~`` negation.
+    """
+    groups = []
+    for group in value.split(","):
+        terms = []
+        for term in group.split("|"):
+            term = term.strip()
+            negative = term.startswith(("!", "~"))
+            term = term[1:].strip() if negative else term
+            if not term or term.startswith(("!", "~")):
+                raise ValueError("A keyword or negated keyword is required for every alternative.")
+            terms.append((term, negative))
+        groups.append(terms)
+    return groups
+
+
+def parse_search_query(value):
+    # type: (str) -> List[List[Tuple[str, bool]]]
+    """
+    Parses comma-separated OR groups of AND terms with optional ``+`` and ``-`` prefixes.
+
+    Quoted phrases are preserved. Each term is returned with its negation flag.
+    """
+    lexer = shlex.shlex(value, posix=True, punctuation_chars="+-,")
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    groups = [[]]  # type: List[List[Tuple[str, bool]]]
+    negative = pending = False
+    for token in lexer:
+        if token == ",":
+            if pending or not groups[-1]:
+                raise ValueError("Empty OR group in search query.")
+            groups.append([])
+        elif token in ["+", "-"]:
+            if pending:
+                raise ValueError("Consecutive operators in search query.")
+            negative, pending = token == "-", True
+        elif not token.strip() or all(char in "+-," for char in token):
+            raise ValueError("Invalid search query term.")
+        else:
+            groups[-1].append((token, negative))
+            negative = pending = False
+    if pending or not groups[-1]:
+        raise ValueError("Missing search query term.")
+    return groups
+
+
+def parse_version_range(value):
+    # type: (str) -> Tuple[Optional[Tuple[int, int, int]], Optional[Tuple[int, int, int]]]
+    """
+    Parses an exact version or an inclusive ``lower/upper`` range with optional ``..`` open bounds.
+    """
+    bounds = value.split("/")
+    if len(bounds) not in [1, 2]:
+        raise ValueError("Expected an exact version or a lower/upper version interval.")
+    versions = []
+    for bound in bounds:
+        if bound == ".." and len(bounds) == 2:
+            versions.append(None)
+        elif re.fullmatch(r"\d+(?:\.\d+){0,2}", bound):
+            versions.append(as_version_major_minor_patch(bound))
+        else:
+            raise ValueError("Version interval bounds must be numeric semantic versions or '..'.")
+    if not any(version is not None for version in versions):
+        raise ValueError("At least one version bound is required.")
+    if len(versions) == 1:
+        return versions[0], versions[0]
+    lower, upper = versions[0], versions[1]
+    if lower is not None and upper is not None and lower > upper:
+        raise ValueError("The lower version bound exceeds the upper bound.")
+    return lower, upper
 
 
 def get_path_kvp(path, sep=",", **params):
