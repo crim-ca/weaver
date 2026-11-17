@@ -589,7 +589,6 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         expect = list(zip(revisions, versions))
         assert result == expect
 
-    @pytest.mark.oap_part5
     def test_process_links_with_semver_suffix(self):
         """
         Tests process links and revision listing for a version with a semantic suffix.
@@ -4228,7 +4227,6 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ("0.1.3.dev10", "0.1.3.dev2", 422),
         ("0.1.3", "0.1.3.dev1", 422),
     ])
-    @pytest.mark.oap_part5
     def test_update_process_prerelease_revision(self, old_version, new_version, status_code):
         """
         Tests prerelease update ordering and conflicts through the local process API.
