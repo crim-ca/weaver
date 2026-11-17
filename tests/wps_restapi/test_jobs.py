@@ -397,6 +397,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert "width: 100%;" in css_resp.text
         assert "table-layout: fixed;" in css_resp.text
         assert "overflow-wrap: anywhere;" in css_resp.text
+        assert ".table-jobs progress {\n    max-width: 100%;\n}" in css_resp.text
 
     @pytest.mark.html
     def test_get_jobs_groups_html_unsupported(self):
