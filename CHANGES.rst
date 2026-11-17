@@ -16,7 +16,8 @@ Changes:
 
 Fixes:
 ------
-- No change.
+- Fix HTML job listing tables overflowing the available page width when zoomed
+  (`#1121 <https://github.com/crim-ca/weaver/issues/1121>`_).
 
 .. _changes_6.18.0:
 
