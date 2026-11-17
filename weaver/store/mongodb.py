@@ -704,7 +704,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         sane_name = get_sane_name(process_id, **self.sane_name_config)
         search = {"identifier": sane_name}
         if version:
-            version = Version(version).as_format(VersionFormat.STRING)
+            version = Version(version).as_format(VersionFormat.STRING)  # make sure it is padded
             sane_tag = f"{sane_name}:{version}"
             search = {"$or": [{"identifier": sane_tag}, {"identifier": sane_name, "version": version}]}
         return search, version

@@ -1028,7 +1028,7 @@ class Version(PackageVersion):
     def __init__(self, version=None):
         # type: (Optional[AnyVersion]) -> None
         if version is None:
-            version = "0.0.0"
+            version = "0.0.0"  # default for backward compatibility with unversioned processes
         elif isinstance(version, (list, tuple)):
             version = ".".join(str(int(part)) for part in version) or "0.0.0"
         super().__init__(str(version))
@@ -1076,23 +1076,57 @@ class Version(PackageVersion):
     def is_update(self, taken_versions, version_level=VersionLevel.PATCH):
         # type: (Iterable[AnyVersion], VersionLevel) -> bool
         """
-        Determines whether this version is an available update at the requested semantic level.
+        Determines if this version is an available update at the specified level compared to existing versions.
 
-        Major updates must exceed all existing major numbers. Minor updates must exceed all minor numbers
-        within an existing major branch. Patch updates must exceed every version within an existing
-        major/minor branch, including suffix ordering. Thus ``1.2.3.dev2`` can update ``1.2.3.dev1`` at patch
-        level, but not at minor or major level. Unrelated newer branches do not prevent updating older branches.
+        If this version corresponds to an older version compared to available ones (i.e.: a taken more recent
+        version also exists), this version will have to fit within the version level range to be considered valid.
+        For example, requesting ``PATCH`` level will require that this version is greater than the last available
+        version against other existing versions with equivalent ``MAJOR.MINOR`` parts. If ``1.2.0`` and ``2.0.0`` were
+        taken versions, and ``1.2.3`` has to be verified as the update version, it will be considered valid since its
+        ``PATCH`` number ``3`` is greater than all other ``1.2.x`` versions
+        (it falls within the ``[1.2.x, 1.3.x[`` range).
+        Requesting instead ``MINOR`` level will require that this version is greater than the last available
+        version against existing versions of same ``MAJOR`` part only. Using again the same example values, ``1.3.0``
+        would be valid since its ``MINOR`` part ``3`` is greater than any other ``1.x`` taken versions.
+        On the other hand, version ``1.2.4`` would not be valid as ``x = 2`` is already taken by other versions
+        considering the same ``1.x`` portion. The ``PATCH`` part is ignored since ``MINOR`` is requested.
+        The ``2.0.0`` revision is ignored because its ``MAJOR`` portion differs from ``1`` of this version.
+        Finally, requesting a ``MAJOR`` level will require
+        necessarily that this version is greater than all other existing versions and increments the ``MAJOR`` part.
+        Since ``MAJOR`` is the highest possible semantic part, higher parts are not available to define an upper bound.
+
+        .. note::
+            As long as the version level is respected, the actual number of this level and all following ones can be
+            anything as long as they are not taken. For example, ``PATCH`` with existing ``1.2.3`` does not require that
+            the update version be ``1.2.4``. It can be ``1.2.5``, ``1.2.24``, etc. as long as ``1.2.x`` is respected.
+            Similarly, ``MINOR`` update can provide any ``PATCH`` number, since ``1.x`` only must be respected. From
+            existing ``1.2.3``, ``MINOR`` update could specify ``1.4.99`` as valid version. The ``PATCH`` part does not
+            need to start back at ``0``.
+
+        Suffix-only changes are also ``PATCH`` revisions. For example, ``1.2.3.dev2`` can update ``1.2.3.dev1``
+        at ``PATCH`` level, but not at ``MINOR`` or ``MAJOR`` level. Full version ordering still applies within
+        the ``MAJOR.MINOR`` branch. Thus ``1.2.3.dev2`` is unavailable if ``1.2.3.dev10`` or ``1.2.3`` already exists.
+
+        :param taken_versions: Existing versions that cannot be reused.
+        :param version_level: Minimum level to consider availability of versions as valid revision number for update.
+        :return: Status of availability of this version.
         """
         if version_level not in VersionLevel.values():
             raise NotImplementedError(f"Unknown version level: {version_level!s}")
         versions = [Version(version) for version in taken_versions]
         if not versions:
             return True
+        # Handle MAJOR separately since it can only be the most recent version.
+        # No higher semantic part is available to define an upper version bound.
         if version_level == VersionLevel.MAJOR:
             return self.major > max(version.major for version in versions)
+        # A higher existing version at the same semantic level prevents an update.
+        # Unrelated major branches must not prevent minor or patch updates to older branches.
         versions = [version for version in versions if version.major == self.major]
         if version_level == VersionLevel.MINOR:
             return bool(versions) and self.minor > max(version.minor for version in versions)
+        # The revision must be above the previous one at the same level and below the upper semantic level.
+        # For PATCH from 1.3.4, the upper bound is 1.4.0. An existing major/minor branch is required.
         versions = [version for version in versions if version.minor == self.minor]
         return bool(versions) and self > max(versions)
 

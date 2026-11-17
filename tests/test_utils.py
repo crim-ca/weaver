@@ -252,12 +252,12 @@ def test_version_invalid(version):
     ("1.2.3", VersionLevel.PATCH, False),
     ("1.3.0", VersionLevel.PATCH, False),
     ("1.3.1", VersionLevel.PATCH, False),
-    ("1.4.5", VersionLevel.PATCH, False),
+    ("1.4.5", VersionLevel.PATCH, False),  # no 1.4.x to update from
     ("0.1.0", VersionLevel.MINOR, False),
     ("0.1.4", VersionLevel.MINOR, False),
     ("1.2.5", VersionLevel.MINOR, False),
     ("1.3.2", VersionLevel.MINOR, False),
-    ("2.0.0", VersionLevel.MINOR, False),
+    ("2.0.0", VersionLevel.MINOR, False),  # no 2.x to update from
     ("2.1.3", VersionLevel.MINOR, False),
     ("0.1.0", VersionLevel.MAJOR, False),
     ("0.1.4", VersionLevel.MAJOR, False),
@@ -290,7 +290,7 @@ def test_version_is_update(version, level, expected, version_format):
         "1.2.4",
         "1.3.1",
     ]
-    random.shuffle(versions)
+    random.shuffle(versions)  # method must not depend on input order
     versions = [Version(value).as_format(version_format) for value in versions]
     version = Version(version).as_format(version_format)
     assert Version(version).is_update(iter(versions), level) is expected
