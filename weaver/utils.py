@@ -1874,19 +1874,19 @@ def parse_search_query(value):
     lexer.commenters = ""
     groups = [[]]  # type: List[List[Tuple[str, bool]]]
     negative = pending = False
-    for token in lexer:
-        if token == ",":
+    for lexeme in lexer:
+        if lexeme == ",":
             if pending or not groups[-1]:
                 raise ValueError("Empty OR group in search query.")
             groups.append([])
-        elif token in ["+", "-"]:
+        elif lexeme in ["+", "-"]:
             if pending:
                 raise ValueError("Consecutive operators in search query.")
-            negative, pending = token == "-", True
-        elif not token.strip() or all(char in "+-," for char in token):
+            negative, pending = lexeme == "-", True
+        elif not lexeme.strip() or all(char in "+-," for char in lexeme):
             raise ValueError("Invalid search query term.")
         else:
-            groups[-1].append((token, negative))
+            groups[-1].append((lexeme, negative))
             negative = pending = False
     if pending or not groups[-1]:
         raise ValueError("Missing search query term.")
