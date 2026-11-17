@@ -39,6 +39,9 @@ List jobs with filtering, pagination, and sorting capabilities.
 
 ## CLI Usage
 
+`GET /jobs/queryables` describes the supported API listing parameters as JSON Schema.
+It is linked from the landing page using `http://www.opengis.net/def/rel/ogc/1.0/queryables`.
+
 ```bash
 # List all jobs
 weaver jobs -u $WEAVER_URL

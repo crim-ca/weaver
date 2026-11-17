@@ -42,6 +42,7 @@ from weaver.wps_restapi.processes.utils import (
 )
 from weaver.wps_restapi.providers.providers import describe_provider_process
 from weaver.wps_restapi.providers.utils import get_provider_id, get_provider_services
+from weaver.wps_restapi.utils import get_queryables_schema
 
 if TYPE_CHECKING:
     from pyramid.config import Configurator
@@ -49,6 +50,20 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnyViewResponse, JSON, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
+
+
+@sd.processes_queryables_service.get(
+    tags=[sd.TAG_PROCESSES],
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas={"200": sd.QueryablesResponseSchema()},
+)
+def get_process_queryables(request):
+    # type: (PyramidRequest) -> JSON
+    """
+    Describes supported process discovery parameters.
+    """
+    return get_queryables_schema(sd.GetProcessesQuery(), request.path_url)
 
 
 @sd.processes_service.options(tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES, sd.TAG_DEPLOY])
@@ -590,6 +605,7 @@ def includeme(config):
     # type: (Configurator) -> None
     LOGGER.info("Adding WPS REST API processes views...")
     config.add_cornice_service(sd.processes_service)
+    config.add_cornice_service(sd.processes_queryables_service)
     config.add_cornice_service(sd.process_service)
     config.add_cornice_service(sd.process_package_service)
     config.add_cornice_service(sd.process_payload_service)

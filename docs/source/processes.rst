@@ -523,6 +523,39 @@ Available processes can all be listed using |getcap-req|_ request. This request 
 process summaries. Other return formats and filters are also available according to provided request query parameters.
 Note that processes not marked with *public visibility* will not be listed in this result.
 
+.. _proc_listing_search:
+
+The ``GET /processes`` listing supports the following search parameters for locally registered processes:
+
+- ``keywords`` matches whole keywords, case-insensitively. Comma-separated groups are combined with AND.
+  Alternatives within each group can be separated by ``|`` (OR).
+  For example, ``keywords=climate,netcdf|grib`` requires ``climate`` and either ``netcdf`` or ``grib``.
+  Prefix an individual keyword with ``!`` or ``~`` to negate it. ``keywords=climate,!grib`` excludes ``grib``.
+- ``title`` and ``description`` match literal substrings, case-insensitively.
+- ``q`` matches comma-separated literal terms against the title, description and keywords, case-insensitively.
+  At least one term must match at least one of these fields.
+- ``query`` searches the same fields with comma-separated OR groups. Within a group, ``+`` or whitespace combines
+  terms with AND and ``-`` negates the following term. For example, ``query=+climate+netcdf-grib,subset`` matches
+  either ``climate`` AND ``netcdf`` AND NOT ``grib``, or ``subset``. Double quotes preserve phrases and literal
+  operators within a term, such as ``query="regional subset" -"out of date"``.
+- ``version`` matches an exact numeric semantic version or an inclusive ``lower/upper`` version interval.
+  For example, ``version=1.2.0/1.10.0`` compares numeric version components, not alphabetical strings.
+  Either bound can be open using ``..``, such as ``version=1.0.0/..``.
+  By default, only the latest revision of each process is searched.
+  Use ``revisions=true`` to include older revisions, optionally with ``process={processID}``.
+- ``sortby`` specifies comma-separated sorting fields, with ``+`` for ascending (default) or ``-`` for descending.
+  For example, ``sortby=+id,-version``. Alternatively, use ``sort=id&order=DESC`` to set an explicit direction.
+  Do not combine ``sortby`` with ``sort`` or ``order``.
+
+Different search parameters are combined with AND. They can be used with metadata filters, sorting, pagination and
+``detail=false``. Filtering occurs before pagination, and ``total`` counts all matching public processes.
+Terms are not regular expressions. Empty terms are invalid.
+These searches cannot be combined with ``providers=true``, since remote provider listings cannot apply the filters.
+URL-encode search values, in particular ``+`` as ``%2B``, to avoid interpreting it as a space in a query string.
+The ``/processes/queryables`` and ``/jobs/queryables`` endpoints describe the parameters supported by each listing
+as JSON Schema. Both are discoverable from the landing page using the
+``http://www.opengis.net/def/rel/ogc/1.0/queryables`` link relation.
+
 For more specific process details, the |describe-req|_ request should be used. This will return all information
 that define the process references and expected inputs/outputs.
 

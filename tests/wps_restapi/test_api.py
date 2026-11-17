@@ -42,8 +42,8 @@ class GenericApiRoutesTestCase(WpsConfigBase):
         except colander.Invalid as ex:
             body = json.dumps(body, indent=2, ensure_ascii=False)
             self.fail(f"expected valid response format as defined in schema [{ex!s}] in\n{body}")
-        refs = [link["rel"] for link in body["links"]]
-        assert len(body["links"]) == len(set(refs)), "Link relationships must all be unique"
+        refs = [(link["rel"], link["href"]) for link in body["links"]]
+        assert len(body["links"]) == len(set(refs)), "Links for the same relationship and target must be unique"
 
         # override media-type with alternative representations for specific rel links
         expect_ctype = {

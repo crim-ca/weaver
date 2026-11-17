@@ -120,7 +120,15 @@ from weaver.provenance import ProvenanceFormat
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
-from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, json_hashable, load_file, repr_json
+from weaver.utils import (
+    AWS_S3_BUCKET_REFERENCE_PATTERN,
+    json_hashable,
+    load_file,
+    parse_keyword_query,
+    parse_search_query,
+    parse_version_range,
+    repr_json
+)
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,
@@ -439,6 +447,7 @@ bills_service = Service(name="bills", path="/bills")
 bill_service = Service(name="bill", path=f"{bills_service.path}/{{bill_id}}")
 
 jobs_service = Service(name="jobs", path="/jobs")
+jobs_queryables_service = Service(name="jobs_queryables", path=f"{jobs_service.path}/queryables")
 job_service = Service(name="job", path=f"{jobs_service.path}/{{job_id}}")
 job_results_service = Service(name="job_results", path=f"{job_service.path}/results")
 job_result_value_service = Service(name="job_result_value", path=f"{job_results_service.path}/{{output_id}}")
@@ -464,6 +473,7 @@ job_prov_run_id_service = Service(name="job_prov_run_id", path=f"{job_prov_servi
 job_prov_runs_service = Service(name="job_prov_runs", path=f"{job_prov_service.path}/runs")
 
 processes_service = Service(name="processes", path="/processes")
+processes_queryables_service = Service(name="processes_queryables", path=f"{processes_service.path}/queryables")
 process_service = Service(name="process", path=f"{processes_service.path}/{{process_id}}")
 process_quotes_service = Service(name="process_quotes", path=process_service.path + quotes_service.path)
 process_quote_service = Service(name="process_quote", path=process_service.path + quote_service.path)
@@ -2525,6 +2535,12 @@ class ProcessSortEnum(ExtendedSchemaNode):
     default = Sort.ID
     example = Sort.CREATED
     validator = OneOf(SortMethods.PROCESS)
+
+
+class ProcessSortByEnum(ExtendedSchemaNode):
+    schema_type = String
+    fields_pattern = "|".join(sorted(SortMethods.PROCESS))
+    validator = Regex(rf"^[+-]?(?:{fields_pattern})(?:,[+-]?(?:{fields_pattern}))*$")
 
 
 class QuoteSortEnum(ExtendedSchemaNode):
@@ -8530,7 +8546,94 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     body = ProviderProcessesSchema()
 
 
-class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuery, ProcessRevisionsQuery):
+class QueryablesResponseSchema(ExtendedMappingSchema):
+    description = "Supported collection query parameters."
+    body = PermissiveMappingSchema(description="JSON Schema describing supported collection query parameters.")
+
+
+class ProcessSearchExpression(ExtendedSchemaNode):
+    schema_type = String
+    parser = staticmethod(parse_search_query)
+
+    def deserialize(self, cstruct=null):
+        # type: (Any) -> Any
+        if cstruct == "":
+            raise colander.Invalid(self, "An empty search expression is not allowed.", value=cstruct)
+        value = super().deserialize(cstruct)
+        if value is not drop and value is not null:
+            try:
+                self.parser(value)
+            except ValueError as exc:
+                raise colander.Invalid(self, str(exc), value=value) from exc
+        return value
+
+
+class ProcessKeywordExpression(ProcessSearchExpression):
+    parser = staticmethod(parse_keyword_query)
+
+
+class ProcessVersionExpression(ProcessSearchExpression):
+    parser = staticmethod(parse_version_range)
+
+
+class ProcessSearchQuery(ExtendedMappingSchema):
+    sortby = ProcessSortByEnum(
+        missing=drop, example="+id,-version",
+        description=(
+            "Comma-separated sorting fields, with '+' for ascending (default) or '-' for descending. "
+            "Cannot be combined with 'sort' or 'order'. URL-encode '+' as '%2B'."
+        ),
+    )
+    order = ExtendedSchemaNode(
+        String(), missing=drop, example="DESC", validator=OneOfCaseInsensitive(["ASC", "DESC"]),
+        description="Direction applied to 'sort'. Defaults to the existing direction when omitted.",
+    )
+    keywords = ProcessKeywordExpression(
+        missing=drop, example="climate,netcdf|grib",
+        description=(
+            "Filter processes by 'keywords'. Comma-separated terms must all be matched (AND). "
+            "Alternatives within a term can be provided using the pipe character (OR). "
+            "Prefix a keyword with '!' or '~' to exclude it. "
+            "Matches whole keywords (case-insensitive). Applicable only to locally registered processes."
+        )
+    )
+    title_search = ExtendedSchemaNode(
+        String(allow_empty=True), name="title", missing=drop, example="Subset",
+        validator=Regex(r"^[\s\S]*\S[\s\S]*$"),
+        description="Filter locally registered processes with a 'title' containing literal text (case-insensitive)."
+    )
+    description_search = ExtendedSchemaNode(
+        String(allow_empty=True), name="description", missing=drop, example="Extracts a region",
+        validator=Regex(r"^[\s\S]*\S[\s\S]*$"),
+        description=(
+            "Filter locally registered processes with a 'description' containing literal text (case-insensitive)."
+        )
+    )
+    q = ExtendedSchemaNode(
+        String(allow_empty=True), missing=drop, example="subset,netcdf",
+        validator=Regex(r"^[^,]*[^\s,][^,]*(?:,[^,]*[^\s,][^,]*)*$"),
+        description=(
+            "Free-text search. Comma-separated terms (OR) are looked up (case-insensitive) "
+            "in the process 'title', 'description' and 'keywords'. Terms are literal text, not regular expressions. "
+            "Applicable only to locally registered processes."
+        )
+    )
+    query = ProcessSearchExpression(missing=drop, example="+climate+netcdf-grib,subset", description=(
+        "Text search across title, description and keywords. Commas separate OR groups. "
+        "Within a group, '+' (or whitespace) combines terms with AND and '-' negates the following term. "
+        "Double quotes preserve phrases and literal punctuation. URL-encode '+' as '%2B'. "
+        "Applicable only to locally registered processes."
+    ))
+    version = ProcessVersionExpression(missing=drop, example="1.2.3", description=(
+        "Filter locally registered processes by version or inclusive 'lower/upper' version range. "
+        "Use '..' for an open bound, such as '1.0.0/..'. "
+        "Use 'revisions=true' to include older revisions."
+    ))
+
+
+class GetProcessesQuery(
+    ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuery, ProcessRevisionsQuery, ProcessSearchQuery
+):
     metadata = ExtendedSchemaNode(
         colander.String(), missing=drop, default=None, name="metadata[process|inputs|outputs][<role>]",
         example="metadata[inputs][https://www.opengis.net/def/profile]=urn:ogc:def:profile:OGC::text-plain",

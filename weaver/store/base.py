@@ -121,6 +121,14 @@ class StoreProcesses(StoreInterface):
                        process=None,        # type: Optional[str]
                        identifiers=None,    # type: Optional[List[str]]
                        metadata=None,       # type: Optional[List[Tuple[MetadataQueryScope, str, str]]]
+                       keywords=None,       # type: Optional[str]
+                       title=None,          # type: Optional[str]
+                       description=None,    # type: Optional[str]
+                       q=None,              # type: Optional[str]
+                       query=None,          # type: Optional[str]
+                       version=None,        # type: Optional[str]
+                       sortby=None,         # type: Optional[str]
+                       order=None,          # type: Optional[str]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         raise NotImplementedError
 
