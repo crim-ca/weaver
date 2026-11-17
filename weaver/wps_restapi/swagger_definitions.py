@@ -8547,6 +8547,7 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
 
 
 class QueryablesResponseSchema(ExtendedMappingSchema):
+    description = "Supported collection query parameters."
     body = PermissiveMappingSchema(description="JSON Schema describing supported collection query parameters.")
 
 

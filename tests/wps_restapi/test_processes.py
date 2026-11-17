@@ -330,6 +330,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         jsonschema.Draft7Validator.check_schema(resp.json)
         assert set(resp.json["properties"]) == {child.name for child in sd.GetProcessesQuery().children}
         assert {"keywords", "q", "query", "version", "sortby", "order"}.issubset(resp.json["properties"])
+        specification = self.app.get("/json", headers=self.json_headers)
+        assert specification.status_code == 200, specification.text
+        assert "/processes/queryables" in specification.json["paths"]
+        assert "/jobs/queryables" in specification.json["paths"]
         landing = self.app.get("/", headers=self.json_headers)
         assert any(
             link["rel"] == "http://www.opengis.net/def/rel/ogc/1.0/queryables"
