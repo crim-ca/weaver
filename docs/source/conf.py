@@ -20,6 +20,7 @@
 import logging
 import os
 import re
+import shutil
 import sys
 
 # for OpenAPI generation
@@ -95,7 +96,12 @@ for _dir in [DOC_SRC_ROOT, DOC_PRJ_ROOT]:
 # note:
 #   setting 'weaver.build_docs' allows to ignore part of code that cause problem or require unnecessary
 #   configuration for the purpose of parsing the source to generate the OpenAPI
-config = Configurator(settings={"weaver.wps": True, "weaver.wps_restapi": True, "weaver.build_docs": True})
+config = Configurator(settings={
+    "weaver.configuration": "HYBRID",
+    "weaver.wps": True,
+    "weaver.wps_restapi": True,
+    "weaver.build_docs": True,
+})
 config.include("weaver")  # need to include package to apply decorators and parse routes
 config.commit()
 api_spec_file = os.path.join(DOC_BLD_ROOT, "api.json")
@@ -103,7 +109,7 @@ api_spec_json = get_openapi_json(
     http_host="example",
     http_scheme="https",
     use_docstring_summary=True,
-    use_refs=False,
+    use_refs=True,
     container=config,
 )
 if not os.path.isdir(DOC_BLD_ROOT):
@@ -544,4 +550,19 @@ def filter_warnings_missing_reference(app, domain, node) -> bool:
 
 
 def setup(app):
+    app.connect("doctree-read", set_api_spec_url)
+    app.connect("build-finished", copy_api_spec)
     app.connect("warn-missing-reference", filter_warnings_missing_reference)
+
+
+def set_api_spec_url(app, doctree):
+    if app.env.docname != "api":
+        return
+    for spec in app.env.metadata[app.env.docname].get("swagger_plugin", []):
+        spec["url_path"] = "api.json"
+
+
+def copy_api_spec(app, exception):
+    if exception or app.builder.name != "html":
+        return
+    shutil.copyfile(api_spec_file, os.path.join(app.builder.outdir, "api.json"))
