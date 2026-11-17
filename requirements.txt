@@ -39,9 +39,9 @@ cryptography>=50.0.2
 # https://github.com/common-workflow-language/cwltool/pull/2207 adds rootless EUID/EGID support in upstream cwltool.
 # cwltool>=3.1.20260315121657 is the first upstream release that includes it.
 cwltool>=3.1.20260315121657
-# Add suport for prov 3.3.0
-cwltool @ git+https://github.com/crim-ca/cwltool.git@3013918b557bcf1066f654a4a85d999ba9aa58a9
-# cwlprov-py fork with updated prov version (needed for the command-line tool)
+# https://github.com/common-workflow-language/cwltool/pull/2349 updates to prov 3.3.0 (needed for PROV-JSONLD)
+cwltool @ git+https://github.com/crim-ca/cwltool.git@5df46d45badb8eb6d3c30b29f4016bf2afdd4029
+# cwlprov-py fork with prov 3.3.0 (needed for the command-line tool)
 cwlprov @ git+https://github.com/crim-ca/cwlprov-py.git@d5d329782078271a809d3616511a56119e8c608e
 cwl-utils>=0.47
 # Pin prov to 3.3.0 to avoid any unexpected incompatibilities
