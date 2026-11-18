@@ -172,8 +172,13 @@ process/wps2:
 process/wps3:
   - changed-files:
     - any-glob-to-any-file:
-      - 'weaver/wps_restapi/**/*'
       - 'tests/processes/test_wps3_process.py'
+
+process/ogcapi:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'weaver/processes/ogc_api_process.py'
+      - 'weaver/wps_restapi/**/*'
       - 'tests/wps_restapi/**/*'
 
 process/esgf-cwt:

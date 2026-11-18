@@ -19,6 +19,7 @@ import yaml
 from webtest import TestRequest as WebTestRequest  # avoid pytest collect warning
 
 from tests.utils import MockedResponse, run_command
+from weaver import WEAVER_ROOT_DIR
 from weaver.cli import (
     BasicAuthHandler,
     BearerAuthHandler,
@@ -956,7 +957,57 @@ def test_parse_inputs_missing_files_handling(missing_files, ignore_errors, expec
                 "in-1": {"value": "data"},
                 "in-2": {"href": "https://fake.domain.com/some-file.json", "type": ContentType.APP_JSON},
             }
-        )
+        ),
+        (
+            # OGC execution body with other fields and structures without 'value/href' (bbox, nested objects)
+            {
+                "inputs": {
+                    "bbox": {"bbox": [1, 2, 3, 4], "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"},
+                    "obj": {"value": {"a": 1}},
+                    "arr": [1, 2, 3],
+                    "objs": [{"value": {"type": "Point", "coordinates": [1, 2]}, "mediaType": ContentType.APP_GEOJSON}],
+                },
+                "outputs": {"out": {}},
+                "response": "document",
+            },
+            {
+                "bbox": {"bbox": [1, 2, 3, 4], "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"},
+                "obj": {"value": {"a": 1}},
+                "arr": [1, 2, 3],
+                "objs": [{"value": {"type": "Point", "coordinates": [1, 2]}, "mediaType": ContentType.APP_GEOJSON}],
+            }
+        ),
+        (
+            # CWL job mapping nested within 'inputs' container
+            {"inputs": {"file": {"class": "File", "path": "https://fake.domain.com/f.txt"}, "lit": "x"}},
+            {"file": {"href": "https://fake.domain.com/f.txt"}, "lit": {"value": "x"}},
+        ),
+        (
+            # CWL job mapping with array of files
+            {"files": [{"class": "File", "path": "https://fake.domain.com/f.txt"}]},
+            {"files": [{"href": "https://fake.domain.com/f.txt"}]},
+        ),
+        (
+            # CWL job with directory array and nested array of files
+            {
+                "dirs": [{"class": "Directory", "path": "https://fake.domain.com/d/"}],
+                "mixed": [1, 2],
+            },
+            {
+                "dirs": [{"href": "https://fake.domain.com/d/", "type": ContentType.APP_DIR}],
+                "mixed": [{"value": 1}, {"value": 2}],
+            },
+        ),
+        (
+            # OGC data containing a 'class' field within 'value' must not be considered CWL
+            {"inputs": {"data": {"value": {"class": "File", "path": "not-cwl"}}}},
+            {"data": {"value": {"class": "File", "path": "not-cwl"}}},
+        ),
+        (
+            # CWL input literally named 'inputs'
+            {"inputs": {"class": "File", "path": "https://fake.domain.com/f.txt"}},
+            {"inputs": {"href": "https://fake.domain.com/f.txt"}},
+        ),
     ]
 )
 def test_parse_inputs(data_inputs, expect_inputs):
@@ -1537,3 +1588,36 @@ def test_parse_cwl_items(cwl_items, expected_count, expected_classes):
     assert all(item.get("cwlVersion") == "v1.2" for item in result)
     for i, expected_class in enumerate(expected_classes):
         assert result[i]["class"] == expected_class
+
+
+@pytest.mark.cli
+@pytest.mark.parametrize("body_only_inputs", [False, True])
+def test_parse_inputs_ogc_execute_body_example(body_only_inputs):
+    """
+    Validate that a complete :term:`OGC API - Processes` execution body is not mistaken for :term:`CWL` job inputs.
+
+    .. seealso::
+        https://github.com/crim-ca/weaver/issues/1048
+    """
+    example = os.path.join(WEAVER_ROOT_DIR, "weaver/wps_restapi/examples/local_process_execute.json")
+    with open(example, mode="r", encoding="utf-8") as io_file:
+        body = json.load(io_file)
+    expect_inputs = body["inputs"]
+    if body_only_inputs:
+        body = expect_inputs  # mapping of inputs directly without the 'inputs' container
+
+    captured = []
+    mock_result = OperationResult(False, code=500)
+
+    def parsed_inputs(_inputs, *_, **__):
+        captured.append(_inputs)
+        return mock_result
+
+    with mock.patch("weaver.cli.WeaverClient._upload_files", side_effect=parsed_inputs):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as input_json:
+            json.dump(body, input_json)
+            input_json.flush()
+            result = WeaverClient().execute("fake_process", inputs=input_json.name, url="https://fake.domain.com")
+    assert result is mock_result, result.message
+    assert len(captured) == 1
+    assert captured[0] == expect_inputs

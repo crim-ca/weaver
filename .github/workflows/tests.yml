@@ -43,8 +43,10 @@ jobs:
       # override make command to install directly in active python
       CONDA_CMD: ""
       DOCKER_TEST_EXEC_ARGS: "-T"
+      # SVG profile output is optional and not needed for CI checks.
+      TEST_PROFILE_SVG: "false"
       # globally excluded 'checks', to be re-executed by dedicated job
-      CHECKS_EXCLUDE: "links"
+      CHECKS_EXCLUDE: "links check-security-secrets"
     services:
       # Label used to access the service container
       mongodb:
@@ -54,56 +56,55 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
         allow-failure: [false]
         test-server: [false]
         test-case: [test-unit-only, test-func-only]
         include:
           # experimental python
-          # not yet ready due to pywps->fiona dependency missing (https://github.com/Toblerity/Fiona/issues/1504)
-          #- os: ubuntu-latest
-          #  python-version: "3.14"
-          #  allow-failure: true
-          #  test-case: test-unit-only
-          #- os: ubuntu-latest
-          #  python-version: "3.14"
-          #  allow-failure: true
-          #  test-case: test-func-only
+          - os: ubuntu-latest
+            python-version: "3.15"
+            allow-failure: true
+            test-case: test-unit-only
+          - os: ubuntu-latest
+            python-version: "3.15"
+            allow-failure: true
+            test-case: test-func-only
           # linter tests
           # performs all 'check' targets except the 'CHECKS_EXCLUDE' ones (that should be defined by dedicated jobs)
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: false
             test-case: check-only
           # check links separately as they tend to sporadically fail from external factors (timeout, ssl, down, etc.)
           # avoid wasting a lot of CI test time because one of them doesn't respond
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: true
             test-case: check-links-only
           # documentation build
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: false
             test-case: docs
           # coverage test
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: false
             test-case: test-coverage-only
           # smoke test of Docker image
           - os: ubuntu-latest
-            python-version: "3.12"  # doesn't matter which one (defined in docker), use only to report matching version
+            python-version: "3.13"  # doesn't matter which one (defined in docker), use only to report matching version
             allow-failure: false
             test-case: test-docker
           # EMS end-2-end Workflow tests
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: false
             test-case: test-workflow-only
           # OGC Code-Sprint tests
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: false
             test-case: test-code-sprint-only
             test-server: true
@@ -129,7 +130,7 @@ jobs:
       - name: Setup Python
         # skip python setup if running with docker or if test should be skipped
         if: ${{ steps.should_skip_test.outputs.skip != 'true' && matrix.test-case != 'test-docker' }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v6.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v6.0.0
         with:
           python-version: "${{ matrix.python-version }}"
           cache: 'pip'
@@ -173,6 +174,9 @@ jobs:
       - name: Start Test Instance
         if: ${{ steps.should_skip_test.outputs.skip != 'true' && matrix.test-server == true }}
         run: |
+          make setup-ini
+          # OpenAPI generation (GET /json) on a cold worker can exceed the default gunicorn 10s timeout on CI runners
+          sed -i -E "s/^timeout = [0-9]+$/timeout = 60/" config/weaver.ini
           make stop start-only
           sleep 10
       - name: Run Tests
@@ -264,7 +268,7 @@ jobs:
             echo "::set-output name=TAG_VERSION::${GITHUB_REF##*/}"
           fi
       - name: Login to DockerHub
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550  # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

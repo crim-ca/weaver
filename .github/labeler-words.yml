@@ -56,8 +56,12 @@ process/wps3:
   - 'WPS3'
   - 'WPS-REST'
   - 'rest bindings'
+
+process/ogcapi:
   - 'OGC API - Processes'
   - 'OGC-API-Processes'
+  - 'OGC API Processes'
+  - 'ProcessDescription'
 
 process/esgf-cwt:
   - 'ESGF'

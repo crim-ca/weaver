@@ -42,6 +42,10 @@ service to run :ref:`app_pkg_docker` per respective :term:`Process`.
     - `Example Configuration Files <https://github.com/crim-ca/weaver/tree/master/config>`_
     - `Example Docker-Compose YAML <https://github.com/crim-ca/weaver/blob/master/docker/docker-compose.yml.example>`_
 
+.. warning::
+    - When using ``docker-compose``, you must customize the INI file to modify ``mongodb.host`` and ``BROKER_URL`` to
+      point to the MongoDB container instead of ``localhost``.  See the comments in `weaver.ini.example`_.
+
 .. _installation-python:
 
 Python Installation

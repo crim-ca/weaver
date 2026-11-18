@@ -4,6 +4,7 @@ import os.path
 import shutil
 import tarfile
 import tempfile
+import zipfile
 from typing import List
 
 import xmltodict
@@ -18,7 +19,7 @@ from PIL import Image
 from pyramid.httpexceptions import HTTPUnprocessableEntity
 from pyramid.response import FileResponse
 
-from weaver.formats import OutputFormat, get_extension
+from weaver.formats import ContentType, OutputFormat, get_extension, is_zarr_media_type
 from weaver.transform.png2svg import rgba_image_to_svg_contiguous
 from weaver.transform.tiff import Tiff
 from weaver.transform.utils import get_content, is_gif, is_image, is_png, is_svg, is_tiff, write_content
@@ -393,6 +394,25 @@ def csv_to_yaml(i: str, out: str) -> None:
     json_to_yaml(f"{i}.json", out)
 
 
+@exception_handler
+def zarr_to_zip(i: str, out: str) -> None:
+    """
+    Archives a Zarr directory store into a zipped Zarr with the store contents at the archive root.
+
+    :param i: Path to the input Zarr directory.
+    :param out: Path to the output zip file.
+    """
+    root = i.rstrip("/")
+    if not os.path.isdir(root):
+        raise RuntimeError(f"Zarr location is not a directory: [{root}]")
+    # stored (uncompressed) as chunks are already compressed and random access should remain efficient
+    with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_STORED) as zip_file:
+        for dir_path, _, file_names in os.walk(root):
+            for file_name in sorted(file_names):
+                file_path = os.path.join(dir_path, file_name)
+                zip_file.write(file_path, os.path.relpath(file_path, root))
+
+
 class Transform:
     """
     Class for handling the transformation of files between different media types (e.g., text, image, application).
@@ -431,8 +451,12 @@ class Transform:
         self.ext = get_extension(self.wmt)
 
         if self.cmt != self.wmt:
-            base_path, _ = os.path.splitext(self.file_path)
-            self.output_path = base_path + self.ext
+            if is_zarr_media_type(self.cmt) and self.wmt == ContentType.APP_ZARR_ZIP:
+                # keep the full name, since Zarr directories are not required to end with '.zarr'
+                self.output_path = f"{self.file_path.rstrip('/')}.zip"
+            else:
+                base_path, _ = os.path.splitext(self.file_path.rstrip("/"))  # directory has trailing slash
+                self.output_path = base_path + self.ext
             if os.path.exists(self.output_path):
                 try:
                     os.remove(self.output_path)
@@ -500,6 +524,19 @@ class Transform:
             self.process_yaml()
         if "xml" in self.cmt:
             self.process_xml()
+        if is_zarr_media_type(self.cmt):
+            self.process_zarr()
+
+    def process_zarr(self) -> None:
+        """
+        Handles the conversion of a Zarr directory store to a zipped Zarr.
+
+        :raises RuntimeError: If a conversion type is unsupported.
+        """
+        if self.wmt == ContentType.APP_ZARR_ZIP:
+            zarr_to_zip(self.file_path, self.output_path)
+        else:
+            raise RuntimeError(f"Conversion from Zarr to {self.wmt} is not supported.")
 
     def process_json(self) -> None:
         """

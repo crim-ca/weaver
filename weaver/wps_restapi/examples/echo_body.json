@@ -1,0 +1,137 @@
+{
+  "inputs": {
+    "stringInput": "Value2",
+    "dateInput": "2026-10-08T21:15:05.071416",
+    "doubleInput": 3.1416,
+    "arrayInput": [
+      1,
+      2,
+      3
+    ],
+    "complexObjectInput": {
+      "value": {
+        "property1": "abc",
+        "property2": "https://example.com",
+        "property3": 1.234,
+        "property5": true
+      }
+    },
+    "geometryInput": [
+      {
+        "value": {
+          "type": "Point",
+          "coordinates": [
+            1,
+            2
+          ]
+        },
+        "mediaType": "application/geo+json"
+      },
+      {
+        "value": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                1,
+                2
+              ],
+              [
+                3,
+                4
+              ],
+              [
+                5,
+                6
+              ],
+              [
+                7,
+                8
+              ],
+              [
+                9,
+                1
+              ],
+              [
+                1,
+                2
+              ]
+            ]
+          ]
+        },
+        "mediaType": "application/json"
+      }
+    ],
+    "measureInput": {
+      "value": {
+        "measurement": 9.81,
+        "uom": "m/s²"
+      }
+    },
+    "boundingBoxInput": {
+      "bbox": [
+        51.9,
+        7.0,
+        52.0,
+        7.1
+      ],
+      "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+    },
+    "imagesInput": [
+      {
+        "value": "cmFuZG9tLXRpZmY=",
+        "mediaType": "image/tiff; application=geotiff",
+        "encoding": "base64"
+      }
+    ],
+    "featureCollectionInput": {
+      "mediaType": "application/geo+json",
+      "value": {
+        "$schema": "https://geojson.org/schema/FeatureCollection.json",
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "properties": {
+              "name": "test"
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                1.2,
+                3.4,
+                5.6
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "outputs": {
+    "geometryOutput": {
+      "format": {
+        "mediaType": "application/json"
+      }
+    },
+    "imagesOutput": {
+      "format": {
+        "mediaType": "image/tiff; application=geotiff",
+        "encoding": "base64"
+      }
+    },
+    "featureCollectionOutput": {
+      "format": {
+        "mediaType": "application/geo+json",
+        "schema": "https://geojson.org/schema/FeatureCollection.json"
+      }
+    },
+    "stringOutput": {},
+    "arrayOutput": {},
+    "doubleOutput": {},
+    "boundingBoxOutput": {},
+    "dateOutput": {},
+    "complexObjectOutput": {},
+    "measureOutput": {}
+  }
+}

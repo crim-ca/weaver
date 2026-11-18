@@ -257,6 +257,12 @@ OGC_API_PROC_PART4_EXC_UNSUPPORTED_SCHEMA_URI = f"{OGC_API_PROC_PART4_EXC_BASE_U
 OGC_API_PROC_PART5_EXC_BASE_URI = "https://www.opengis.net/def/exceptions/ogcapi-processes-5/1.0"
 OGC_API_PROC_PART5_EXC_PROV_MISSING_URI = f"{OGC_API_PROC_PART5_EXC_BASE_URI}/prov-missing"
 OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI = f"{OGC_API_PROC_PART5_EXC_BASE_URI}/prov-unsupported-format"
+OGC_API_PROC_PART5_EXC_INVALID_METADATA_PROFILE_URI = f"{OGC_API_PROC_PART5_EXC_BASE_URI}/invalid-metadata-profile"
+OGC_API_PROC_PART5_EXC_UNSUPPORTED_METADATA_PROFILE_URI = (
+    f"{OGC_API_PROC_PART5_EXC_BASE_URI}/unsupported-metadata-profile"
+)
+OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI = "https://www.opengis.net/def/profile"
+OGC_API_PROC_PART5_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"
 
 OGC_API_PROC_REL_BASE_URI = "https://www.opengis.net/def/rel/ogc/1.0"
 OGC_API_PROC_REL_EXCEPTIONS_URI = f"{OGC_API_PROC_REL_BASE_URI}/exceptions"
@@ -974,6 +980,9 @@ class PreferHeader(ExtendedSchemaNode):
         "Parameter 'return' indicates the structure and contents how results should be returned. "
         "Parameter 'wait' and 'respond-async' indicate the execution mode of the process job. "
         "Parameter 'profile' can indicate an alternate results representation than the resolved one by the context. "
+        "Parameter 'handling' set to 'lenient' (default) or 'strict' indicates whether literal (non-percent-encoded) "
+        "brackets are accepted in the `metadata` query parameter of the process listing endpoint "
+        "(see `/per/metadata-profiles/query-literal-brackets`). "
         f"For more details, see {DOC_URL}/processes.html#execution-mode and {DOC_URL}/processes.html#execution-results."
     )
     name = "Prefer"
@@ -1643,6 +1652,14 @@ class ProcessDeployMeta(ExtendedMappingSchema):
 
 
 class InputOutputDescriptionMeta(ExtendedMappingSchema):
+    # NOTE:
+    #   'keywords'/'metadata' must be declared explicitly (not inherited) so that they are not silently dropped
+    #   by validation (eg: when parsing a submitted deploy/update payload, or when generating a describe response
+    #   for a process previously updated with per-I/O 'metadata' such as 'role'/'profile' references).
+    #   No 'default' is set, so that unnecessary empty lists are not injected where nothing was provided.
+    keywords = KeywordList(missing=drop, description="Keywords applied to the input/output.")
+    metadata = MetadataList(missing=drop, description="External references relevant to the input/output.")
+
     # remove unnecessary empty lists by default if nothing is provided for inputs/outputs
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
@@ -5306,6 +5323,10 @@ class Execute(AllOfKeywordSchema):
     # OGC 'execute.yaml' does not enforce any required item
     description = "Process execution parameters."
     examples = {
+        "ExecuteEchoProcess": {
+            "summary": "Execution body of the sample ``EchoProcess`` with all OGC API input value representations.",
+            "value": EXAMPLES["local_process_execute.json"],
+        },
         "ExecuteJSON": {
             "summary": "Execute a process job using REST JSON payload with OGC API schema.",
             "value": EXAMPLES["job_execute.json"],
@@ -8510,6 +8531,19 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
 
 
 class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuery, ProcessRevisionsQuery):
+    metadata = ExtendedSchemaNode(
+        colander.String(), missing=drop, default=None, name="metadata[process|inputs|outputs][<role>]",
+        example="metadata[inputs][https://www.opengis.net/def/profile]=urn:ogc:def:profile:OGC::text-plain",
+        description=(
+            "Filters processes by a `role`/`profile` reference that must be matched by an entry of their "
+            "`metadata` field (*OGC API - Processes - Part 5: Provenance and Profiles*, "
+            f"`{OGC_API_PROC_PART5_BASE_URI}/conf/metadata-profiles`). "
+            "The dynamic parameter name must be formatted as `metadata[<scope>][<role>]=<profile>`, where "
+            "`<scope>` is one of `process`, `inputs` or `outputs`, and `<role>`/`<profile>` are IRIs, URNs "
+            "or Safe CURIEs. Multiple `<profile>` for a same `<role>` can be provided using comma-separated "
+            "values, or using repeated query parameters, and must all be matched (logical AND)."
+        )
+    )
     providers = ExtendedSchemaNode(
         QueryBoolean(), example=True, default=False, missing=drop,
         description="List local processes as well as all sub-processes of all registered providers. "
@@ -8525,7 +8559,12 @@ class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuer
     )
 
 
+class GetProcessesRequestHeaders(RequestHeadersNoBody):
+    prefer = PreferHeader(missing=drop)
+
+
 class GetProcessesEndpoint(ExtendedMappingSchema):
+    header = GetProcessesRequestHeaders()
     querystring = GetProcessesQuery()
 
 
@@ -9165,6 +9204,7 @@ get_processes_responses = {
     "400": BadRequestResponseSchema(description="Error in case of invalid listing query parameters."),
     "405": MethodNotAllowedErrorResponseSchema(),
     "406": NotAcceptableErrorResponseSchema(),
+    "422": UnprocessableEntityResponseSchema(description="Unresolvable metadata-profiles CURIE query filter."),
     "500": InternalServerErrorResponseSchema(),
 }
 post_processes_responses = {

@@ -1121,6 +1121,29 @@ def test_fetch_directory_host_html():
         )
 
 
+def test_fetch_directory_zarr_v2_names_preserved():
+    """
+    Zarr v2 metadata dot-files and extensionless chunks must keep their exact names for the store to remain readable.
+    """
+    with contextlib.ExitStack() as stack:
+        tmp_host = "https://mocked-file-server.com"
+        tmp_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        stack.enter_context(mocked_file_server(tmp_dir, tmp_host, settings={}, mock_browse_index=True))
+        test_zarr_files = [
+            "store.zarr/.zgroup",
+            "store.zarr/.zattrs",
+            "store.zarr/.zmetadata",
+            "store.zarr/var/.zarray",
+            "store.zarr/var/0.0",
+            "store.zarr/var/1",
+        ]
+        setup_test_file_hierarchy(test_zarr_files, tmp_dir)
+        out_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        out_files = fetch_directory(f"{tmp_host}/store.zarr/", out_dir)
+        expect_files = [os.path.join(out_dir, file) for file in test_zarr_files]
+        assert list(out_files) == sorted(expect_files)
+
+
 def test_fetch_directory_json():
     with contextlib.ExitStack() as stack:
         tmp_host = "https://mocked-file-server.com"

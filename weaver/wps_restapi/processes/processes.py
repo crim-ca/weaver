@@ -51,6 +51,19 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
+@sd.processes_service.options(tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES, sd.TAG_DEPLOY])
+def options_processes(request):
+    # type: (PyramidRequest) -> HTTPNoContent
+    """
+    Returns the methods supported by the process listing and deployment endpoint.
+    """
+    return HTTPNoContent(headers={
+        "Allow": "GET, POST, OPTIONS",
+        "Accept-Post": ", ".join(sorted(sd.DeployContentTypeAny.validator.choices)),
+        "Vary": "Accept, Prefer",
+    })
+
+
 @sd.processes_service.get(
     tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES],
     schema=sd.GetProcessesEndpoint(),
@@ -162,11 +175,15 @@ def get_processes(request):
         body["description"] = sd.OkGetProcessesListResponse.description
         LOGGER.debug("Process listing generated, validating schema...")
         body = sd.MultiProcessesListing().deserialize(body)
+        request.response.headers["Vary"] = "Accept, Prefer"
         request.response.headers.extend([
             ("Link", make_link_header(link))
             for link in body["links"]
         ])
         request.response.headers["Content-Profile"] = sd.OGC_API_PROC_PROFILE_PROC_LIST_URI
+        bracket_handling = getattr(request, "metadata_bracket_handling", None)
+        if bracket_handling:
+            request.response.headers["Preference-Applied"] = f"handling={bracket_handling}"
         return Box(body)
 
     except ServiceException as exc:
