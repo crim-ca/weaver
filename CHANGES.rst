@@ -12,8 +12,9 @@ Changes
 
 Changes:
 --------
-- Replace the ``Redoc`` viewer in generated API documentation with ``Swagger UI`` and include all supported endpoints
-  in the generated OpenAPI specification (resolves `#732 <https://github.com/crim-ca/weaver/issues/732>`_).
+- Replace the ``Redoc`` viewer in generated API documentation with ``Swagger UI``, include all supported endpoints in
+  the generated OpenAPI specification, and add links to endpoint groups (resolves
+  `#732 <https://github.com/crim-ca/weaver/issues/732>`_).
 
 Fixes:
 ------
