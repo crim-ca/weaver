@@ -12,7 +12,7 @@ Changes
 
 Changes:
 --------
-- No change.
+- Update from Node 24 to Node 26 in `base.dockerfile`.
 
 Fixes:
 ------
