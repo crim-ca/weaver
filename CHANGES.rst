@@ -12,7 +12,7 @@ Changes
 
 Changes:
 --------
-- No change.
+- Allow Sphinx 9 for documentation builds with ``sphinx_autodoc_typehints>=3.6.1``.
 
 Fixes:
 ------
