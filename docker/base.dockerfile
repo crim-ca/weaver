@@ -1,6 +1,6 @@
 ARG PYTHON_IMAGE_VERSION=3.13
 
-FROM node:24-slim AS node-runtime
+FROM node:26-slim AS node-runtime
 
 FROM python:${PYTHON_IMAGE_VERSION}-slim AS py-build
 ARG PYTHON_IMAGE_VERSION
