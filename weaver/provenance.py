@@ -534,6 +534,7 @@ def _prov_value(value):
 
 def _ogc_prov_objects(document):
     # type: (ProvDocument) -> dict[str, dict[str, Any]]
+    """Collect PROV objects from a document and convert to OGC Provenance JSON."""
     objects_by_uri = {}  # type: dict[str, dict[str, Any]]
 
     # The JSON schema for OGC Provenance Chain defines "Bundle" as an
@@ -551,7 +552,6 @@ def _ogc_prov_objects(document):
             continue
         key = record.identifier.uri
         if key in objects_by_uri:
-            # This should actually never happen due to unification
             LOGGER.warning("Duplicate %s record %s in unified PROV",
                            record_type, key)
             continue
@@ -592,6 +592,7 @@ def _ogc_prov_objects(document):
 
 def _ogc_prov_nested(objects_by_uri, root_obj, expanded):
     # type: (dict[str, dict[str, Any]], dict[str, Any], Set[Union[str, None]]) -> dict[str, Any]
+    """Convert OGC Provenance Chain to nested format rooted at the specified object."""
     for attr in list(root_obj):
         if attr == "id":
             continue
@@ -612,8 +613,7 @@ def _ogc_prov_nested(objects_by_uri, root_obj, expanded):
 
 def convert_to_prov_chain(input_data, root_uri=None):
     # type: (str, str | None) -> str
-    """
-    Convert a PROV-JSON document (as text) to OGC Provenance Chain JSON.
+    """Convert a PROV-JSON document (as text) to OGC Provenance Chain JSON.
 
     Since OGC Provenance Chain has no notion of bundles, this operates
     on the flattened PROV document.  Only objects and relations
@@ -644,9 +644,9 @@ def convert_to_prov_chain(input_data, root_uri=None):
     for additional PROV types (e.g. ``Person``, ``SoftwareAgent``).
     As with relations, if `root_uri` is not ``None``, attributes whose
     values are references to objects in the graph will directly
-    include the those objects on the first reference.  The
-    ``prov:label`` property (equivalent to ``rdfs:label``) is returned
-    as ``name`` if it is distinct from the ``id`` property.
+    include those objects on the first reference.  The ``prov:label``
+    property (equivalent to ``rdfs:label``) is returned as ``name`` if
+    it is distinct from the ``id`` property.
 
     Other attributes in the PROV-O vocabulary are passed through as
     primitive values (`str`, `int`, `float`).  Certain attributes are
@@ -655,10 +655,11 @@ def convert_to_prov_chain(input_data, root_uri=None):
     namespaces (``foaf``, ``wfprov``, etc) are returned as QNames
     (e.g. ``wfprov:wasEnactedBy``).
 
+    :param input_data: Input data, as PROV-JSON.
     :param root_uri: If not ``None``, return object provenance rooted
         at the object with the given URI.  Otherwise, return
         array-form provenance for all objects.
-    :return: OGC Provenance Chain in array or object form, according
+    :return: Serialized OGC Provenance Chain JSON, according
         to the value of `root_uri`.
 
     .. seealso::

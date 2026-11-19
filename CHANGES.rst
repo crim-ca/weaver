@@ -13,11 +13,15 @@ Changes
 Changes:
 --------
 - Allow Sphinx 9 for documentation builds with ``sphinx_autodoc_typehints>=3.6.1``.
+- Add ``PROV-OGC-JSON`` and ``PROV-OGC-JSON-ACTIVITY`` formats, selectable using the ``format`` / ``f`` parameter or the
+  ``Accept-Profile`` header, and returning OGC Provenance Chain and Activity JSON (resolves `#1017
+  <https://github.com/crim-ca/weaver/issues/1017>`_).
 
 Fixes:
 ------
 - Fix HTML job listing tables overflowing the available page width when zoomed
   (`#1121 <https://github.com/crim-ca/weaver/issues/1121>`_).
+- Correct `Swagger-UI` to show the correct profiles for the provenance endpoint.
 
 .. _changes_6.18.0:
 
@@ -73,22 +77,6 @@ Changes:
   offered, and requesting it returns the same directory store without conversion.
 - Refuse deployment of a `Process` declaring a `Zarr` directory media-type on an `I/O` that is defined as a `CWL`
   ``File``, since `Zarr` stores must be represented by a ``Directory``.
-- Update to ``prov`` 3.3 to produce `PROV-JSONLD <https://www.w3.org/submissions/prov-jsonld/>`_
-  rather than PROV-O as JSON-LD (fixes `#1009 <https://github.com/crim-ca/weaver/issues/1009>`_).
-- Create ``ProcessRun`` as an ``Activity`` rather than an ``Entity`` to satisfy
-  `PROV-CONSTRAINTS <https://www.w3.org/TR/2013/REC-prov-constraints-20130430/#entity-activity-disjoint_text>`_
-  requirement for disjoint activity and entity (as of ``prov>=3.0.0``).
-- Remove relationships in the generated PROV that are inconsistent with the changes to ``ProcessRun``, since they are
-  not defined for ``Activity``.
-- Remove inconsistent and redundant timestamps from the generated PROV.
-- Ensure that the user agent in the PROV document is created as a ``SoftwareAgent`` not a ``Person`` with recent
-  versions of ``prov`` that more strongly enforce update-only ``ProvRecord``.
-- Add a skill with example input data (in ``weaver/wps_restapi/examples``) for the ``EchoProcess`` and a script to
-  regenerate the PROV example data for the OpenAPI definition.
-- Add ``PROV-OGC-JSON`` format and associated profile returning `OGC Provenance Chain JSON
-  <https://ogcincubator.github.io/bblock-prov-schema/bblock/ogc.ogc-utils.prov/json-schema>`_, a simplified
-  graph-centric JSON representation of provenance for OGC Processes workflows (resolves `#1017
-  <https://github.com/crim-ca/weaver/issues/1017>`_)
 
 Fixes:
 ------
@@ -150,7 +138,6 @@ Fixes:
   blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
   section, causing a ``ReferenceError`` when clicking them.
 - Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
-- Correct the command-line and code examples in the ``job-provenance`` skill.
 - Fix quote currency conversion failing with ``KeyError`` for every converter whose `URL` uses an ``{amount}``
   template parameter (``currencylayer``, ``exchangeratesapi``, ``fixer``, ``scrapper``).
 - Fix ``fixer`` currency converter registered under the ``openexchangerates`` name, which made ``fixer`` unavailable
@@ -159,10 +146,6 @@ Fixes:
   ``GET`` describe responses whenever a mismatched `CWL`/`WPS` ``format``/``schema`` auto-generated an invalid
   ``metadata`` "Schema" link reference (empty ``href``, or missing required ``rel``), causing the corresponding
   `AllOf`/`OneOf` schema validation to fail and the whole `I/O` entry to be discarded instead of rendered.
-- Correct the ``install-cairo-dependencies`` check in the Makefile to avoid failure if ``ldconfig`` is not available,
-  such as on non-Linux systems.
-- Avoid linting installed virtual environments in ``make check``.
-- Correct `Swagger-UI` to show the correct profiles for the provenance endpoint.
 - Make test SVG profiling creation configurable and install Graphviz through the Makefile when the option is enabled.
 - Fix the Celery registry-resolution test failure seen with ``celery==5.7.0``/``kombu==5.7.0``. It also reproduces
   with ``celery==5.6.3``/``kombu==5.6.2``, indicating a test setup issue rather than a ``_store_result`` regression.
