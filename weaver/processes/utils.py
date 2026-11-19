@@ -522,6 +522,7 @@ def create_multipart_deploy(
     msg = MIMEMultipart("related", boundary=boundary)
     main_workflow_cid = None
     workflow_count = 0
+    cwl_ids = []
 
     # Add CWL parts
     for idx, cwl_item in enumerate(cwl_files):
@@ -540,6 +541,7 @@ def create_multipart_deploy(
                 f"Each CWL package must have an 'id' to be used as Content-ID."
             )
 
+        cwl_ids.append(cwl_id)
         if is_workflow:
             workflow_count += 1
             if workflow_count == 1:
@@ -560,7 +562,7 @@ def create_multipart_deploy(
     # Add process description if provided
     if process_description:
         descriptions = process_description if isinstance(process_description, list) else [process_description]
-        for desc_idx, description in enumerate(descriptions):
+        for description in descriptions:
             if description_type in ContentType.ANY_YAML:
                 desc_body = OutputFormat.convert(description, OutputFormat.YAML)
                 desc_part = MIMEText(desc_body, _subtype="yaml", _charset="utf-8")
@@ -568,10 +570,9 @@ def create_multipart_deploy(
                 desc_part = MIMEText(json.dumps(description, indent=2), _subtype="json", _charset="utf-8")
             # Replace the default text/* Content-Type with the application/* one
             desc_part.replace_header("Content-Type", description_type)
-            if len(descriptions) == 1:
-                desc_part.add_header("Content-ID", "<process-description>")
-            else:
-                desc_part.add_header("Content-ID", create_content_id(f"process-description-{desc_idx}", url))
+            # a description without 'id' refers to the main CWL, prefix avoids collision with the CWL part Content-ID
+            desc_id = get_process_description_id(description) or main_workflow_cid or cwl_ids[0]
+            desc_part.add_header("Content-ID", create_content_id(f"process-description-{desc_id}", url))
             msg.attach(desc_part)
 
     multipart_content = msg.as_bytes()
@@ -838,12 +839,26 @@ def _interpret_multipart_part(part, request=None):
     return None
 
 
-def _strip_cwl_id(cwl_id):
+def resolve_process_reference(reference):
     # type: (Optional[str]) -> Optional[str]
     """
-    Remove the ``#`` prefix employed by :term:`CWL` identifiers within a ``$graph``.
+    Resolve a :term:`Process` reference as either its local identifier or the full URI of a remote :term:`Process`.
+
+    - A full URI (e.g.: ``https://example.com/processes/{id}``) is returned as is.
+    - A :term:`CWL` ``$graph`` reference (``#{id}``) has its ``#`` prefix removed.
+    - A local :term:`CWL` file reference (``{id}.cwl``) has its extension removed.
+
+    :returns: Resolved reference, or ``None`` if the reference is empty or invalid.
     """
-    return cwl_id.lstrip("#") if isinstance(cwl_id, str) and cwl_id else None
+    if not isinstance(reference, str) or not reference:
+        return None
+    if urlparse(reference).scheme:
+        return reference
+    reference = reference.lstrip("#")
+    ref_name, ref_ext = os.path.splitext(reference)
+    if ref_ext.replace(".", "") in PACKAGE_EXTENSIONS:
+        return ref_name or None
+    return reference or None
 
 
 def get_process_description_id(description):
@@ -851,7 +866,7 @@ def get_process_description_id(description):
     """
     Obtain the :term:`Process` identifier from a deployment description, considering the supported formats.
     """
-    proc_id = get_process_information(description).get("id")
+    proc_id = get_any_id(get_process_information(description)) or get_any_id(description)
     return proc_id if isinstance(proc_id, str) and proc_id else None
 
 
@@ -1174,10 +1189,10 @@ def _link_process_descriptions(cwl_packages, descriptions):
         return linked
 
     main = cwl_packages[0] if len(cwl_packages) == 1 else resolve_deployment_order(cwl_packages)[1]
-    main_id = _strip_cwl_id(main.get("id")) if main else None
-    cwl_ids = {_strip_cwl_id(pkg.get("id")) for pkg in cwl_packages}
+    main_id = resolve_process_reference(get_any_id(main)) if main else None
+    cwl_ids = {resolve_process_reference(get_any_id(pkg)) for pkg in cwl_packages}
     for description in descriptions:
-        desc_id = _strip_cwl_id(get_process_description_id(description))
+        desc_id = resolve_process_reference(get_process_description_id(description))
         if desc_id and desc_id in cwl_ids:
             target = desc_id
         elif not desc_id or main_id is None:
@@ -1256,7 +1271,7 @@ def parse_process_deploy_content(
             # This avoids double-wrapping if the package already contains a $graph
             content = _merge_process_description(
                 cwl_packages[0],
-                linked_descriptions.get(_strip_cwl_id(cwl_packages[0].get("id")))
+                linked_descriptions.get(resolve_process_reference(get_any_id(cwl_packages[0])))
             )
         else:
             # Multiple packages - return as list to be wrapped in $graph
@@ -1652,7 +1667,8 @@ def _deploy_process_multi_cwl(
         # NOTE: Child tools are always deployed with overwrite=False to preserve existing dependencies.
         # This means retrying a failed multi-CWL deployment will skip already-deployed tools.
         try:
-            tool_payload = _merge_process_description(tool_pkg_deploy, descriptions.get(_strip_cwl_id(tool_id)))
+            tool_description = descriptions.get(resolve_process_reference(tool_id))
+            tool_payload = _merge_process_description(tool_pkg_deploy, tool_description)
             response = deploy_process_from_payload(tool_payload, container, overwrite=False)
             deployed_processes.append(response.json["processSummary"])
             LOGGER.info("Successfully deployed CWL tool: %s", tool_id)
@@ -1682,7 +1698,8 @@ def _deploy_process_multi_cwl(
 
     # Pass CWL package directly
     LOGGER.info("Deploying main CWL process: %s", main_process_id)
-    main_payload = _merge_process_description(main_pkg_deploy, descriptions.get(_strip_cwl_id(main_process_id)))
+    main_description = descriptions.get(resolve_process_reference(main_process_id))
+    main_payload = _merge_process_description(main_pkg_deploy, main_description)
     response = deploy_process_from_payload(main_payload, container, overwrite)
 
     LOGGER.info("Successfully deployed multi-CWL package: main process %s with %d child processes",

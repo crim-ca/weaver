@@ -132,7 +132,7 @@ from weaver.processes.convert import (
 )
 from weaver.processes.sources import retrieve_data_source_url
 from weaver.processes.types import ProcessType
-from weaver.processes.utils import load_package_file, map_progress, pull_docker
+from weaver.processes.utils import load_package_file, map_progress, pull_docker, resolve_process_reference
 from weaver.provenance import WeaverResearchObject
 from weaver.status import STATUS_PYWPS_IDS, Status, StatusCompliant, map_status
 from weaver.store.base import StoreJobs, StoreProcesses
@@ -317,11 +317,7 @@ def get_package_workflow_steps(package_dict_or_url):
     if package_type == ProcessType.WORKFLOW:
         workflow_steps = package_dict_or_url.get("steps")
         for step in workflow_steps:
-            step_package_ref = workflow_steps[step].get("run")
-            # if a local file reference was specified, convert it to process id
-            package_ref_name, package_ref_ext = os.path.splitext(step_package_ref)
-            if urlparse(step_package_ref).scheme == "" and package_ref_ext.replace(".", "") in PACKAGE_EXTENSIONS:
-                step_package_ref = package_ref_name
+            step_package_ref = resolve_process_reference(workflow_steps[step].get("run"))
             workflow_steps_ids.append({"name": step, "reference": step_package_ref})
     return workflow_steps_ids
 

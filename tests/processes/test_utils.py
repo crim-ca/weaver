@@ -34,12 +34,14 @@ from weaver.processes.utils import (  # noqa: W0212
     _organize_job_execution_parts,
     _parse_multipart_message,
     create_multipart_deploy,
+    get_process_description_id,
     parse_multipart_deploy,
     parse_multipart_job_execution,
     register_cwl_processes_from_config,
     register_wps_processes_from_config,
     resolve_cwl_graph,
-    resolve_deployment_order
+    resolve_deployment_order,
+    resolve_process_reference
 )
 from weaver.wps_restapi import swagger_definitions as sd
 
@@ -420,6 +422,41 @@ def test_register_cwl_processes_from_config_error_handling():
                 assert mock_deploy.call_count == 0, "Deploy should not be reached due to failed CWL pre-validation."
                 assert mock_load.call_count == 1
                 assert result is None  # not returned
+
+
+@pytest.mark.parametrize(
+    ["reference", "expected"],
+    [
+        ("my-process", "my-process"),
+        ("#my-process", "my-process"),
+        ("my-process.cwl", "my-process"),
+        ("#my-process.yml", "my-process"),
+        ("my.process", "my.process"),
+        ("https://example.com/processes/my-process", "https://example.com/processes/my-process"),
+        ("https://example.com/package.cwl", "https://example.com/package.cwl"),
+        ("", None),
+        ("#", None),
+        (None, None),
+        (123, None),
+    ]
+)
+def test_resolve_process_reference(reference, expected):
+    assert resolve_process_reference(reference) == expected
+
+
+@pytest.mark.parametrize(
+    ["description", "expected"],
+    [
+        ({"processDescription": {"id": "test"}}, "test"),
+        ({"processDescription": {"identifier": "test"}}, "test"),
+        ({"processDescription": {"process": {"id": "test"}}}, "test"),
+        ({"id": "test"}, "test"),
+        ({"processDescription": {"title": "no-id"}}, None),
+        ({"processDescription": {"id": 123}}, None),
+    ]
+)
+def test_get_process_description_id(description, expected):
+    assert get_process_description_id(description) == expected
 
 
 @pytest.mark.multipart
@@ -1913,6 +1950,35 @@ class TestMultipartDeployment:
         assert len(cwl_packages) == 1
         assert descriptions == [description]
 
+    def test_create_multipart_deploy_description_content_id(self):
+        """
+        Test that description parts are identified by their process ID, or the main CWL ID if omitted.
+        """
+        tool_cwl = {"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "tool-1", "inputs": {}, "outputs": {}}
+        workflow_cwl = {"cwlVersion": "v1.2", "class": "Workflow", "id": "workflow-1", "inputs": {}, "outputs": {}}
+        descriptions = [
+            {"processDescription": {"id": "tool-1", "title": "Tool"}},
+            {"processDescription": {"title": "Main"}},
+        ]
+
+        content, content_type = create_multipart_deploy(
+            [tool_cwl, workflow_cwl], "localhost", process_description=descriptions,
+        )
+        msg = _parse_multipart_message(content, content_type)
+        content_ids = [part.get("Content-ID") for part in msg.get_payload()]
+
+        assert content_ids == [
+            "<tool-1@localhost>",
+            "<workflow-1@localhost>",
+            "<process-description-tool-1@localhost>",
+            "<process-description-workflow-1@localhost>",
+        ]
+
+        # a single description follows the same representation
+        content, content_type = create_multipart_deploy([tool_cwl], "localhost", process_description=descriptions[0])
+        msg = _parse_multipart_message(content, content_type)
+        assert msg.get_payload()[-1].get("Content-ID") == "<process-description-tool-1@localhost>"
+
     def test_link_process_descriptions(self):
         tool = {"class": "CommandLineTool", "id": "#tool-1"}
         workflow = {"class": "Workflow", "id": "workflow-1"}
@@ -1927,17 +1993,50 @@ class TestMultipartDeployment:
         assert merged["executionUnit"] == [{"unit": tool}]
         assert _merge_process_description(tool, None) is tool
 
-    def test_link_process_descriptions_errors(self):
+    @pytest.mark.parametrize(
+        ["descriptions", "expected_title"],
+        [
+            # unknown ID, whichever location it is defined at
+            ([{"processDescription": {"id": "unknown"}}], "Unknown process description identifier"),
+            ([{"processDescription": {"identifier": "unknown"}}], "Unknown process description identifier"),
+            ([{"processDescription": {"process": {"id": "unknown"}}}], "Unknown process description identifier"),
+            ([{"processDescription": {"id": "https://example.com/processes/tool-1"}}],
+             "Unknown process description identifier"),
+            # many descriptions without ID refer to the same main CWL
+            ([{"processDescription": {"title": "A"}}, {"processDescription": {"title": "B"}}],
+             "Duplicate process description"),
+            # a description without ID refers to the main CWL, same as another with its explicit ID
+            ([{"processDescription": {"title": "A"}}, {"processDescription": {"id": "workflow-1"}}],
+             "Duplicate process description"),
+            # same ID defined at different locations of the description structures
+            ([{"processDescription": {"id": "tool-1"}}, {"processDescription": {"identifier": "tool-1"}}],
+             "Duplicate process description"),
+            ([{"processDescription": {"id": "tool-1"}}, {"processDescription": {"process": {"id": "tool-1"}}}],
+             "Duplicate process description"),
+            # same ID with or without the CWL '$graph' reference prefix
+            ([{"processDescription": {"id": "tool-1"}}, {"processDescription": {"id": "#tool-1"}}],
+             "Duplicate process description"),
+        ],
+        ids=[
+            "unknown_id",
+            "unknown_identifier",
+            "unknown_process_id",
+            "unknown_remote_uri",
+            "duplicate_main_no_id",
+            "duplicate_main_explicit_id",
+            "duplicate_id_and_identifier",
+            "duplicate_id_and_process_id",
+            "duplicate_id_graph_prefix",
+        ],
+    )
+    def test_link_process_descriptions_errors(self, descriptions, expected_title):
         tool = {"class": "CommandLineTool", "id": "tool-1"}
         workflow = {"class": "Workflow", "id": "workflow-1"}
 
-        with pytest.raises(HTTPUnprocessableEntity):
-            _link_process_descriptions([tool, workflow], [{"processDescription": {"id": "unknown"}}])
-        with pytest.raises(HTTPUnprocessableEntity):
-            _link_process_descriptions([tool, workflow], [
-                {"processDescription": {"title": "A"}},
-                {"processDescription": {"id": "workflow-1"}},
-            ])
+        with pytest.raises(HTTPUnprocessableEntity) as exc_info:
+            _link_process_descriptions([tool, workflow], descriptions)
+
+        assert exc_info.value.json["title"] == expected_title
 
     def test_deploy_multi_cwl_with_process_descriptions(self):
         tool = {"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "tool-1"}
