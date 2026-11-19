@@ -851,7 +851,7 @@ def get_process_description_id(description):
     """
     Obtain the :term:`Process` identifier from a deployment description, considering the supported formats.
     """
-    proc_id = get_process_information(description).get("id") or description.get("id")
+    proc_id = get_process_information(description).get("id")
     return proc_id if isinstance(proc_id, str) and proc_id else None
 
 
@@ -910,8 +910,7 @@ def _expand_deploy_profile_part(part_data):
     if isinstance(units, dict):
         units = [units if "unit" in units or "href" in units else {"unit": units}]
     packages = resolve_multi_execution_units(units) if isinstance(units, list) else []
-    description = {key: val for key, val in part_data.items() if key != "executionUnit"}
-    description = description if "processDescription" in description else None
+    description = {"processDescription": part_data["processDescription"]} if "processDescription" in part_data else None
     if not description and not packages:
         raise HTTPBadRequest(json={
             "title": "Invalid deployment part",
@@ -940,7 +939,7 @@ def _organize_deploy_parts(interpreted_parts, root_workflow_cid):
     :param interpreted_parts:
         ``list`` of interpreted parts ``(content_type, content_id, content_location, profile, data)``
     :param root_workflow_cid: ``Content-ID`` of root workflow from ``start`` parameter (if any)
-    :returns: ``tuple`` of (``list`` of :term:`CWL` packages, ``list`` of process descriptions)
+    :returns: Parts organized into distinct :term:`CWL` and :term:`Process` description lists.
     :raises HTTPBadRequest: If no CWL packages found or root workflow validation fails
     """
     cwl_packages = []
@@ -1167,7 +1166,7 @@ def _link_process_descriptions(cwl_packages, descriptions):
 
     :param cwl_packages: :term:`CWL` packages to deploy.
     :param descriptions: :term:`Process` descriptions provided along the :term:`CWL`.
-    :returns: Mapping of :term:`CWL` ``id`` (without ``#``) to their description.
+    :returns: Mapping of :term:`CWL` ``id`` to their description.
     :raises HTTPUnprocessableEntity: If a description refers to an unknown :term:`CWL` or many refer to the same one.
     """
     linked = {}
@@ -1595,11 +1594,11 @@ def _save_deploy_process(process, override, container):
 
 
 def _deploy_process_multi_cwl(
-    cwl_packages,   # type: List[CWL]
-    container,      # type: Union[AnySettingsContainer, AnyRequestType]
-    overwrite,      # type: Union[bool, Process]
+    cwl_packages,       # type: List[CWL]
+    container,          # type: Union[AnySettingsContainer, AnyRequestType]
+    overwrite,          # type: Union[bool, Process]
     descriptions=None,  # type: Optional[Dict[Optional[str], JSON]]
-):                  # type: (...) -> HTTPException
+):                      # type: (...) -> HTTPException
     """
     Deploy multiple :term:`CWL` packages from a ``$graph`` definition using recursive deployment calls.
 
@@ -1619,7 +1618,7 @@ def _deploy_process_multi_cwl(
     :param container: Application container.
     :param overwrite: Whether to overwrite existing processes. Note: only applies to main process, not child tools.
     :param descriptions:
-        Mapping of :term:`CWL` ``id`` (without ``#``) to their :term:`Process` description.
+        Mapping of :term:`CWL` ``id`` to their :term:`Process` description.
         Each :term:`CWL` with a corresponding description is deployed with it.
     :returns: HTTP response with deployment result from the main process.
     """

@@ -1812,6 +1812,23 @@ class TestMultipartDeployment:
         assert cwl_packages == [{"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "tool-1"}]
         assert descriptions == [{"processDescription": {"id": "tool-1", "title": "Tool"}}]
 
+    def test_organize_deploy_parts_deploy_profile_ignores_top_level_id(self):
+        """
+        Test that only the ``id`` within ``processDescription`` links a description, not an unrelated top-level one.
+        """
+        cwl_tool = {"cwlVersion": "v1.2", "class": "CommandLineTool"}
+        interpreted_parts = [
+            (ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_DEPLOY_URI, {
+                "id": "some-process",
+                "processDescription": {"title": "Tool"},
+                "executionUnit": [{"unit": cwl_tool}],
+            }),
+        ]
+
+        cwl_packages, _ = _organize_deploy_parts(interpreted_parts, root_workflow_cid=None)
+
+        assert "id" not in cwl_packages[0]
+
     def test_organize_deploy_parts_deploy_profile_invalid(self):
         interpreted_parts = [(ContentType.APP_JSON, "", "", sd.OGC_API_PROC_PROFILE_DEPLOY_URI, {"title": "x"})]
         with pytest.raises(HTTPBadRequest):
