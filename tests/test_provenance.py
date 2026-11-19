@@ -209,8 +209,7 @@ def test_convert_to_prov_list():
     # It should be a prov chain as a list
     assert isinstance(prov, list)
     assert all("id" in obj for obj in prov)
-    assert all(("provType" in obj or "activityType" in obj)
-               for obj in prov)
+    assert all("provType" in obj for obj in prov)
     # It should not be nested
     assert all(isinstance(obj["wasGeneratedBy"], str)
                for obj in prov
@@ -229,8 +228,8 @@ def test_convert_to_prov_object():
     assert isinstance(prov, dict)
     assert "id" in prov
     assert prov["id"] == root_id
-    assert "activityType" in prov
-    assert prov["activityType"] == "Activity"
+    assert "provType" in prov
+    assert prov["provType"] == "Activity"
     # It should use startedAtTime, not startTime
     assert "startTime" not in prov
     assert "startedAtTime" in prov

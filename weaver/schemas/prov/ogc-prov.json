@@ -129,56 +129,28 @@
         }
       }
     },
-    "EntityType": {
-      "type": "string",
-      "enum": [
-        "Entity",
-        "Bundle",
-        "Plan",
-        "prov:Collection",
-        "prov:Entity",
-        "prov:Bundle",
-        "prov:Plan",
-        "prov:PrimarySource",
-        "wfdesc:Process",
-        "wfprov:Artifact",
-        "wf4ever:File",
-        "schema:SoftwareSourceCode"
-      ]
-    },
-    "EntityTypes": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/EntityType"
-        },
-        {
-          "type": "array",
-          "contains": {
-            "$ref": "#/$defs/EntityType"
-          }
-        }
-      ]
-    },
     "Entity": {
       "type": "object",
       "properties": {
-        "activityType": false,
-        "agentType": false,
         "id": {
           "$ref": "#/$defs/objectref",
           "x-jsonld-id": "@id"
         },
-        "featureType": {
-          "$ref": "#/$defs/oneOrMoreObjectref",
+        "provType": {
+          "const": "Entity",
           "x-jsonld-id": "@type"
         },
-        "entityType": {
+        "type": {
           "$ref": "#/$defs/oneOrMoreObjectref",
-          "x-jsonld-id": "@type"
+          "x-jsonld-id": "type"
         },
-        "has_provenance": {
-          "$ref": "#/$defs/Prov",
-          "x-jsonld-id": "http://purl.org/dc/terms/provenance",
+        "name": {
+          "type": "string",
+          "x-jsonld-id": "http://www.w3.org/2000/01/rdf-schema#label"
+        },
+        "hadMember": {
+          "$ref": "#/$defs/oneOrMoreEntitiesOrRefIds",
+          "x-jsonld-id": "http://www.w3.org/ns/prov#hadMember",
           "x-jsonld-type": "@id"
         },
         "wasGeneratedBy": {
@@ -340,109 +312,8 @@
         }
       },
       "required": [
-        "id"
-      ],
-      "anyOf": [
-        {
-          "properties": {
-            "provType": {
-              "$ref": "#/$defs/EntityTypes",
-              "x-jsonld-id": "@type"
-            }
-          },
-          "required": [
-            "provType"
-          ]
-        },
-        {
-          "properties": {
-            "prov:type": {
-              "$ref": "#/$defs/EntityTypes",
-              "x-jsonld-id": "http://www.w3.org/ns/prov#type"
-            }
-          },
-          "required": [
-            "prov:type"
-          ]
-        },
-        {
-          "properties": {
-            "type": {
-              "$ref": "#/$defs/EntityTypes"
-            }
-          },
-          "required": [
-            "type"
-          ]
-        },
-        {
-          "required": [
-            "featureType"
-          ]
-        },
-        {
-          "required": [
-            "entityType"
-          ]
-        },
-        {
-          "required": [
-            "wasGeneratedBy"
-          ]
-        },
-        {
-          "required": [
-            "wasAttributedTo"
-          ]
-        },
-        {
-          "required": [
-            "wasDerivedFrom"
-          ]
-        },
-        {
-          "required": [
-            "has_provenance"
-          ]
-        },
-        {
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "Collection"
-            },
-            "hadMember": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/Entity"
-              },
-              "x-jsonld-id": "http://www.w3.org/ns/prov#hadMember",
-              "x-jsonld-type": "@id"
-            }
-          },
-          "required": [
-            "hadMember",
-            "type"
-          ]
-        },
-        {
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "EmptyCollection"
-            },
-            "hadMember": {
-              "type": "array",
-              "maxItems": 0,
-              "x-jsonld-id": "http://www.w3.org/ns/prov#hadMember",
-              "x-jsonld-type": "@id"
-            }
-          },
-          "required": [
-            "hadMember",
-            "type"
-          ]
-        }
+        "id",
+        "provType"
       ],
       "allOf": [
         {
@@ -455,49 +326,29 @@
       "format": "date-time",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})?$"
     },
-    "ActivityType": {
-      "type": "string",
-      "enum": [
-        "Activity",
-        "prov:Activity",
-        "wfprov:ProcessRun",
-        "wfprov:WorkflowRun"
-      ]
-    },
-    "ActivityTypes": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/ActivityType"
-        },
-        {
-          "type": "array",
-          "contains": {
-            "$ref": "#/$defs/ActivityType"
-          }
-        }
-      ]
-    },
     "Activity": {
       "type": "object",
       "properties": {
-        "entityType": false,
-        "featureType": false,
-        "agentType": false,
         "id": {
           "$ref": "#/$defs/objectref",
           "x-jsonld-id": "@id"
         },
-        "activityType": {
-          "$ref": "#/$defs/oneOrMoreObjectref",
+        "provType": {
+          "const": "Activity",
           "x-jsonld-id": "@type"
+        },
+        "type": {
+          "$ref": "#/$defs/oneOrMoreObjectref",
+          "x-jsonld-id": "type"
         },
         "name": {
           "type": "string",
           "x-jsonld-id": "http://www.w3.org/2000/01/rdf-schema#label"
         },
-        "prov:type": {
-          "$ref": "#/$defs/ActivityTypes",
-          "x-jsonld-id": "http://www.w3.org/ns/prov#type"
+        "startedAtTime": {
+          "$ref": "#/$defs/dateTime",
+          "x-jsonld-id": "http://www.w3.org/ns/prov#startedAtTime",
+          "x-jsonld-type": "http://www.w3.org/2001/XMLSchema#dateTime"
         },
         "endedAtTime": {
           "$ref": "#/$defs/dateTime",
@@ -645,55 +496,8 @@
         }
       },
       "required": [
-        "id"
-      ],
-      "anyOf": [
-        {
-          "properties": {
-            "activityType": {
-              "$ref": "#/$defs/ActivityType",
-              "x-jsonld-id": "@type"
-            }
-          },
-          "required": [
-            "activityType"
-          ]
-        },
-        {
-          "required": [
-            "prov:type"
-          ]
-        },
-        {
-          "required": [
-            "type"
-          ]
-        },
-        {
-          "required": [
-            "used"
-          ]
-        },
-        {
-          "required": [
-            "wasInformedBy"
-          ]
-        },
-        {
-          "required": [
-            "endedAtTime"
-          ]
-        },
-        {
-          "required": [
-            "startedAtTime"
-          ]
-        },
-        {
-          "required": [
-            "wasAssociatedWith"
-          ]
-        }
+        "id",
+        "provType"
       ],
       "allOf": [
         {
@@ -701,50 +505,16 @@
         }
       ]
     },
-    "AgentTypes": {
-      "type": "string",
-      "enum": [
-        "Agent",
-        "Organization",
-        "Person",
-        "SoftwareAgent",
-        "SoftwareDescription",
-        "DirectQueryService",
-        "prov:Agent",
-        "prov:Organization",
-        "prov:Person",
-        "prov:SoftwareAgent",
-        "prov:SoftwareDescription",
-        "prov:DirectQueryService",
-        "wfprov:WorkflowEngine",
-        "schema:SoftwareApplication",
-        "foaf:OnlineAccount"
-      ]
-    },
-    "AgentType": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/AgentTypes"
-        },
-        {
-          "type": "array",
-          "items": {
-            "contains": {
-              "$ref": "#/$defs/AgentTypes"
-            }
-          }
-        }
-      ]
-    },
     "Agent": {
       "type": "object",
       "properties": {
-        "activityType": false,
-        "entityType": false,
-        "featureType": false,
-        "agentType": {
-          "$ref": "#/$defs/oneOrMoreObjectref",
+        "provType": {
+          "const": "Agent",
           "x-jsonld-id": "@type"
+        },
+        "type": {
+          "$ref": "#/$defs/oneOrMoreObjectref",
+          "x-jsonld-id": "type"
         },
         "name": {
           "type": "string",
@@ -791,64 +561,8 @@
         }
       },
       "required": [
-        "id"
-      ],
-      "not": {
-        "properties": {
-          "provType": {
-            "$ref": "#/$defs/EntityType"
-          }
-        }
-      },
-      "anyOf": [
-        {
-          "properties": {
-            "provType": {
-              "$ref": "#/$defs/AgentType",
-              "x-jsonld-id": "@type"
-            }
-          },
-          "required": [
-            "provType"
-          ]
-        },
-        {
-          "properties": {
-            "type": {
-              "$ref": "#/$defs/AgentType"
-            }
-          },
-          "required": [
-            "type"
-          ]
-        },
-        {
-          "properties": {
-            "agentType": {
-              "$ref": "#/$defs/AgentType",
-              "x-jsonld-id": "@type"
-            }
-          },
-          "required": [
-            "agentType"
-          ]
-        },
-        {
-          "properties": {
-            "prov:type": {
-              "$ref": "#/$defs/AgentType",
-              "x-jsonld-id": "http://www.w3.org/ns/prov#type"
-            }
-          },
-          "required": [
-            "prov:type"
-          ]
-        },
-        {
-          "required": [
-            "actedOnBehalfOf"
-          ]
-        }
+        "id",
+        "provType"
       ],
       "allOf": [
         {
@@ -859,33 +573,17 @@
     "Usage": {
       "type": "object",
       "properties": {
+        "provType": {
+          "const": "Usage",
+          "x-jsonld-id": "@type"
+        },
         "id": {
           "$ref": "#/$defs/objectref",
           "x-jsonld-id": "@id"
         },
         "type": {
-          "oneOf": [
-            {
-              "type": "string",
-              "enum": [
-                "prov:Usage",
-                "Usage"
-              ]
-            },
-            {
-              "type": "array",
-              "contains": {
-                "type": "string",
-                "enum": [
-                  "prov:Usage",
-                  "Usage"
-                ]
-              },
-              "items": {
-                "type": "string"
-              }
-            }
-          ]
+          "$ref": "#/$defs/oneOrMoreObjectref",
+          "x-jsonld-id": "type"
         },
         "atTime": {
           "$ref": "#/$defs/dateTime",
@@ -905,9 +603,17 @@
     "ActivityInfluence": {
       "type": "object",
       "properties": {
+        "provType": {
+          "const": "ActivityInfluence",
+          "x-jsonld-id": "@type"
+        },
         "id": {
           "$ref": "#/$defs/objectref",
           "x-jsonld-id": "@id"
+        },
+        "type": {
+          "$ref": "#/$defs/oneOrMoreObjectref",
+          "x-jsonld-id": "type"
         },
         "atTime": {
           "$ref": "#/$defs/dateTime",
@@ -944,28 +650,11 @@
         {
           "type": "object",
           "properties": {
-            "type": {
-              "oneOf": [
-                {
-                  "type": "string",
-                  "const": "Generation"
-                },
-                {
-                  "type": "array",
-                  "contains": {
-                    "type": "string",
-                    "const": "Generation"
-                  },
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              ]
+            "provType": {
+              "const": "Generation",
+              "x-jsonld-id": "@type"
             }
-          },
-          "required": [
-            "type"
-          ]
+          }
         }
       ]
     },
@@ -977,28 +666,11 @@
         {
           "type": "object",
           "properties": {
-            "type": {
-              "oneOf": [
-                {
-                  "type": "string",
-                  "const": "Invalidation"
-                },
-                {
-                  "type": "array",
-                  "contains": {
-                    "type": "string",
-                    "const": "Invalidation"
-                  },
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              ]
+            "provType": {
+              "const": "Invalidation",
+              "x-jsonld-id": "@type"
             }
-          },
-          "required": [
-            "type"
-          ]
+          }
         }
       ]
     },
@@ -1010,28 +682,11 @@
         {
           "type": "object",
           "properties": {
-            "type": {
-              "oneOf": [
-                {
-                  "type": "string",
-                  "const": "Communication"
-                },
-                {
-                  "type": "array",
-                  "contains": {
-                    "type": "string",
-                    "const": "Communication"
-                  },
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              ]
+            "provType": {
+              "const": "Communication",
+              "x-jsonld-id": "@type"
             }
-          },
-          "required": [
-            "type"
-          ]
+          }
         }
       ]
     },
@@ -1043,17 +698,8 @@
           "x-jsonld-id": "@id"
         },
         "type": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          ]
+          "$ref": "#/$defs/oneOrMoreObjectref",
+          "x-jsonld-id": "type"
         },
         "atTime": {
           "$ref": "#/$defs/dateTime",
@@ -1090,46 +736,32 @@
       ]
     },
     "Start": {
+      "type": "object",
       "allOf": [
         {
           "$ref": "#/$defs/StartOrEnd"
         },
         {
           "properties": {
-            "type": {
-              "anyOf": [
-                {
-                  "const": "Start"
-                },
-                {
-                  "contains": {
-                    "const": "Start"
-                  }
-                }
-              ]
+            "provType": {
+              "const": "Start",
+              "x-jsonld-id": "@type"
             }
           }
         }
       ]
     },
     "End": {
+      "type": "object",
       "allOf": [
         {
           "$ref": "#/$defs/StartOrEnd"
         },
         {
           "properties": {
-            "type": {
-              "anyOf": [
-                {
-                  "const": "End"
-                },
-                {
-                  "contains": {
-                    "const": "End"
-                  }
-                }
-              ]
+            "provType": {
+              "const": "End",
+              "x-jsonld-id": "@type"
             }
           }
         }
@@ -1142,23 +774,13 @@
           "$ref": "#/$defs/objectref",
           "x-jsonld-id": "@id"
         },
+        "provType": {
+          "const": "Derivation",
+          "x-jsonld-id": "@type"
+        },
         "type": {
-          "oneOf": [
-            {
-              "type": "string",
-              "const": "Derivation"
-            },
-            {
-              "type": "array",
-              "contains": {
-                "type": "string",
-                "const": "Derivation"
-              },
-              "items": {
-                "type": "string"
-              }
-            }
-          ]
+          "$ref": "#/$defs/oneOrMoreObjectref",
+          "x-jsonld-id": "type"
         },
         "hadGeneration": {
           "oneOf": [
@@ -1221,23 +843,13 @@
           "$ref": "#/$defs/objectref",
           "x-jsonld-id": "@id"
         },
+        "provType": {
+          "const": "Delegation",
+          "x-jsonld-id": "@type"
+        },
         "type": {
-          "oneOf": [
-            {
-              "type": "string",
-              "const": "Delegation"
-            },
-            {
-              "type": "array",
-              "contains": {
-                "type": "string",
-                "const": "Delegation"
-              },
-              "items": {
-                "type": "string"
-              }
-            }
-          ]
+          "$ref": "#/$defs/oneOrMoreObjectref",
+          "x-jsonld-id": "type"
         },
         "agent": {
           "oneOf": [
@@ -1272,23 +884,13 @@
           "$ref": "#/$defs/objectref",
           "x-jsonld-id": "@id"
         },
+        "provType": {
+          "const": "Attribution",
+          "x-jsonld-id": "@type"
+        },
         "type": {
-          "oneOf": [
-            {
-              "type": "string",
-              "const": "Attribution"
-            },
-            {
-              "type": "array",
-              "contains": {
-                "type": "string",
-                "const": "Attribution"
-              },
-              "items": {
-                "type": "string"
-              }
-            }
-          ]
+          "$ref": "#/$defs/oneOrMoreObjectref",
+          "x-jsonld-id": "type"
         },
         "agent": {
           "oneOf": [
@@ -1311,23 +913,13 @@
           "$ref": "#/$defs/objectref",
           "x-jsonld-id": "@id"
         },
+        "provType": {
+          "const": "Association",
+          "x-jsonld-id": "@type"
+        },
         "type": {
-          "oneOf": [
-            {
-              "type": "string",
-              "const": "Association"
-            },
-            {
-              "type": "array",
-              "contains": {
-                "type": "string",
-                "const": "Association"
-              },
-              "items": {
-                "type": "string"
-              }
-            }
-          ]
+          "$ref": "#/$defs/oneOrMoreObjectref",
+          "x-jsonld-id": "type"
         },
         "agent": {
           "oneOf": [
@@ -1359,6 +951,14 @@
         "id": {
           "$ref": "#/$defs/objectref",
           "x-jsonld-id": "@id"
+        },
+        "provType": {
+          "const": "Influence",
+          "x-jsonld-id": "@type"
+        },
+        "type": {
+          "$ref": "#/$defs/oneOrMoreObjectref",
+          "x-jsonld-id": "type"
         },
         "influencer": {
           "anyOf": [
@@ -1441,10 +1041,12 @@
     },
     {
       "$ref": "#/$defs/Activity"
+    },
+    {
+      "$ref": "#/$defs/Agent"
     }
   ],
   "x-jsonld-extra-terms": {
-    "agentType": "@type",
     "Activity": "http://www.w3.org/ns/prov#Activity",
     "ActivityInfluence": "http://www.w3.org/ns/prov#ActivityInfluence",
     "Agent": "http://www.w3.org/ns/prov#Agent",

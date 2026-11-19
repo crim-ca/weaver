@@ -498,13 +498,10 @@ _RELATION_HANDLERS = {
     prov_const.PROV_SPECIALIZATION: RelationHandler("generalEntity", "specificEntity",
                                                     "specificEntity", "generalEntity"),
 }
-# Specific field for the primary type (corresponding to @types in
-# PROV-JSONLD).  For some reason provType is only defined for Entity
-# and Activity.
-_PROV_TYPE_FIELD = {
-    "Entity": "provType",
-    "Activity": "activityType",
-    "Agent": "provType",
+_PROV_STARTING_POINTS = {
+    "Entity",
+    "Activity",
+    "Agent",
 }
 # Specific mappings for certain PROV-DM attributes that have different
 # representations in PROV-O. PROV-JSON uses the PROV-DM names
@@ -545,8 +542,7 @@ def _ogc_prov_objects(document):
         record_type = record.get_type().localpart if record.get_type() else None
         if record_type is None:
             continue
-        prov_type_field = _PROV_TYPE_FIELD.get(record_type)
-        if prov_type_field is None:  # only objects in the OGC schema
+        if record_type not in _PROV_STARTING_POINTS:
             continue
         if record.identifier is None:
             continue
@@ -555,7 +551,7 @@ def _ogc_prov_objects(document):
             LOGGER.warning("Duplicate %s record %s in unified PROV",
                            record_type, key)
             continue
-        prov_obj: dict[str, Any] = {"id": key, prov_type_field: record_type}
+        prov_obj: dict[str, Any] = {"id": key, "provType": record_type}
         if record.value:
             # This is always a `set`, which is why we convert it to a
             # `list` (to make it serializable as JSON)
@@ -564,7 +560,7 @@ def _ogc_prov_objects(document):
             prov_obj["name"] = record.label
         prov_types = [str(val) for val in record.get_attribute(prov_const.PROV_TYPE)]
         if prov_types:
-            prov_obj["prov:type"] = prov_types[0] if len(prov_types) == 1 else prov_types
+            prov_obj["type"] = prov_types[0] if len(prov_types) == 1 else prov_types
         # value, label, type have special handling above, other PROV-O
         # attributes are simply passed through, modulo some remapping.
         for attr, val in record.attributes:
@@ -639,14 +635,13 @@ def convert_to_prov_chain(input_data, root_uri=None):
     when rooted at a non-Entity.
 
     In conformance with the JSON schema and PROV-JSONLD, the primary
-    record type is returned in the ``provType`` or ``activityType``
-    attribute, and ``prov:type``, which is always prefixed, is used
-    for additional PROV types (e.g. ``Person``, ``SoftwareAgent``).
-    As with relations, if `root_uri` is not ``None``, attributes whose
-    values are references to objects in the graph will directly
-    include those objects on the first reference.  The ``prov:label``
-    property (equivalent to ``rdfs:label``) is returned as ``name`` if
-    it is distinct from the ``id`` property.
+    record type is returned in the ``provType` attribute, and ``type``
+    is used for additional PROV types (e.g. ``Person``,
+    ``SoftwareAgent``).  As with relations, if `root_uri` is not
+    ``None``, attributes whose values are references to objects in the
+    graph will directly include those objects on the first reference.
+    The ``prov:label`` property (equivalent to ``rdfs:label``) is
+    returned as ``name`` if it is distinct from the ``id`` property.
 
     Other attributes in the PROV-O vocabulary are passed through as
     primitive values (`str`, `int`, `float`).  Certain attributes are
