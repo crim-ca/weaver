@@ -56,56 +56,55 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
         allow-failure: [false]
         test-server: [false]
         test-case: [test-unit-only, test-func-only]
         include:
           # experimental python
-          # not yet ready due to pywps->fiona dependency missing (https://github.com/Toblerity/Fiona/issues/1504)
-          #- os: ubuntu-latest
-          #  python-version: "3.14"
-          #  allow-failure: true
-          #  test-case: test-unit-only
-          #- os: ubuntu-latest
-          #  python-version: "3.14"
-          #  allow-failure: true
-          #  test-case: test-func-only
+          - os: ubuntu-latest
+            python-version: "3.15"
+            allow-failure: true
+            test-case: test-unit-only
+          - os: ubuntu-latest
+            python-version: "3.15"
+            allow-failure: true
+            test-case: test-func-only
           # linter tests
           # performs all 'check' targets except the 'CHECKS_EXCLUDE' ones (that should be defined by dedicated jobs)
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: false
             test-case: check-only
           # check links separately as they tend to sporadically fail from external factors (timeout, ssl, down, etc.)
           # avoid wasting a lot of CI test time because one of them doesn't respond
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: true
             test-case: check-links-only
           # documentation build
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: false
             test-case: docs
           # coverage test
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: false
             test-case: test-coverage-only
           # smoke test of Docker image
           - os: ubuntu-latest
-            python-version: "3.12"  # doesn't matter which one (defined in docker), use only to report matching version
+            python-version: "3.13"  # doesn't matter which one (defined in docker), use only to report matching version
             allow-failure: false
             test-case: test-docker
           # EMS end-2-end Workflow tests
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: false
             test-case: test-workflow-only
           # OGC Code-Sprint tests
           - os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             allow-failure: false
             test-case: test-code-sprint-only
             test-server: true
