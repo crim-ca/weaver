@@ -604,9 +604,10 @@ Additional Metadata
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Each :term:`CWL` part (the main :term:`Workflow` and any sub-:term:`CWL`) can be accompanied by its own
-:term:`Process` description provided as a :term:`JSON` or :term:`YAML` part. Descriptions are linked to their :term:`CWL`
-using the ``id`` field, matching either the :term:`CWL` ``id`` or the ``Content-ID``/``Content-Location``
-of the :term:`CWL` part. A description without an ``id`` applies to the main :term:`Workflow`.
+:term:`Process` description provided as a :term:`JSON` or :term:`YAML` part.
+Descriptions are linked to their :term:`CWL` using the ``id`` field, matching either the :term:`CWL` ``id``
+or the ``Content-ID``/``Content-Location`` of the :term:`CWL` part.
+A description without an ``id`` applies to the main :term:`Workflow`.
 The part is validated against the :term:`Process` deployment schema when it is annotated with
 ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-process-description``.
 
