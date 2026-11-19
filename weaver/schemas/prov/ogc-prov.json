@@ -210,6 +210,94 @@
           },
           "x-jsonld-id": "http://www.w3.org/2000/01/rdf-schema#seeAlso"
         },
+        "generatedAtTime": {
+          "$ref": "#/$defs/dateTime",
+          "x-jsonld-id": "http://www.w3.org/ns/prov#generatedAtTime",
+          "x-jsonld-type": "http://www.w3.org/2001/XMLSchema#dateTime"
+        },
+        "invalidatedAtTime": {
+          "$ref": "#/$defs/dateTime",
+          "x-jsonld-id": "http://www.w3.org/ns/prov#invalidatedAtTime",
+          "x-jsonld-type": "http://www.w3.org/2001/XMLSchema#dateTime"
+        },
+        "value": {
+          "x-jsonld-id": "http://www.w3.org/ns/prov#value"
+        },
+        "qualifiedPrimarySource": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/objectref"
+            },
+            {
+              "$ref": "#/$defs/PrimarySource"
+            },
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/objectref"
+                  },
+                  {
+                    "$ref": "#/$defs/PrimarySource"
+                  }
+                ]
+              }
+            }
+          ],
+          "x-jsonld-id": "http://www.w3.org/ns/prov#qualifiedPrimarySource",
+          "x-jsonld-type": "@id"
+        },
+        "qualifiedQuotation": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/objectref"
+            },
+            {
+              "$ref": "#/$defs/Quotation"
+            },
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/objectref"
+                  },
+                  {
+                    "$ref": "#/$defs/Quotation"
+                  }
+                ]
+              }
+            }
+          ],
+          "x-jsonld-id": "http://www.w3.org/ns/prov#qualifiedQuotation",
+          "x-jsonld-type": "@id"
+        },
+        "qualifiedRevision": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/objectref"
+            },
+            {
+              "$ref": "#/$defs/Revision"
+            },
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/objectref"
+                  },
+                  {
+                    "$ref": "#/$defs/Revision"
+                  }
+                ]
+              }
+            }
+          ],
+          "x-jsonld-id": "http://www.w3.org/ns/prov#qualifiedRevision",
+          "x-jsonld-type": "@id"
+        },
         "qualifiedGeneration": {
           "oneOf": [
             {
@@ -604,7 +692,12 @@
       "type": "object",
       "properties": {
         "provType": {
-          "const": "ActivityInfluence",
+          "enum": [
+            "ActivityInfluence",
+            "Generation",
+            "Invalidation",
+            "Communication"
+          ],
           "x-jsonld-id": "@type"
         },
         "id": {
@@ -775,7 +868,12 @@
           "x-jsonld-id": "@id"
         },
         "provType": {
-          "const": "Derivation",
+          "enum": [
+            "Derivation",
+            "PrimarySource",
+            "Quotation",
+            "Revision"
+          ],
           "x-jsonld-id": "@type"
         },
         "type": {
@@ -832,8 +930,55 @@
         }
       },
       "required": [
-        "atTime",
         "entity"
+      ]
+    },
+    "PrimarySource": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Derivation"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provType": {
+              "const": "PrimarySource",
+              "x-jsonld-id": "@type"
+            }
+          }
+        }
+      ]
+    },
+    "Quotation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Derivation"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provType": {
+              "const": "Quotation",
+              "x-jsonld-id": "@type"
+            }
+          }
+        }
+      ]
+    },
+    "Revision": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Derivation"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provType": {
+              "const": "Revision",
+              "x-jsonld-id": "@type"
+            }
+          }
+        }
       ]
     },
     "Delegation": {
