@@ -9684,6 +9684,10 @@ get_job_prov_responses = {
                 "summary": "Provenance details returned in PROV-OGC-JSON format.",
                 "value": EXAMPLES["job_prov_ogc.json"],
             },
+            "PROV-OGC-JSON-ACTIVITY": {
+                "summary": "Provenance details returned in PROV-OGC-JSON-ACTIVITY format.",
+                "value": EXAMPLES["job_prov_ogc_activity.json"],
+            },
             "PROV-JSONLD": {
                 "summary": "Provenance details returned in PROV-JSONLD format.",
                 "value": EXAMPLES["job_prov.jsonld"],

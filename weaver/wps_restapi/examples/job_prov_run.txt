@@ -1,35 +1,35 @@
-2026-11-02 18:07:45.759989+00:00                            Flow b3de0240-663b-4003-86c6-1004173fa711 [ Run of workflow/packed.cwl#main 
+2026-11-19 23:29:57.839887+00:00                            Flow 4468e044-a1d4-41a5-b8aa-65e465d627d6 [ Run of workflow/packed.cwl#main 
 (unknown usage time)                                 In   644e201526525f62152815a76a2dc773450f3dd9 < 
-2026-11-02 18:07:45.761896+00:00                            In   0cf60d40470fde378076afacf5812f961208a018 < wf:main/stringInput
-2026-11-02 18:07:45.761958+00:00                            In   3773c534-01f2-4fab-b31b-55f49d5d7790 < wf:main/measureInput
-2026-11-02 18:07:45.762116+00:00                            In   d88aaa302517127d82182445af28a866c379e7ac < wf:main/dateInput
-2026-11-02 18:07:45.762154+00:00                            In   9f8e1c4d-c4d8-4010-b217-a913bc585fbc < wf:main/doubleInput
-2026-11-02 18:07:45.762272+00:00                            In   8c09b6f0-a6f1-4564-b048-8449d5c2ddf3 < wf:main/arrayInput
-2026-11-02 18:07:45.762677+00:00                            In   73b63dd4-55e4-4d9c-9e3f-5cd063a01c58 < wf:main/complexObjectInput
-2026-11-02 18:07:45.763195+00:00                            In   d1b537f2-bb51-476e-9ec2-ecdcecbe5912 < wf:main/geometryInput
-2026-11-02 18:07:45.763418+00:00                            In   36708105-1f5f-4d5d-b38b-7e235cf834b4 < wf:main/boundingBoxInput
-2026-11-02 18:07:45.763629+00:00                            In   ed82fb5a-a357-471c-a7ad-a510a74b4e22 < wf:main/imagesInput
-2026-11-02 18:07:45.763776+00:00                            In   c3ea4a01-30c4-4daa-8081-f772ff91b1e5 < wf:main/featureCollectionInput
-2026-11-02 18:07:45.764494+00:00                            In   0cf60d40470fde378076afacf5812f961208a018 < wf:main/EchoProcess/stringInput
-2026-11-02 18:07:45.764535+00:00                            In   c88667c6-baf0-4ac1-9f74-d85631d8a055 < wf:main/EchoProcess/measureInput
-2026-11-02 18:07:45.764646+00:00                            In   d88aaa302517127d82182445af28a866c379e7ac < wf:main/EchoProcess/dateInput
-2026-11-02 18:07:45.764706+00:00                            In   c96f9daa-13e7-4841-8044-a3b061b0daaa < wf:main/EchoProcess/doubleInput
-2026-11-02 18:07:45.764790+00:00                            In   840a54ef-f1f4-40eb-acba-82c3727ea2cc < wf:main/EchoProcess/arrayInput
-2026-11-02 18:07:45.764949+00:00                            In   af36d58b-39b7-4248-94e6-5187c9105c23 < wf:main/EchoProcess/complexObjectInput
-2026-11-02 18:07:45.765721+00:00                            In   22a442bc-0dc7-41a9-a0b1-7b1421e46b24 < wf:main/EchoProcess/geometryInput
-2026-11-02 18:07:45.766004+00:00                            In   7b6cfa44-00d5-4596-b7e8-263e9eec3278 < wf:main/EchoProcess/boundingBoxInput
-2026-11-02 18:07:45.766303+00:00                            In   5db0206f-afba-4627-bb70-881bf0df1b6e < wf:main/EchoProcess/imagesInput
-2026-11-02 18:07:45.766563+00:00                            In   1d787a65-8abd-4ba4-8072-ac5e699be970 < wf:main/EchoProcess/featureCollectionInput
-                           2026-11-02 18:07:45.771268+00:00 Out  0cf60d40470fde378076afacf5812f961208a018 > wf:main/primary/stringOutput
-                           2026-11-02 18:07:45.771268+00:00 Out  bd391391-703b-456c-9b21-8162f06a5300 > wf:main/primary/measureOutput
-                           2026-11-02 18:07:45.771268+00:00 Out  d88aaa302517127d82182445af28a866c379e7ac > wf:main/primary/dateOutput
-                           2026-11-02 18:07:45.771268+00:00 Out  0aec4e97-4205-40cd-a405-a557c495f244 > wf:main/primary/doubleOutput
-                           2026-11-02 18:07:45.771268+00:00 Out  2242aecb-578c-406a-a4b0-45456a948762 > wf:main/primary/arrayOutput
-                           2026-11-02 18:07:45.771268+00:00 Out  af36d58b-39b7-4248-94e6-5187c9105c23 > wf:main/primary/complexObjectOutput
-                           2026-11-02 18:07:45.771268+00:00 Out  ee65cbd3-4a26-40c4-b6bc-1043d3e261d1 > wf:main/primary/geometryOutput
-                           2026-11-02 18:07:45.771268+00:00 Out  7b6cfa44-00d5-4596-b7e8-263e9eec3278 > wf:main/primary/boundingBoxOutput
-                           2026-11-02 18:07:45.771268+00:00 Out  be126706-1468-41d5-ae90-8862135692bb > wf:main/primary/imagesOutput
-                           2026-11-02 18:07:45.771268+00:00 Out  1d787a65-8abd-4ba4-8072-ac5e699be970 > wf:main/primary/featureCollectionOutput
-                           2026-11-02 18:07:45.771268+00:00 Out  b2fcaa17-0140-409e-b629-7c186407f1bb > wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_9dc110ce-c9d5-4c1d-9946-066f5eaa3674
-                           2026-11-02 18:07:45.771268+00:00 Out  e3a57a74-2995-4f9d-8bb7-42da009047fa > wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_ba618616-7798-4bcd-a364-ebf30dfb1338
-                           2026-11-02 18:07:45.773001+00:00 Flow b3de0240-663b-4003-86c6-1004173fa711 ] Run of workflow/packed.cwl#main  (0:00:00.013012)
+2026-11-19 23:29:57.842045+00:00                            In   0cf60d40470fde378076afacf5812f961208a018 < wf:main/stringInput
+2026-11-19 23:29:57.842114+00:00                            In   2966e221-b5ee-4fb6-b2f4-81d97259105b < wf:main/measureInput
+2026-11-19 23:29:57.842360+00:00                            In   d88aaa302517127d82182445af28a866c379e7ac < wf:main/dateInput
+2026-11-19 23:29:57.842403+00:00                            In   202fc5d1-5ef2-4328-975b-a651f66e5ea8 < wf:main/doubleInput
+2026-11-19 23:29:57.842509+00:00                            In   e6748885-4e7f-4896-a820-8ad970f5b456 < wf:main/arrayInput
+2026-11-19 23:29:57.842723+00:00                            In   fdee7b62-a007-42eb-b9be-f2ae2093b274 < wf:main/complexObjectInput
+2026-11-19 23:29:57.843053+00:00                            In   2f4a6ffa-e1b5-4497-a68e-0e9a503fba59 < wf:main/geometryInput
+2026-11-19 23:29:57.843215+00:00                            In   56250b82-5533-491e-93e5-288a7a552481 < wf:main/boundingBoxInput
+2026-11-19 23:29:57.843383+00:00                            In   49789665-00fd-42dd-8c6c-4b5aa317ec3b < wf:main/imagesInput
+2026-11-19 23:29:57.843526+00:00                            In   8bd70102-46c5-4851-96a9-d5d631b135d3 < wf:main/featureCollectionInput
+2026-11-19 23:29:57.844428+00:00                            In   0cf60d40470fde378076afacf5812f961208a018 < wf:main/EchoProcess/stringInput
+2026-11-19 23:29:57.844491+00:00                            In   b911eb92-5b48-431e-8f40-029aad2efd91 < wf:main/EchoProcess/measureInput
+2026-11-19 23:29:57.844602+00:00                            In   d88aaa302517127d82182445af28a866c379e7ac < wf:main/EchoProcess/dateInput
+2026-11-19 23:29:57.844637+00:00                            In   4652a0c4-1053-444f-a051-5b6bb7bd3bed < wf:main/EchoProcess/doubleInput
+2026-11-19 23:29:57.844735+00:00                            In   f9412928-0abc-43d0-81f9-0aca46e32c15 < wf:main/EchoProcess/arrayInput
+2026-11-19 23:29:57.844908+00:00                            In   70632e58-ba09-408e-80af-9853b47196f5 < wf:main/EchoProcess/complexObjectInput
+2026-11-19 23:29:57.845289+00:00                            In   faadcc2d-d86f-4e47-95ee-84f79370a1da < wf:main/EchoProcess/geometryInput
+2026-11-19 23:29:57.845422+00:00                            In   45f9805d-7527-49f1-869f-8e7212a8db12 < wf:main/EchoProcess/boundingBoxInput
+2026-11-19 23:29:57.845590+00:00                            In   d726927b-a97b-421f-9eb2-266f61be8a25 < wf:main/EchoProcess/imagesInput
+2026-11-19 23:29:57.845718+00:00                            In   4e5bc928-6056-400a-a416-04147c5cf529 < wf:main/EchoProcess/featureCollectionInput
+                           2026-11-19 23:29:57.850613+00:00 Out  0cf60d40470fde378076afacf5812f961208a018 > wf:main/primary/stringOutput
+                           2026-11-19 23:29:57.850613+00:00 Out  9dd6c76b-1f4c-46de-a249-b0f3c137961f > wf:main/primary/measureOutput
+                           2026-11-19 23:29:57.850613+00:00 Out  d88aaa302517127d82182445af28a866c379e7ac > wf:main/primary/dateOutput
+                           2026-11-19 23:29:57.850613+00:00 Out  5c248bcd-becd-465c-a98a-a6e407341caa > wf:main/primary/doubleOutput
+                           2026-11-19 23:29:57.850613+00:00 Out  21cbb77a-c3cc-49d6-b8e9-c1ddf562de88 > wf:main/primary/arrayOutput
+                           2026-11-19 23:29:57.850613+00:00 Out  70632e58-ba09-408e-80af-9853b47196f5 > wf:main/primary/complexObjectOutput
+                           2026-11-19 23:29:57.850613+00:00 Out  f4afcb71-80b3-445c-8745-6e6c18e277e1 > wf:main/primary/geometryOutput
+                           2026-11-19 23:29:57.850613+00:00 Out  45f9805d-7527-49f1-869f-8e7212a8db12 > wf:main/primary/boundingBoxOutput
+                           2026-11-19 23:29:57.850613+00:00 Out  4c71b852-0c69-4a01-88b0-3581023ac09a > wf:main/primary/imagesOutput
+                           2026-11-19 23:29:57.850613+00:00 Out  4e5bc928-6056-400a-a416-04147c5cf529 > wf:main/primary/featureCollectionOutput
+                           2026-11-19 23:29:57.850613+00:00 Out  990f669e-f460-4928-9599-88a111786bf9 > wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_811f33d1-8fab-4d8c-b12e-62c0d80f0f0d
+                           2026-11-19 23:29:57.850613+00:00 Out  91d70c0b-a245-42db-b1df-09c17a388d95 > wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_0b1b65d7-61dd-4b49-8482-df33733f2523
+                           2026-11-19 23:29:57.851621+00:00 Flow 4468e044-a1d4-41a5-b8aa-65e465d627d6 ] Run of workflow/packed.cwl#main  (0:00:00.011734)
