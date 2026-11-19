@@ -1,6 +1,5 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$comment": "Extended/corrected version of https://ogcincubator.github.io/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json",
   "description": "Provenance Chain using PROV-O core model supporting both an ID based object graph and nesting",
   "$defs": {
     "objectref": {

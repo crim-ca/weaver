@@ -1563,6 +1563,10 @@ class Job(Base, LoggerHandler):
             (None, None): prov_path,  # the directory itself with all metadata
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSON): f"{prov_meta_path}/primary.cwlprov.json",
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_OGC_JSON): f"{prov_meta_path}/primary.cwlprov.json",
+            (
+                ProvenancePathType.PROV,
+                ProvenanceFormat.PROV_OGC_JSON_ACTIVITY
+            ): f"{prov_meta_path}/primary.cwlprov.json",
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_JSONLD): f"{prov_meta_path}/primary.cwlprov.jsonld",
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_TURTLE): f"{prov_meta_path}/primary.cwlprov.ttl",
             (ProvenancePathType.PROV, ProvenanceFormat.PROV_XML): f"{prov_meta_path}/primary.cwlprov.xml",
@@ -1590,10 +1594,12 @@ class Job(Base, LoggerHandler):
         if prov_path and os.path.isfile(prov_path):
             with open(prov_path, mode="r", encoding="utf-8") as prov_f:
                 data = prov_f.read()
-            # Convert to OGC PROV chain (as it is a derivative of the
-            # PROV JSON that is returned by cwltool, and thus doesn't
-            # have a unique prov_path)
+            # Convert to OGC PROV chain or activity (as it is a
+            # derivative of the PROV JSON that is returned by cwltool,
+            # and thus doesn't have a unique prov_path)
             if prov_format == ProvenanceFormat.PROV_OGC_JSON:
+                data = convert_to_prov_chain(data, None)
+            elif prov_format == ProvenanceFormat.PROV_OGC_JSON_ACTIVITY:
                 data = convert_to_prov_chain(data, f"urn:uuid:{self.id}")
         elif extra_path in (None, ProvenancePathType.PROV):
             # Requested PROV format is unsupported/unresolvable,
@@ -1627,8 +1633,10 @@ class Job(Base, LoggerHandler):
             data = json.loads(data)
             data = OutputFormat.convert(data, to=OutputFormat.YAML)
         # normalize media-type
-        if content_type == ContentType.APP_JSON and prov_format != ProvenanceFormat.PROV_OGC_JSON:
-            content_type = ContentType.APP_PROV_JSON
+        if content_type == ContentType.APP_JSON:
+            if prov_format not in (ProvenanceFormat.PROV_OGC_JSON,
+                                   ProvenanceFormat.PROV_OGC_JSON_ACTIVITY):
+                content_type = ContentType.APP_PROV_JSON
         if content_type in ContentType.ANY_XML:
             content_type = ContentType.APP_PROV_XML
         return data, content_type

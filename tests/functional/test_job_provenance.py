@@ -148,15 +148,17 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert ended_id is not None
 
     @parameterized.expand([
-        ({"f": ProvenanceFormat.PROV_OGC_JSON}, {}),
-        ({"f": "ogc-json"}, {}),
+        ({"f": ProvenanceFormat.PROV_OGC_JSON_ACTIVITY}, {}),
+        ({"f": "ogc-json-activity"}, {}),
+        ({"profile": "https://ogcincubator.github.io"
+          "/bblock-prov-schema/build/annotated/ogc-utils/prov-activity/schema.json"}, {}),
         ({}, {"Accept": f"{ContentType.APP_JSON}; "
               "profile=https://ogcincubator.github.io"
-              "/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"}),
+              "/bblock-prov-schema/build/annotated/ogc-utils/prov-activity/schema.json"}),
         ({}, {"Accept-Profile": "https://ogcincubator.github.io"
-              "/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"}),
+              "/bblock-prov-schema/build/annotated/ogc-utils/prov-activity/schema.json"}),
     ])
-    def test_job_prov_ogc_json(self, queries, headers):
+    def test_job_prov_ogc_json_object(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
         resp = self.app.get(prov_url, params=queries, headers=headers)
         assert resp.status_code == 200
@@ -183,10 +185,47 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert any(isinstance(obj, dict) for obj in prov["generated"])
 
     @parameterized.expand([
+        ({"f": ProvenanceFormat.PROV_OGC_JSON}, {}),
+        ({"f": "ogc-json"}, {}),
+        ({}, {"Accept": f"{ContentType.APP_JSON}; "
+              "profile=https://ogcincubator.github.io"
+              "/bblock-prov-schema/build/annotated/ogc-utils/prov/schema.json"}),
+        ({}, {"Accept-Profile": "https://ogcincubator.github.io"
+              "/bblock-prov-schema/build/annotated/ogc-utils/prov/schema.json"}),
+    ])
+    def test_job_prov_ogc_json_list(self, queries, headers):
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        # Make sure it is application/json and not application/provenance+json
+        assert resp.content_type == ContentType.APP_JSON
+        prov = resp.json
+        # Make sure it contains activities, entities and agents
+        assert isinstance(prov, list)
+        assert all("id" in obj for obj in prov)
+        assert any("activityType" in obj for obj in prov)
+        assert all(obj["activityType"] == "Activity"
+                   for obj in prov if "activityType" in obj)
+        # It should use startedAtTime, not startTime
+        assert all("startTime" not in obj for obj in prov)
+        assert any("startedAtTime" in obj for obj in prov)
+        # It should not be nested
+        for obj in prov:
+            assoc = obj.get("wasAssociatedWith")
+            if assoc is None:
+                continue
+            assert isinstance(assoc, (str, list))
+            if isinstance(assoc, list):
+                assert all(isinstance(ref, str) for ref in assoc)
+        # It should not contain reverse relations
+        assert all("generated" not in obj for obj in prov)
+
+    @parameterized.expand([
         ({},
          {"Accept": ContentType.APP_YAML,
           "Accept-Profile": "https://ogcincubator.github.io"
-          "/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"}),
+          "/bblock-prov-schema/build/annotated/ogc-utils/prov/schema.json"}),
     ])
     def test_job_prov_ogc_yaml(self, queries, headers):
         prov_url = f"{self.job_url}/prov"

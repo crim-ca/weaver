@@ -64,6 +64,7 @@ def test_provenance_formats():
         ProvenanceFormat.PROV_XML,
         ProvenanceFormat.PROV_NT,
         ProvenanceFormat.PROV_OGC_JSON,
+        ProvenanceFormat.PROV_OGC_JSON_ACTIVITY,
     ]
     assert set(result) == set(expect)
 
@@ -95,6 +96,7 @@ def test_provenance_media_types():
         ("PROV-JSON", ProvenanceFormat.PROV_JSON),
         ("PROV-JSONLD", ProvenanceFormat.PROV_JSONLD),
         ("PROV-OGC-JSON", ProvenanceFormat.PROV_OGC_JSON),
+        ("PROV-OGC-JSON-ACTIVITY", ProvenanceFormat.PROV_OGC_JSON_ACTIVITY),
     ]
 )
 def test_provenance_format(provenance, expect):
@@ -108,6 +110,8 @@ def test_provenance_format(provenance, expect):
     [
         (None, None),
         (ProvenanceFormat.PROV_JSON, ContentType.APP_PROV_JSON),
+        (ProvenanceFormat.PROV_OGC_JSON, ContentType.APP_JSON),
+        (ProvenanceFormat.PROV_OGC_JSON_ACTIVITY, ContentType.APP_JSON),
         (ProvenanceFormat.PROV_JSONLD, ContentType.APP_JSONLD),
         (ProvenanceFormat.PROV_XML, ContentType.APP_PROV_XML),
         (ProvenanceFormat.PROV_NT, ContentType.APP_NT),
@@ -215,11 +219,12 @@ def test_convert_to_prov_list():
 
 def test_convert_to_prov_object():
     prov_data = resources.load_resource("job_prov.json", text=True)
-    # Could get this from the data (it is the workflow run object)
-    root_id = "urn:uuid:b3de0240-663b-4003-86c6-1004173fa711"
-    prov_json = convert_to_prov_chain(prov_data, root_id)
-    assert prov_json
-    prov = json.loads(prov_json)
+    prov_json = json.loads(prov_data)
+    # Use first (only) activity as root
+    root_id = next(iter(prov_json["activity"])).replace("id:", "urn:uuid:")
+    prov_ogc_json = convert_to_prov_chain(prov_data, root_id)
+    assert prov_ogc_json
+    prov = json.loads(prov_ogc_json)
     # Make sure it is an activity
     assert isinstance(prov, dict)
     assert "id" in prov
@@ -241,7 +246,7 @@ def test_validate_prov_list():
     prov_data = resources.load_resource("job_prov.json", text=True)
     prov_json = convert_to_prov_chain(prov_data)
     prov = json.loads(prov_json)
-    with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov-bundled.json",
+    with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov.json",
               encoding="utf-8") as fh:
         prov_schema = json.load(fh)
     jsonschema.validate(prov, prov_schema)
@@ -252,7 +257,7 @@ def test_validate_prov_object():
     root_id = "urn:uuid:b3de0240-663b-4003-86c6-1004173fa711"
     prov_json = convert_to_prov_chain(prov_data, root_id)
     prov = json.loads(prov_json)
-    with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov-bundled.json",
+    with open(Path(WEAVER_SCHEMA_DIR) / "prov" / "ogc-prov.json",
               encoding="utf-8") as fh:
         prov_schema = json.load(fh)
     jsonschema.validate(prov, prov_schema)

@@ -90,6 +90,7 @@ class ProvenanceFormat(Constants):
     PROV_N = "PROV-N"
     PROV_NT = "PROV-NT"
     PROV_OGC_JSON = "PROV-OGC-JSON"
+    PROV_OGC_JSON_ACTIVITY = "PROV-OGC-JSON-ACTIVITY"
 
     _media_types = {
         ContentType.APP_YAML: PROV_JSON,
@@ -111,6 +112,7 @@ class ProvenanceFormat(Constants):
         PROV_N: ContentType.TEXT_PROVN,
         PROV_NT: ContentType.APP_NT,
         PROV_OGC_JSON: ContentType.APP_JSON,
+        PROV_OGC_JSON_ACTIVITY: ContentType.APP_JSON,
     }
     _profiles = {
         PROV_JSON: "https://www.w3.org/submissions/prov-json/",
@@ -121,7 +123,11 @@ class ProvenanceFormat(Constants):
         PROV_NT: "https://www.w3.org/TR/prov-o/",
         PROV_OGC_JSON: (
             "https://ogcincubator.github.io/"
-            "bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json"
+            "bblock-prov-schema/build/annotated/ogc-utils/prov/schema.json"
+        ),
+        PROV_OGC_JSON_ACTIVITY: (
+            "https://ogcincubator.github.io/"
+            "bblock-prov-schema/build/annotated/ogc-utils/prov-activity/schema.json"
         ),
     }
     _profile_formats = {v: k for k, v in _profiles.items()}
@@ -499,8 +505,10 @@ _PROV_TYPE_FIELD = {
     "Activity": "activityType",
     "Agent": "provType",
 }
-# Specific mappings for certain PROV attributes that are mismatched
-# between PROV-JSON and PROV-O
+# Specific mappings for certain PROV-DM attributes that have different
+# representations in PROV-O. PROV-JSON uses the PROV-DM names
+# (prov:startTime) while PROV-JSONLD and OGC Provenance Chain use the
+# PROV-O names (prov:startedAtTime).
 _PROV_ATTRIBUTES = {
     prov_const.PROV_ATTR_STARTTIME: "startedAtTime",
     prov_const.PROV_ATTR_ENDTIME: "endedAtTime",
