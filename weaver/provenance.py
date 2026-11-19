@@ -240,6 +240,7 @@ class ProvenanceFormat(Constants):
                 ProvenanceFormat.PROV_JSON,
                 ProvenanceFormat.PROV_JSONLD,
                 ProvenanceFormat.PROV_OGC_JSON,
+                ProvenanceFormat.PROV_OGC_JSON_ACTIVITY,
             ]:
                 return err_mismatch
             if prov_format is None:

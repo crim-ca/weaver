@@ -226,6 +226,10 @@ class TestJobProvenance(TestJobProvenanceBase):
          {"Accept": ContentType.APP_YAML,
           "Accept-Profile": "https://ogcincubator.github.io"
           "/bblock-prov-schema/build/annotated/ogc-utils/prov/schema.json"}),
+        ({},
+         {"Accept": ContentType.APP_YAML,
+          "Accept-Profile": "https://ogcincubator.github.io"
+          "/bblock-prov-schema/build/annotated/ogc-utils/prov-activity/schema.json"}),
     ])
     def test_job_prov_ogc_yaml(self, queries, headers):
         prov_url = f"{self.job_url}/prov"

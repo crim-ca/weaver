@@ -3228,8 +3228,7 @@ The provenance endpoints are provided in alignment with the |ogc-api-proc-part5|
 However, `Weaver` also provides additional functionalities in comparison to the minimal requirements from the
 :term:`OGC` specification.
 
-Following is a table of available formats and corresponding endpoints
-offered by `Weaver`.
+Following is a table of available formats and corresponding endpoints offered by `Weaver`.
 
 .. list-table:: Job Provenance Endpoints
     :name: table-job-prov
@@ -3306,13 +3305,12 @@ offered by `Weaver`.
       - ``text/plain``
       - Same as their respective definitions above, but for a specific step of a :term:`Workflow`.
 
-Provenance formats can be requested using the same mechanism described
-in :ref:`proc_content_negotiation`.  Because the :term:`Media-Type` is
-ambiguous for provenance data, it is recommended to either:
+Provenance formats can be requested using the same mechanism described in :ref:`proc_content_negotiation`.  Because the
+:term:`Media-Type` is ambiguous for provenance data, it is recommended to either:
 
-- Use the |PROV|_ Format name with the ``format`` parameter, for example ``?f=PROV-OGC-JSON``
+- Use the |PROV|_ Format name with the ``format`` parameter, for example ``?f=PROV-OGC-JSON``.
 - Explicitly request the desired profile using one of the mechanisms described in
-  :ref:`proc_content_negotiation_profile_order`.
+:ref:`proc_content_negotiation_profile_order`.
 
 .. seealso::
     This feature is enabled by default. Its functionality and the corresponding :term:`API` endpoints
