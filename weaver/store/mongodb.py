@@ -748,7 +748,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         process_id = self._get_process_id(process_id)
         process_id = Process.split_version(process_id)[0]  # version never needed to fetch all revisions
         sane_name = get_sane_name(process_id, **self.sane_name_config)
-        version_name = rf"^{sane_name}(:.*)?$"
+        version_name = sd.Tag.pattern_for(sane_name)
         versions = self.collection.find(
             filter={"identifier": {"$regex": version_name}},
             projection={"_id": False, "version": True},

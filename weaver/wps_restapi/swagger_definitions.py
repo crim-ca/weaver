@@ -620,6 +620,17 @@ class Tag(ExtendedSchemaNode):
         rf"(:{SemanticVersion(v_prefix=False, rc_suffix=True).pattern[1:-1]})?$"
     )
 
+    @classmethod
+    def pattern_for(cls, process_id):
+        # type: (str) -> str
+        """
+        Obtains the process tag pattern for a specific process identifier.
+        """
+        slug_pattern = SLUG.pattern.pattern[:-1]
+        if not cls.pattern.pattern.startswith(slug_pattern):
+            raise RuntimeError("Tag pattern must start with the generic process identifier pattern.")
+        return f"^{re.escape(process_id)}{cls.pattern.pattern[len(slug_pattern):]}"
+
 
 class URL(ExtendedSchemaNode):
     """
