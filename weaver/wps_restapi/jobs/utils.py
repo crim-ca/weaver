@@ -1935,7 +1935,7 @@ def get_job_prov_response(request):
     # explicit format=/f= takes precedence over a requested profile, itself taking precedence over the media-type
     profile = get_response_profile(request) if prov_fmt is None else None
     if profile:
-        prov_fmt = ProvenanceFormat.from_profile(profile)
+        prov_fmt = ProvenanceFormat.from_profile(profile, content_type=prov_content_type)
         if prov_fmt is None:
             raise HTTPNotAcceptable(json={
                 "title": "JobProvenanceUnsupportedFormat",

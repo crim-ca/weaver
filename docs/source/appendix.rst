@@ -209,7 +209,7 @@ Glossary
     MIME-types
         | Multipurpose Internet Mail Extensions
         | Format representation of the referenced element, often represented by :term:`IANA` or :term:`EDAM` ontologies.
-          More recent `Media-Type` naming is employed for the general use of ``Content-Type`` data representation in
+          More recent :term:`Media-Type` naming is employed for the general use of ``Content-Type`` data representation in
           multiple situations and contexts.
 
         .. seealso::

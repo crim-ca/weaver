@@ -348,6 +348,8 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({"f": "turtle"}, {}),
         ({"f": ProvenanceFormat.PROV_TURTLE}, {}),
         ({}, {"Accept": ContentType.TEXT_TURTLE}),
+        ({}, {"Accept": ContentType.TEXT_TURTLE,
+              "Accept-Profile": "https://www.w3.org/TR/prov-o/"}),
     ])
     def test_job_prov_ttl(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -365,6 +367,8 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({"f": "nt"}, {}),
         ({"f": ProvenanceFormat.PROV_NT}, {}),
         ({}, {"Accept": ContentType.APP_NT}),
+        ({}, {"Accept": ContentType.APP_NT,
+              "Accept-Profile": "https://www.w3.org/TR/prov-o/"}),
     ])
     def test_job_prov_nt(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
