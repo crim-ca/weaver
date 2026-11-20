@@ -24,7 +24,7 @@ doc8>=2.0.0
 # which cannot be integrated without all the above 1.7.8 problems
 # if higher python version is employed, use 'make CHECKS_EXCLUDE=docf check-only'
 docformatter>=1.7.7,!=1.7.8; python_version < "3.14"
-flake8>=7.4.1
+flake8>=7.5.0
 flynt
 isort>=9.0.2
 mdformat
@@ -42,7 +42,7 @@ pluggy>=1.7.0
 pycodestyle>=2.11.0; python_version >= "3.12"
 pytest
 pytest-dependency
-pytest-httpserver>=1.2.0  # support werkzeug>=3
+pytest-httpserver>=1.2.1  # support werkzeug>=3
 pytest-profiling
 pytest-server-fixtures
 #pytest-rerunfailures
