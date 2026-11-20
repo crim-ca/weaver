@@ -432,6 +432,19 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert "detail" in resp.json
 
     @parameterized.expand([
+        (ContentType.APP_JSON, "https://www.w3.org/TR/prov-xml/"),
+        (ContentType.APP_JSON, "https://www.w3.org/TR/prov-n/"),
+    ])
+    def test_job_prov_incompatible_media_type_profile(self, content_type, profile):
+        prov_url = f"{self.job_url}/prov"
+        headers = {"Accept": f"{content_type}; profile={profile}"}
+        resp = self.app.get(prov_url, headers=headers, expect_errors=True)
+        assert resp.status_code == 406, f"Expected 406, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI
+        assert "detail" in resp.json
+
+    @parameterized.expand([
         ({"f": ProvenanceFormat.PROV_XML}, ContentType.APP_PROV_XML),
         ({"f": ProvenanceFormat.PROV_JSON}, ContentType.APP_PROV_JSON),
     ])
@@ -441,7 +454,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         """
         prov_url = f"{self.job_url}/prov"
         for profile in [
-            "https://ogcincubator.github.io/bblock-prov-schema/build/annotated/ogc-utils/prov-bundled/schema.json",
+            "https://ogcincubator.github.io/bblock-prov-schema/build/annotated/ogc-utils/prov/schema.json",
             "http://example.org/unknown",
         ]:
             resp = self.app.get(prov_url, params=queries, headers={"Accept-Profile": profile})

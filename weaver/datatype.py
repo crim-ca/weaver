@@ -1629,9 +1629,6 @@ class Job(Base, LoggerHandler):
             tool.output.seek(0)
             data = tool.output.read()
             content_type = ContentType.TEXT_PLAIN
-        if content_type == ContentType.APP_YAML:
-            data = json.loads(data)
-            data = OutputFormat.convert(data, to=OutputFormat.YAML)
         # uplift application/json to extended types
         if content_type == ContentType.APP_JSON:
             if prov_format == ProvenanceFormat.PROV_JSONLD:
@@ -1642,6 +1639,18 @@ class Job(Base, LoggerHandler):
         # likewise with application/xml
         if content_type in ContentType.ANY_XML:
             content_type = ContentType.APP_PROV_XML
+        if prov_format and content_type:
+            prov_content_type = ProvenanceFormat.as_media_type(prov_format)
+            if content_type == ContentType.APP_YAML:
+                if prov_content_type not in (
+                    ContentType.APP_JSON, ContentType.APP_PROV_JSON, ContentType.APP_JSONLD
+                ):
+                    return None, None
+            elif content_type != prov_content_type:
+                return None, None
+        if content_type == ContentType.APP_YAML:
+            data = json.loads(data)
+            data = OutputFormat.convert(data, to=OutputFormat.YAML)
         return data, content_type
 
     def links(self, container=None, self_link=None):
