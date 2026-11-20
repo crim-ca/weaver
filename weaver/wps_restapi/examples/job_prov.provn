@@ -8,42 +8,42 @@ document
   prefix id <urn:uuid:>
   prefix data <urn:hash::sha1:>
   prefix sha256 <nih:sha-256;>
-  prefix researchobject <arcp://uuid,4468e044-a1d4-41a5-b8aa-65e465d627d6/>
-  prefix metadata <arcp://uuid,4468e044-a1d4-41a5-b8aa-65e465d627d6/metadata/>
-  prefix provenance <arcp://uuid,4468e044-a1d4-41a5-b8aa-65e465d627d6/metadata/provenance/>
-  prefix wf <arcp://uuid,4468e044-a1d4-41a5-b8aa-65e465d627d6/workflow/packed.cwl#>
-  prefix input <arcp://uuid,4468e044-a1d4-41a5-b8aa-65e465d627d6/workflow/primary-job.json#>
+  prefix researchobject <arcp://uuid,57e9d06a-0aa1-4560-98a1-2c127e11c51c/>
+  prefix metadata <arcp://uuid,57e9d06a-0aa1-4560-98a1-2c127e11c51c/metadata/>
+  prefix provenance <arcp://uuid,57e9d06a-0aa1-4560-98a1-2c127e11c51c/metadata/provenance/>
+  prefix wf <arcp://uuid,57e9d06a-0aa1-4560-98a1-2c127e11c51c/workflow/packed.cwl#>
+  prefix input <arcp://uuid,57e9d06a-0aa1-4560-98a1-2c127e11c51c/workflow/primary-job.json#>
   prefix doi <https://doi.org/>
   prefix wf4ever <http://purl.org/wf4ever/wf4ever#>
   
-  agent(id:0de4fab7-7ae8-4668-af1d-6a5533d79371)
-  agent(id:0de4fab7-7ae8-4668-af1d-6a5533d79371,
+  agent(id:17a696a5-ee1f-4b3e-8ee4-c360c19f34e7)
+  agent(id:17a696a5-ee1f-4b3e-8ee4-c360c19f34e7,
         [prov:type='foaf:OnlineAccount',
          prov:location="https://hirondelle.crim.ca/weaver",
          cwlprov:hostname="hirondelle.crim.ca"])
-  agent(id:0de4fab7-7ae8-4668-af1d-6a5533d79371,
+  agent(id:17a696a5-ee1f-4b3e-8ee4-c360c19f34e7,
         [prov:type='foaf:OnlineAccount',
          prov:label="weaver-worker",
          foaf:accountName="weaver-worker"])
-  agent(id:5f21fdfe-cc9b-4681-b6f2-b8ff67ecffab,
+  agent(id:e8c0fbf5-c485-43f7-b789-9887c013c029,
         [prov:type='prov:SoftwareAgent',
          prov:type='schema:SoftwareApplication',
          prov:label="weaver-worker@crim-ca/weaver:6.18.0",
          foaf:name="weaver-worker@crim-ca/weaver:6.18.0",
-         foaf:account='id:0de4fab7-7ae8-4668-af1d-6a5533d79371',
+         foaf:account='id:17a696a5-ee1f-4b3e-8ee4-c360c19f34e7',
          schema:name="weaver-worker@crim-ca/weaver:6.18.0"])
-  actedOnBehalfOf(id:0de4fab7-7ae8-4668-af1d-6a5533d79371, id:5f21fdfe-cc9b-4681-b6f2-b8ff67ecffab, -)
-  agent(id:f2da75ac-d251-4814-9ce3-bee959bcf0f4,
+  actedOnBehalfOf(id:17a696a5-ee1f-4b3e-8ee4-c360c19f34e7, id:e8c0fbf5-c485-43f7-b789-9887c013c029, -)
+  agent(id:c6e00880-e085-4ab6-ac69-c0ac993f07c9,
         [prov:type='prov:SoftwareAgent',
          prov:type='wfprov:WorkflowEngine',
          prov:label="cwltool 3.3.20261106131235.dev26+g707e26127"])
-  activity(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.839887+00:00, -,
+  activity(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.720253+00:00, -,
            [prov:type='wfprov:WorkflowRun',
             prov:label="Run of workflow/packed.cwl#main"])
-  actedOnBehalfOf(id:f2da75ac-d251-4814-9ce3-bee959bcf0f4, id:0de4fab7-7ae8-4668-af1d-6a5533d79371, id:4468e044-a1d4-41a5-b8aa-65e465d627d6)
-  wasStartedBy(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, -, id:f2da75ac-d251-4814-9ce3-bee959bcf0f4, 2026-11-19T23:29:57.839887+00:00)
-  wasAssociatedWith(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:f2da75ac-d251-4814-9ce3-bee959bcf0f4, wf:main)
-  wasAssociatedWith(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:f2da75ac-d251-4814-9ce3-bee959bcf0f4, -)
+  actedOnBehalfOf(id:c6e00880-e085-4ab6-ac69-c0ac993f07c9, id:17a696a5-ee1f-4b3e-8ee4-c360c19f34e7, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c)
+  wasStartedBy(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, -, id:c6e00880-e085-4ab6-ac69-c0ac993f07c9, 2026-11-20T14:11:52.720253+00:00)
+  wasAssociatedWith(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:c6e00880-e085-4ab6-ac69-c0ac993f07c9, wf:main)
+  wasAssociatedWith(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:c6e00880-e085-4ab6-ac69-c0ac993f07c9, -)
   entity(data:644e201526525f62152815a76a2dc773450f3dd9,
          [prov:type='schema:SoftwareSourceCode',
           prov:label="Source code repository",
@@ -70,16 +70,16 @@ document
          [prov:type='wfdesc:Process',
           prov:location="https://hirondelle.crim.ca/weaver/processes/EchoProcess",
           prov:label="Process Description"])
-  activity(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, -, -,
+  activity(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, -, -,
            [prov:type='wfprov:ProcessRun',
-            prov:location="https://hirondelle.crim.ca/weaver/processes/EchoProcess/jobs/4468e044-a1d4-41a5-b8aa-65e465d627d6",
+            prov:location="https://hirondelle.crim.ca/weaver/processes/EchoProcess/jobs/57e9d06a-0aa1-4560-98a1-2c127e11c51c",
             prov:label="Job Information",
-            wfprov:wasEnactedBy='id:f2da75ac-d251-4814-9ce3-bee959bcf0f4',
+            wfprov:wasEnactedBy='id:c6e00880-e085-4ab6-ac69-c0ac993f07c9',
             wfprov:describedByProcess='data:3074a57368a31e0f562f819313be239fbdd327e1'])
-  wasStartedBy(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, -, id:f2da75ac-d251-4814-9ce3-bee959bcf0f4, -)
-  actedOnBehalfOf(data:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11, id:5f21fdfe-cc9b-4681-b6f2-b8ff67ecffab, -)
+  wasStartedBy(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, -, id:c6e00880-e085-4ab6-ac69-c0ac993f07c9, -)
+  actedOnBehalfOf(data:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11, id:e8c0fbf5-c485-43f7-b789-9887c013c029, -)
   actedOnBehalfOf(data:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11, data:838cdfa4bbf09d1aedd26d79b46bfa8778ede2e0, -)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, data:644e201526525f62152815a76a2dc773450f3dd9, -)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, data:644e201526525f62152815a76a2dc773450f3dd9, -)
   entity(wf:main,
          [prov:type='wfdesc:Process',
           prov:type='prov:Plan',
@@ -87,258 +87,258 @@ document
   entity(data:0cf60d40470fde378076afacf5812f961208a018,
          [prov:type='wfprov:Artifact',
           prov:value="Value2"])
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, data:0cf60d40470fde378076afacf5812f961208a018, 2026-11-19T23:29:57.842045+00:00,
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, data:0cf60d40470fde378076afacf5812f961208a018, 2026-11-20T14:11:52.722419+00:00,
        [prov:role='wf:main/stringInput'])
-  entity(id:2966e221-b5ee-4fb6-b2f4-81d97259105b,
+  entity(id:1455b416-5441-4861-a75f-95e5a589d87e,
          [prov:value="9.81" %% xsd:double])
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:2966e221-b5ee-4fb6-b2f4-81d97259105b, 2026-11-19T23:29:57.842114+00:00,
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:1455b416-5441-4861-a75f-95e5a589d87e, 2026-11-20T14:11:52.722478+00:00,
        [prov:role='wf:main/measureInput'])
   entity(data:d88aaa302517127d82182445af28a866c379e7ac,
          [prov:type='wfprov:Artifact',
           prov:value="2026-10-08T21:15:05.071416"])
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, data:d88aaa302517127d82182445af28a866c379e7ac, 2026-11-19T23:29:57.842360+00:00,
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, data:d88aaa302517127d82182445af28a866c379e7ac, 2026-11-20T14:11:52.722631+00:00,
        [prov:role='wf:main/dateInput'])
-  entity(id:202fc5d1-5ef2-4328-975b-a651f66e5ea8,
+  entity(id:6679364b-8c4e-42bb-b5aa-3199c6a14a69,
          [prov:value="3.1416" %% xsd:double])
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:202fc5d1-5ef2-4328-975b-a651f66e5ea8, 2026-11-19T23:29:57.842403+00:00,
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:6679364b-8c4e-42bb-b5aa-3199c6a14a69, 2026-11-20T14:11:52.722673+00:00,
        [prov:role='wf:main/doubleInput'])
-  entity(id:aeebc95a-96cb-43ad-af9d-f4251f01e13f, [prov:value=1])
-  entity(id:e5ef9c2f-190e-4858-8a3f-c153af0bbf4d, [prov:value=2])
-  entity(id:f08e4434-842a-4181-acc3-bcbe4ab3de4d, [prov:value=3])
-  entity(id:e6748885-4e7f-4896-a820-8ad970f5b456,
+  entity(id:bed28861-828b-4f75-8b26-004e88068794, [prov:value=1])
+  entity(id:520b43f8-f071-40c2-a153-160330bddc4a, [prov:value=2])
+  entity(id:a4d206e4-f576-4a0c-a656-2a563bfd5d74, [prov:value=3])
+  entity(id:74e830a1-ce04-409d-8246-ef1db3d12287,
          [prov:type='wfprov:Artifact',
           prov:type='prov:Collection'])
-  hadMember(id:e6748885-4e7f-4896-a820-8ad970f5b456, id:aeebc95a-96cb-43ad-af9d-f4251f01e13f)
-  hadMember(id:e6748885-4e7f-4896-a820-8ad970f5b456, id:e5ef9c2f-190e-4858-8a3f-c153af0bbf4d)
-  hadMember(id:e6748885-4e7f-4896-a820-8ad970f5b456, id:f08e4434-842a-4181-acc3-bcbe4ab3de4d)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:e6748885-4e7f-4896-a820-8ad970f5b456, 2026-11-19T23:29:57.842509+00:00,
+  hadMember(id:74e830a1-ce04-409d-8246-ef1db3d12287, id:bed28861-828b-4f75-8b26-004e88068794)
+  hadMember(id:74e830a1-ce04-409d-8246-ef1db3d12287, id:520b43f8-f071-40c2-a153-160330bddc4a)
+  hadMember(id:74e830a1-ce04-409d-8246-ef1db3d12287, id:a4d206e4-f576-4a0c-a656-2a563bfd5d74)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:74e830a1-ce04-409d-8246-ef1db3d12287, 2026-11-20T14:11:52.722770+00:00,
        [prov:role='wf:main/arrayInput'])
   entity(data:387a00b69dd6112551d5167f4498e05a89166eb0,
          [prov:type='wfprov:Artifact'])
-  entity(id:fdee7b62-a007-42eb-b9be-f2ae2093b274,
+  entity(id:35f9edbd-4937-4c25-b27e-379e6128d416,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File'])
-  specializationOf(id:fdee7b62-a007-42eb-b9be-f2ae2093b274, data:387a00b69dd6112551d5167f4498e05a89166eb0)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:fdee7b62-a007-42eb-b9be-f2ae2093b274, 2026-11-19T23:29:57.842723+00:00,
+  specializationOf(id:35f9edbd-4937-4c25-b27e-379e6128d416, data:387a00b69dd6112551d5167f4498e05a89166eb0)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:35f9edbd-4937-4c25-b27e-379e6128d416, 2026-11-20T14:11:52.723058+00:00,
        [prov:role='wf:main/complexObjectInput'])
   entity(data:9f71fd268fb807d8085c9e92abd2d33310184f31,
          [prov:type='wfprov:Artifact'])
-  entity(id:e9774c55-acea-42d5-b45f-70e0b028ba90,
+  entity(id:f8062fba-4eea-419a-8172-7359042f5753,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File'])
-  specializationOf(id:e9774c55-acea-42d5-b45f-70e0b028ba90, data:9f71fd268fb807d8085c9e92abd2d33310184f31)
+  specializationOf(id:f8062fba-4eea-419a-8172-7359042f5753, data:9f71fd268fb807d8085c9e92abd2d33310184f31)
   entity(data:a17865ee4d8af3ebe8bd5b092dbb92464ba4cff4,
          [prov:type='wfprov:Artifact'])
-  entity(id:99fddb44-da33-4a86-a3cd-fb875fef49e9,
+  entity(id:c08471c5-dd2a-4505-a97b-91fe710dd458,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File'])
-  specializationOf(id:99fddb44-da33-4a86-a3cd-fb875fef49e9, data:a17865ee4d8af3ebe8bd5b092dbb92464ba4cff4)
-  entity(id:2f4a6ffa-e1b5-4497-a68e-0e9a503fba59,
+  specializationOf(id:c08471c5-dd2a-4505-a97b-91fe710dd458, data:a17865ee4d8af3ebe8bd5b092dbb92464ba4cff4)
+  entity(id:b6bce66f-20d9-4536-8fdf-a80e6a530efa,
          [prov:type='wfprov:Artifact',
           prov:type='prov:Collection'])
-  hadMember(id:2f4a6ffa-e1b5-4497-a68e-0e9a503fba59, id:e9774c55-acea-42d5-b45f-70e0b028ba90)
-  hadMember(id:2f4a6ffa-e1b5-4497-a68e-0e9a503fba59, id:99fddb44-da33-4a86-a3cd-fb875fef49e9)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:2f4a6ffa-e1b5-4497-a68e-0e9a503fba59, 2026-11-19T23:29:57.843053+00:00,
+  hadMember(id:b6bce66f-20d9-4536-8fdf-a80e6a530efa, id:f8062fba-4eea-419a-8172-7359042f5753)
+  hadMember(id:b6bce66f-20d9-4536-8fdf-a80e6a530efa, id:c08471c5-dd2a-4505-a97b-91fe710dd458)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:b6bce66f-20d9-4536-8fdf-a80e6a530efa, 2026-11-20T14:11:52.723443+00:00,
        [prov:role='wf:main/geometryInput'])
   entity(data:fc6f6f7466a49edf8dd6d0aa6d30457c85263b2d,
          [prov:type='wfprov:Artifact'])
-  entity(id:56250b82-5533-491e-93e5-288a7a552481,
+  entity(id:58355480-5c9e-4816-bcf4-7aba0a64723d,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File'])
-  specializationOf(id:56250b82-5533-491e-93e5-288a7a552481, data:fc6f6f7466a49edf8dd6d0aa6d30457c85263b2d)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:56250b82-5533-491e-93e5-288a7a552481, 2026-11-19T23:29:57.843215+00:00,
+  specializationOf(id:58355480-5c9e-4816-bcf4-7aba0a64723d, data:fc6f6f7466a49edf8dd6d0aa6d30457c85263b2d)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:58355480-5c9e-4816-bcf4-7aba0a64723d, 2026-11-20T14:11:52.723602+00:00,
        [prov:role='wf:main/boundingBoxInput'])
   entity(data:661863675627302283a66531e9d849a0670e7c03,
          [prov:type='wfprov:Artifact'])
-  entity(id:b4628a0e-4cd0-4368-9032-95b7c4bece32,
+  entity(id:b6a8aadd-6556-4eb7-80f0-25a6bb5709b5,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File'])
-  specializationOf(id:b4628a0e-4cd0-4368-9032-95b7c4bece32, data:661863675627302283a66531e9d849a0670e7c03)
-  entity(id:49789665-00fd-42dd-8c6c-4b5aa317ec3b,
+  specializationOf(id:b6a8aadd-6556-4eb7-80f0-25a6bb5709b5, data:661863675627302283a66531e9d849a0670e7c03)
+  entity(id:6c495dbc-c70a-488e-85ac-971c8a478519,
          [prov:type='wfprov:Artifact',
           prov:type='prov:Collection'])
-  hadMember(id:49789665-00fd-42dd-8c6c-4b5aa317ec3b, id:b4628a0e-4cd0-4368-9032-95b7c4bece32)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:49789665-00fd-42dd-8c6c-4b5aa317ec3b, 2026-11-19T23:29:57.843383+00:00,
+  hadMember(id:6c495dbc-c70a-488e-85ac-971c8a478519, id:b6a8aadd-6556-4eb7-80f0-25a6bb5709b5)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:6c495dbc-c70a-488e-85ac-971c8a478519, 2026-11-20T14:11:52.723769+00:00,
        [prov:role='wf:main/imagesInput'])
   entity(data:f421813fc7dea73d182e0d89307b5ba45128a9b5,
          [prov:type='wfprov:Artifact'])
-  entity(id:8bd70102-46c5-4851-96a9-d5d631b135d3,
+  entity(id:64f0f1fe-ee95-4ed2-857d-7ecf23f012fd,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File'])
-  specializationOf(id:8bd70102-46c5-4851-96a9-d5d631b135d3, data:f421813fc7dea73d182e0d89307b5ba45128a9b5)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:8bd70102-46c5-4851-96a9-d5d631b135d3, 2026-11-19T23:29:57.843526+00:00,
+  specializationOf(id:64f0f1fe-ee95-4ed2-857d-7ecf23f012fd, data:f421813fc7dea73d182e0d89307b5ba45128a9b5)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:64f0f1fe-ee95-4ed2-857d-7ecf23f012fd, 2026-11-20T14:11:52.723907+00:00,
        [prov:role='wf:main/featureCollectionInput'])
   entity(data:0cf60d40470fde378076afacf5812f961208a018,
          [prov:type='wfprov:Artifact',
           prov:value="Value2"])
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, data:0cf60d40470fde378076afacf5812f961208a018, 2026-11-19T23:29:57.844428+00:00,
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, data:0cf60d40470fde378076afacf5812f961208a018, 2026-11-20T14:11:52.724605+00:00,
        [prov:role='wf:main/EchoProcess/stringInput'])
-  entity(id:b911eb92-5b48-431e-8f40-029aad2efd91,
+  entity(id:bfb1f574-8cea-4548-9168-b7176e4f04ac,
          [prov:value="9.81" %% xsd:double])
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:b911eb92-5b48-431e-8f40-029aad2efd91, 2026-11-19T23:29:57.844491+00:00,
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:bfb1f574-8cea-4548-9168-b7176e4f04ac, 2026-11-20T14:11:52.724648+00:00,
        [prov:role='wf:main/EchoProcess/measureInput'])
   entity(data:d88aaa302517127d82182445af28a866c379e7ac,
          [prov:type='wfprov:Artifact',
           prov:value="2026-10-08T21:15:05.071416"])
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, data:d88aaa302517127d82182445af28a866c379e7ac, 2026-11-19T23:29:57.844602+00:00,
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, data:d88aaa302517127d82182445af28a866c379e7ac, 2026-11-20T14:11:52.724744+00:00,
        [prov:role='wf:main/EchoProcess/dateInput'])
-  entity(id:4652a0c4-1053-444f-a051-5b6bb7bd3bed,
+  entity(id:7491c7c3-38fa-4b09-ad41-58ef26c1233c,
          [prov:value="3.1416" %% xsd:double])
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:4652a0c4-1053-444f-a051-5b6bb7bd3bed, 2026-11-19T23:29:57.844637+00:00,
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:7491c7c3-38fa-4b09-ad41-58ef26c1233c, 2026-11-20T14:11:52.724777+00:00,
        [prov:role='wf:main/EchoProcess/doubleInput'])
-  entity(id:09fcb4db-8fd0-4bbf-b906-2228204abdcc, [prov:value=1])
-  entity(id:3cc0ec42-b207-43a1-a7c4-a179df08a15c, [prov:value=2])
-  entity(id:15d95f1a-5475-4891-a82a-718eac9161fb, [prov:value=3])
-  entity(id:f9412928-0abc-43d0-81f9-0aca46e32c15,
+  entity(id:e4fb4ed3-22d6-4f64-b372-e7c9260cc4fb, [prov:value=1])
+  entity(id:fdc6ae54-3589-4414-9685-b6c131fadc25, [prov:value=2])
+  entity(id:2eabfc30-6af9-4f77-9e4b-cd8bba0dc8c4, [prov:value=3])
+  entity(id:3e129c97-cf95-47f1-95fb-b0a0dfbdae69,
          [prov:type='wfprov:Artifact',
           prov:type='prov:Collection'])
-  hadMember(id:f9412928-0abc-43d0-81f9-0aca46e32c15, id:09fcb4db-8fd0-4bbf-b906-2228204abdcc)
-  hadMember(id:f9412928-0abc-43d0-81f9-0aca46e32c15, id:3cc0ec42-b207-43a1-a7c4-a179df08a15c)
-  hadMember(id:f9412928-0abc-43d0-81f9-0aca46e32c15, id:15d95f1a-5475-4891-a82a-718eac9161fb)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:f9412928-0abc-43d0-81f9-0aca46e32c15, 2026-11-19T23:29:57.844735+00:00,
+  hadMember(id:3e129c97-cf95-47f1-95fb-b0a0dfbdae69, id:e4fb4ed3-22d6-4f64-b372-e7c9260cc4fb)
+  hadMember(id:3e129c97-cf95-47f1-95fb-b0a0dfbdae69, id:fdc6ae54-3589-4414-9685-b6c131fadc25)
+  hadMember(id:3e129c97-cf95-47f1-95fb-b0a0dfbdae69, id:2eabfc30-6af9-4f77-9e4b-cd8bba0dc8c4)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:3e129c97-cf95-47f1-95fb-b0a0dfbdae69, 2026-11-20T14:11:52.724867+00:00,
        [prov:role='wf:main/EchoProcess/arrayInput'])
   entity(data:387a00b69dd6112551d5167f4498e05a89166eb0,
          [prov:type='wfprov:Artifact'])
-  entity(id:70632e58-ba09-408e-80af-9853b47196f5,
+  entity(id:af56c9b2-9d9e-4e04-8b9b-05324864a377,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File',
           cwlprov:basename="input",
           cwlprov:nameroot="input",
           cwlprov:nameext=""])
-  specializationOf(id:70632e58-ba09-408e-80af-9853b47196f5, data:387a00b69dd6112551d5167f4498e05a89166eb0)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:70632e58-ba09-408e-80af-9853b47196f5, 2026-11-19T23:29:57.844908+00:00,
+  specializationOf(id:af56c9b2-9d9e-4e04-8b9b-05324864a377, data:387a00b69dd6112551d5167f4498e05a89166eb0)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:af56c9b2-9d9e-4e04-8b9b-05324864a377, 2026-11-20T14:11:52.725011+00:00,
        [prov:role='wf:main/EchoProcess/complexObjectInput'])
   entity(data:9f71fd268fb807d8085c9e92abd2d33310184f31,
          [prov:type='wfprov:Artifact'])
-  entity(id:b7362187-967d-4267-b9c1-bb283b757730,
+  entity(id:ba50fe5d-a15e-47e1-9924-cd3406ca1001,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File',
-          cwlprov:basename="input_xpm2ewib",
-          cwlprov:nameroot="input_xpm2ewib",
+          cwlprov:basename="input_4f8qlaut",
+          cwlprov:nameroot="input_4f8qlaut",
           cwlprov:nameext=""])
-  specializationOf(id:b7362187-967d-4267-b9c1-bb283b757730, data:9f71fd268fb807d8085c9e92abd2d33310184f31)
+  specializationOf(id:ba50fe5d-a15e-47e1-9924-cd3406ca1001, data:9f71fd268fb807d8085c9e92abd2d33310184f31)
   entity(data:a17865ee4d8af3ebe8bd5b092dbb92464ba4cff4,
          [prov:type='wfprov:Artifact'])
-  entity(id:6abeacf5-1c47-43af-a1a9-474ea3bd9ac5,
+  entity(id:46879014-4b80-4ef6-b7d0-b533e8a7c30b,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File',
-          cwlprov:basename="input_l10lpliu",
-          cwlprov:nameroot="input_l10lpliu",
+          cwlprov:basename="input_2y6fc7oc",
+          cwlprov:nameroot="input_2y6fc7oc",
           cwlprov:nameext=""])
-  specializationOf(id:6abeacf5-1c47-43af-a1a9-474ea3bd9ac5, data:a17865ee4d8af3ebe8bd5b092dbb92464ba4cff4)
-  entity(id:faadcc2d-d86f-4e47-95ee-84f79370a1da,
+  specializationOf(id:46879014-4b80-4ef6-b7d0-b533e8a7c30b, data:a17865ee4d8af3ebe8bd5b092dbb92464ba4cff4)
+  entity(id:c4e15377-2d8e-4560-a791-d29d2cf745e3,
          [prov:type='wfprov:Artifact',
           prov:type='prov:Collection'])
-  hadMember(id:faadcc2d-d86f-4e47-95ee-84f79370a1da, id:b7362187-967d-4267-b9c1-bb283b757730)
-  hadMember(id:faadcc2d-d86f-4e47-95ee-84f79370a1da, id:6abeacf5-1c47-43af-a1a9-474ea3bd9ac5)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:faadcc2d-d86f-4e47-95ee-84f79370a1da, 2026-11-19T23:29:57.845289+00:00,
+  hadMember(id:c4e15377-2d8e-4560-a791-d29d2cf745e3, id:ba50fe5d-a15e-47e1-9924-cd3406ca1001)
+  hadMember(id:c4e15377-2d8e-4560-a791-d29d2cf745e3, id:46879014-4b80-4ef6-b7d0-b533e8a7c30b)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:c4e15377-2d8e-4560-a791-d29d2cf745e3, 2026-11-20T14:11:52.725280+00:00,
        [prov:role='wf:main/EchoProcess/geometryInput'])
   entity(data:fc6f6f7466a49edf8dd6d0aa6d30457c85263b2d,
          [prov:type='wfprov:Artifact'])
-  entity(id:45f9805d-7527-49f1-869f-8e7212a8db12,
+  entity(id:8c3ad3e7-4ddb-4ac0-8a33-bea641c745da,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File',
-          cwlprov:basename="input_2azlcque",
-          cwlprov:nameroot="input_2azlcque",
+          cwlprov:basename="input_9jzae01l",
+          cwlprov:nameroot="input_9jzae01l",
           cwlprov:nameext=""])
-  specializationOf(id:45f9805d-7527-49f1-869f-8e7212a8db12, data:fc6f6f7466a49edf8dd6d0aa6d30457c85263b2d)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:45f9805d-7527-49f1-869f-8e7212a8db12, 2026-11-19T23:29:57.845422+00:00,
+  specializationOf(id:8c3ad3e7-4ddb-4ac0-8a33-bea641c745da, data:fc6f6f7466a49edf8dd6d0aa6d30457c85263b2d)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:8c3ad3e7-4ddb-4ac0-8a33-bea641c745da, 2026-11-20T14:11:52.725415+00:00,
        [prov:role='wf:main/EchoProcess/boundingBoxInput'])
   entity(data:661863675627302283a66531e9d849a0670e7c03,
          [prov:type='wfprov:Artifact'])
-  entity(id:7bf117cd-eee0-4160-b9bc-95f98795d07f,
+  entity(id:50567ef2-0bf7-4b28-b475-5dd55d493650,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File',
-          cwlprov:basename="input_hkq119g_",
-          cwlprov:nameroot="input_hkq119g_",
+          cwlprov:basename="input_l5o5u8za",
+          cwlprov:nameroot="input_l5o5u8za",
           cwlprov:nameext=""])
-  specializationOf(id:7bf117cd-eee0-4160-b9bc-95f98795d07f, data:661863675627302283a66531e9d849a0670e7c03)
-  entity(id:d726927b-a97b-421f-9eb2-266f61be8a25,
+  specializationOf(id:50567ef2-0bf7-4b28-b475-5dd55d493650, data:661863675627302283a66531e9d849a0670e7c03)
+  entity(id:92dad43c-7c0f-4772-856f-1006e27568bc,
          [prov:type='wfprov:Artifact',
           prov:type='prov:Collection'])
-  hadMember(id:d726927b-a97b-421f-9eb2-266f61be8a25, id:7bf117cd-eee0-4160-b9bc-95f98795d07f)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:d726927b-a97b-421f-9eb2-266f61be8a25, 2026-11-19T23:29:57.845590+00:00,
+  hadMember(id:92dad43c-7c0f-4772-856f-1006e27568bc, id:50567ef2-0bf7-4b28-b475-5dd55d493650)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:92dad43c-7c0f-4772-856f-1006e27568bc, 2026-11-20T14:11:52.725553+00:00,
        [prov:role='wf:main/EchoProcess/imagesInput'])
   entity(data:f421813fc7dea73d182e0d89307b5ba45128a9b5,
          [prov:type='wfprov:Artifact'])
-  entity(id:4e5bc928-6056-400a-a416-04147c5cf529,
+  entity(id:8d0527fd-9a8d-4bf3-a649-ee3a5ffce1d8,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File',
-          cwlprov:basename="input_obelzatl",
-          cwlprov:nameroot="input_obelzatl",
+          cwlprov:basename="input_fyqgjmql",
+          cwlprov:nameroot="input_fyqgjmql",
           cwlprov:nameext=""])
-  specializationOf(id:4e5bc928-6056-400a-a416-04147c5cf529, data:f421813fc7dea73d182e0d89307b5ba45128a9b5)
-  used(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, id:4e5bc928-6056-400a-a416-04147c5cf529, 2026-11-19T23:29:57.845718+00:00,
+  specializationOf(id:8d0527fd-9a8d-4bf3-a649-ee3a5ffce1d8, data:f421813fc7dea73d182e0d89307b5ba45128a9b5)
+  used(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, id:8d0527fd-9a8d-4bf3-a649-ee3a5ffce1d8, 2026-11-20T14:11:52.725667+00:00,
        [prov:role='wf:main/EchoProcess/featureCollectionInput'])
   entity(data:0cf60d40470fde378076afacf5812f961208a018,
          [prov:type='wfprov:Artifact',
           prov:value="Value2"])
-  wasGeneratedBy(data:0cf60d40470fde378076afacf5812f961208a018, id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.850613+00:00,
+  wasGeneratedBy(data:0cf60d40470fde378076afacf5812f961208a018, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.729239+00:00,
                  [prov:role='wf:main/primary/stringOutput'])
-  entity(id:9dd6c76b-1f4c-46de-a249-b0f3c137961f,
+  entity(id:efdab33d-9ebd-46dd-b2ab-91d5a8b09093,
          [prov:value="9.81" %% xsd:double])
-  wasGeneratedBy(id:9dd6c76b-1f4c-46de-a249-b0f3c137961f, id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.850613+00:00,
+  wasGeneratedBy(id:efdab33d-9ebd-46dd-b2ab-91d5a8b09093, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.729239+00:00,
                  [prov:role='wf:main/primary/measureOutput'])
   entity(data:d88aaa302517127d82182445af28a866c379e7ac,
          [prov:type='wfprov:Artifact',
           prov:value="2026-10-08T21:15:05.071416"])
-  wasGeneratedBy(data:d88aaa302517127d82182445af28a866c379e7ac, id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.850613+00:00,
+  wasGeneratedBy(data:d88aaa302517127d82182445af28a866c379e7ac, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.729239+00:00,
                  [prov:role='wf:main/primary/dateOutput'])
-  entity(id:5c248bcd-becd-465c-a98a-a6e407341caa,
+  entity(id:bf9a65e9-4acd-4f3f-bf9d-607a6017188c,
          [prov:value="3.1416" %% xsd:double])
-  wasGeneratedBy(id:5c248bcd-becd-465c-a98a-a6e407341caa, id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.850613+00:00,
+  wasGeneratedBy(id:bf9a65e9-4acd-4f3f-bf9d-607a6017188c, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.729239+00:00,
                  [prov:role='wf:main/primary/doubleOutput'])
-  entity(id:30021f97-b727-4a70-8395-1fe300714fd2, [prov:value=1])
-  entity(id:3bc8845b-9aa0-49fb-a19d-4fd3e9dfa60f, [prov:value=2])
-  entity(id:130ecd2b-76b5-4a2b-a107-11f2bb8643aa, [prov:value=3])
-  entity(id:21cbb77a-c3cc-49d6-b8e9-c1ddf562de88,
+  entity(id:7b07687c-2132-4070-81e4-57a67993fe2c, [prov:value=1])
+  entity(id:71079149-3bcf-411a-8aa7-db5189c10f1c, [prov:value=2])
+  entity(id:4be13619-5136-42a9-9002-fd5bed834f56, [prov:value=3])
+  entity(id:8f1d5d34-443d-4088-adf6-b8675bb2ccde,
          [prov:type='wfprov:Artifact',
           prov:type='prov:Collection'])
-  hadMember(id:21cbb77a-c3cc-49d6-b8e9-c1ddf562de88, id:30021f97-b727-4a70-8395-1fe300714fd2)
-  hadMember(id:21cbb77a-c3cc-49d6-b8e9-c1ddf562de88, id:3bc8845b-9aa0-49fb-a19d-4fd3e9dfa60f)
-  hadMember(id:21cbb77a-c3cc-49d6-b8e9-c1ddf562de88, id:130ecd2b-76b5-4a2b-a107-11f2bb8643aa)
-  wasGeneratedBy(id:21cbb77a-c3cc-49d6-b8e9-c1ddf562de88, id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.850613+00:00,
+  hadMember(id:8f1d5d34-443d-4088-adf6-b8675bb2ccde, id:7b07687c-2132-4070-81e4-57a67993fe2c)
+  hadMember(id:8f1d5d34-443d-4088-adf6-b8675bb2ccde, id:71079149-3bcf-411a-8aa7-db5189c10f1c)
+  hadMember(id:8f1d5d34-443d-4088-adf6-b8675bb2ccde, id:4be13619-5136-42a9-9002-fd5bed834f56)
+  wasGeneratedBy(id:8f1d5d34-443d-4088-adf6-b8675bb2ccde, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.729239+00:00,
                  [prov:role='wf:main/primary/arrayOutput'])
-  wasGeneratedBy(id:70632e58-ba09-408e-80af-9853b47196f5, id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.850613+00:00,
+  wasGeneratedBy(id:af56c9b2-9d9e-4e04-8b9b-05324864a377, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.729239+00:00,
                  [prov:role='wf:main/primary/complexObjectOutput'])
-  entity(id:f4afcb71-80b3-445c-8745-6e6c18e277e1,
+  entity(id:6b453680-78f4-4005-b8ac-dd6765824c4f,
          [prov:type='wfprov:Artifact',
           prov:type='prov:Collection'])
-  hadMember(id:f4afcb71-80b3-445c-8745-6e6c18e277e1, id:b7362187-967d-4267-b9c1-bb283b757730)
-  hadMember(id:f4afcb71-80b3-445c-8745-6e6c18e277e1, id:6abeacf5-1c47-43af-a1a9-474ea3bd9ac5)
-  wasGeneratedBy(id:f4afcb71-80b3-445c-8745-6e6c18e277e1, id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.850613+00:00,
+  hadMember(id:6b453680-78f4-4005-b8ac-dd6765824c4f, id:ba50fe5d-a15e-47e1-9924-cd3406ca1001)
+  hadMember(id:6b453680-78f4-4005-b8ac-dd6765824c4f, id:46879014-4b80-4ef6-b7d0-b533e8a7c30b)
+  wasGeneratedBy(id:6b453680-78f4-4005-b8ac-dd6765824c4f, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.729239+00:00,
                  [prov:role='wf:main/primary/geometryOutput'])
-  wasGeneratedBy(id:45f9805d-7527-49f1-869f-8e7212a8db12, id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.850613+00:00,
+  wasGeneratedBy(id:8c3ad3e7-4ddb-4ac0-8a33-bea641c745da, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.729239+00:00,
                  [prov:role='wf:main/primary/boundingBoxOutput'])
-  entity(id:4c71b852-0c69-4a01-88b0-3581023ac09a,
+  entity(id:fbc1cb55-279e-4fad-9b77-2911a3413976,
          [prov:type='wfprov:Artifact',
           prov:type='prov:Collection'])
-  hadMember(id:4c71b852-0c69-4a01-88b0-3581023ac09a, id:7bf117cd-eee0-4160-b9bc-95f98795d07f)
-  wasGeneratedBy(id:4c71b852-0c69-4a01-88b0-3581023ac09a, id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.850613+00:00,
+  hadMember(id:fbc1cb55-279e-4fad-9b77-2911a3413976, id:50567ef2-0bf7-4b28-b475-5dd55d493650)
+  wasGeneratedBy(id:fbc1cb55-279e-4fad-9b77-2911a3413976, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.729239+00:00,
                  [prov:role='wf:main/primary/imagesOutput'])
-  wasGeneratedBy(id:4e5bc928-6056-400a-a416-04147c5cf529, id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.850613+00:00,
+  wasGeneratedBy(id:8d0527fd-9a8d-4bf3-a649-ee3a5ffce1d8, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.729239+00:00,
                  [prov:role='wf:main/primary/featureCollectionOutput'])
   entity(data:da39a3ee5e6b4b0d3255bfef95601890afd80709,
          [prov:type='wfprov:Artifact'])
-  entity(id:990f669e-f460-4928-9599-88a111786bf9,
+  entity(id:06bdacb3-2d37-4dd5-be2a-3f7620d8ff7f,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File',
           cwlprov:basename="stderr.log",
           cwlprov:nameroot="stderr",
           cwlprov:nameext=".log"])
-  specializationOf(id:990f669e-f460-4928-9599-88a111786bf9, data:da39a3ee5e6b4b0d3255bfef95601890afd80709)
-  wasGeneratedBy(id:990f669e-f460-4928-9599-88a111786bf9, id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.850613+00:00,
-                 [prov:role='wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_811f33d1-8fab-4d8c-b12e-62c0d80f0f0d'])
+  specializationOf(id:06bdacb3-2d37-4dd5-be2a-3f7620d8ff7f, data:da39a3ee5e6b4b0d3255bfef95601890afd80709)
+  wasGeneratedBy(id:06bdacb3-2d37-4dd5-be2a-3f7620d8ff7f, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.729239+00:00,
+                 [prov:role='wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_312ef64b-80e7-4969-ad78-a4c7ec9752c9'])
   entity(data:adc83b19e793491b1c6ea0fd8b46cd9f32e592fc,
          [prov:type='wfprov:Artifact'])
-  entity(id:91d70c0b-a245-42db-b1df-09c17a388d95,
+  entity(id:80b9eace-6fd2-4b49-baf7-23bc2df9ad7d,
          [prov:type='wfprov:Artifact',
           prov:type='wf4ever:File',
           cwlprov:basename="stdout.log",
           cwlprov:nameroot="stdout",
           cwlprov:nameext=".log"])
-  specializationOf(id:91d70c0b-a245-42db-b1df-09c17a388d95, data:adc83b19e793491b1c6ea0fd8b46cd9f32e592fc)
-  wasGeneratedBy(id:91d70c0b-a245-42db-b1df-09c17a388d95, id:4468e044-a1d4-41a5-b8aa-65e465d627d6, 2026-11-19T23:29:57.850613+00:00,
-                 [prov:role='wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_0b1b65d7-61dd-4b49-8482-df33733f2523'])
-  wasEndedBy(id:4468e044-a1d4-41a5-b8aa-65e465d627d6, -, id:f2da75ac-d251-4814-9ce3-bee959bcf0f4, 2026-11-19T23:29:57.851621+00:00)
+  specializationOf(id:80b9eace-6fd2-4b49-baf7-23bc2df9ad7d, data:adc83b19e793491b1c6ea0fd8b46cd9f32e592fc)
+  wasGeneratedBy(id:80b9eace-6fd2-4b49-baf7-23bc2df9ad7d, id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, 2026-11-20T14:11:52.729239+00:00,
+                 [prov:role='wf:main/primary/PACKAGE_OUTPUT_HOOK_LOG_10c28f8d-86f8-4292-9f78-2fc7875322eb'])
+  wasEndedBy(id:57e9d06a-0aa1-4560-98a1-2c127e11c51c, -, id:c6e00880-e085-4ab6-ac69-c0ac993f07c9, 2026-11-20T14:11:52.730167+00:00)
 endDocument

@@ -498,10 +498,18 @@ _RELATION_HANDLERS = {
     prov_const.PROV_SPECIALIZATION: RelationHandler("generalEntity", "specificEntity",
                                                     "specificEntity", "generalEntity"),
 }
-_PROV_STARTING_POINTS = {
-    "Entity",
-    "Activity",
-    "Agent",
+# PROV-O terms we support, with their application type field used for
+# additional PROV and non-PROV types (corresponding to type in
+# PROV-JSONLD).
+_PROV_TERMS = {
+    "Entity": "entityType",
+    "Activity": "activityType",
+    "Agent": "agentType",
+    "Usage": "influenceType",
+    "Association": "influenceType",
+    "Attribution": "influenceType",
+    "Derivation": "influenceType",
+    "Delegation": "influenceType",
 }
 # Specific mappings for certain PROV-DM attributes that have different
 # representations in PROV-O. PROV-JSON uses the PROV-DM names
@@ -542,7 +550,8 @@ def _ogc_prov_objects(document):
         record_type = record.get_type().localpart if record.get_type() else None
         if record_type is None:
             continue
-        if record_type not in _PROV_STARTING_POINTS:
+        prov_types_attr = _PROV_TERMS.get(record_type)
+        if prov_types_attr is None:
             continue
         if record.identifier is None:
             continue
@@ -560,7 +569,9 @@ def _ogc_prov_objects(document):
             prov_obj["name"] = record.label
         prov_types = [str(val) for val in record.get_attribute(prov_const.PROV_TYPE)]
         if prov_types:
-            prov_obj["type"] = prov_types[0] if len(prov_types) == 1 else prov_types
+            prov_obj[prov_types_attr] = (
+                prov_types[0] if len(prov_types) == 1 else prov_types
+            )
         # value, label, type have special handling above, other PROV-O
         # attributes are simply passed through, modulo some remapping.
         for attr, val in record.attributes:

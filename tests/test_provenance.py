@@ -230,6 +230,9 @@ def test_convert_to_prov_object():
     assert prov["id"] == root_id
     assert "provType" in prov
     assert prov["provType"] == "Activity"
+    # It should use activityType for extra types
+    assert "activityType" in prov
+    assert isinstance(prov["activityType"], list)
     # It should use startedAtTime, not startTime
     assert "startTime" not in prov
     assert "startedAtTime" in prov

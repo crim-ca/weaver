@@ -170,8 +170,11 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert isinstance(prov, dict)
         assert "id" in prov
         assert prov["id"] == f"urn:uuid:{self.job_id}"
+        assert "provType" in prov
+        assert prov["provType"] == "Activity"
+        # It should use activityType for extra types
         assert "activityType" in prov
-        assert prov["activityType"] == "Activity"
+        assert isinstance(prov["activityType"], list)
         # It should use startedAtTime, not startTime
         assert "startTime" not in prov
         assert "startedAtTime" in prov
@@ -204,9 +207,10 @@ class TestJobProvenance(TestJobProvenanceBase):
         # Make sure it contains activities, entities and agents
         assert isinstance(prov, list)
         assert all("id" in obj for obj in prov)
-        assert any("activityType" in obj for obj in prov)
-        assert all(obj["activityType"] == "Activity"
-                   for obj in prov if "activityType" in obj)
+        assert all("provType" in obj for obj in prov)
+        assert all("activityType" in obj
+                   for obj in prov
+                   if obj["provType"] == "Activity")
         # It should use startedAtTime, not startTime
         assert all("startTime" not in obj for obj in prov)
         assert any("startedAtTime" in obj for obj in prov)
