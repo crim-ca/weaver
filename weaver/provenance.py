@@ -505,11 +505,6 @@ _PROV_TERMS = {
     "Entity": "entityType",
     "Activity": "activityType",
     "Agent": "agentType",
-    "Usage": "influenceType",
-    "Association": "influenceType",
-    "Attribution": "influenceType",
-    "Derivation": "influenceType",
-    "Delegation": "influenceType",
 }
 # Specific mappings for certain PROV-DM attributes that have different
 # representations in PROV-O. PROV-JSON uses the PROV-DM names
