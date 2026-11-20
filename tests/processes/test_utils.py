@@ -52,11 +52,19 @@ class MockResponseOk(object):
     status_code = 200
 
 
-@pytest.mark.parametrize("version", ["1.2.3.dev1", Version("1.2.3.dev1"), [1, 2, 3], (1, 2, 3)])
-@pytest.mark.parametrize("level,expected", [
-    (VersionLevel.PATCH, [1, 2, 4]),
-    (VersionLevel.MINOR, [1, 3, 0]),
-    (VersionLevel.MAJOR, [2, 0, 0]),
+@pytest.mark.parametrize("version,level,expected", [
+    ("1.2.3.dev1", VersionLevel.PATCH, [1, 2, 4]),
+    ("1.2.3.dev1", VersionLevel.MINOR, [1, 3, 0]),
+    ("1.2.3.dev1", VersionLevel.MAJOR, [2, 0, 0]),
+    (Version("1.2.3.dev1"), VersionLevel.PATCH, [1, 2, 4]),
+    (Version("1.2.3.dev1"), VersionLevel.MINOR, [1, 3, 0]),
+    (Version("1.2.3.dev1"), VersionLevel.MAJOR, [2, 0, 0]),
+    ([1, 2, 3], VersionLevel.PATCH, [1, 2, 4]),
+    ([1, 2, 3], VersionLevel.MINOR, [1, 3, 0]),
+    ([1, 2, 3], VersionLevel.MAJOR, [2, 0, 0]),
+    ((1, 2, 3), VersionLevel.PATCH, [1, 2, 4]),
+    ((1, 2, 3), VersionLevel.MINOR, [1, 3, 0]),
+    ((1, 2, 3), VersionLevel.MAJOR, [2, 0, 0]),
 ])
 def test_bump_process_version(version, level, expected):
     """
