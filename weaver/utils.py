@@ -1865,37 +1865,32 @@ def parse_keyword_query(value):
 def parse_search_query(value):
     # type: (str) -> List[List[Tuple[str, bool]]]
     """
-    Parses comma-separated OR groups of AND terms with optional ``+`` and ``-`` prefixes.
+    Parses OR groups of phrases with boundary-prefixed AND (``+``) and NOT (``-``) operators.
 
-    Quoted phrases are preserved. Each term is returned with its negation flag.
+    Signs are operators only at the beginning or after whitespace or commas. Other signs are literal.
+    Ordinary whitespace joins a phrase. Quoted punctuation is preserved. Terms include their negation flag.
     """
-    lexer = shlex.shlex(value, posix=True, punctuation_chars="+-,")
-    lexer.whitespace_split = True
-    lexer.commenters = ""
-    lexemes = (
-        part
-        for lexeme in lexer
-        for part in (lexeme if lexeme and all(char in "+-," for char in lexeme) else [lexeme])
-    )
+    pattern = r'"(?:\\.|[^"\\])*"|(?P<operator>,|(?<![^\s,])[+-])|[^\s,"]+|\s+|"'
     groups = [[]]  # type: List[List[Tuple[str, bool]]]
+    parts = []
     negative = pending = False
-    for lexeme in lexemes:
-        if lexeme == ",":
-            if pending or not groups[-1]:
-                raise ValueError("Empty OR group in search query.")
-            groups.append([])
-        elif lexeme in ["+", "-"]:
-            if pending:
-                raise ValueError("Consecutive operators in search query.")
-            negative, pending = lexeme == "-", True
-        elif not lexeme.strip():
-            raise ValueError("Invalid search query term.")
+    for match in re.finditer(pattern, f"{value},"):
+        lexeme = match.group()
+        if match.group("operator"):
+            text = "".join(parts).strip()
+            if text:
+                groups[-1].append((text, negative))
+            elif pending or lexeme == ",":
+                raise ValueError("Missing search query term.")
+            if lexeme == ",":
+                groups.append([])
+            parts = []
+            negative, pending = lexeme == "-", lexeme != ","
+        elif lexeme.startswith('"'):
+            parts.extend(shlex.split(lexeme))
         else:
-            groups[-1].append((lexeme, negative))
-            negative = pending = False
-    if pending or not groups[-1]:
-        raise ValueError("Missing search query term.")
-    return groups
+            parts.append(lexeme)
+    return groups[:-1]
 
 
 def parse_version_range(value):

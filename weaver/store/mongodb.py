@@ -590,9 +590,10 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             Alternatives for a given keyword can be provided with ``|`` (OR).
         :param title: Case-insensitive text that must be contained in the process title.
         :param description: Case-insensitive text that must be contained in the process description.
-        :param q:
-            Comma-separated free-text terms (OR), each looked up in the process title, description or keywords.
-        :param query: Text expression with comma-separated OR groups, AND (``+``) and NOT (``-``).
+        :param q: Alias for :paramref:`query`.
+        :param query:
+            Phrase search across title, description and keywords with comma-separated OR groups.
+            Boundary-prefixed ``+`` and ``-`` introduce AND and NOT terms. Other signs are literal.
         :param version: Exact process version or inclusive ``lower/upper`` range with ``..`` for open bounds.
         :param sortby: Comma-separated fields prefixed with ``+`` (ascending) or ``-`` (descending).
         :param order: Explicit ``ASC`` or ``DESC`` direction applied to ``sort``.
@@ -762,13 +763,9 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         for field, text in [("title", title), ("description", description)]:
             if text:
                 conditions.append(MongodbProcessStore._apply_text_filter(field, text))
-        if q:
-            conditions.append({"$or": [
-                MongodbProcessStore._apply_text_filter(field, term)
-                for term in q.split(",") for field in ["title", "description", "keywords"]
-            ]})
-        if query:
-            conditions.append(MongodbProcessStore._apply_query_filter(query))
+        for expression in [q, query]:
+            if expression:
+                conditions.append(MongodbProcessStore._apply_query_filter(expression))
         if version:
             conditions.append(MongodbProcessStore._apply_version_filter(version))
         return conditions
@@ -784,7 +781,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             terms = []
             for text, negative in group:
                 condition = {"$or": [
-                    MongodbProcessStore._apply_text_filter(field, text)
+                    MongodbProcessStore._apply_text_filter(field, text, match_whitespace=True)
                     for field in ["title", "description", "keywords"]
                 ]}
                 terms.append({"$nor": [condition]} if negative else condition)
@@ -809,12 +806,13 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return {"$expr": {"$cond": [numeric_version, {"$and": conditions}, False]}}
 
     @staticmethod
-    def _apply_text_filter(field, text):
-        # type: (str, str) -> MongodbAggregateExpression
+    def _apply_text_filter(field, text, match_whitespace=False):
+        # type: (str, str, bool) -> MongodbAggregateExpression
         """
-        Matches literal text against the effective process description fields.
+        Matches literal text against the effective process description fields, with optional flexible phrase whitespace.
         """
-        regex = re.escape(text.strip())
+        parts = re.split(r"\s+", text.strip()) if match_whitespace else [text.strip()]
+        regex = r"\s+".join(re.escape(part) for part in parts)
         if field == "keywords":
             return {field: {"$regex": regex, "$options": "i"}}
         # Match the same fallback fields exposed by Process.title and Process.description.

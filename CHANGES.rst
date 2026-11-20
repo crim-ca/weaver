@@ -16,8 +16,9 @@ Changes:
   (partially resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
 - Add ``title`` and ``description`` query parameters on ``GET /processes`` for case-insensitive text search
   (partially resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
-- Add ``q`` text search and ``query`` expressions with ``+`` (AND), ``-`` (NOT) and ``,`` (OR) over process titles,
-  descriptions and keywords (partially resolves `#644 <https://github.com/crim-ca/weaver/issues/644>`_).
+- Add ``q`` and ``query`` phrase search with boundary-prefixed ``+`` (AND), ``-`` (NOT) and ``,`` (OR) over process
+  titles, descriptions and keywords. Preserve literal embedded/trailing signs and match flexible phrase whitespace
+  (partially resolves `#644 <https://github.com/crim-ca/weaver/issues/644>`_).
 - Add exact and inclusive ``lower/upper`` version range filtering on ``GET /processes``
   (resolves `#627 <https://github.com/crim-ca/weaver/issues/627>`_).
 - Add ``sortby`` signed multi-field sorting and ``sort``/``order`` support on ``GET /processes``

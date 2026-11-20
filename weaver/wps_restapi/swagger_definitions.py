@@ -8609,19 +8609,20 @@ class ProcessSearchQuery(ExtendedMappingSchema):
             "Filter locally registered processes with a 'description' containing literal text (case-insensitive)."
         )
     )
-    q = ExtendedSchemaNode(
-        String(allow_empty=True), missing=drop, example="subset,netcdf",
-        validator=Regex(r"^[^,]*[^\s,][^,]*(?:,[^,]*[^\s,][^,]*)*$"),
+    q = ProcessSearchExpression(
+        missing=drop, example="subset,netcdf",
         description=(
-            "Free-text search. Comma-separated terms (OR) are looked up (case-insensitive) "
-            "in the process 'title', 'description' and 'keywords'. Terms are literal text, not regular expressions. "
-            "Applicable only to locally registered processes."
+            "Alias of 'query'. Searches partial terms and phrases across title, description and keywords. "
+            "Supports comma-separated OR groups and boundary-prefixed '+' (AND) and '-' (NOT) operators. "
+            "Applicable only to locally registered processes. URL-encode '+' as '%2B'."
         )
     )
-    query = ProcessSearchExpression(missing=drop, example="+climate+netcdf-grib,subset", description=(
-        "Text search across title, description and keywords. Commas separate OR groups. "
-        "Within a group, '+' (or whitespace) combines terms with AND and '-' negates the following term. "
-        "Double quotes preserve phrases and literal punctuation. URL-encode '+' as '%2B'. "
+    query = ProcessSearchExpression(missing=drop, example="+climate +netcdf -grib,subset", description=(
+        "Case-insensitive substring search across title, description and keywords. Commas separate OR groups. "
+        "A '+' (AND) or '-' (NOT) is an operator only at the beginning or after whitespace or a comma. "
+        "Other signs are literal, so 'data-' matches 'data-analysis'. Use '+-data' for a leading literal minus. "
+        "Ordinary spaces join an ordered phrase and match one or more whitespace characters. "
+        "Double quotes preserve literal punctuation. URL-encode '+' as '%2B'. "
         "Applicable only to locally registered processes."
     ))
     version = ProcessVersionExpression(missing=drop, example="1.2.3", description=(

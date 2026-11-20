@@ -532,12 +532,15 @@ The ``GET /processes`` listing supports the following search parameters for loca
   For example, ``keywords=climate,netcdf|grib`` requires ``climate`` and either ``netcdf`` or ``grib``.
   Prefix an individual keyword with ``!`` or ``~`` to negate it. ``keywords=climate,!grib`` excludes ``grib``.
 - ``title`` and ``description`` match literal substrings, case-insensitively.
-- ``q`` matches comma-separated literal terms against the title, description and keywords, case-insensitively.
-  At least one term must match at least one of these fields.
-- ``query`` searches the same fields with comma-separated OR groups. Within a group, ``+`` or whitespace combines
-  terms with AND and ``-`` negates the following term. For example, ``query=+climate+netcdf-grib,subset`` matches
-  either ``climate`` AND ``netcdf`` AND NOT ``grib``, or ``subset``. Double quotes preserve phrases and literal
-  operators within a term, such as ``query="regional subset" -"out of date"``.
+- ``q`` and ``query`` search partial terms against the title, description and keywords, case-insensitively.
+  Commas separate OR groups. Within a group, ``+`` combines terms with AND and ``-`` negates the following term.
+  Signs are operators only at the beginning or after whitespace or commas. Otherwise, they are literal characters.
+  For example, ``q=data-`` matches ``data-analysis`` and ``data-science``, and ``q=data+`` matches ``data+analysis``.
+  Use ``+-data`` to search a leading literal minus instead of negating ``data``.
+  Ordinary spaces join a contiguous, ordered phrase and match one or more whitespace characters.
+  For example, ``q=+climate weather +netcdf -grib`` requires the phrase ``climate weather`` and the term ``netcdf``,
+  while excluding ``grib``. It does not match ``climate data and weather``.
+  Double quotes preserve literal punctuation, such as the comma in ``query="regional,subset"``.
 - ``version`` matches an exact numeric semantic version or an inclusive ``lower/upper`` version interval.
   For example, ``version=1.2.0/1.10.0`` compares numeric version components, not alphabetical strings.
   Either bound can be open using ``..``, such as ``version=1.0.0/..``.

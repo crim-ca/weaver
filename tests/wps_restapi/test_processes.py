@@ -5559,14 +5559,14 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ("q_description", {"q": "extracts"}, True),
         ("q_no_match", {"q": "other,unknown"}, False),
         ("q_literal", {"q": ".*"}, False),
-        ("query_and", {"query": "+regional+climate"}, True),
-        ("query_and_no_match", {"query": "+regional+grib"}, False),
-        ("query_not", {"query": "+climate-grib"}, True),
-        ("query_not_match", {"query": "+climate-netcdf"}, False),
+        ("query_and", {"query": "+regional +climate"}, True),
+        ("query_and_no_match", {"query": "+regional +grib"}, False),
+        ("query_not", {"query": "+climate -grib"}, True),
+        ("query_not_match", {"query": "+climate -netcdf"}, False),
         ("query_only_not", {"query": "-grib"}, True),
         ("query_only_not_match", {"query": "-climate"}, False),
-        ("query_or", {"query": "missing,climate+subset"}, True),
-        ("query_or_no_match", {"query": "missing,climate+unknown"}, False),
+        ("query_or", {"query": "missing,climate +subset"}, True),
+        ("query_or_no_match", {"query": "missing,climate +unknown"}, False),
         ("query_or_positive", {"query": "missing,+climate"}, True),
         ("query_or_not", {"query": "missing,-grib"}, True),
         ("query_or_not_match", {"query": "missing,-climate"}, False),
@@ -5604,13 +5604,61 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert (p_id in [proc["id"] for proc in resp.json["processes"]]) is match
 
     @parameterized.expand([
+        (f"{field}_{name}", field, value, expected)
+        for field in ["q", "query"]
+        for name, value, expected in [
+            ("trailing_minus", "data-", ["analysis", "science"]),
+            ("trailing_plus", "data+", ["plus"]),
+            ("trailing_minus_or", "data-,missing", ["analysis", "science"]),
+            ("trailing_plus_or", "data+,missing", ["plus"]),
+            ("embedded_minus", "+data-analysis", ["analysis"]),
+            ("embedded_plus", "+data+analysis", ["plus"]),
+            ("negative_prefix", "+-data", ["leading"]),
+            ("and", "+data- +analysis", ["analysis"]),
+            ("not", "+data- -analysis", ["science"]),
+            ("initial_not", "-data-", ["plus", "phrase", "separated", "leading"]),
+            ("phrase", "+data analysis", ["phrase"]),
+            ("phrase_whitespace", "data \t analysis", ["phrase"]),
+            ("phrase_and", "+data analysis +regional", ["phrase"]),
+            ("phrase_not", "+data analysis -regional", []),
+            ("phrase_order", "analysis data", []),
+            ("phrase_across_fields", "analysis regional", []),
+            ("substring", "clim", ["analysis", "science", "plus"]),
+        ]
+    ])
+    @pytest.mark.oap_part1
+    def test_get_processes_filter_by_search_term_boundaries(self, _, field, value, expected):
+        # type: (str, str, str, List[str]) -> None
+        """
+        Tests literal signs, boundary-prefixed operators and contiguous phrases in both text search parameters.
+        """
+        for suffix, title, keywords in [
+            ("analysis", "Data-analysis", ["climate"]),
+            ("science", "Data-science", ["climatology"]),
+            ("plus", "Data+analysis", ["xclim"]),
+            ("phrase", "Data \t analysis", ["regional"]),
+            ("separated", "Data and analysis", []),
+            ("leading", "-data", []),
+        ]:
+            self.process_store.save_process(Process(
+                id=f"test-search-terms-{suffix}", package={}, visibility=Visibility.PUBLIC,
+                title=title, keywords=["search-terms-fixture"] + keywords,
+            ))
+        resp = self.app.get("/processes", params={
+            field: value, "keywords": "search-terms-fixture", "detail": "false",
+        }, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert set(resp.json["processes"]) == {f"test-search-terms-{suffix}" for suffix in expected}
+        assert resp.json["total"] == len(expected)
+
+    @parameterized.expand([
         ("keywords", " "), ("keywords", ",climate"), ("keywords", "climate,"),
         ("keywords", ""), ("title", ""), ("description", ""), ("q", ""), ("query", ""), ("version", ""),
         ("keywords", "climate||netcdf"), ("keywords", "climate| "),
         ("keywords", "!"), ("keywords", "climate,~"), ("keywords", "!!climate"),
         ("q", ","), ("q", "other,,subset"), ("q", "subset, "),
         ("q", " "), ("title", " "), ("description", " "), ("version", "invalid"),
-        ("query", "+"), ("query", "-"), ("query", "+-climate"), ("query", "climate,"),
+        ("query", "+"), ("query", "-"), ("query", "climate +"), ("query", "climate,"),
         ("query", ",climate"), ("query", '"climate'), ("query", " "),
         ("version", "../.."), ("version", "2.0.0/1.0.0"), ("version", "1.0.0//2.0.0"),
         ("order", "sideways"), ("sortby", "unknown"), ("sortby", "id,"),
@@ -5695,7 +5743,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 if metadata else [],
             ))
         resp = self.app.get("/processes", params={
-            "q": "search + subset & netcdf|grib", "query": "+climate-grass",
+            "q": "search + subset & netcdf|grib", "query": "+climate -grass",
             f"metadata[process][{role}]": profile,
             "limit": 1, "page": 0, "detail": detail, "sort": "id",
         }, headers=self.json_headers)

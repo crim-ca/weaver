@@ -2197,9 +2197,21 @@ def test_validate_s3_parameters(combo):
 
 
 @pytest.mark.parametrize("value, expected", [
-    ("climate+netcdf-grib,subset", [[("climate", False), ("netcdf", False), ("grib", True)], [("subset", False)]]),
+    ("climate +netcdf -grib,subset", [[("climate", False), ("netcdf", False), ("grib", True)], [("subset", False)]]),
+    ("climate+netcdf-grib", [[("climate+netcdf-grib", False)]]),
     ("climate,-grib", [[("climate", False)], [("grib", True)]]),
     ("climate,+subset", [[("climate", False)], [("subset", False)]]),
+    ("x+,y", [[("x+", False)], [("y", False)]]),
+    ("x+", [[("x+", False)]]),
+    ("x-", [[("x-", False)]]),
+    ("data-", [[("data-", False)]]),
+    ("+A B +C", [[("A B", False), ("C", False)]]),
+    ("+A B", [[("A B", False)]]),
+    ("+A-B", [[("A-B", False)]]),
+    ("+A+B", [[("A+B", False)]]),
+    ("+-A", [[("-A", False)]]),
+    ('"+"', [[("+", False)]]),
+    ('"data"-', [[("data-", False)]]),
     ('"regional subset" -"out of date"', [[("regional subset", False), ("out of date", True)]]),
     ('"net-cdf" + "a+b" -"x,y"', [[("net-cdf", False), ("a+b", False), ("x,y", True)]]),
 ])
@@ -2211,7 +2223,7 @@ def test_parse_search_query(value, expected):
     assert parse_search_query(value) == expected
 
 
-@pytest.mark.parametrize("value", ["", ",", "x,,y", "+-", "x+-y", "x+,y", "x+", "x-", 'x "unfinished'])
+@pytest.mark.parametrize("value", ["", ",", "x,,y", "+", "-", "x +", "x -", "x +,y", 'x "unfinished'])
 def test_parse_search_query_invalid(value):
     # type: (str) -> None
     """

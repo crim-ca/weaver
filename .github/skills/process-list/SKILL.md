@@ -52,9 +52,11 @@ weaver capabilities -u $WEAVER_URL --detail
 - **keywords** (string): Whole-keyword, case-insensitive matches. Use `,` for AND and `|` for OR within a group.
   Prefix a keyword with `!` or `~` for NOT.
 - **title**, **description** (string): Case-insensitive literal substring searches.
-- **q** (string): Comma-separated literal terms (OR) searched across title, description and keywords.
-- **query** (string): OR groups separated by `,`, with `+`/whitespace for AND and `-` for NOT within a group.
-  Double quotes preserve phrases and literal operators.
+- **q**, **query** (string): Partial terms searched across title, description and keywords, with `,` for OR,
+  `+` for AND and `-` for NOT. Signs are operators only at the beginning or after whitespace or commas.
+  Other signs are literal: `data-` matches `data-analysis` and `data-science`.
+  Ordinary spaces join an ordered phrase and match one or more whitespace characters.
+  Use `+-data` for a leading literal minus. Double quotes preserve literal punctuation.
 - **version** (string): Exact version or inclusive `lower/upper` interval. Use `..` for an open bound.
   Add **revisions=true** to search older revisions.
 - **sortby** (string): Signed, comma-separated sorting fields, such as `+id,-version`.
@@ -67,7 +69,7 @@ Empty terms are invalid. URL-encode values, particularly `+` as `%2B`.
 ```bash
 curl --get "${WEAVER_URL}/processes" \
   --data-urlencode "keywords=climate,netcdf|grib" \
-  --data-urlencode "query=+climate+netcdf-grib,subset" \
+  --data-urlencode "query=+climate +netcdf -grib,subset" \
   --data-urlencode "limit=10"
 ```
 
