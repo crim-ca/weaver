@@ -4,11 +4,13 @@ from pathlib import Path
 
 import jsonschema
 import pytest
+from prov.identifier import QualifiedName
+from prov.model import Namespace
 
 from tests import resources
 from weaver import WEAVER_SCHEMA_DIR
 from weaver.formats import ContentType, OutputFormat
-from weaver.provenance import ProvenanceFormat, ProvenancePathType, convert_to_prov_chain
+from weaver.provenance import ProvenanceFormat, ProvenancePathType, _prov_value, convert_to_prov_chain
 
 
 @pytest.mark.prov
@@ -244,6 +246,12 @@ def test_convert_to_prov_object():
     assert any(isinstance(obj, dict) for obj in prov["generated"])
 
 
+def test_convert_to_prov_object_failure():
+    prov_data = resources.load_resource("job_prov.json", text=True)
+    with pytest.raises(ValueError):
+        convert_to_prov_chain(prov_data, "urn:bugs-bunny")
+
+
 def test_validate_prov_list():
     prov_data = resources.load_resource("job_prov.json", text=True)
     prov_json = convert_to_prov_chain(prov_data)
@@ -263,3 +271,11 @@ def test_validate_prov_object():
               encoding="utf-8") as fh:
         prov_schema = json.load(fh)
     jsonschema.validate(prov, prov_schema)
+
+
+def test_prov_value():
+    ns = Namespace("example", "http://example.org/")
+    ex1 = QualifiedName(ns, "ex1")
+    assert _prov_value(ex1) == "http://example.org/ex1"
+    ex2 = [1, 2, 3]
+    assert _prov_value(ex2) == str(ex2)

@@ -253,6 +253,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({"f": ProvenanceFormat.PROV_JSONLD}, {}),
         ({}, {"Accept": ContentType.APP_JSONLD}),
         ({}, {"Accept": f"{ContentType.APP_JSONLD}; profile=https://www.w3.org/submissions/prov-jsonld/"}),
+        ({}, {"Accept-Profile": "https://www.w3.org/submissions/prov-jsonld/"}),
     ])
     def test_job_prov_json_ld(self, queries, headers):
         prov_url = f"{self.job_url}/prov"

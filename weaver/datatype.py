@@ -1632,11 +1632,14 @@ class Job(Base, LoggerHandler):
         if content_type == ContentType.APP_YAML:
             data = json.loads(data)
             data = OutputFormat.convert(data, to=OutputFormat.YAML)
-        # normalize media-type
+        # uplift application/json to extended types
         if content_type == ContentType.APP_JSON:
-            if prov_format not in (ProvenanceFormat.PROV_OGC_JSON,
-                                   ProvenanceFormat.PROV_OGC_JSON_ACTIVITY):
+            if prov_format == ProvenanceFormat.PROV_JSONLD:
+                content_type = ContentType.APP_JSONLD
+            elif prov_format not in (ProvenanceFormat.PROV_OGC_JSON,
+                                     ProvenanceFormat.PROV_OGC_JSON_ACTIVITY):
                 content_type = ContentType.APP_PROV_JSON
+        # likewise with application/xml
         if content_type in ContentType.ANY_XML:
             content_type = ContentType.APP_PROV_XML
         return data, content_type

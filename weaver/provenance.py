@@ -542,19 +542,14 @@ def _ogc_prov_objects(document):
     # will use the flattened form here.  We also unify the records,
     # similarly to other graph representations.
     for record in document.flattened().unified().get_records():
-        record_type = record.get_type().localpart if record.get_type() else None
-        if record_type is None:
-            continue
+        record_type = record.get_type().localpart
         prov_types_attr = _PROV_TERMS.get(record_type)
         if prov_types_attr is None:
             continue
-        if record.identifier is None:
-            continue
+        # Because the document is unified, this cannot be None, and
+        # its URI will always be unique.
+        assert record.identifier is not None
         key = record.identifier.uri
-        if key in objects_by_uri:
-            LOGGER.warning("Duplicate %s record %s in unified PROV",
-                           record_type, key)
-            continue
         prov_obj: dict[str, Any] = {"id": key, "provType": record_type}
         if record.value:
             # This is always a `set`, which is why we convert it to a
