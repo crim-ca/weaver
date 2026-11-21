@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         ExecutionOutputs,
         ExecutionSubscribers,
         JSON,
+        MetadataQueryScope,
         SettingsType,
         TypedDict
     )
@@ -119,6 +120,7 @@ class StoreProcesses(StoreInterface):
                        revisions=False,     # type: bool
                        process=None,        # type: Optional[str]
                        identifiers=None,    # type: Optional[List[str]]
+                       metadata=None,       # type: Optional[List[Tuple[MetadataQueryScope, str, str]]]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         raise NotImplementedError
 

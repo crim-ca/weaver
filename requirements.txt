@@ -9,7 +9,7 @@ boto3-stubs[s3]
 # windows fixes until
 # https://github.com/celery/billiard/issues/260
 # https://github.com/celery/billiard/issues/313
-billiard>2; sys_platform != "win32"  # avoid issue with use_2to3
+billiard>=4.3.2; sys_platform != "win32"  # avoid issue with use_2to3
 billiard>3.2,<3.4; sys_platform == "win32"
 # pymongo>=4 breaks for some kombu combinations corresponding to pinned Celery
 # - https://github.com/crim-ca/weaver/issues/386
@@ -35,24 +35,17 @@ colander<2
 cornice
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
-cryptography>=47.0.0
-# FIXME: properly support GPU execution
-#   - https://github.com/crim-ca/weaver/issues/104
-#   - https://github.com/crim-ca/weaver/issues/138
-# use cwltool gpu-enabled support until integrated within the original tool
-# (https://github.com/common-workflow-language/common-workflow-language/issues/587)
-### git+https://github.com/crim-ca/cwltool@docker-gpu#egg=cwltool
-# FIXME: https://github.com/common-workflow-language/cwltool/pull/2207 to allow rootless execution with user namespaces
-# ~3.1.20260108082145 + PR#2207
-cwltool @ git+https://github.com/crim-ca/cwltool.git@allow-uid-gid-rootless
+cryptography>=50.0.2
+# https://github.com/common-workflow-language/cwltool/pull/2207 adds rootless EUID/EGID support in upstream cwltool.
+# cwltool>=3.1.20260315121657 is the first upstream release that includes it.
+cwltool>=3.1.20260315121657
 # cwltool>=3.1.20241217163858,<3.2  # first version that provides CWLProv, required across all Python versions
-cwltool>=3.1.20250925164626; python_version >= "3.14"  # first version available
 # for some reason, not the same release number,
 # but same code as https://github.com/common-workflow-language/cwlprov/tree/0.6.0
 cwlprov==0.2.1
-cwl-utils>=0.42
+cwl-utils>=0.47
 dnspython>=2.8.0  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
-docker>=7.1
+docker>=7.2.0
 duration
 esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
 # invalid 'zarr' requirement in 'geotiff' dependencies required by 'pywps' fail to install
@@ -60,16 +53,16 @@ esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
 geotiff>=0.2.10
 # gunicorn >20 breaks some config.ini loading parameters (paste)
 # use pserve to continue supporting config.ini with paste settings
-gunicorn>=26.0.0
+gunicorn>=26.2.0
 # reduced dependencies contrains to let packages update to latest (https://github.com/vinitkumar/json2xml/issues/157)
 # even more reduced dependency constraints (https://github.com/vinitkumar/json2xml/pull/195)
-json2xml==4.1.0
+json2xml==8.0.0
 jsonschema>=4.26.0
 # FIXME: kombu for pymongo>=4 not yet released as 5.3.0 (only pre-releases available)
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
 # - https://github.com/celery/celery/pull/7834
-kombu>=5.6.2,<6
+kombu>=5.7.0,<6
 # FIXME: https://github.com/lark-parser/lark/issues/1565
 lark==1.2.2
 lxml
@@ -79,9 +72,9 @@ mako
 #mistune>=2.0.3,<2.1
 # multiformats for digestMultibase (W3C VC Data Integrity)
 # provides multibase and multihash encoding for resource integrity verification
-multiformats>=0.3.1
+multiformats>=0.3.1.post4
 mypy_boto3_s3
-numpy>=2.2.6
+numpy>=2.4.6
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
 owslib==0.35.0
@@ -95,12 +88,12 @@ psutil
 #   https://github.com/tschaub/ogcapi-features/tree/json-array-expression/extensions/cql/jfe
 # - extra 'backend-native' uses shapely for Python objects
 # - support FES, CQL(TEXT,JSON), CQL2(TEXT,JSON), ECQL, JFE
-pygeofilter[fes,backend-native]>=0.3.3
+pygeofilter[fes,backend-native]>=0.4.0
 # pymongo>=4 breaks for some kombu combinations corresponding to pinned Celery
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
 # - https://github.com/celery/celery/pull/7834
-pymongo>=4.6.3  # either (pymongo>=4, kombu>=5.3.0b2) or (pymongo<4, celery<5.2)
+pymongo>=4.20.0  # either (pymongo>=4, kombu>=5.3.0b2) or (pymongo<4, celery<5.2)
 # FIXME: setuptools/pkg_resources deprecated dependency
 #   (https://github.com/Pylons/pyramid/issues/3731, https://github.com/pypa/setuptools/pull/5007)
 # below setuptools pin is placed here purposely instead of 'requirements-sys.txt' in order to keep it
@@ -119,22 +112,22 @@ pystac_client
 python-box
 python-dateutil
 pytz
-pywps==4.7.0
+pywps==4.8.1
 pyyaml>=6.0.3
 rdflib>=7.6.0  # pyup: ignore
-requests>=2.33.1
+requests>=2.34.2
 requests_file
 # FIXME: https://github.com/requests/toolbelt/pull/380
 requests_toolbelt @ git+https://github.com/crim-ca/requests-toolbelt.git@patch-multipart
 ruamel.yaml>=0.19.1
 # force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
 # employed by cwltool -> schema-salad -> mistune
-schema-salad>=8.9.20260417192335,<9
+schema-salad>=8.10.20260825112551,<9
 shapely
 simplejson
-urllib3>=2.7.0
+urllib3>=2.8.0
 urlmatch
 xmltodict>=1.0.4
 webob
-werkzeug>=3.1.8
-zipp>=3.23.1 # not directly required, pinned by Snyk to avoid a vulnerability
+werkzeug>=3.1.9
+zipp>=4.1.2 # not directly required, pinned by Snyk to avoid a vulnerability

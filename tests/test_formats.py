@@ -18,6 +18,7 @@ from requests.exceptions import ConnectionError
 
 from tests.utils import MockedRequest
 from weaver import formats as f
+from weaver.transform.const import CONVERSION_DICT
 from weaver.utils import null, request_extra
 
 if TYPE_CHECKING:
@@ -67,6 +68,9 @@ def test_valid_media_type_categories(media_type):
         (f.ContentType.APP_GEOJSON, {}, ".geojson"),  # pywps <4.4 definition
         (f.ContentType.APP_VDN_GEOJSON, {}, ".geojson"),  # pywps>=4.4 definition
         (f.ContentType.IMAGE_GEOTIFF, {}, ".tiff"),  # pywps definition
+        (f.ContentType.APP_OGC_GEOTIFF, {}, ".tif"),
+        (f.ContentType.IMAGE_JPEG2000, {}, ".jp2"),
+        (f.ContentType.APP_JPEG2000, {}, ".jp2"),
         ("application/x-custom", {}, ".custom"),
         ("application/unknown", {}, ".unknown"),
         (f.ContentType.APP_DIR, {"dot": True}, "/"),
@@ -94,6 +98,7 @@ def test_get_extension(test_media_type, extra_params, expected_extension):
         (".json", {}, f.ContentType.APP_JSON),
         (".tif", {}, f.ContentType.IMAGE_TIFF),
         (".tiff", {}, f.ContentType.IMAGE_TIFF),
+        (".jp2", {}, f.ContentType.IMAGE_JPEG2000),
         (".yml", {}, f.ContentType.APP_YAML),
         (".yaml", {}, f.ContentType.APP_YAML),
         ("/", {}, f.ContentType.APP_DIR),
@@ -105,6 +110,80 @@ def test_get_extension(test_media_type, extra_params, expected_extension):
 )
 def test_get_content_type(test_extension, extra_params, expected_content_type):
     assert f.get_content_type(test_extension, **extra_params) == expected_content_type
+
+
+@pytest.mark.parametrize(
+    ["test_media_type", "expected_extension"],
+    [
+        (f.ContentType.APP_ZARR, ".zarr"),
+        (f.ContentType.APP_ZARR_V2, ".zarr"),
+        (f.ContentType.APP_ZARR_V3, ".zarr"),
+        (f.ContentType.APP_ZARR_ZIP, ".zarr.zip"),
+        (f.ContentType.APP_ZIP, ".zip"),  # plain zip must remain distinct
+    ]
+)
+def test_get_extension_zarr(test_media_type, expected_extension):
+    assert f.get_extension(test_media_type) == expected_extension
+    assert f.get_format(test_media_type).extension == expected_extension
+
+
+@pytest.mark.parametrize(
+    ["test_extension", "expected_content_type"],
+    [
+        (".zarr", f.ContentType.APP_ZARR),  # version cannot be inferred from extension
+        (".zarr.zip", f.ContentType.APP_ZARR_ZIP),
+        (".zip", f.ContentType.APP_ZIP),
+    ]
+)
+def test_get_content_type_zarr(test_extension, expected_content_type):
+    assert f.get_content_type(test_extension) == expected_content_type
+
+
+@pytest.mark.parametrize(
+    ["test_media_type", "is_zarr", "is_directory"],
+    [
+        (f.ContentType.APP_ZARR, True, True),
+        (f.ContentType.APP_ZARR_V2, True, True),
+        (f.ContentType.APP_ZARR_V3, True, True),
+        (f"{f.ContentType.APP_ZARR};version=3", True, True),  # no space before parameter
+        (f"{f.ContentType.APP_ZARR_V3}; charset=UTF-8", True, True),
+        (f.ContentType.APP_DIR, False, True),
+        (f.ContentType.APP_ZARR_ZIP, False, False),  # single file
+        (f.ContentType.APP_ZIP, False, False),
+        (f.ContentType.APP_JSON, False, False),
+        ("", False, False),
+        (None, False, False),
+    ]
+)
+def test_zarr_and_directory_media_types(test_media_type, is_zarr, is_directory):
+    assert f.is_zarr_media_type(test_media_type) is is_zarr
+    assert f.is_directory_media_type(test_media_type) is is_directory
+
+
+@pytest.mark.parametrize(
+    ["test_media_type", "expect_version"],
+    [
+        (f.ContentType.APP_ZARR, None),
+        (f.ContentType.APP_ZARR_V2, "2"),
+        (f.ContentType.APP_ZARR_V3, "3"),
+        (f"{f.ContentType.APP_ZARR};version=3", "3"),  # no space before parameter
+        (f"{f.ContentType.APP_ZARR}; charset=UTF-8; version = 2", "2"),
+        (f.ContentType.APP_ZARR_ZIP, None),
+        (f.ContentType.APP_JSON, None),
+        (None, None),
+    ]
+)
+def test_get_zarr_version(test_media_type, expect_version):
+    assert f.get_zarr_version(test_media_type) == expect_version
+
+
+def test_zarr_media_types_group():
+    assert f.ContentType.ANY_ZARR == {
+        f.ContentType.APP_ZARR,
+        f.ContentType.APP_ZARR_V2,
+        f.ContentType.APP_ZARR_V3,
+    }
+    assert f.ContentType.APP_ZARR_ZIP not in f.ContentType.ANY_ZARR
 
 
 @pytest.mark.parametrize(
@@ -827,13 +906,13 @@ def test_output_format_version(test_format, allow_version, expect_type):
             f.OutputFormat.XML_STR,
             # FIXME: 'encoding="UTF-8"' missing (https://github.com/vinitkumar/json2xml/pull/213)
             inspect.cleandoc("""
-            <?xml version="1.0" ?>
+            <?xml version="1.0" encoding="UTF-8" ?>
             <item>
-                <data type="list">
-                    <item type="int">123</item>
-                </data>
+              <data type="list">
+                <item type="int">123</item>
+              </data>
             </item>
-            """).replace("    ", "\t")
+            """)
         ),
     ]
 )
@@ -866,3 +945,23 @@ def test_find_supported_media_types(io_definition, expected_media_type):
         assert sorted(found_media_type) == sorted(expected_media_type)
     else:
         assert found_media_type == expected_media_type
+
+
+@pytest.mark.parametrize(
+    ["legacy_type", "official_type"],
+    [
+        (f.ContentType.APP_OGC_GEOTIFF, f.ContentType.IMAGE_OGC_GEOTIFF),
+        (f.ContentType.APP_JPEG2000, f.ContentType.IMAGE_JPEG2000),
+    ]
+)
+def test_legacy_media_types(legacy_type, official_type):
+    assert legacy_type in f.ContentType.ANY_LEGACY
+    assert official_type not in f.ContentType.ANY_LEGACY
+    assert legacy_type in CONVERSION_DICT[official_type]
+    assert f.get_format(legacy_type).mime_type == legacy_type
+    ext = f.get_extension(legacy_type)
+    assert f.get_extension(official_type) == ext or ext in f.get_extension(official_type, variants=True)
+    # legacy must never be selected when resolving from extension
+    assert f.get_content_type(ext) not in f.ContentType.ANY_LEGACY
+    for ext_variant in f.get_extension(legacy_type, variants=True):
+        assert f.get_content_type(ext_variant) != legacy_type

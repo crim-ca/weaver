@@ -1056,6 +1056,10 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
     def test_execute_file_type_io_format_references(self):
         """
         Test to validate :term:`OGC` compliant ``type`` directly provided as ``mediaType`` for execution file reference.
+
+        .. versionchanged:: 6.17.0
+            An unsupported ``type`` is refused directly with an error describing the supported formats,
+            instead of being dropped during the request validation and failing only when the job is executed.
         """
         body = self.retrieve_payload("CatFile", "deploy", local=True)
         body["processDescription"]["process"].update({
@@ -1092,15 +1096,18 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             # in such case, the default YAML format (defined in above deploy) would be used and execution would succeed
             # if it fails, it means 'type' was properly detected as unsupported format for the input and was rejected
             # NOTE:
-            #   execution request itself succeeds *submission*, but fails running it
-            #   since async exec is mocked, we can check failure with the status directly after
+            #   unsupported 'type' is detected directly when validating the execution request
             proc_url = f"/processes/{self._testMethodName}/jobs"
             data["inputs"]["file"] = {"href": tmp_href, "type": ContentType.IMAGE_GEOTIFF}
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
                                        data=data, headers=self.json_headers, only_local=True)
-            assert resp.status_code == 201, resp.text
-            status_url = resp.json.get("location")
-            self.monitor_job(status_url, expect_failed=True)
+            assert resp.status_code == 400, resp.text
+            assert resp.json["code"] == "InvalidParameterValue"
+            assert resp.json["name"] == "inputs.file"
+            assert resp.json["value"]["executionFormats"] == [ContentType.IMAGE_GEOTIFF]
+            assert ContentType.APP_YAML in resp.json["value"]["supportedFormats"]
+            assert ContentType.APP_JSON in resp.json["value"]["supportedFormats"]
+            assert ContentType.IMAGE_GEOTIFF not in resp.json["value"]["supportedFormats"]
 
             data["inputs"]["file"]["type"] = ContentType.APP_YAML
             resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
@@ -1108,6 +1115,57 @@ class WpsPackageAppTest(WpsConfigBase, ResourcesUtil):
             assert resp.status_code in [200, 201], resp.text
             status_url = resp.json.get("location")
             self.monitor_job(status_url)  # expect successful
+
+    @parameterized.expand([
+        (ContentType.IMAGE_OGC_GEOTIFF, ContentType.APP_OGC_GEOTIFF, ".tif", False),
+        (ContentType.IMAGE_OGC_GEOTIFF, ContentType.IMAGE_PNG, ".tif", True),
+        (ContentType.IMAGE_JPEG2000, ContentType.APP_JPEG2000, ".jp2", False),
+        (ContentType.IMAGE_JPEG2000, ContentType.IMAGE_PNG, ".jp2", True),
+    ])
+    @pytest.mark.format
+    def test_execute_file_type_io_format_legacy_media_type(self, official_type, input_type, suffix, expect_rejected):
+        """
+        Legacy :term:`Media-Type` are transparently supported when only their official equivalent is defined.
+
+        Any other unrelated :term:`Media-Type` must still be rejected.
+        """
+        body = self.retrieve_payload("CatFile", "deploy", local=True)
+        body["processDescription"]["process"].update({
+            "id": self._testMethodName,
+            "inputs": {"file": {"formats": [{"mediaType": official_type, "default": True}]}},
+        })
+        self.deploy_process(body)
+        data = self.retrieve_payload("CatFile", ref_name="Execute_CatFile_ogc_mapping_schema.yml", local=True)
+        data.update({
+            "mode": ExecuteMode.ASYNC,
+            "response": ExecuteResponse.DOCUMENT,
+            "outputs": {"output": {"transmissionMode": ExecuteTransmissionMode.VALUE}}
+        })
+        with contextlib.ExitStack() as stack_exec:
+            for mock_exec in mocked_execute_celery():
+                stack_exec.enter_context(mock_exec)
+            stack_exec.enter_context(mocked_wps_output(self.settings))
+            out_dir = self.settings["weaver.wps_output_dir"]
+            out_url = self.settings["weaver.wps_output_url"]
+            tmp_file = stack_exec.enter_context(tempfile.NamedTemporaryFile(mode="w", dir=out_dir, suffix=suffix))
+            tmp_file.write("test")
+            tmp_file.flush()
+            tmp_href = tmp_file.name.replace(out_dir, out_url, 1)
+
+            proc_url = f"/processes/{self._testMethodName}/jobs"
+            data["inputs"]["file"] = {"href": tmp_href, "type": input_type}
+            resp = mocked_sub_requests(self.app, "post_json", proc_url, timeout=5,
+                                       data=data, headers=self.json_headers, only_local=True)
+            if expect_rejected:
+                assert resp.status_code == 400, resp.text
+                assert resp.json["code"] == "InvalidParameterValue"
+                assert resp.json["name"] == "inputs.file"
+                assert resp.json["value"]["executionFormats"] == [input_type]
+                assert official_type in resp.json["value"]["supportedFormats"]
+                assert input_type not in resp.json["value"]["supportedFormats"]
+                return
+            assert resp.status_code in [200, 201], resp.text
+            self.monitor_job(resp.json.get("location"))
 
     @pytest.mark.format
     def test_execute_file_type_io_format_cwl_iana_yaml_mapping(self):

@@ -38,6 +38,7 @@ from weaver.formats import (
     clean_media_type_format,
     get_content_type,
     get_format,
+    is_directory_media_type,
     repr_json
 )
 from weaver.processes.constants import ProcessSchema
@@ -1670,39 +1671,33 @@ class WeaverClient(object):
             values = inputs.get("inputs", null)
             if values is null:
                 values = inputs
-            if (
-                # consider possible ambiguity if literal CWL input is named 'inputs'
-                # - if value of 'inputs' is an object, it can collide with 'OGC' schema,
-                #   unless 'value/href/collection/process' (known OGC structures)
-                #   are present AND their sub-dict don't have CWL 'class'
-                # - if value of 'inputs' is a mapping with nested objects or an array of objects,
-                #   they must be interpreted as the CWL form if a 'class' is found in the object
-                #   (literals would be interpreted the same regardless of OGC or CWL form)
-                # - if value of 'inputs' is an array, it can collide with 'OLD' schema,
-                #   unless 'value/href/collection/process' (and also 'id' technically) are present
-                values is not null and
-                (
-                    (
-                        isinstance(values, dict) and
-                        get_any_value(values, default=null, extras=["collection", "processes"]) is null and
-                        "class" in values
-                    ) or
-                    (
-                        isinstance(values, (dict, list)) and  # main container OGC/OLD style
-                        any(
-                            (
-                                isinstance(val, dict) and  # CWL Object
-                                get_any_value(val, default=null, extras=["collection", "processes"]) is null
-                            ) or (
-                                isinstance(val, list) and  # CWL Array
-                                any("class" in (item if isinstance(item, dict) else {}) for item in val)
-                            )
-                            for val in (values if isinstance(values, list) else values.values())
-                        )
-                    )
-                )
-            ):
+
+            def _has_cwl_class(item):
+                # type: (Any) -> bool
+                """
+                Detect cases representing a :term:`CWL` input value.
+
+                CWL job inputs are identified by a ``class`` field (``File``, ``Directory``, etc.), including
+                any special modifier (``File[]``, ``File?``, etc.). Literals are equivalent in OGC and CWL.
+                OGC structures (``value``, ``href``, ``collection``, ``process``, ``bbox``, etc.) must not be searched,
+                since their contents could contain any field leading to false positives. They are preserved as is.
+                If the value of ``inputs`` is itself a CWL object, it is a CWL with ID ``inputs``.
+                If a list, it can be either CWL or OGC (OLD format), but must be converted to the mapping.
+                """
+                if isinstance(item, list):
+                    return any(_has_cwl_class(val) for val in item)
+                if not isinstance(item, dict):
+                    return False
+                if isinstance(item.get("class"), str):
+                    return True
+                if get_any_value(item, default=null, extras=["collection", "process", "processes", "bbox"]) is not null:
+                    return False
+                return any(_has_cwl_class(val) for val in item.values())
+
+            if isinstance(values, dict) and isinstance(values.get("class"), str):
                 values = cwl2json_input_values(inputs, schema=ProcessSchema.OGC)
+            elif _has_cwl_class(values):
+                values = cwl2json_input_values(values, schema=ProcessSchema.OGC)
             if values is null:  # pragma: no cover  # ignore safeguard against error in implementation
                 raise ValueError("Input values parsed as null. Could not properly detect employed schema.")
             values = convert_input_values_schema(values, schema=ProcessSchema.OGC)
@@ -1758,7 +1753,7 @@ class WeaverClient(object):
                 if "://" not in href and (
                     os.path.isdir(href) or
                     href.endswith("/") or
-                    data.get("type") == ContentType.APP_DIR
+                    is_directory_media_type(data.get("type"))
                 ):
                     return OperationResult(
                         success=False,
@@ -3913,16 +3908,25 @@ class WeaverArgumentParser(ArgumentParserFixedRequiredArgs, SubArgumentParserFix
         """
         self._formatters.add(formatter)
 
-    def _get_formatter(self):
-        # type: () -> argparse.HelpFormatter
-        formatter = super(WeaverArgumentParser, self)._get_formatter()
+    def _get_formatter(self, file=None):
+        # type: (Optional[Any]) -> argparse.HelpFormatter
+        if file is None:
+            formatter = super(WeaverArgumentParser, self)._get_formatter()
+        else:
+            # Python 3.15 added the ``file`` keyword to argparse's formatter method, older Pyhton don't know about it.
+            formatter = super(WeaverArgumentParser, self)._get_formatter(file=file)  # pylint: disable=E1123
         setattr(formatter, "parser", self)
         return formatter
 
-    def format_help(self):
-        # type: () -> str
+    def format_help(self, formatter=None):
+        # type: (Optional[argparse.HelpFormatter]) -> str
         self.help_mode = True
-        text = f"{super(WeaverArgumentParser, self).format_help()}\n"
+        if formatter is None:
+            text = super(WeaverArgumentParser, self).format_help()
+        else:
+            # Python 3.15 added the ``formatter`` keyword to argparse's help method, older Pyhton don't know about it.
+            text = super(WeaverArgumentParser, self).format_help(formatter=formatter)  # pylint: disable=E1123
+        text = f"{text}\n"
         for fmt in self._formatters:
             text = fmt(text)
         self.help_mode = False
@@ -4087,7 +4091,8 @@ def make_parser():
     # use regex to handle cases where argparse wraps arguments across multiple lines based on terminal width
     op_deploy.add_formatter(
         lambda _help: re.sub(
-            r"\[-T TOKEN\]\s+\[-U USERNAME\]\s+\[-P PASSWORD\]",
+            r"\[-T TOKEN\]\s+\[-U USERNAME\]\s+\[-P PASSWORD\]"
+            r"|\[-T TOKEN \| -P PASSWORD\]\s+\[-U USERNAME\]",
             "[-T TOKEN | ( -U USERNAME -P PASSWORD )]",
             _help
         )

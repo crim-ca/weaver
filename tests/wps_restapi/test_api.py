@@ -162,6 +162,16 @@ class GenericApiRoutesTestCase(WpsConfigBase):
         assert "$id" in body["components"]["schemas"]["CWL"]
         assert body["components"]["schemas"]["CWL"]["$id"] == sd.CWL_SCHEMA_URL
 
+    @pytest.mark.oap_part5
+    def test_openapi_includes_processes_options(self):
+        """
+        Tests [OGC API Processes Part 5] that the process-listing OPTIONS operation is included in OpenAPI.
+        """
+        resp = self.app.get(sd.openapi_json_service.path, headers=self.json_headers)
+        assert resp.status_code == 200
+        operation = resp.json["paths"][sd.processes_service.path]["options"]
+        assert set(operation["tags"]) == {sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES, sd.TAG_DEPLOY}
+
     def test_openapi_jobs_create_description(self):
         """
         Ensure the correct docstring is picked up by multiple service decorators across view functions.

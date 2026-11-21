@@ -55,6 +55,7 @@ from weaver.utils import (
 )
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
+from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
@@ -80,7 +81,8 @@ if TYPE_CHECKING:
         ExecutionInputs,
         ExecutionOutputs,
         ExecutionSubscribers,
-        JSON
+        JSON,
+        MetadataQueryScope
     )
     from weaver.visibility import AnyVisibility
 
@@ -549,6 +551,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                        revisions=False,     # type: bool
                        process=None,        # type: Optional[str]
                        identifiers=None,    # type: Optional[List[str]]
+                       metadata=None,       # type: Optional[List[Tuple[MetadataQueryScope, str, str]]]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         """
         Lists all processes in database, optionally filtered by `visibility`.
@@ -563,6 +566,13 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         :param identifiers:
             Limit results only to specified explicit list of process IDs with revision tags as applicable.
             Cannot be combined with the other :paramref:`process` and :paramref:`revisions` options.
+        :param metadata:
+            List of resolved ``(scope, role, profile)`` references that a ``metadata`` entry of the process (scope
+            ``process``), or of at least one of its inputs/outputs (scope ``inputs``/``outputs``), must match.
+            Only ``metadata`` entries that are profile links (``rel`` set to
+            :data:`weaver.wps_restapi.swagger_definitions.OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI`) are
+            considered for the ``role``/``href`` matching
+            (`OGC API - Processes - Part 5` ``metadata-profiles`` query filtering).
         :returns:
             List of sorted, and possibly page-filtered, processes matching queries.
             If ``total`` was requested, return a tuple of this list and the number of processes.
@@ -629,6 +639,18 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             if vis not in Visibility:
                 raise ValueError(f"Invalid visibility value '{v!s}' is not one of {list(Visibility.values())!s}")
         search_filters["visibility"] = {"$in": list(visibility)}
+
+        if metadata:
+            metadata_conditions = []
+            for scope, role, profile in metadata:
+                # only consider 'metadata' entries describing a profile link, as per OGC API - Processes
+                # Part 5: Provenance and Profiles, '/req/metadata-profiles/profile-link'
+                elem_match = {"role": role, "href": profile, "rel": sd.OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI}
+                if scope == "process":
+                    metadata_conditions.append({"metadata": {"$elemMatch": elem_match}})
+                else:  # "inputs" or "outputs"
+                    metadata_conditions.append({scope: {"$elemMatch": {"metadata": {"$elemMatch": elem_match}}}})
+            search_filters["$and"] = metadata_conditions
 
         # processes do not have 'created', but ObjectID in '_id' has the particularity of embedding creation time
         if sort == Sort.CREATED:

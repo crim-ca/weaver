@@ -2,6 +2,10 @@
 Utilities for rendering elements in other pages.
 -->
 
+<%def name="get_providers_link(query='')">\
+${weaver.wps_restapi_url}/providers${f"?{query}" if query else ""}\
+</%def>
+
 
 <%def name="get_provider_link(provider_id, query='')">\
 ${weaver.wps_restapi_url}/providers/${provider_id}${f"?{query}" if query else ""}\
@@ -16,13 +20,24 @@ ${_prefix}/processes${f"?{query}" if query else ""}\
 </%def>
 
 
-<%def name="get_process_link(process_id, provider_id='', query='')">\
-${get_processes_link(provider_id=provider_id)}/${process_id}${f"?{query}" if query else ""}\
+<%def name="get_process_link(process_id, provider_id='', provider_uri=False, query='')">\
+<%
+    _prefix = get_processes_link(provider_id=provider_id if provider_id and provider_uri else None)
+    if provider_id and not provider_uri:
+        query = f"{query}&provider={provider_id}" if query else f"provider={provider_id}"
+%>\
+${_prefix}/${process_id}${f"?{query}" if query else ""}\
 </%def>
 
 
 <!--always apply 'detail' query to populate the table in one request-->
-<%def name="get_jobs_link(query='')">\
+<%def name="get_jobs_link(process_id='', provider_id='', query='')">\
+<%
+    if provider_id:
+        query = f"{query}&provider={provider_id}" if query else f"provider={provider_id}"
+    if process_id:
+        query = f"{query}&process={process_id}" if query else f"process={process_id}"
+%>\
 ${weaver.wps_restapi_url}/jobs${f"?{query}&detail=true" if query else "?detail=true"}\
 </%def>
 
@@ -115,27 +130,52 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 </%def>
 
 
+<!--
+Render a reference value (eg: a 'rel'/'role' identifier) as a clickable link when it is a fully qualified URL
+(eg: 'https://schema.org/author'), or as plain code text otherwise (eg: a registered IANA link relation slug).
+-->
+<%def name="render_metadata_reference(value)">\
+%if value and str(value).startswith(("http://", "https://")):
+<div class="code"><a href="${value}">${value}</a></div>\
+%else:
+<div class="code">${value}</div>\
+%endif
+</%def>
+
+<!--
+Metadata entries can represent either a link reference ('href' + optional 'rel'/'type') or an embedded value
+('value' + optional 'lang'), and can optionally be tagged with a 'role' (eg: schema.org relation) regardless
+of the representation. The 'value' contents can themselves be an arbitrary JSON literal, object or array, which
+must be pretty-printed accordingly instead of dumping the raw Python representation.
+-->
 <%def name="render_metadata(metadata)">
 <dl class="indent">
 %for meta in metadata:
+    <%
+        is_link = "href" in meta
+        meta_title = meta.get("title")
+        meta_rel = meta.get("rel")
+        meta_role = meta.get("role")
+        meta_value = meta.get("value")
+    %>
     <dt>
         <div class="field-key">
-        %if "title" in meta:
-            Title: ${meta.title}
-        %elif "role" in meta:
-            Role: ${meta.role}
+        %if meta_title:
+            <span class="field-title">${meta_title}</span>
         %else:
-            Rel: ${meta.rel}
+            <span class="label label-info">${"Link" if is_link else "Value"}</span>
         %endif
         </div>
     </dt>
     <dd>
-        %if "href" in meta:
+        %if is_link:
             <div class="code">
                 <a href="${meta.href}">${meta.href}</a>
             </div>
+        %elif isinstance(meta_value, (dict, list)):
+            ${render_json(meta_value)}
         %else:
-            <div class="code">${meta.value}</div>
+            <div class="code">${meta_value}</div>
         %endif
         %if "lang" in meta:
             <div class="field">
@@ -148,16 +188,28 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
                 <div class="language">${meta.hreflang}</div>
             </div>
         %endif
-        %if "role" in meta:
+        %if meta_rel:
+            <div class="field">
+                <div class="field-key">Relation:</div>
+                ${render_metadata_reference(meta_rel)}
+            </div>
+        %endif
+        %if meta_role:
             <div class="field">
                 <div class="field-key">Role:</div>
-                <div class="code">${meta.role}</div>
+                ${render_metadata_reference(meta_role)}
             </div>
         %endif
         %if "type" in meta:
-            <div class="field indent">
+            <div class="field">
                 <div class="field-key">Media-Type:</div>
                 <div class="code">${meta.type}</div>
+            </div>
+        %endif
+        %if "id" in meta:
+            <div class="field">
+                <div class="field-key">ID:</div>
+                <div class="code">${meta.id}</div>
             </div>
         %endif
     </dd>
@@ -197,6 +249,68 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 </%def>
 
 
+<%def name="render_provider(provider, detail=False)">
+<dl class="indent">
+    <div class="process-provider">
+        <dt id="provider-id">
+            <div class="field-id inline code">
+                <a href="${get_provider_link(provider.id, query='f=html')}">${provider.id}</a>
+            </div>
+            %if "title" in provider:
+                <span class="dash">&#8212;</span>
+                <span class="field-title">${provider.title}</span>
+            %endif
+            <div class="format-link">
+                (<a href="${get_provider_link(provider.id, query='f=json')}">JSON</a>)
+            </div>
+        </dt>
+            <dd>
+            <div class="field">
+                <div class="field-key">Type:</div>
+                <div class="label label-info">${provider.type}</div>
+            </div>
+            <div class="field">
+                <div class="field-key">Location:</div>
+                <div class="code"><a href="${provider.url}">${provider.url}</a></div>
+            </div>
+            %if provider.get("description"):
+                <div class="field">
+                    <div class="field-key">Description:</div>
+                    <div class="field-description">${render_description(provider.description)}</div>
+                </div>
+            %endif
+            %if "version" in provider:
+                <div class="field">
+                    <div class="field-key">Version:</div>
+                    <div class="label label-info version-tag">${provider.version}</div>
+                </div>
+            %endif
+            %if "keywords" in provider:
+                <div class="field">
+                    <div class="field-key">Keywords:</div>
+                    %for keyword in provider.keywords:
+                        <div class="label label-note">${keyword}</div>
+                    %endfor
+                </div>
+            %endif
+            %if detail and provider.get("metadata"):
+                <div class="field">
+                    <div class="field-key">Metadata:</div>
+                    ${render_metadata(provider.metadata)}
+                </div>
+            %endif
+            %if detail and provider.get("links"):
+                <div class="field">
+                    <div class="field-key">Links:</div>
+                    ${render_links(provider.links)}
+                </div>
+            %endif
+        </dd>
+    </div>
+</dl>
+</%def>
+
+
 <%def name="render_inputs(inputs)">
 <dl class="indent">
 %for input_id, input_data in inputs.items():
@@ -215,7 +329,7 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
                 %if field in input_data:
                 <div class="field">
                     <div class="field-key field-sub">${field.capitalize()}:</div>
-                    <div class="field-${field}">${input_data[field]}</div>
+                    <div class="field-${field}">${render_description(input_data[field])}</div>
                 </div>
                 %endif
             %endfor
@@ -228,9 +342,16 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
                 </div>
                 ${render_json(input_data.schema)}
             </div>
+            <%
+                input_metadata = input_data.get("metadata")
+            %>
+            %if input_metadata:
+                <div class="field-key field-sub">Metadata:</div>
+                ${render_metadata(input_metadata)}
+            %endif
             <div class>
                 <%
-                    known_fields = {"title", "description", "schema", "minOccurs", "maxOccurs"}
+                    known_fields = {"title", "description", "schema", "minOccurs", "maxOccurs", "metadata"}
                     extra_fields = set(input_data) - known_fields
                 %>
                 %if extra_fields:
@@ -255,13 +376,34 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 %for output_id, output_data in outputs.items():
     <div class="process-output">
         <dt id="output-${output_id}">
-            <a href="#output-${output_id}">${output_id}</a>
+            <div class="field-id inline code">
+                <a href="#output-${output_id}">${output_id}</a>
+            </div>
+            %if "title" in output_data:
+                <span class="dash">&#8212;</span>
+                <span class="field-title">${output_data.title}</span>
+            %endif
         </dt>
         <dd>
-            <div>
-                <div class="field-key">Schema:</div>
+            %for field in ["description"]:
+                %if field in output_data:
+                <div class="field">
+                    <div class="field-key field-sub">${field.capitalize()}:</div>
+                    <div class="field-${field}">${render_description(output_data[field])}</div>
+                </div>
+                %endif
+            %endfor
+            <div class="field-key field-sub">Schema:</div>
+            <div class="indent">
                 ${render_json(output_data.schema)}
             </div>
+            <%
+                output_metadata = output_data.get("metadata")
+            %>
+            %if output_metadata:
+                <div class="field-key field-sub">Metadata:</div>
+                ${render_metadata(output_metadata)}
+            %endif
         </dd>
     </div>
 %endfor
@@ -395,11 +537,79 @@ NOTE: class 'language-json' used by the 'ajax/libs/highlight.js' library inserte
 <!--
     Convenience wrapper of 'build_toggle_button_code' for contents retrieved from a process sub-path.
 -->
-<%def name="build_process_toggle_button_code(process_id, type, path, format, language, queries='', name='', btn_tabs='')">
+<%def name="build_process_toggle_button_code(process_id, provider_id, type, path, format, language, queries='', name='', btn_tabs='')">
     ${build_toggle_button_code(
         "process",
-        capture(get_process_link, process_id),
+        capture(get_process_link, process_id, provider_id=provider_id),
         type, path, format, language,
         queries=queries, name=name, btn_tabs=btn_tabs,
     )}
+</%def>
+
+
+<%!
+import html
+import re
+
+_MARKDOWN_LINK_REGEX = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
+_PLAIN_TEXT_URL_REGEX = re.compile(r"https?://[^\s<>()]+")
+
+
+def _linkify_description_text(text):
+    """
+    Convert markdown and plain URLs into HTML anchors while escaping surrounding text.
+    """
+    if not text:
+        return ""
+
+    result = []
+    cursor = 0
+
+    for md_match in _MARKDOWN_LINK_REGEX.finditer(text):
+        start, end = md_match.span()
+        if start > cursor:
+            result.append(("text", text[cursor:start]))
+        result.append(("md", md_match.group(1), md_match.group(2)))
+        cursor = end
+
+    if cursor < len(text):
+        result.append(("text", text[cursor:]))
+
+    content = []
+    for token in result:
+        if token[0] == "md":
+            _, label, url = token
+            label = html.escape(label)
+            href = html.escape(url, quote=True)
+            content.append(f'<a href="{href}">{label}</a>')
+            continue
+
+        segment = token[1]
+        seg_cursor = 0
+        for url_match in _PLAIN_TEXT_URL_REGEX.finditer(segment):
+            url_start, url_end = url_match.span()
+            if url_start > seg_cursor:
+                content.append(html.escape(segment[seg_cursor:url_start]))
+
+            url_value = url_match.group(0)
+            # Keep punctuation outside anchors for cleaner copy/paste and visual flow.
+            suffix = ""
+            while url_value and url_value[-1] in ".,;:!?":
+                suffix = url_value[-1] + suffix
+                url_value = url_value[:-1]
+
+            href = html.escape(url_value, quote=True)
+            label = html.escape(url_value)
+            content.append(f'<a href="{href}">{label}</a>')
+            if suffix:
+                content.append(html.escape(suffix))
+            seg_cursor = url_end
+
+        if seg_cursor < len(segment):
+            content.append(html.escape(segment[seg_cursor:]))
+
+    return "".join(content)
+%>
+<%def name="render_description(text)">
+${_linkify_description_text(text) | n}
 </%def>

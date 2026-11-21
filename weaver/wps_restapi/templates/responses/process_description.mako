@@ -1,10 +1,21 @@
 <%inherit file="weaver.wps_restapi:templates/responses/base.mako"/>
 <%namespace name="util" file="weaver.wps_restapi:templates/responses/util.mako"/>
 
+<%
+    provider_id = provider.id if provider else None
+%>
+
 <%block name="breadcrumbs">
 <li><a href="${weaver.wps_restapi_url}?f=html">Home</a></li>
+%if provider:
+<li><a href="${util.get_providers_link(query='f=html')}">Providers</a></li>
+<li><a href="${util.get_provider_link(provider.id, query='f=html')}"><span class="code">${provider.id}</span></a></li>
+<li><a href="${util.get_processes_link(provider_id=provider.id, query='f=html')}">Processes</a></li>
+<li><a href="${util.get_process_link(id, provider_id=provider.id, query='f=html')}"><span class="code">${id}</span></a></li>
+%else:
 <li><a href="${util.get_processes_link(query='f=html')}">Processes</a></li>
 <li><a href="${util.get_process_link(id, query='f=html')}"><span class="code">${id}</span></a></li>
+%endif
 </%block>
 
 <h2 id="id" class="page-title">
@@ -22,10 +33,10 @@
 </h2>
 
 <div class="format-link">
-    (<a href="${util.get_process_link(id, query='f=json')}">OGC JSON</a>,
-     <a href="${util.get_process_link(id, query='f=xml')}">WPS XML</a>,
-     <a href="${util.get_process_link(id)}/package?f=json">CWL JSON</a>,
-     <a href="${util.get_process_link(id)}/package?f=yaml">CWL YAML</a>)
+    (<a href="${util.get_process_link(id, provider_id=provider_id, query='f=json')}">OGC JSON</a>,
+     <a href="${util.get_process_link(id, provider_id=provider_id, query='f=xml')}">WPS XML</a>,
+     <a href="${util.get_process_link(id, provider_id=provider_id)}/package?f=json">CWL JSON</a>,
+     <a href="${util.get_process_link(id, provider_id=provider_id)}/package?f=yaml">CWL YAML</a>)
 </div>
 
 <div class="content-section nav-menu">
@@ -50,6 +61,13 @@
                 Go to <a href="#metadata">Process Metadata</a>
             </div>
         </li>
+        %if provider:
+        <li>
+            <div class="nav-link">
+                Go to <a href="#provider">Process Provider</a>
+            </div>
+        </li>
+        %endif
         <li>
             <div class="nav-link">
                 Go to <a href="#inputs">Process Inputs</a>
@@ -80,7 +98,7 @@
         <span class="field-title">${title}</span>
     %endif
     %if description:
-        <span class="field-description">${description}</span>
+        <span class="field-description">${util.render_description(description)}</span>
     %else:
         <span class="field-description undefined">No description available.</span>
     %endif
@@ -96,6 +114,15 @@
             <span class="undefined">No metadata provided.</span>
         %endif
     </div>
+
+    %if provider:
+    <div class="content-section">
+        <h3 id="provider">
+            <a href="#provider">Provider</a>
+        </h3>
+        ${util.render_provider(provider)}
+    </div>
+    %endif
 
     <div class="content-section">
         <h3 id="inputs">
@@ -129,7 +156,7 @@
                 %>
                 %for (pkg_type, pkg_fmt, pkg_lang, pkg_name) in pkg_variants:
                     ${util.build_process_toggle_button_code(
-                        id,
+                        id, provider_id,
                         type=pkg_type, path="/package", format=pkg_fmt, language=pkg_lang,
                         name=pkg_name, btn_tabs="process-package",
                     )}

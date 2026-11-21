@@ -80,6 +80,8 @@
 .. _edam-link: https://edamontology.org/page
 .. |iana-link| replace:: IANA media types
 .. _iana-link: https://www.iana.org/assignments/media-types/media-types.xhtml
+.. |zarr-link| replace:: Zarr
+.. _zarr-link: https://zarr.dev/
 .. |feature-ogc-def| replace:: Feature
 .. _feature-ogc-def: https://docs.ogc.org/DRAFTS/20-024.html#feature-definition
 .. |feature-w3c-def| replace:: Feature

@@ -99,6 +99,7 @@ class ContentType(Constants):
     APP_FORM = "application/x-www-form-urlencoded"
     APP_GEOJSON = "application/geo+json"
     APP_VDN_GEOJSON = "application/vnd.geo+json"
+    APP_OGC_GEOTIFF = "application/tiff; application=geotiff"  # legacy
     APP_GZIP = "application/gzip"
     APP_HDF5 = "application/x-hdf5"
     APP_JSON = "application/json"
@@ -107,6 +108,7 @@ class ContentType(Constants):
     APP_OAS_JSON = "application/vnd.oai.openapi+json; version=3.0"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
     APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"
+    APP_JPEG2000 = "application/jp2"  # legacy
     APP_NETCDF = "application/netcdf"       # official (registered IANA: https://github.com/Unidata/netcdf/issues/42)
     APP_X_NETCDF = "application/x-netcdf"   # legacy
     APP_NT = "application/n-triples"
@@ -123,6 +125,10 @@ class ContentType(Constants):
     TEXT_YAML = "text/yaml"             # deprecated
     APP_XYZ = "application/x-xyz"       # raw 3D points / LiDAR
     APP_ZIP = "application/zip"
+    APP_ZARR = "application/vnd.zarr"                  # directory-based store, any version
+    APP_ZARR_V2 = "application/vnd.zarr; version=2"
+    APP_ZARR_V3 = "application/vnd.zarr; version=3"
+    APP_ZARR_ZIP = "application/zarr+zip"              # zipped store, distinct from plain application/zip
     IMAGE_GEOTIFF = "image/tiff; subtype=geotiff"
     IMAGE_OGC_GEOTIFF = "image/tiff; application=geotiff"
     IMAGE_COG = "image/tiff; application=geotiff; profile=cloud-optimized"
@@ -148,9 +154,13 @@ class ContentType(Constants):
 
     # special handling
     ANY_NETCDF = {APP_NETCDF, APP_X_NETCDF}
-    ANY_TIFF = {IMAGE_GEOTIFF, IMAGE_OGC_GEOTIFF, IMAGE_COG, IMAGE_TIFF}
+    ANY_TIFF = {IMAGE_GEOTIFF, IMAGE_OGC_GEOTIFF, APP_OGC_GEOTIFF, IMAGE_COG, IMAGE_TIFF}
+    # legacy types are equivalent to the official ones, but never selected when resolving media-types
+    ANY_LEGACY = {APP_OGC_GEOTIFF, APP_JPEG2000}
     ANY_GEOJSON = {APP_GEOJSON, APP_VDN_GEOJSON}
     ANY_YAML = {APP_YAML, APP_X_YAML, TEXT_YAML, TEXT_X_YAML}
+    # 'APP_ZARR_ZIP' is excluded on purpose: it is a single ZIP file (CWL 'File'), not a directory (CWL 'Directory')
+    ANY_ZARR = {APP_ZARR, APP_ZARR_V2, APP_ZARR_V3}
     ANY_JSON = {
         APP_JSON, *ANY_YAML, *ANY_GEOJSON,
         APP_CWL, APP_CWL_JSON, APP_CWL_X, APP_CWL_YAML,
@@ -478,15 +488,21 @@ _CONTENT_TYPE_EXTENSION_OVERRIDES = {
     ContentType.APP_GZIP: ".gz",
     ContentType.APP_TAR_GZ: ".tar.gz",
     ContentType.APP_YAML: ".yaml",
+    ContentType.APP_JPEG2000: ".jp2",
     ContentType.IMAGE_JPEG2000: ".jp2",
     ContentType.IMAGE_TIFF: ".tif",  # common alternate to .tiff
     ContentType.IMAGE_OGC_GEOTIFF: ".tif",
+    ContentType.APP_OGC_GEOTIFF: ".tif",
     ContentType.ANY: ".*",      # any for glob
     ContentType.APP_DIR: "/",   # force href to finish with explicit '/' to mark directory
     ContentType.APP_OCTET_STREAM: ".bin",
     ContentType.APP_FORM: "",
     ContentType.MULTIPART_FORM: "",
     ContentType.IMAGE_SVG_XML: ".svg",
+    ContentType.APP_ZARR: ".zarr",
+    ContentType.APP_ZARR_V2: ".zarr",
+    ContentType.APP_ZARR_V3: ".zarr",
+    ContentType.APP_ZARR_ZIP: ".zarr.zip",
 }
 _CONTENT_TYPE_FORMAT_OVERRIDES = {
     # align encoding with PyWPS variant
@@ -527,7 +543,7 @@ _CONTENT_TYPE_EXTENSION_MAPPING.update({
     if ctype not in _CONTENT_TYPE_EXTENSION_MAPPING
 })
 # apply any remaining local types not explicitly or indirectly added by FORMATS
-_CONTENT_TYPE_EXT_PATTERN = re.compile(r"^[a-z]+/(x-)?(?P<ext>([a-z]+)).*$")
+_CONTENT_TYPE_EXT_PATTERN = re.compile(r"^[a-z]+/(x-)?(?P<ext>([a-z0-9]+)).*$")
 _CONTENT_TYPE_LOCALS_MISSING = [
     (ctype, _CONTENT_TYPE_EXT_PATTERN.match(ctype))
     for ctype in ContentType.values()
@@ -569,7 +585,10 @@ _EXTENSION_CONTENT_TYPES_MAPPING = {
     # because the same extension can represent multiple distinct Content-Types,
     # derive the simplest (shortest) one by default for guessing generic Content-Type
     ext: ctype for ctype, ext in reversed(sorted(
-        _CONTENT_TYPE_EXTENSION_MAPPING.items(),
+        (
+            (ctype, ext) for ctype, ext in _CONTENT_TYPE_EXTENSION_MAPPING.items()
+            if ctype not in ContentType.ANY_LEGACY
+        ),
         key=lambda typ_ext: len(typ_ext[0])
     ))
 }
@@ -672,6 +691,7 @@ OGC_MAPPING = {
     ContentType.IMAGE_GEOTIFF: "geotiff",
     ContentType.IMAGE_OGC_GEOTIFF: "geotiff",
     ContentType.IMAGE_COG: "geotiff",
+    ContentType.APP_OGC_GEOTIFF: "geotiff",
     ContentType.APP_NETCDF: "netcdf",
     ContentType.APP_X_NETCDF: "netcdf",
 }
@@ -857,6 +877,47 @@ def get_content_type(extension, charset=None, default=None):
     if not ctype:
         return default
     return add_content_type_charset(ctype, charset)
+
+
+ZARR_METADATA_FILES = frozenset(["zarr.json", ".zgroup", ".zarray", ".zattrs", ".zmetadata"])  # v3, v2
+"""
+Known Zarr metadata file names, which also allow detecting a Zarr directory store from its listing.
+"""
+
+
+def is_zarr_media_type(media_type):
+    # type: (Any) -> bool
+    """
+    Indicates if the media-type is a Zarr directory store of any version (parameters ignored).
+    """
+    if not media_type or not isinstance(media_type, str):
+        return False
+    return clean_media_type_format(media_type, strip_parameters=True) == ContentType.APP_ZARR
+
+
+def get_zarr_version(media_type):
+    # type: (Any) -> Optional[str]
+    """
+    Obtains the ``version`` parameter of a Zarr media-type, or ``None`` for the generic type without any version.
+    """
+    if not is_zarr_media_type(media_type):
+        return None
+    for param in str(media_type).split(";")[1:]:
+        key, _, value = param.partition("=")
+        if key.strip().lower() == "version":
+            return value.strip().strip("\"") or None
+    return None
+
+
+def is_directory_media_type(media_type):
+    # type: (Any) -> bool
+    """
+    Indicates if the media-type represents a directory structure rather than a single file.
+    """
+    if not media_type or not isinstance(media_type, str):
+        return False
+    ctype = clean_media_type_format(media_type, strip_parameters=True)
+    return ctype in [ContentType.APP_DIR, ContentType.APP_ZARR]
 
 
 @cache

@@ -1,0 +1,21 @@
+# https://docs.safetycli.com/safety-docs/administration/safety-policy-files
+security:
+  ignore-cvss-severity-below: 0
+  ignore-cvss-unknown-severity: false
+  ignore-vulnerabilities:
+    42194:
+      reason: |
+        SQLAlchemy-Utils issue unresolved since 2015.
+        https://github.com/kvesteri/sqlalchemy-utils/issues/166
+    42498:
+      reason: |
+        Celery <5.2.0 uses Kombu versions with Redis/SQS vulnerabilities.
+        Weaver uses MongoDB by default.
+    43738:
+      reason: |
+        Celery <5.2.2 trusts messages and metadata stored in backends (CVE-2021-23727).
+    45185:
+      reason: |
+        Pylint <2.13.0 vulnerability affects an unrelated documentation extension.
+        https://github.com/PyCQA/pylint/issues/5322
+  continue-on-vulnerability-error: false

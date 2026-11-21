@@ -21,7 +21,7 @@ from owslib.crs import Crs
 from owslib.wps import ComplexData, Input as OWSInput, Output as OWSOutput
 from pywps.inout.basic import UOM
 from pywps.inout.formats import Format
-from pywps.inout.inputs import ComplexInput, LiteralInput
+from pywps.inout.inputs import BoundingBoxInput, ComplexInput, LiteralInput
 from pywps.inout.literaltypes import AllowedValue, AnyValue
 from pywps.inout.outputs import ComplexOutput
 from pywps.validator.mode import MODE
@@ -40,6 +40,7 @@ from weaver.formats import (
     OGC_NAMESPACE_DEFINITION,
     ContentEncoding,
     ContentType,
+    SchemaRole,
     get_cwl_file_format
 )
 from weaver.processes.constants import (
@@ -64,15 +65,18 @@ from weaver.processes.convert import _convert_any2cwl_io_complex  # noqa: W0212
 from weaver.processes.convert import _get_cwl_js_value_from  # noqa: W0212
 from weaver.processes.convert import (
     PACKAGE_ARRAY_MAX_SIZE,
+    PACKAGE_DIRECTORY_TYPE,
     PACKAGE_FILE_TYPE,
     CWLIODefinition,
     any2cwl_io,
+    check_io_compatible,
     complex2json,
     convert_input_values_schema,
     convert_value_units,
     cwl2json_input_values,
     cwl2wps_io,
     get_cwl_io_type,
+    get_field,
     get_io_type_category,
     is_cwl_complex_type,
     json2oas_io,
@@ -80,6 +84,7 @@ from weaver.processes.convert import (
     json2wps_datatype,
     json2wps_io,
     json2wps_supported_uoms,
+    merge_io_fields,
     merge_io_formats,
     normalize_ordered_io,
     oas2json_io,
@@ -249,7 +254,55 @@ def test_are_different_and_set_single_null():
                     "glob": ["*.nc", "*.zip"]
                 }
             }
-        )
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_ZARR_V3, "encoding": None, "default": True},
+                ]
+            },
+            {
+                "id": "output",
+                "type": PACKAGE_DIRECTORY_TYPE,  # no "format" applicable to CWL Directory
+                "outputBinding": {
+                    "glob": "*.zarr"
+                }
+            }
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_ZARR_V2, "encoding": None, "default": True},
+                    {"mimeType": ContentType.APP_ZARR_V3, "encoding": None, "default": False},
+                ]
+            },
+            {
+                "id": "output",
+                "type": PACKAGE_DIRECTORY_TYPE,
+                "outputBinding": {
+                    "glob": "*.zarr"  # all versions share the same extension
+                }
+            }
+        ),
+        (
+            {
+                "id": "output",
+                "formats": [
+                    {"mimeType": ContentType.APP_DIR, "encoding": None, "default": False},
+                    {"mimeType": ContentType.APP_ZARR_V3, "encoding": None, "default": True},
+                    {"mimeType": ContentType.APP_ZARR_ZIP, "encoding": None, "default": False},
+                ]
+            },
+            {
+                "id": "output",
+                "type": PACKAGE_DIRECTORY_TYPE,  # as published by Weaver, native directory and zipped alternate
+                "outputBinding": {
+                    "glob": "*.zarr"
+                }
+            }
+        ),
     ]
 )
 def test_convert_any2cwl_io_complex(wps_io, cwl_io_expect):
@@ -1058,6 +1111,36 @@ def test_cwl2wps_io_raise_mixed_types(test_type):
         cwl2wps_io(io_info, IO_INPUT)
 
 
+def test_check_io_compatible_zarr_requires_cwl_directory():
+    wps_io = ComplexInput("test", "", supported_formats=[Format(ContentType.APP_ZARR_V3)])
+    cwl_dir = cwl2wps_io({"name": "test", "type": PACKAGE_DIRECTORY_TYPE}, IO_INPUT)
+    check_io_compatible(wps_io, cwl_dir, "test")  # no error
+
+    cwl_file = cwl2wps_io({"name": "test", "type": PACKAGE_FILE_TYPE}, IO_INPUT)
+    with pytest.raises(PackageTypeError, match="Directory"):
+        check_io_compatible(wps_io, cwl_file, "test")
+
+
+def test_check_io_compatible_zarr_cwl_file_with_zarr_format():
+    wps_io = ComplexInput("test", "", supported_formats=[Format(ContentType.APP_ZARR_V3)])
+    cwl_file = cwl2wps_io(
+        {"name": "test", "type": PACKAGE_FILE_TYPE, "format": ContentType.APP_ZARR_V3},
+        IO_INPUT,
+    )
+    with pytest.raises(PackageTypeError, match="Directory"):
+        check_io_compatible(wps_io, cwl_file, "test")
+
+
+def test_check_io_compatible_zarr_output_requires_cwl_directory():
+    wps_io = ComplexOutput("test", "", supported_formats=[Format(ContentType.APP_ZARR_V3)])
+    cwl_dir = cwl2wps_io({"name": "test", "type": PACKAGE_DIRECTORY_TYPE}, IO_OUTPUT)
+    check_io_compatible(wps_io, cwl_dir, "test")  # no error
+
+    cwl_file = cwl2wps_io({"name": "test", "type": PACKAGE_FILE_TYPE}, IO_OUTPUT)
+    with pytest.raises(PackageTypeError, match="Directory"):
+        check_io_compatible(wps_io, cwl_file, "test")
+
+
 @pytest.mark.parametrize(
     ["io_default", "io_expect", "is_erroneous"],
     [
@@ -1708,6 +1791,36 @@ def test_merge_io_formats_wps_overlaps_cwl():
         Format(ContentType.APP_XML),
         Format(ContentType.TEXT_PLAIN),
     ])
+
+
+def test_merge_io_fields_bbox_cwl_schema_added():
+    """
+    Validate that a CWL ``Format`` with a ``schema`` reference is converted into a WPS ``Metadata`` ``Schema`` entry.
+    """
+    wps_io = BoundingBoxInput("test", "", crss=["EPSG:4326"])
+    cwl_fmt = Format(ContentType.APP_JSON, schema="https://example.com/bbox-schema.json")
+    cwl_io = ComplexInput("test", "", supported_formats=[cwl_fmt], data_format=cwl_fmt)
+    merged_io = merge_io_fields(wps_io, cwl_io)
+    metadata = get_field(merged_io, "metadata", default=[])
+    schema_meta = [meta for meta in metadata if get_field(meta, "href", default=None) == cwl_fmt.schema]
+    assert len(schema_meta) == 1
+    assert get_field(schema_meta[0], "role", default=None) == SchemaRole.JSON_SCHEMA
+    assert get_field(schema_meta[0], "rel", default=None) == "schema"
+
+
+def test_merge_io_fields_bbox_cwl_schema_missing():
+    """
+    Validate that no invalid ``Metadata`` entry (empty ``href``) is generated when CWL ``Format`` has no ``schema``.
+    """
+    wps_io = BoundingBoxInput("test", "", crss=["EPSG:4326"])
+    cwl_fmt = Format(ContentType.APP_JSON)  # no 'schema' provided
+    cwl_io = ComplexInput("test", "", supported_formats=[cwl_fmt], data_format=cwl_fmt)
+    metadata_before = list(get_field(wps_io, "metadata", default=[]))
+    merged_io = merge_io_fields(wps_io, cwl_io)
+    metadata_after = get_field(merged_io, "metadata", default=[])
+    # no new 'Schema' metadata entry (with invalid empty 'href') should have been added
+    assert len(metadata_after) == len(metadata_before)
+    assert not any(get_field(meta, "href", default=None) == "" for meta in metadata_after)
 
 
 def test_normalize_ordered_io_with_builtin_dict_and_hints():
@@ -2426,6 +2539,28 @@ def test_ogcapi2cwl_process_with_extra_exec_href():
     body["executionUnit"] = [{"unit": cwl}]
     body["deploymentProfile"] = "http://www.opengis.net/profiles/eoc/ogcapiApplication"
     assert info == body, "Execution unit should be rewritten with OGC-API hints requirement."
+
+
+def test_ogcapi2cwl_process_zarr_published_formats():
+    """
+    Formats of a Zarr I/O as published by Weaver (with ``application/directory`` and zip alternate) is a Directory.
+    """
+    href = "https://remote-server.com/processes/test-process"
+    formats = [
+        {"mediaType": ContentType.APP_DIR},
+        {"mediaType": ContentType.APP_ZARR_V3, "default": True},
+        {"mediaType": ContentType.APP_ZARR_ZIP},
+    ]
+    body = {
+        "inputs": {"zarr_in": {"formats": formats}},
+        "outputs": {"zarr_out": {"formats": formats}},
+    }
+    cwl, _ = ogcapi2cwl_process(body, href)
+    assert cwl["inputs"]["zarr_in"]["type"] == PACKAGE_DIRECTORY_TYPE
+    assert "format" not in cwl["inputs"]["zarr_in"]
+    assert cwl["outputs"]["zarr_out"]["type"] == PACKAGE_DIRECTORY_TYPE
+    assert "format" not in cwl["outputs"]["zarr_out"]
+    assert cwl["outputs"]["zarr_out"]["outputBinding"] == {"glob": "*.zarr"}
 
 
 def test_ogcapi2cwl_process_without_extra():

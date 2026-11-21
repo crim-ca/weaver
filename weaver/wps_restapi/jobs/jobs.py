@@ -41,7 +41,7 @@ from weaver.processes.utils import get_process
 from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
-from weaver.transform.const import CONVERSION_DICT
+from weaver.transform.utils import extend_alternate_formats
 from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
@@ -805,8 +805,9 @@ def get_job_output(request):
 
     result = results[0]
     mime_type = get_field(result, "mime_type", search_variations=True, default="")
-    possible_media_types = CONVERSION_DICT.get(mime_type, [])
-    possible_media_types.append(mime_type)
+    possible_media_types = [
+        fmt["mediaType"] for fmt in extend_alternate_formats([{"mediaType": mime_type}])
+    ]  # same alternates as advertised in links, without mutating the conversion table
 
     # Get requested media-type. "*/*" if omit
     accept = str(request.accept) if request.accept else "*/*"

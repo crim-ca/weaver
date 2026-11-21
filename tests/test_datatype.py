@@ -3,16 +3,18 @@ import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta
 
+import colander
 import mock
 import pytest
-from visibility import Visibility
 
 from tests import resources
 from weaver.datatype import Authentication, AuthenticationTypes, DockerAuthentication, Job, Process, Service
 from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, ExecuteReturnPreference
 from weaver.formats import ContentType
+from weaver.processes.types import ProcessType
 from weaver.status import Status
 from weaver.utils import localize_datetime, now
+from weaver.visibility import Visibility
 
 TEST_UUID = uuid.uuid4()
 
@@ -215,6 +217,26 @@ def test_process_io_schema_ignore_uri():
 ])
 def test_process_split_version(process_id, result):
     assert Process.split_version(process_id) == result
+
+
+def test_process_cleanup_keywords():
+    proc = Process(id="test", type=ProcessType.WPS_REMOTE, keywords=[" PyWPS ", " WPS", " OGC", " demo "], package={})
+    assert proc.keywords == ["PyWPS", "WPS", "OGC", "demo", ProcessType.WPS_REMOTE]
+
+
+@pytest.mark.parametrize(
+    "keywords",
+    [
+        [1, 2],
+        [""],
+        [" "],
+        ["ok", " "],
+    ]
+)
+def test_process_invalid_keywords(keywords):
+    proc = Process(id="test", package={})
+    with pytest.raises((AttributeError, ValueError, colander.Invalid)):
+        proc.keywords = keywords
 
 
 def test_process_outputs_alt():

@@ -111,6 +111,11 @@ button.active {
     text-decoration: underline;
 }
 
+/* Breadcrumbs ID */
+.breadcrumbs li a .code {
+    font-size: 1.25em;
+}
+
 /* --- Generic Formats --- */
 
 .undefined {
@@ -156,11 +161,15 @@ button.active {
 }
 
 .field > .code {
-    margin-top: 0.2em;
+    margin-top: 0.4em;
+}
+
+.field > .uri {
+    margin-top: 0;
 }
 
 .field > .language {
-    margin-top: 0.2em;
+    margin-top: 0.4em;
 }
 
 .code {
@@ -218,7 +227,21 @@ button.active {
     border-style: solid;
     border-width: 1px;
     border-collapse: collapse;
-    padding: 1em;
+    padding: 0.5em;
+}
+
+.table-jobs {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.table-jobs th,
+.table-jobs td {
+    overflow-wrap: anywhere;
+}
+
+.table-jobs progress {
+    max-width: 100%;
 }
 
 .table-job-status,
@@ -321,8 +344,10 @@ button.active {
 /* --- Labels --- */
 
 .label {
-    display: inline;
-    padding: 0.2em 0.5em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25em 0.5em;
     margin-right: 0.25em;
     font-size: 75%;
     font-weight: 700;
@@ -330,9 +355,17 @@ button.active {
     color: #FFFFFF;
     text-align: center;
     white-space: nowrap;
-    vertical-align: baseline;
+    vertical-align: middle;
     border-radius: 0.25em;
     background-color: #5BC0DE; /* info default */
+}
+
+/* Override any external generic '.label' declarations (same class name collision). */
+div.label,
+span.label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .label-danger {

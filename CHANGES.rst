@@ -21,6 +21,150 @@ Changes:
   of `Job` results. This can be used with servers that do not directly support outputs selection at execution time,
   or simply to retrieve partial results of an existing `Job`. This option also allows the selection of output array
   elements by index using ``{outputID}/{N}`` and can be combined with ``--download`` to obtain only those results.
+
+Fixes:
+------
+- Fix HTML job listing tables overflowing the available page width when zoomed
+  (`#1121 <https://github.com/crim-ca/weaver/issues/1121>`_).
+
+.. _changes_6.18.0:
+
+`6.18.0 <https://github.com/crim-ca/weaver/tree/6.18.0>`_ (2026-11-13)
+====================================================================================================================
+
+Changes:
+--------
+- Add Python 3.14 official support.
+- Add Python 3.15 as experimental support in CI.
+- Drop Python 3.10 EOL support.
+- Use an upstream `cwltool` release with the rootless EUID/EGID fix instead of the conflicting fork dependency.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.17.0:
+
+`6.17.0 <https://github.com/crim-ca/weaver/tree/6.17.0>`_ (2026-11-10)
+====================================================================================================================
+
+Changes:
+--------
+- Add `Zarr` media-types ``application/vnd.zarr`` (including ``version=2`` and ``version=3`` parameters) for directory
+  stores, and ``application/zarr+zip`` for zipped stores, with their ``.zarr`` and ``.zarr.zip`` extensions.
+  The zipped variant is distinguished from a plain ``application/zip``
+  (resolves `#1012 <https://github.com/crim-ca/weaver/issues/1012>`_).
+- Convert `WPS`/`OGC API - Processes` `I/O` using only `Zarr` directory media-types into `CWL` ``Directory`` without
+  ``format`` (not applicable for that type), similarly to the handling of ``application/directory``.
+- Handle `Zarr` directory media-types as directories when returning `Job` results by-value and when refusing
+  local directory uploads to the `Vault` from the `CLI`.
+- Preserve the `Zarr` media-type declared by a `Process` output as the type of the resulting `Job` output when the
+  `CWL` output is a ``Directory`` (instead of reporting it as ``application/directory``), and report it
+  as ``Content-Type`` for directory references when explicitly provided.
+- Offer ``application/zarr+zip`` as alternate format of `Zarr` directory `Job` outputs, using the ``?f={mediaType}``
+  result representation to obtain the zipped store (store contents located at the root of the archive).
+  When an explicit ``version`` of the `Zarr` media-type is declared, the generic ``application/vnd.zarr`` is also
+  offered, and requesting it returns the same directory store without conversion.
+- Refuse deployment of a `Process` declaring a `Zarr` directory media-type on an `I/O` that is defined as a `CWL`
+  ``File``, since `Zarr` stores must be represented by a ``Directory``.
+
+Fixes:
+------
+- Fix files without extension in a remote directory listing (e.g.: `Zarr` chunks such as ``c/0``) being renamed with
+  a default extension (e.g.: ``c/0.txt``) when fetched as part of a directory, which corrupted the directory contents.
+- Fix `Job` results returned by-value for binary contents (e.g.: zipped `Zarr`) being decoded as `UTF-8` text, which
+  failed for non-text bytes. Raw bytes are now returned as is for single result responses, and as ``base64`` encoded
+  ``value`` (with ``encoding`` metadata) when embedded in the `JSON` results document.
+- Run ``safety`` dependency checks using its ``ghcr.io/pyupio/safety`` Docker image in the Makefile and CI.
+  Move vulnerability exclusions and their reasons into ``.safety-policy.yml``.
+  Remove the Python development dependency and its ``authlib``/``marshmallow`` compatibility pins
+  (relates to `pyupio/safety#822 <https://github.com/pyupio/safety/issues/822>`_).
+- Add `OGC API - Processes - Part 5: Provenance and Profiles` new ``metadata-profiles`` conformance class references
+  which provides the semantics of ``metadata`` with ``role``, ``href`` and a profiled-term ``rel`` to annotate the
+  `Process` itself or at granular I/O definitions, and aligns with ``dataClasses`` URIs along the I/O ``schema``
+  (relates to `opengeospatial/ogcapi-processes#637 <https://github.com/opengeospatial/ogcapi-processes/pull/637>`_).
+- Implement ``GET /processes?metadata[<scope>][<role>]=<profile>`` query filtering to list only `Process` summaries
+  that define a matching ``metadata`` entry, either in the main `process` or per `inputs`/`outputs` definition of the
+  requested `<scope>`, and resolving Safe `CURIE`/`URN` ``role``/``profile`` references to their long-form `URI` as
+  necessary. Corresponding HTTP 400/422 error responses are raised when applicable for invald parsing or combinations.
+- Add `OGC API - Processes - Part 5: Provenance and Profiles` ``metadata-profiles`` conformance class references.
+- Implement ``OPTIONS /processes`` to advertise supported methods and deployment media types with ``Allow``
+  and ``Accept-Post`` headers, as required by the ``metadata-profiles`` requirements.
+  Add ``Vary: Accept, Prefer`` because process-list response behavior depends on those request headers.
+- Add legacy ``application/tiff; application=geotiff`` and ``application/jp2`` media-types
+  (from the `OGC API - Processes` examples) as dynamically supported equivalents
+  of ``image/tiff; application=geotiff`` and ``image/jp2`` respectively.
+  Inputs submitted with them are accepted by any `Process` that defines the official media-types, without explicitly
+  listing them in its description. The legacy types are never selected when resolving media-types
+  (e.g.: from file extensions).
+- Add keyless ``allratestoday`` option for ``weaver.quotation_currency_converter``, using the daily `ECB` reference
+  rates through an ``exchangeratesapi`` compatible ``convert`` response.
+- Fix ``PATCH`` requests silently dropping per-``id`` ``inputs``/``outputs`` ``metadata``
+  (e.g., to add ``role``/``profile`` links) submitted for update, by declaring ``keywords``/``metadata``
+  fields on ``InputOutputDescriptionMeta`` schema-node definition.
+- Fix ``PATCH`` list-append logic (``keywords``, ``metadata``, ``links``)
+  that discarded the merged result and persisted the original unchanged list instead.
+- Fix execution input validation that ignored ``format.mediaType`` of an input, and the conversion of single
+  ``Job`` input mapping to listing that dropped any field other than the first one (e.g.: ``format`` next to ``href``).
+- Fix media-type extension parsing pattern that did not support digits (e.g.: ``jp2``).
+- Fix `CLI` ``execute`` inputs parsing that incorrectly interpreted valid `OGC API - Processes` execution bodies
+  (e.g.: with ``bbox``, nested ``value`` objects) as `CWL` job inputs and failed. Only inputs containing
+  a ``class`` field are now considered `CWL` as originally intended. Logic is simplified to help interpretability
+  (fixes `#1048 <https://github.com/crim-ca/weaver/issues/1048>`_).
+- Fix `HTML` rendering of `Process`/`Provider` ``metadata`` entries that mixed link reference (``rel``/``href``) and
+  value (``role``/``value``) representations, causing duplicated ``role`` fields, ``rel``/``role`` identifiers not
+  rendered as clickable links when they are fully qualified `URL` references, literal embedded JSON ``value`` objects
+  dumped using their raw Python representation instead of pretty-printed JSON, and inconsistent indentation of the
+  ``Media-Type`` field relative to the corresponding link reference.
+- Extend the same ``metadata`` `HTML` rendering improvements to per-``id`` ``inputs``/``outputs`` entries of a
+  `Process`/`Provider` description, and add missing ``title``/``description`` rendering for ``outputs`` (previously
+  only the ``Schema`` was displayed).
+- Fix `HTML` ``Jobs`` breadcrumb and listing links on a `Job`/`Process`/`Provider`-scoped page that incorrectly
+  redirected to the unfiltered `Job` listing instead of preserving the ``process``/``provider`` filtering context.
+- Remove `HTML` duplicate rendering of alternate OGC/WPS/CWL JSON/YAML/XML content negotiation links.
+- Fix `HTML` missing `Provider`-scoped links in corresponding pages when navigating their contents.
+- Fix `HTML` rendering of ``get_process_link`` util helper that omitted a line-continuation after a Mako control
+  block, leaking a stray newline into generated `Process` `URL` references. This broke the inline ``<script>``
+  blocks responsible for the `CWL` `JSON`/`YAML` toggle buttons under the ``Process`` description `Package`
+  section, causing a ``ReferenceError`` when clicking them.
+- Correct Docker Compose configuration paths and document the required MongoDB hostname settings.
+- Fix quote currency conversion failing with ``KeyError`` for every converter whose `URL` uses an ``{amount}``
+  template parameter (``currencylayer``, ``exchangeratesapi``, ``fixer``, ``scrapper``).
+- Fix ``fixer`` currency converter registered under the ``openexchangerates`` name, which made ``fixer`` unavailable
+  and replaced the actual ``openexchangerates`` converter.
+- Fix `BoundingBox` `I/O` description entries (`input`/`output`) being silently dropped entirely from `Process`
+  ``GET`` describe responses whenever a mismatched `CWL`/`WPS` ``format``/``schema`` auto-generated an invalid
+  ``metadata`` "Schema" link reference (empty ``href``, or missing required ``rel``), causing the corresponding
+  `AllOf`/`OneOf` schema validation to fail and the whole `I/O` entry to be discarded instead of rendered.
+- Make test SVG profiling creation configurable and install Graphviz through the Makefile when the option is enabled.
+- Fix the Celery registry-resolution test failure seen with ``celery==5.7.0``/``kombu==5.7.0``. It also reproduces
+  with ``celery==5.6.3``/``kombu==5.6.2``, indicating a test setup issue rather than a ``_store_result`` regression.
+  The detached worker could be queried before it was ready, and its configuration pointed to the default ``weaver``
+  database instead of the test database, leaving task metadata unavailable. Wait for worker readiness and task
+  completion, configure the worker with the test database, and handle nullable traceback metadata.
+
+.. _changes_6.16.0:
+
+`6.16.0 <https://github.com/crim-ca/weaver/tree/6.16.0>`_ (2026-10-06)
+====================================================================================================================
+
+Changes:
+--------
+- Add `HTML` shortcut links to easily toggle contextually between full `Provider` or only local `Process` listing.
+- Add `HTML` support of ``/providers/{providerID}/processes/?f=html`` to list all `Process` references of a `Provider`.
+- Add `HTML` support of ``/processes/?providers=true`` to list all `Provider` and local `Process` references.
+- Add `HTML` support of ``/providers?f=html`` with shortcut navigation from the API frontpage.
+- Add `HTML` support of ``/providers/{providerID}?f=html`` with contextual breadcrumbs and links to related listings.
+- Add `Provider`-aware `HTML` links to `Process` and `Job` listings that resolve corresponding descriptions.
+- Add `HTML` auto-detection and link encoding of embedded `URL` to render references in ``description`` fields.
+- Add `XML` support for ``/providers/{providerID}/processes/{processID}?f=xml`` returning `WPS` offering details.
+- Add ``?provider={providerID}`` and ``?service={providerID}`` query parameters to ``/processes/{processID}`` request
+  as alias to resolve the corresponding ``/providers/{providerID}/processes/{processID}`` resource.
+- Add ``provider`` details embedded within the ``/processes/{processID}`` response if ``?provider={providerID}``
+  or ``?service={providerID}`` query parameter is specified and that the `Provider`'s `Process` can be resolved.
+- Add content negotiation on ``/providers/{providerID}/processes/{processID}/package`` to align with local `Process`.
+- Added conformance definitions (``/req``, ``/conf``) for the existing ``GET /jobs/{jobId}/outputs/{outputId}/{N}``
+  endpoint to align with the latest OGC API - Processes Core specification.
 - Provide the `CWL` `Application Package` in JSON and YAML on the HTML `Process` description page.
 - Adjust the output directory resolution to preserve the nested base name of the directory, such that when it has a
   semantic meaning (e.g.: ``output.zarr/``) or when the workflow step rely on their names to operate, it is preserved
@@ -60,6 +204,8 @@ Changes:
 
 Fixes:
 ------
+- Fix tutorial examples that used local ``file://`` references rejected by built-in process security validation
+  (resolves `#1033 <https://github.com/crim-ca/weaver/issues/1033>`_).
 - Fix invalid convertion to ``array`` within `I/O` ``schema`` for an optional single-value parameter
   (i.e.: when ``minOccurs=0`` and ``minOccurs=1``). Since any `CWL` `I/O` providing a ``default`` is resolved
   as optional (i.e.: ``["null", <type>]``), a definition such as ``type: boolean`` with ``default: true`` was
@@ -103,6 +249,7 @@ Fixes:
 .. _changes_6.15.0:
 
 `6.15.0 <https://github.com/crim-ca/weaver/tree/6.15.0>`_ (2026-07-03)
+====================================================================================================================
 
 Changes:
 --------

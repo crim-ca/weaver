@@ -1,0 +1,23 @@
+processDescription:
+  id: WorkflowZarrChain
+  title: Chain Zarr directory input/output through two steps (in -> out -> in -> out).
+  version: "0.0.1"
+  inputs:
+    - id: zarr_in
+      formats:
+        - mediaType: "application/vnd.zarr; version=3"
+          default: true
+      minOccurs: 1
+      maxOccurs: 1
+  outputs:
+    - id: zarr_out
+      formats:
+        - mimeType: "application/vnd.zarr; version=3"
+          default: true
+      minOccurs: 1
+      maxOccurs: 1
+  visibility: public
+executionUnit:
+  - test: WorkflowZarrChain.cwl
+immediateDeployment: true
+deploymentProfileName: "http://www.opengis.net/profiles/eoc/workflow"
