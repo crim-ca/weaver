@@ -924,15 +924,15 @@ class TestWeaverClient(TestWeaverClientBase):
         # Update with explicit version
         result = mocked_sub_requests(
             self.app, self.client.replace, test_id,
-            metadata={"title": "Version Test"}, version="2.5.0"
+            metadata={"title": "Version Test"}, version="1.0.5"
         )
         assert result.success
-        assert result.body["version"] == "2.5.0", "Explicit version should be used"
+        assert result.body["processSummary"]["version"] == "1.0.5", "Explicit version should be used"
 
         # Verify version
         result = mocked_sub_requests(self.app, self.client.describe, test_id)
         assert result.success
-        assert result.body["version"] == "2.5.0"
+        assert result.body["version"] == "1.0.5"
 
     @pytest.mark.oap_part2
     def test_replace_with_http_method_patch(self):
@@ -954,7 +954,7 @@ class TestWeaverClient(TestWeaverClientBase):
 
         result = mocked_sub_requests(self.app, self.client.describe, test_id)
         assert result.success
-        assert result.body["processSummary"]["title"] == "PATCH Test"
+        assert result.body["title"] == "PATCH Test"
 
     def test_describe(self):
         result = mocked_sub_requests(self.app, self.client.describe, self.test_process["Echo"])
