@@ -83,7 +83,8 @@ The execution of the process should read the JSON list with our dummy NetCDF fil
 on the output parameter named ``output`` with a path matching the configured output WPS path of the application.
 
 .. note::
-    All above WPS-1/2 requests suppose that configuration setting ``weaver.wps_path = /ows/wps`` (default value).
+    All above WPS-1/2 requests suppose that configuration setting :confval:`weaver.wps_path` = ``/ows/wps``
+    (default value).
     The request URL have to be adjusted accordingly if this parameter is modified.
 
 OGC API - Processes requests
