@@ -12,10 +12,16 @@ Changes
 
 Changes:
 --------
+- Consolidate version normalization and prerelease update validation in ``weaver.utils.Version``
+  (relates to `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 - Allow Sphinx 9 for documentation builds with ``sphinx_autodoc_typehints>=3.6.1``.
 
 Fixes:
 ------
+- Fix process version links and version-history listings for semantic versions with suffixes such as ``0.1.3.dev10``.
+  Correct ``latest-version``, ``version-history``, ``predecessor-version``, ``successor-version`` and ``working-copy``
+  links. Add ``current`` and ``working-copy-of`` links and make ``self`` and ``alternate`` links representation-aware
+  (resolves `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 - Fix HTML job listing tables overflowing the available page width when zoomed
   (`#1121 <https://github.com/crim-ca/weaver/issues/1121>`_).
 
