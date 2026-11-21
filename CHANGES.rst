@@ -27,6 +27,8 @@ Fixes:
   (resolves `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 - Fix HTML job listing tables overflowing the available page width when zoomed
   (`#1121 <https://github.com/crim-ca/weaver/issues/1121>`_).
+- Fix ``Installation`` and ``Configuration`` links of the ``README.rst`` header resolving to external URLs
+  instead of their sections, caused by conflicting inline named hyperlink targets.
 
 .. _changes_6.18.0:
 
