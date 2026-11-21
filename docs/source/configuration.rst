@@ -73,8 +73,8 @@ they are optional and which default value or operation is applied in each situat
 
    .. note::
 
-    This is the URL that you want displayed in responses (e.g.: ``processDescriptionURL`` or job ``location``).
-    For the effective URL employed by the WSGI HTTP server, refer to ``[server:main]`` section of `weaver.ini.example`_.
+      This is the URL that you want displayed in responses (e.g.: ``processDescriptionURL`` or job ``location``).
+      For the effective URL employed by the WSGI HTTP server, refer to ``[server:main]`` section of `weaver.ini.example`_.
 
 .. confval:: weaver.schema_url
    :type: URL
@@ -96,31 +96,31 @@ they are optional and which default value or operation is applied in each situat
 
    .. note::
 
-     When a :term:`Docker` container is employed for running the :term:`Application Package`,
-     the effective user ID (and group ID, see :confval:`weaver.cwl_egid`) will also take into consideration any relevant
-     user-namespace mapping, whether using |docker-rootless|_ or |docker-userns-remap|_ security features which
-     will take effect according to existing ``/etc/subuid`` and ``/etc/subgid`` configuration on the host machine.
-     Therefore, the effective user ID and group ID must take into consideration the values with these mappings
-     if applicable to avoid redundant definitions that could work against their features.
+      When a :term:`Docker` container is employed for running the :term:`Application Package`,
+      the effective user ID (and group ID, see :confval:`weaver.cwl_egid`) will also take into consideration any relevant
+      user-namespace mapping, whether using |docker-rootless|_ or |docker-userns-remap|_ security features which
+      will take effect according to existing ``/etc/subuid`` and ``/etc/subgid`` configuration on the host machine.
+      Therefore, the effective user ID and group ID must take into consideration the values with these mappings
+      if applicable to avoid redundant definitions that could work against their features.
 
-     Otherwise (e.g.: when running a root :term:`Docker` daemon and containers), these parameters can be set to
-     indicate explicitly the desired effective user and group IDs to run the :term:`Application Package` with.
-     File system permissions to read and write :term:`I/O` of the :term:`Process` should be adapted accordingly
-     to each situation.
+      Otherwise (e.g.: when running a root :term:`Docker` daemon and containers), these parameters can be set to
+      indicate explicitly the desired effective user and group IDs to run the :term:`Application Package` with.
+      File system permissions to read and write :term:`I/O` of the :term:`Process` should be adapted accordingly
+      to each situation.
 
    .. note::
-    Can also be configured using the :envvar:`WEAVER_CWL_EUID` environment variable.
+      Can also be configured using the :envvar:`WEAVER_CWL_EUID` environment variable.
 
    .. seealso::
-    - `weaver.ini.example`_
-    - :func:`weaver.processes.wps_package.WpsPackage.update_effective_user`
+      - `weaver.ini.example`_
+      - :func:`weaver.processes.wps_package.WpsPackage.update_effective_user`
 
    .. versionadded:: 1.9
    .. versionchanged:: 6.9
-    Using ``0`` will now be explicitly set to allow |docker-rootless|_ that performs the user/group mapping itself.
-    Also, settings will be applied whether :confval:`weaver.cwl_euid` or :confval:`weaver.cwl_egid` are detected to differ from
-    the running process, rather than requiring both to be defined explicitly simultaneously. Missing entries (if any)
-    will use the corresponding value from the running process as default.
+      Using ``0`` will now be explicitly set to allow |docker-rootless|_ that performs the user/group mapping itself.
+      Also, settings will be applied whether :confval:`weaver.cwl_euid` or :confval:`weaver.cwl_egid` are detected to differ from
+      the running process, rather than requiring both to be defined explicitly simultaneously. Missing entries (if any)
+      will use the corresponding value from the running process as default.
 
 .. confval:: weaver.cwl_egid
    :type: int, experimental
@@ -129,14 +129,14 @@ they are optional and which default value or operation is applied in each situat
    Define the effective machine group ID to be used for running the :term:`Application Package`.
 
    .. note::
-    Can also be configured using the :envvar:`WEAVER_CWL_EGID` environment variable.
+      Can also be configured using the :envvar:`WEAVER_CWL_EGID` environment variable.
 
    .. seealso::
-    Refer to :confval:`weaver.cwl_euid` about additional details and implications of this setting.
+      Refer to :confval:`weaver.cwl_euid` about additional details and implications of this setting.
 
    .. versionadded:: 1.9
    .. versionchanged:: 6.9
-    See :confval:`weaver.cwl_euid` for details.
+      See :confval:`weaver.cwl_euid` for details.
 
 .. confval:: weaver.cwl_no_match_user
    :type: bool-like, experimental
@@ -150,10 +150,10 @@ they are optional and which default value or operation is applied in each situat
    is performed by Docker itself, therefore avoiding redundant and potentially conflicting settings.
 
    .. note::
-    Can also be configured using the :envvar:`WEAVER_CWL_NO_MATCH_USER` environment variable.
+      Can also be configured using the :envvar:`WEAVER_CWL_NO_MATCH_USER` environment variable.
 
    .. seealso::
-    Refer to :confval:`weaver.cwl_euid` and :confval:`weaver.cwl_egid`.
+      Refer to :confval:`weaver.cwl_euid` and :confval:`weaver.cwl_egid`.
 
    .. versionadded:: 6.9
 
@@ -167,9 +167,9 @@ they are optional and which default value or operation is applied in each situat
 
    .. note::
 
-     Any pre-existing :term:`Job` that was created when this option did not yet exist or that was executed while
-     it was disabled will not offer :term:`Provenance` metadata. This is intrinsic to the functionality that must obtain
-     timely metadata *while* executing to properly represent operational steps and :term:`Job` updates as they occur.
+      Any pre-existing :term:`Job` that was created when this option did not yet exist or that was executed while
+      it was disabled will not offer :term:`Provenance` metadata. This is intrinsic to the functionality that must obtain
+      timely metadata *while* executing to properly represent operational steps and :term:`Job` updates as they occur.
 
    .. versionadded:: 6.1
 
@@ -180,12 +180,12 @@ they are optional and which default value or operation is applied in each situat
    Enables the WPS-1/2 endpoint.
 
    .. seealso::
-    :ref:`wps_endpoint`
+      :ref:`wps_endpoint`
 
    .. warning::
 
-     At the moment, this setting must be ``true`` to allow :term:`Job` execution as the worker monitors this endpoint.
-     This could change with future developments (see issue `#21 <https://github.com/crim-ca/weaver/issues/21>`_).
+      At the moment, this setting must be ``true`` to allow :term:`Job` execution as the worker monitors this endpoint.
+      This could change with future developments (see issue `#21 <https://github.com/crim-ca/weaver/issues/21>`_).
 
 .. confval:: weaver.wps_path
    :type: URL path
@@ -216,7 +216,7 @@ they are optional and which default value or operation is applied in each situat
 
    .. versionadded:: 1.13
    .. seealso::
-    :ref:`conf_s3_buckets`
+      :ref:`conf_s3_buckets`
 
 .. confval:: weaver.wps_output_s3_region
    :type: S3 region name
@@ -230,7 +230,7 @@ they are optional and which default value or operation is applied in each situat
 
    .. versionadded:: 1.13
    .. seealso::
-    :ref:`conf_s3_buckets`
+      :ref:`conf_s3_buckets`
 
 .. confval:: weaver.wps_output_dir
    :type: directory path
@@ -244,8 +244,8 @@ they are optional and which default value or operation is applied in each situat
    This directory should be mapped to `Weaver`'s :term:`WPS` output URL to serve them externally as needed.
 
    .. versionchanged:: 4.3
-    The output directory could be nested under a *contextual directory* if requested during :term:`Job` submission.
-    See :ref:`exec_output_location` and below ``weaver.wps_output_context`` parameter for more details.
+      The output directory could be nested under a *contextual directory* if requested during :term:`Job` submission.
+      See :ref:`exec_output_location` and below ``weaver.wps_output_context`` parameter for more details.
 
 .. confval:: weaver.wps_output_context
    :type: sub-directory path
@@ -260,13 +260,13 @@ they are optional and which default value or operation is applied in each situat
    .. versionadded:: 4.3
 
    .. versionchanged:: 4.27
-    Nesting of the *context* directory from ``X-WPS-Output-Context`` or ``weaver.wps_output_dir`` will
-    also take effect when storing :term:`Job` results under :term:`S3` when ``weaver.wps_output_s3_bucket``
-    and ``weaver.wps_output_s3_region`` are also defined. Previous versions applied the *context* directory
-    only for local storage using the other :term:`WPS` output settings.
+      Nesting of the *context* directory from ``X-WPS-Output-Context`` or ``weaver.wps_output_dir`` will
+      also take effect when storing :term:`Job` results under :term:`S3` when ``weaver.wps_output_s3_bucket``
+      and ``weaver.wps_output_s3_region`` are also defined. Previous versions applied the *context* directory
+      only for local storage using the other :term:`WPS` output settings.
 
    .. seealso::
-    See :ref:`exec_output_location` for more details about this feature and implications of this setting.
+      See :ref:`exec_output_location` for more details about this feature and implications of this setting.
 
 .. confval:: weaver.wps_output_path
    :type: URL path
@@ -280,10 +280,10 @@ they are optional and which default value or operation is applied in each situat
    not strictly enforced.
 
    .. note::
-    The resulting ``weaver.wps_output_url`` endpoint, whether directly provided or indirectly
-    resolved by ``weaver.url`` and ``weaver.wps_output_path`` will not be served by `Weaver` itself.
-    This location is returned for reference in API responses, but it is up to the infrastructure that
-    hosts `Weaver` service to make this location available online as deemed necessary.
+      The resulting ``weaver.wps_output_url`` endpoint, whether directly provided or indirectly
+      resolved by ``weaver.url`` and ``weaver.wps_output_path`` will not be served by `Weaver` itself.
+      This location is returned for reference in API responses, but it is up to the infrastructure that
+      hosts `Weaver` service to make this location available online as deemed necessary.
 
 .. confval:: weaver.wps_output_url
    :type: URL
@@ -306,8 +306,8 @@ they are optional and which default value or operation is applied in each situat
    The value can be indicated with ``xB``, ``xKB``, ``xMB``, ``xGB``, where ``x`` is an integer value.
 
    .. note::
-    The value applies for :term:`OGC API - Processes` requests as well when are they are transferred to the :term:`WPS`
-    context. However, the limit will be applied only when executing the :term:`Job` through the :term:`WPS` server.
+      The value applies for :term:`OGC API - Processes` requests as well when are they are transferred to the :term:`WPS`
+      context. However, the limit will be applied only when executing the :term:`Job` through the :term:`WPS` server.
 
    .. versionadded:: 5.6
 
@@ -320,8 +320,8 @@ they are optional and which default value or operation is applied in each situat
    The value can be indicated with ``xB``, ``xKB``, ``xMB``, ``xGB``, where ``x`` is an integer value.
 
    .. note::
-    The value applies for :term:`OGC API - Processes` requests as well when are they are transferred to the :term:`WPS`
-    context. However, the limit will be applied only when executing the :term:`Job` through the :term:`WPS` server.
+      The value applies for :term:`OGC API - Processes` requests as well when are they are transferred to the :term:`WPS`
+      context. However, the limit will be applied only when executing the :term:`Job` through the :term:`WPS` server.
 
    .. versionadded:: 5.6
 
@@ -335,8 +335,8 @@ they are optional and which default value or operation is applied in each situat
    .. versionadded:: 5.1.0
 
    .. seealso::
-    - :func:`weaver.wps.utils.get_wps_client_filtered_headers`
-    - :func:`weaver.wps.utils.get_wps_client`
+      - :func:`weaver.wps.utils.get_wps_client_filtered_headers`
+      - :func:`weaver.wps.utils.get_wps_client`
 
 .. confval:: weaver.wps_restapi
    :type: bool-like
@@ -346,8 +346,8 @@ they are optional and which default value or operation is applied in each situat
 
    .. warning::
 
-    `Weaver` looses most, if not all, of its useful features without this, and there won't be much point in using
-    it without REST endpoint, but it should technically be possible to run it as :term:`WPS`-1/2 only if desired.
+      `Weaver` looses most, if not all, of its useful features without this, and there won't be much point in using
+      it without REST endpoint, but it should technically be possible to run it as :term:`WPS`-1/2 only if desired.
 
 .. confval:: weaver.wps_restapi_html
    :type: bool-like
@@ -464,7 +464,7 @@ they are optional and which default value or operation is applied in each situat
    the request body did not include a subscription to those notifications, even if the templates were configured.
 
    .. seealso::
-    See :ref:`Notification Subscribers <proc_op_execute_subscribers>` for more details.
+      See :ref:`Notification Subscribers <proc_op_execute_subscribers>` for more details.
 
    .. versionadded:: 4.15
    .. versionchanged:: 4.34
@@ -480,7 +480,7 @@ they are optional and which default value or operation is applied in each situat
 
    .. versionadded:: 4.15
    .. versionchanged:: 4.30
-    Renamed from ``weaver.exec_sync_max_wait`` to ``weaver.execute_sync_max_wait``.
+      Renamed from ``weaver.exec_sync_max_wait`` to ``weaver.execute_sync_max_wait``.
 
 .. _conf_celery:
 
@@ -629,8 +629,8 @@ Please refer to `wps_processes.yml.example`_ for explicit format, keywords suppo
    The default value is employed if the setting is not defined at all.
 
    .. seealso::
-    - `weaver.ini.example`_
-    - `wps_processes.yml.example`_
+      - `weaver.ini.example`_
+      - `wps_processes.yml.example`_
 
 .. _conf_cwl_processes:
 
@@ -669,13 +669,13 @@ in an identical definition as if it was :ref:`Deployed <proc_op_deploy>` using :
    The default value is employed if the setting is not defined at all.
 
    .. note::
-    When registering processes using :term:`CWL`, it is mandatory for those definitions to provide an ``id`` within
-    the file along other :term:`CWL` details to let `Weaver` know which :term:`Process` reference to use for deployment.
+      When registering processes using :term:`CWL`, it is mandatory for those definitions to provide an ``id`` within
+      the file along other :term:`CWL` details to let `Weaver` know which :term:`Process` reference to use for deployment.
 
    .. warning::
-    If a :term:`Process` depends on another definition, such as in the case of a :ref:`proc_workflow` definition, all
-    dependencies must be registered prior to this :term:`Process`. Consider naming your :term:`CWL` files to take
-    advantage of loading order to resolve such situations.
+      If a :term:`Process` depends on another definition, such as in the case of a :ref:`proc_workflow` definition, all
+      dependencies must be registered prior to this :term:`Process`. Consider naming your :term:`CWL` files to take
+      advantage of loading order to resolve such situations.
 
 .. confval:: weaver.cwl_processes_register_error
    :type: bool
@@ -686,7 +686,7 @@ in an identical definition as if it was :ref:`Deployed <proc_op_deploy>` using :
    immediately fail (when ``true``) when an issue is raised during :term:`Process` deployment.
 
    .. seealso::
-    - `weaver.ini.example`_
+      - `weaver.ini.example`_
 
 .. _conf_request_options:
 
@@ -731,11 +731,11 @@ etc. on a per-request basis, leave other requests unaffected and generally more 
    Toggle the SSL certificate verification across all requests.
 
    .. warning::
-    It is **NOT** recommended to disable SSL verification across all requests for security reasons
-    (avoid man-in-the-middle attacks). This is crucial for requests that involve any form of authentication, secured
-    access or personal user data references. This should be employed only for quickly resolving issues during
-    development. Consider fixing SSL certificates on problematic servers, or disable the verification on a per-request
-    basis using :term:`Request Options` for acceptable cases.
+      It is **NOT** recommended to disable SSL verification across all requests for security reasons
+      (avoid man-in-the-middle attacks). This is crucial for requests that involve any form of authentication, secured
+      access or personal user data references. This should be employed only for quickly resolving issues during
+      development. Consider fixing SSL certificates on problematic servers, or disable the verification on a per-request
+      basis using :term:`Request Options` for acceptable cases.
 
 .. _conf_quotation:
 
@@ -887,7 +887,7 @@ and all corresponding functionalities, including `API` endpoints, will be disabl
    Ensure `Celery`_ worker is configured as specified in :ref:`conf_celery`.
 
    .. versionchanged:: 4.30
-    Renamed from ``weaver.quote_sync_max_wait`` to ``weaver.quotation_sync_max_wait``.
+      Renamed from ``weaver.quote_sync_max_wait`` to ``weaver.quotation_sync_max_wait``.
 
 .. _conf_vault:
 
