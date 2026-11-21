@@ -13,7 +13,7 @@ from weaver.execute import ExecuteControlOption, ExecuteMode, ExecuteResponse, E
 from weaver.formats import ContentType
 from weaver.processes.types import ProcessType
 from weaver.status import Status
-from weaver.utils import localize_datetime, now
+from weaver.utils import Version, localize_datetime, now
 from weaver.visibility import Visibility
 
 TEST_UUID = uuid.uuid4()
@@ -213,10 +213,28 @@ def test_process_io_schema_ignore_uri():
     ("urn:test:random-test:1.3.4", ("urn:test:random-test", "1.3.4")),
     ("random-test:1", ("random-test", "1")),
     ("random-test:1.3.4", ("random-test", "1.3.4")),
+    ("random-test:0.1.3.dev10", ("random-test", "0.1.3.dev10")),
     ("random-test:not.a.version", ("random-test:not.a.version", None)),
 ])
 def test_process_split_version(process_id, result):
     assert Process.split_version(process_id) == result
+
+
+@pytest.mark.parametrize("version,expected", [
+    (1, "1.0.0"),
+    (1.2, "1.2.0"),
+    ([1, 2], "1.2.0"),
+    ((1, 2, 3), "1.2.3"),
+    (Version("0.1.3.dev1"), "0.1.3.dev1"),
+])
+def test_process_version_representations(version, expected):
+    """
+    Tests process version assignment and tagging with normalized version representations.
+    """
+    process = Process(id="test-process-version", package={})
+    process.version = version
+    assert process.version == expected
+    assert process.tag == f"test-process-version:{expected}"
 
 
 def test_process_cleanup_keywords():
