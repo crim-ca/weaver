@@ -679,6 +679,35 @@ def get_header(header_name,         # type: str
     return default
 
 
+def accepts_gzip_encoding(accept_encoding):
+    # type: (str) -> bool
+    """
+    Determines whether gzip is an acceptable response encoding.
+    """
+    qualities = {}
+    for offer in accept_encoding.split(","):
+        parts = offer.strip().split(";")
+        coding = parts[0].lower()
+        if not coding:
+            continue
+        quality = 1.0
+        for parameter in parts[1:]:
+            name, separator, value = parameter.strip().partition("=")
+            if name.lower() == "q":
+                try:
+                    quality = float(value) if separator else 0.0
+                except ValueError:
+                    quality = 0.0
+                if not 0.0 <= quality <= 1.0:
+                    quality = 0.0
+                break
+        qualities.setdefault(coding, quality)
+
+    gzip_quality = qualities.get("gzip", qualities.get("*", 0.0))
+    identity_quality = qualities.get("identity", 0.0 if qualities.get("*") == 0.0 else 1.0)
+    return gzip_quality > 0.0 and gzip_quality >= identity_quality
+
+
 def get_cookie_headers(header_container, cookie_header_name="Cookie"):
     # type: (AnyHeadersContainer, Optional[str]) -> HeadersType
     """

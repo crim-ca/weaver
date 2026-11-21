@@ -15,6 +15,9 @@ Changes:
 - Replace the ``Redoc`` viewer in generated API documentation with ``Swagger UI``, include all supported endpoints in
   the generated OpenAPI specification, and add links to endpoint groups (resolves
   `#732 <https://github.com/crim-ca/weaver/issues/732>`_).
+- Adjust runtime ``/api`` Swagger UI response to include the same generated docs endpoint-group shortcuts.
+- Add ``gzip`` compression of ``/json`` responses and reduce repeated schema conversion work during OpenAPI
+  generation to speed up responses.
 
 Fixes:
 ------

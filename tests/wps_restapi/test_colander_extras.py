@@ -1405,6 +1405,11 @@ def test_schema_ref_resolution(
         if schema_expected_deserialize:
             assert "$schema" in schema_data, err_msg
             assert schema_data["$schema"] == schema_expected_deserialize, err_msg
+            with pytest.raises(colander.Invalid):
+                schema_node._schema_deserialize(
+                    {"$schema": "https://schema.com/other"},
+                    schema_meta=schema_expected_deserialize,
+                )
         else:
             assert "$schema" not in schema_data, err_msg
         if schema_meta_expected_convert_type:
