@@ -3254,8 +3254,22 @@ Following is a table of available formats and corresponding endpoints offered by
       - Description
     * - ``/jobs/{jobID}/prov``
       - |PROV-JSON|_
-      - ``application/json``
+      - ``application/json`` or ``application/provenance+json``
       - :term:`Provenance` metadata using :term:`JSON` representation.
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-JSON|_ as :term:`YAML`
+      - ``application/yaml``
+      - :term:`Provenance` metadata using :term:`JSON` representation, serialized as :term:`YAML`.
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-OGC-JSON|_
+      - ``application/json`` using profile
+        ``https://ogcincubator.github.io/bblock-prov-schema/build/annotated/ogc-utils/prov/schema.json``
+      - :term:`Provenance` metadata using flat OGC Provenance Chain :term:`JSON` representation.
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-OGC-JSON-ACTIVITY|_
+      - ``application/json`` using profile
+        ``https://ogcincubator.github.io/bblock-prov-schema/build/annotated/ogc-utils/prov-activity/schema.json``
+      - :term:`Provenance` metadata using nested OGC Provenance Activity :term:`JSON` representation.
     * - ``/jobs/{jobID}/prov``
       - |PROV-JSONLD|_
       - ``application/ld+json``
@@ -3304,6 +3318,13 @@ Following is a table of available formats and corresponding endpoints offered by
       - |na|
       - ``text/plain``
       - Same as their respective definitions above, but for a specific step of a :term:`Workflow`.
+
+Provenance formats can be requested using the same mechanism described in :ref:`proc_content_negotiation`.  Because the
+:term:`Media-Type` is ambiguous for provenance data, it is recommended to either:
+
+- Use the |PROV|_ Format name with the ``format`` parameter, for example ``?f=PROV-OGC-JSON``.
+- Explicitly request the desired profile using one of the mechanisms described in
+  :ref:`proc_content_negotiation_profile_order`.
 
 .. seealso::
     This feature is enabled by default. Its functionality and the corresponding :term:`API` endpoints

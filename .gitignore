@@ -109,3 +109,5 @@ archive
 
 ## old project sources
 [Bb]in
+.venv/
+celerybeat-schedule

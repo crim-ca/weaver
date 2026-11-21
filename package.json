@@ -46,7 +46,12 @@
             "!tip",
             "!important",
             "!warning",
-            "!caution"
+            "!caution",
+            "!NOTE",
+            "!TIP",
+            "!IMPORTANT",
+            "!WARNING",
+            "!CAUTION"
           ]
         }
       ],

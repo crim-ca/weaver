@@ -8853,8 +8853,15 @@ class JobProvAcceptHeader(AcceptHeader):
     validator = OneOf(ProvenanceFormat.media_types())
 
 
+class JobProvAcceptProfileHeader(AcceptProfileHeader):
+    validator = ProfileOneOf(
+        choices=ProvenanceFormat.profiles()
+    )
+
+
 class JobProvRequestHeaders(RequestHeadersNoBody):
     accept = JobProvAcceptHeader()
+    accept_profile = JobProvAcceptProfileHeader(missing=drop)
 
 
 class JobProvEndpoint(JobPath):
@@ -9684,6 +9691,14 @@ get_job_prov_responses = {
             "PROV-JSON": {
                 "summary": "Provenance details returned in PROV-JSON format.",
                 "value": EXAMPLES["job_prov.json"],
+            },
+            "PROV-OGC-JSON": {
+                "summary": "Provenance details returned in PROV-OGC-JSON format.",
+                "value": EXAMPLES["job_prov_ogc.json"],
+            },
+            "PROV-OGC-JSON-ACTIVITY": {
+                "summary": "Provenance details returned in PROV-OGC-JSON-ACTIVITY format.",
+                "value": EXAMPLES["job_prov_ogc_activity.json"],
             },
             "PROV-JSONLD": {
                 "summary": "Provenance details returned in PROV-JSONLD format.",
