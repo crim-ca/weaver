@@ -21,6 +21,9 @@ Changes:
   of `Job` results. This can be used with servers that do not directly support outputs selection at execution time,
   or simply to retrieve partial results of an existing `Job`. This option also allows the selection of output array
   elements by index using ``{outputID}/{N}`` and can be combined with ``--download`` to obtain only those results.
+- Replace the ``Redoc`` viewer in generated API documentation with ``Swagger UI``, include all supported endpoints in
+  the generated OpenAPI specification, and add links to endpoint groups (resolves
+  `#732 <https://github.com/crim-ca/weaver/issues/732>`_).
 - Consolidate version normalization and prerelease update validation in ``weaver.utils.Version``
   (relates to `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 - Allow Sphinx 9 for documentation builds with ``sphinx_autodoc_typehints>=3.6.1``.
@@ -35,6 +38,8 @@ Fixes:
   (`#1121 <https://github.com/crim-ca/weaver/issues/1121>`_).
 - Fix ``PATCH /processes/{id}`` not applying an updated ``description`` when the `Process` already defined
   the legacy ``abstract`` field, since the latter took precedence when reporting the description.
+- Fix ``Installation`` and ``Configuration`` links of the ``README.rst`` header resolving to external URLs
+  instead of their sections, caused by conflicting inline named hyperlink targets.
 
 .. _changes_6.18.0:
 
