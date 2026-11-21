@@ -23,12 +23,15 @@
             display: none;
         }
         #api-tag-shortcuts {
-            display: grid;
+            display: none;
             grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
             gap: 0.25rem 1rem;
             list-style: none;
             margin: 1rem 0;
             padding: 0 1rem;
+        }
+        .swagger-ui .info .description #api-tag-shortcuts {
+            display: grid;
         }
     </style>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.32.8/swagger-ui.css">
@@ -52,11 +55,19 @@
                 ],
                 apisSorter : "alpha",
                 operationsSorter: "alpha",
+                onComplete: function() {
+                    const shortcuts = document.getElementById("api-tag-shortcuts");
+                    const description = document.querySelector("#swagger-ui .info .description");
+                    if (shortcuts && description) {
+                        description.appendChild(shortcuts);
+                    }
+                },
             });
         });
     </script>
 </head>
 <body>
+<div id="swagger-ui"></div>
 <nav aria-label="API endpoint groups">
     <ul id="api-tag-shortcuts">
         <li><a href="#operations-tag-API">API</a></li>
@@ -81,6 +92,5 @@
         <li><a href="#operations-tag-Deprecated_Endpoints">Deprecated Endpoints</a></li>
     </ul>
 </nav>
-<div id="swagger-ui"></div>
 </body>
 </html>

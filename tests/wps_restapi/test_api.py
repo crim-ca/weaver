@@ -128,6 +128,8 @@ class GenericApiRoutesTestCase(WpsConfigBase):
         assert resp.status_code == 200
         assert resp.content_type == ContentType.TEXT_HTML
         assert f"<title>{sd.API_TITLE}</title>" in resp.text
+        assert resp.text.index('id="swagger-ui"') < resp.text.index('id="api-tag-shortcuts"')
+        assert 'document.querySelector("#swagger-ui .info .description")' in resp.text
         assert resp.text.index("Deprecated Endpoints") > resp.text.index("WPS</a>")
         assert resp.text.count('href="#operations-tag-') == 20
 
