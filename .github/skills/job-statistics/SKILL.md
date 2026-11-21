@@ -27,7 +27,7 @@ Retrieve execution statistics and resource usage for a job.
 
 ### Required
 
-- **job_id** (string): Job identifier
+- `job_id` (string): Job identifier
 
 ## CLI Usage
 
@@ -100,22 +100,22 @@ curl -X GET \
 
 ### Timing
 
-- **duration**: Total time from submission to completion
-- **executionDuration**: Actual processing time
-- **queueDuration**: Time spent waiting in queue
+- `duration`: Total time from submission to completion
+- `executionDuration`: Actual processing time
+- `queueDuration`: Time spent waiting in queue
 
 ### Resource Usage
 
-- **cpuUsage**: CPU utilization (average and peak)
-- **memoryUsage**: RAM consumption (average and peak)
-- **diskIO**: Disk read/write operations
-- **networkIO**: Network transfer (if applicable)
+- `cpuUsage`: CPU utilization (average and peak)
+- `memoryUsage`: RAM consumption (average and peak)
+- `diskIO`: Disk read/write operations
+- `networkIO`: Network transfer (if applicable)
 
 ### Data Metrics
 
-- **inputSize**: Total size of input data
-- **outputSize**: Total size of output data
-- **transferredData**: Data transferred between services
+- `inputSize`: Total size of input data
+- `outputSize`: Total size of output data
+- `transferredData`: Data transferred between services
 
 ## Use Cases
 

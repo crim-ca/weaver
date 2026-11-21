@@ -24,11 +24,11 @@ Remove a deployed process from Weaver permanently.
 
 ### Required
 
-- **process_id** (string): Process identifier to remove
+- `process_id` (string): Process identifier to remove
 
 ### Optional
 
-- **provider** (string): Provider identifier for remote processes
+- `provider` (string): Provider identifier for remote processes
 
 ## CLI Usage
 
@@ -64,14 +64,14 @@ curl -X DELETE \
 
 ## Returns
 
-- **status**: Confirmation of removal
-- **message**: Success or error message
+- `status`: Confirmation of removal
+- `message`: Success or error message
 
 ## Error Handling
 
-- **404 Not Found**: Process does not exist
-- **403 Forbidden**: Insufficient permissions to undeploy
-- **409 Conflict**: Process has active jobs
+- `404 Not Found`: Process does not exist
+- `403 Forbidden`: Insufficient permissions to undeploy
+- `409 Conflict`: Process has active jobs
 
 ## Related Skills
 
