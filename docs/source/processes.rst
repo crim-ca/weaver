@@ -1990,8 +1990,9 @@ combinations.
 
 .. [#file2http]
     When a |file_scheme| (or empty scheme) maps to a local file that needs to be exposed externally for
-    another remote process, the conversion to |http_scheme| scheme employs setting ``weaver.wps_output_url`` to form
-    the result URL reference. The file is placed in ``weaver.wps_output_dir`` to expose it as HTTP(S) endpoint.
+    another remote process, the conversion to |http_scheme| scheme employs setting
+    :confval:`weaver.wps_output_url` to form the result URL reference.
+    The file is placed in :confval:`weaver.wps_output_dir` to expose it as HTTP(S) endpoint.
     Note that the HTTP(S) servicing of the file is not handled by `Weaver` itself. It is assumed that the server
     where `Weaver` is hosted or another service takes care of this task.
 
@@ -2608,12 +2609,14 @@ To work around this limitation, there are two potential solutions.
 Outputs Location
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-By default, :term:`Job` results will be hosted under the endpoint configured by ``weaver.wps_output_url`` and
-``weaver.wps_output_path``, and will be stored under directory defined by ``weaver.wps_output_dir`` setting.
+By default, :term:`Job` results will be hosted under the endpoint configured by :confval:`weaver.wps_output_url` and
+:confval:`weaver.wps_output_path`, and will be stored under the directory defined by
+:confval:`weaver.wps_output_dir`.
 
 .. warning::
     Hosting of results from the file system is **NOT** handled by `Weaver` itself. The API will only *report* the
-    expected endpoints using configured ``weaver.wps_output_url``. It is up to an alternate service or the platform
+    expected endpoints using configured :confval:`weaver.wps_output_url`.
+    It is up to an alternate service or the platform
     provider that serves the `Weaver` application to provide the external hosting and availability of files online
     as desired.
 
@@ -2628,8 +2631,8 @@ avoid conflicts. Therefore, outputs will be available with the following locatio
     {WPS_OUTPUT_URL}/{JOB_UUID}/{outputID}/{output.ext}     # results of the job if successful
 
 .. note::
-    Value ``WPS_OUTPUT_URL`` in above example is resolved accordingly with ``weaver.wps_output_url``,
-    ``weaver.wps_output_path`` and ``weaver.url``, as per :ref:`conf_settings` details.
+    Value ``WPS_OUTPUT_URL`` in above example is resolved accordingly with :confval:`weaver.wps_output_url`,
+    :confval:`weaver.wps_output_path` and :confval:`weaver.url`, as per :ref:`conf_settings` details.
 
 .. note::
     When the ``{output.ext}`` part corresponds to a :ref:`CWL Directory Type <cwl-dir>`,
@@ -2656,8 +2659,9 @@ For example, providing ``X-WPS-Output-Context: project/test-1`` will result in o
     The path also **CANNOT** start by ``/``. In such cases, an HTTP error will be immediately raised indicating
     the symbols that where rejected when detected within ``X-WPS-Output-Context`` header.
 
-If desired, parameter ``weaver.wps_output_context`` can also be defined in the :ref:`conf_settings` in order to employ
-a default directory location nested under ``weaver.wps_output_dir`` when ``X-WPS-Output-Context`` header is omitted
+If desired, parameter :confval:`weaver.wps_output_context` can also be defined in the :ref:`conf_settings` in order
+to employ a default directory location nested under :confval:`weaver.wps_output_dir` when the
+``X-WPS-Output-Context`` header is omitted
 from the request. By default, this parameter is not defined (empty) in order to store :term:`Job` results directly under
 the configured :term:`WPS` output directory.
 
@@ -3642,9 +3646,9 @@ again for that input within the :ref:`Execute <proc_op_execute>` request body.
 WPS Endpoint
 ---------------
 
-This endpoint is available if ``weaver.wps`` setting was enabled (``true`` by default).
+This endpoint is available if :confval:`weaver.wps` setting was enabled (``true`` by default).
 The specific location where :term:`WPS` requests it will be accessible depends on the resolution
-of relevant :ref:`conf_settings`, namely ``weaver.wps_path`` and ``weaver.wps_url``.
+of relevant :ref:`conf_settings`, namely :confval:`weaver.wps_path` and :confval:`weaver.wps_url`.
 
 Details regarding contents for each request is provided in schemas under |wps-req|_.
 
