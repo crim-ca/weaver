@@ -1923,7 +1923,10 @@ def _apply_process_metadata(process, update_data):  # pylint: disable=R1260,too-
                 if unique and isinstance(value, list):
                     value = list(dict.fromkeys(value))  # not set to preserve order
                 if current != value:
-                    set_field(dest, target, value)
+                    if isinstance(dest, Process) and target == "description":
+                        dest.description = value  # preserve precedence over legacy 'abstract' field
+                    else:
+                        set_field(dest, target, value)
                     any_change = True
         return any_change
 

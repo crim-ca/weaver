@@ -24,12 +24,12 @@ Continuously monitor a job until completion or timeout with regular status polli
 
 ### Required
 
-- **job_id** (string): Job identifier to monitor
+- `job_id` (string): Job identifier to monitor
 
 ### Optional
 
-- **timeout** (integer): Maximum time to wait in seconds (default: 60)
-- **interval** (integer): Polling interval in seconds (default: 5)
+- `timeout` (integer): Maximum time to wait in seconds (default: 60)
+- `interval` (integer): Polling interval in seconds (default: 5)
 
 ## CLI Usage
 
@@ -63,10 +63,10 @@ print(f"Final status: {status.body['status']}")
 
 ## Returns
 
-- **status**: Final job status (succeeded, failed, dismissed)
-- **progress**: Progress percentage (0-100)
-- **duration**: Total execution time
-- **message**: Status message or error details
+- `status`: Final job status (succeeded, failed, dismissed)
+- `progress`: Progress percentage (0-100)
+- `duration`: Total execution time
+- `message`: Status message or error details
 
 ## Documentation
 
