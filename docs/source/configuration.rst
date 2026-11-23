@@ -633,8 +633,7 @@ with fields such as ``url``, ``name``, ``id`` and ``visible``. Entries under ``p
 process snapshots. Entries under ``providers`` register remote :term:`WPS` providers whose :term:`Process` listings
 are resolved from the remote service. The example file shows the supported combinations. The loader accepts
 :term:`JSON` as well as :term:`YAML`. The ``weaver.wps_processes_file`` setting selects one file, not a directory.
-The default filename resolves in the configuration directory. Other relative paths are resolved from the application
-working directory.
+See the setting below for its default location and path resolution.
 
 .. note::
     Processes defined under ``processes`` section registered into `Weaver` will correspond to a local snapshot of
@@ -763,7 +762,7 @@ checked in order, and only the first matching URL and method entry is used:
 
 The ``url`` value may be one pattern or a list of patterns. ``method`` is optional and may be a method, a list, or
 comma-separated methods. Other keys are passed as options to the request handler, including options supported by
-``requests`` and ``weaver.utils.request_extra`` such as ``timeout``, ``verify``, ``retries``, ``backoff`` and
+:mod:`requests` and :func:`weaver.utils.request_extra` such as ``timeout``, ``verify``, ``retries``, ``backoff`` and
 ``cache_enabled`` (see :ref:`Configuration of Request Caching <conf_caching>`). Use restrictive URL patterns,
 especially for authentication and TLS settings.
 
