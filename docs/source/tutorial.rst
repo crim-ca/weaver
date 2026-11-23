@@ -51,7 +51,8 @@ paths have been customized.
 
 .. note::
     `Weaver` exposes two :term:`Process` interfaces. :term:`OGC API - Processes` uses resource :term:`URL` references
-    and :term:`JSON` request bodies, for example ``POST /processes/{process_id}/jobs``. The traditional
+    such as ``GET /processes`` to list available :term:`Process` definitions, and :term:`JSON` request bodies for
+    operations such as :term:`Job` submission. The traditional
     :term:`WPS`-1/2 interface uses the configured :term:`WPS` endpoint (``/ows/wps`` by default) with operations such
     as ``GetCapabilities``, ``DescribeProcess`` and ``Execute``. :term:`WPS` requests and responses use :term:`XML`
     or supported :term:`JSON` representations. The modern interface is also referred to as WPS-REST, WPS-T or WPS-3.
