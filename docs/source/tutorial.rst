@@ -43,8 +43,9 @@ interfaces. The same landing page can be requested as :term:`JSON` or :term:`HTM
 the `Weaver` software version, while ``/conformance`` lists the :term:`OGC API - Processes` conformance classes
 implemented by the service.
 
-The interactive :term:`API` reference is available at ``/api`` and the :term:`OpenAPI` document as :term:`JSON` at
-``/json``. These paths, along with ``/processes`` and ``/jobs``, are relative to the configured
+The interactive :term:`API` reference is available at ``/api``. Request the :term:`OpenAPI` document as :term:`JSON`
+at ``/api?f=json`` or request ``/api`` with an ``Accept: application/json`` header. These paths, along with
+``/processes`` and ``/jobs``, are relative to the configured
 :term:`OGC API - Processes` base :term:`URL`. Use the links from the landing page when that base URL or the endpoint
 paths have been customized.
 
