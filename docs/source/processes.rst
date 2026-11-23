@@ -123,7 +123,8 @@ to provide them through `Weaver`.
 
 The :term:`WPS`-1/2 endpoint is a single configured :term:`URL` where requests select operations such as
 ``GetCapabilities``, ``DescribeProcess`` or ``Execute`` using :term:`WPS` parameters. :term:`OGC API - Processes`
-instead exposes separate resource URLs and uses :term:`JSON` bodies for process descriptions and job submissions.
+instead exposes separate resource URLs and uses :term:`JSON` bodies for :term:`Process` descriptions and :term:`Job`
+submissions.
 `Weaver` can expose both interfaces for the same local :term:`Process`. Details and request examples are in
 :ref:`wps_endpoint` and the :ref:`tutorial`.
 
