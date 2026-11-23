@@ -21,6 +21,7 @@ from weaver.exceptions import PackageRegistrationError
 from weaver.formats import ContentType
 from weaver.processes.constants import CWL_NAMESPACE_WEAVER_ID, CWL_REQUIREMENT_APP_WPS1, CWL_RequirementWeaverWPS1Type
 from weaver.processes.utils import (  # noqa: W0212
+    _bump_process_version,
     _check_package_file,
     _classify_multipart_part,
     _extract_multipart_profile,
@@ -38,6 +39,7 @@ from weaver.processes.utils import (  # noqa: W0212
     resolve_cwl_graph,
     resolve_deployment_order
 )
+from weaver.utils import Version, VersionLevel
 from weaver.wps_restapi import swagger_definitions as sd
 
 WPS1_URL1 = resources.TEST_REMOTE_SERVER_URL
@@ -48,6 +50,27 @@ WPS1_URL4 = "http://emu-server.com"
 
 class MockResponseOk(object):
     status_code = 200
+
+
+@pytest.mark.parametrize("version,level,expected", [
+    ("1.2.3.dev1", VersionLevel.PATCH, [1, 2, 4]),
+    ("1.2.3.dev1", VersionLevel.MINOR, [1, 3, 0]),
+    ("1.2.3.dev1", VersionLevel.MAJOR, [2, 0, 0]),
+    (Version("1.2.3.dev1"), VersionLevel.PATCH, [1, 2, 4]),
+    (Version("1.2.3.dev1"), VersionLevel.MINOR, [1, 3, 0]),
+    (Version("1.2.3.dev1"), VersionLevel.MAJOR, [2, 0, 0]),
+    ([1, 2, 3], VersionLevel.PATCH, [1, 2, 4]),
+    ([1, 2, 3], VersionLevel.MINOR, [1, 3, 0]),
+    ([1, 2, 3], VersionLevel.MAJOR, [2, 0, 0]),
+    ((1, 2, 3), VersionLevel.PATCH, [1, 2, 4]),
+    ((1, 2, 3), VersionLevel.MINOR, [1, 3, 0]),
+    ((1, 2, 3), VersionLevel.MAJOR, [2, 0, 0]),
+])
+def test_bump_process_version(version, level, expected):
+    """
+    Tests automatic revision increments from release parts without propagating prerelease suffixes.
+    """
+    assert _bump_process_version(version, level) == expected
 
 
 def test_check_package_file_with_url():

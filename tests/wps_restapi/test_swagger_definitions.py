@@ -1,6 +1,7 @@
 import copy
 import glob
 import os
+import re
 import uuid
 from typing import TYPE_CHECKING
 
@@ -73,6 +74,17 @@ def test_process_id_with_version_tag_get_valid():
             sd.ProcessIdentifierTag().deserialize(test_id)
     for test_id in test_id_version_valid:
         assert sd.ProcessIdentifierTag().deserialize(test_id) == test_id
+
+
+def test_process_tag_pattern_for_process_id():
+    """
+    Tests process-specific tag patterns reuse API tag validation and escape identifier characters.
+    """
+    pattern = re.compile(sd.Tag.pattern_for("test-process"))
+    assert pattern.fullmatch("test-process:0.1.3.dev10")
+    assert pattern.fullmatch("test-process")
+    assert not pattern.fullmatch("test-process:not-a-version")
+    assert not pattern.fullmatch("test-process-other:1.2.3")
 
 
 @pytest.mark.parametrize("test_value", [
