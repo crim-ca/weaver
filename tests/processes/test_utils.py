@@ -1937,17 +1937,30 @@ class TestMultipartDeployment:
 
         assert "Invalid process description" in exc_info.value.json["title"]
 
-    def test_create_multipart_deploy_yaml_process_description(self):
+    @pytest.mark.parametrize(
+        ["cwl_yaml", "description_yaml"],
+        [(False, False), (False, True), (True, False), (True, True)],
+    )
+    def test_create_multipart_deploy_retains_part_formats(self, tmp_path, cwl_yaml, description_yaml):
+        """
+        Test that CWL and description parts retain their original JSON/YAML format, in any combination.
+        """
         tool_cwl = {"cwlVersion": "v1.2", "class": "CommandLineTool", "id": "tool-1", "inputs": {}, "outputs": {}}
         description = {"processDescription": {"id": "tool-1", "title": "Tool"}}
+        paths = []
+        for name, data, is_yaml in [("tool.cwl", tool_cwl, cwl_yaml), ("desc.json", description, description_yaml)]:
+            path = tmp_path / name
+            path.write_text(yaml.safe_dump(data) if is_yaml else json.dumps(data), encoding="utf-8")
+            paths.append(str(path))
 
-        content, content_type = create_multipart_deploy(
-            [tool_cwl], "localhost", process_description=description, description_type=ContentType.APP_YAML,
-        )
+        content, content_type = create_multipart_deploy([paths[0]], "localhost", process_description=paths[1])
         cwl_packages, descriptions = parse_multipart_deploy(content, content_type)
 
-        assert ContentType.APP_YAML.encode() in content
-        assert len(cwl_packages) == 1
+        assert (ContentType.APP_CWL_YAML in content.decode()) == cwl_yaml
+        assert (ContentType.APP_CWL_JSON in content.decode()) == (not cwl_yaml)
+        assert (ContentType.APP_YAML in content.decode()) == description_yaml
+        assert (ContentType.APP_JSON in content.decode()) == (not description_yaml)
+        assert cwl_packages == [tool_cwl]
         assert descriptions == [description]
 
     def test_create_multipart_deploy_description_content_id(self):
