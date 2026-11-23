@@ -25,26 +25,26 @@ Execute a deployed process with specified inputs in synchronous or asynchronous 
 
 ### Required
 
-- **process_id** (string): Process identifier to execute
-- **inputs** (object or file): Process input values
+- `process_id` (string): Process identifier to execute
+- `inputs` (object or file): Process input values
   - Can be JSON/YAML file path
   - Can be inline key=value pairs
   - Can be CWL input format
 
 ### Optional
 
-- **mode** (string): Execution mode
+- `mode` (string): Execution mode
   - `async`: Asynchronous execution (default) - returns job ID immediately
   - `sync`: Synchronous execution - waits for completion
   - `auto`: Let server decide based on estimated duration
-- **response** (string): Response format
+- `response` (string): Response format
   - `document`: Full job status document (default)
   - `raw`: Direct output results
-- **output_transmission** (string): How outputs are returned
+- `output_transmission` (string): How outputs are returned
   - `reference`: URLs to output files (default)
   - `value`: Inline output values
-- **subscribers** (object): Notification callbacks for job events
-- **headers** (object): Custom HTTP headers
+- `subscribers` (object): Notification callbacks for job events
+- `headers` (object): Custom HTTP headers
 
 ## CLI Usage
 
@@ -196,10 +196,10 @@ curl -X POST \
 
 ## Error Handling
 
-- **404 Not Found**: Process does not exist
-- **400 Bad Request**: Invalid inputs or parameters
-- **422 Unprocessable Entity**: Input validation failed
-- **503 Service Unavailable**: Execution resources unavailable
+- `404 Not Found`: Process does not exist
+- `400 Bad Request`: Invalid inputs or parameters
+- `422 Unprocessable Entity`: Input validation failed
+- `503 Service Unavailable`: Execution resources unavailable
 
 ## Related Skills
 

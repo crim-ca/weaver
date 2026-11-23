@@ -24,7 +24,7 @@ Check current execution status of a job with progress and timestamps.
 
 ### Required
 
-- **job_id** (string): Job identifier
+- `job_id` (string): Job identifier
 
 ## CLI Usage
 
@@ -63,11 +63,11 @@ print(f"Progress: {status.body.get('progress', 0)}%")
 
 ## Job Status Values
 
-- **accepted**: Job received and queued
-- **running**: Job is executing
-- **succeeded**: Job completed successfully
-- **failed**: Job failed with errors
-- **dismissed**: Job was cancelled
+- `accepted`: Job received and queued
+- `running`: Job is executing
+- `succeeded`: Job completed successfully
+- `failed`: Job failed with errors
+- `dismissed`: Job was cancelled
 
 ## Related Skills
 

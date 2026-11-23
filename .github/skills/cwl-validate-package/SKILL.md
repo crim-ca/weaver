@@ -26,12 +26,12 @@ Validate CWL package syntax and structure before deploying to Weaver.
 
 ### Required
 
-- **package_file** (path): CWL file to validate (.cwl or .yaml)
+- `package_file` (path): CWL file to validate (.cwl or .yaml)
 
 ### Optional
 
-- **strict** (boolean): Enable strict validation mode
-- **check_docker** (boolean): Verify Docker images are accessible
+- `strict` (boolean): Enable strict validation mode
+- `check_docker` (boolean): Verify Docker images are accessible
 
 ## CLI Usage
 
@@ -224,9 +224,9 @@ weaver deploy -u $WEAVER_URL -p my-process -b process.cwl
 
 ## Tools
 
-- **cwltool**: Reference CWL implementation
-- **schema-salad**: CWL schema validator
-- **Docker**: For testing Docker-based packages
+- `cwltool`: Reference CWL implementation
+- `schema-salad`: CWL schema validator
+- `docker`: For testing Docker-based packages
 
 ## Best Practices
 
