@@ -161,6 +161,22 @@ Sections that are not applicable can be omitted, but should be provided if avail
 - `## Related Skills` — Relevant skills and their relationship.
 - `## References` — Documentation and specifications.
 
+## When to Use
+
+- Use case 1
+- Use case 2
+- Use case 3
+
+## Parameters
+
+### Required
+
+- `param_name` (type): Description
+
+### Optional
+
+- `param_name` (type): Optional description
+
 ### CLI Usage
 
 ```bash
@@ -306,12 +322,14 @@ Before considering a skill complete:
 - [ ] At least 3 usage examples (CLI, Python, API)
 - [ ] All examples are syntactically correct
 - [ ] All code examples tested
-- [ ] Parameters clearly documented with types
-- [ ] Return values documented and match expected API behavior
+- [ ] Parameters clearly documented with types and use code quotes for their name (not \*\*)
+- [ ] Required/Optional subsections are indicated as applicable for **parameters**
+- [ ] Return/errors values or HTTP codes are documented and match expected API behavior
 - [ ] Links to related skills are valid
 - [ ] Metadata keywords enable discovery
 - [ ] Line length ≤ 120 characters
-- [ ] No escaped underscores (`\_` → `_`)
+- [ ] No escaped underscores (`\_` → `_`). This is an indcator of a code element!
+- [ ] Code quotes (i.e.: `var`) are used for fields, properties, constants, variables, parameters, HTTP codes/messages
 - [ ] YAML frontmatter is syntactically valid
 - [ ] Lint checks pass for Markdown formatting, line length and skill code examples
 - [ ] Any lint issues introduced by this skill were fixed and checks rerun until clean

@@ -20,6 +20,7 @@
 import logging
 import os
 import re
+import shutil
 import sys
 
 # for OpenAPI generation
@@ -54,7 +55,7 @@ sys.path.append(os.path.join(DOC_DIR_ROOT, "_extensions"))
 extensions = [
     "doc_redirect",         # redirect literal RST references -> built HTML page
     "sphinxarg.ext",        # render argparse CLI definitions
-    "sphinxcontrib.redoc",  # generate live OpenAPI with this doc
+    "swagger_plugin_for_sphinx",  # render the generated OpenAPI specification
     "sphinx.ext.autodoc",   # document code docstrings
     "sphinx.ext.autosectionlabel",  # help make cross-references to title/sections
     "sphinx.ext.githubpages",   # for publishing the doc to GitHub pages
@@ -66,6 +67,10 @@ extensions = [
     "pywps.ext_autodoc",        # extra autodoc for PyWPS processes
     "sphinx_paramlinks",        # allow ':paramref:`<>`' references in docstrings
 ]
+
+swagger_present_uri = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.8/swagger-ui-standalone-preset.js"
+swagger_bundle_uri = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.8/swagger-ui-bundle.js"
+swagger_css_uri = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.8/swagger-ui.css"
 
 # note: see custom extension documentation
 doc_redirect_ignores = [
@@ -95,35 +100,26 @@ for _dir in [DOC_SRC_ROOT, DOC_PRJ_ROOT]:
 # note:
 #   setting 'weaver.build_docs' allows to ignore part of code that cause problem or require unnecessary
 #   configuration for the purpose of parsing the source to generate the OpenAPI
-config = Configurator(settings={"weaver.wps": True, "weaver.wps_restapi": True, "weaver.build_docs": True})
+config = Configurator(settings={
+    "weaver.configuration": "HYBRID",
+    "weaver.wps": True,
+    "weaver.wps_restapi": True,
+    "weaver.build_docs": True,
+})
 config.include("weaver")  # need to include package to apply decorators and parse routes
 config.commit()
 api_spec_file = os.path.join(DOC_BLD_ROOT, "api.json")
-# must disable references when using redoc (alpha version note rendering them correctly)
 api_spec_json = get_openapi_json(
     http_host="example",
     http_scheme="https",
     use_docstring_summary=True,
-    use_refs=False,
+    use_refs=True,
     container=config,
 )
 if not os.path.isdir(DOC_BLD_ROOT):
     os.makedirs(DOC_BLD_ROOT)
 with open(api_spec_file, mode="w", encoding="utf-8") as f:
     json.dump(api_spec_json, f, use_decimal=True)
-
-redoc = [{
-    "name": __meta__.__title__,
-    "page": "api",  # rendered under '{root}/api.html'
-    "spec": api_spec_file,
-    "embed": True,
-    "opts": {
-        "lazy-rendering": True,
-        "hide-hostname": True
-    }
-}]
-# must use next version (2.x-alpha) because default 1.x does not support OpenAPIv3
-redoc_uri = "https://cdn.jsdelivr.net/npm/redoc@2.5.2/bundles/redoc.standalone.js"
 
 autoapi_type = "python"
 autoapi_dirs = [DOC_PKG_ROOT]
@@ -558,4 +554,19 @@ def filter_warnings_missing_reference(app, domain, node) -> bool:
 
 
 def setup(app):
+    app.connect("doctree-read", set_api_spec_url)
+    app.connect("build-finished", copy_api_spec)
     app.connect("warn-missing-reference", filter_warnings_missing_reference)
+
+
+def set_api_spec_url(app, doctree):
+    if app.env.docname != "api":
+        return
+    for spec in app.env.metadata[app.env.docname].get("swagger_plugin", []):
+        spec["url_path"] = "api.json"
+
+
+def copy_api_spec(app, exception):
+    if exception or app.builder.name != "html":
+        return
+    shutil.copyfile(api_spec_file, os.path.join(app.builder.outdir, "api.json"))

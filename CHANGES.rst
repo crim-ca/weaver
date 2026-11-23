@@ -15,10 +15,37 @@ Changes:
 - Expand usage documentation with service discovery, configuration and caching, bounding-box and multiple-input
   examples, workflow chaining, and quotation and billing operations. Resolves
   `#61 <https://github.com/crim-ca/weaver/issues/61>`_.
+- Implement the `CLI` ``replace`` operation to update an existing `Process` definition
+  (resolves `#906 <https://github.com/crim-ca/weaver/issues/906>`_).
+- Add ``--output-id`` option (multiple allowed) to `CLI` ``execute`` and ``update_job`` operations to
+  provide the inverse option from ``--output-filter``, which can be easier when the set of desired outputs is smaller.
+  This also aligns with the "*output selection*" approach defined by `OGC API - Processes`.
+- Add ``--output-id`` option (multiple allowed) to `CLI` ``results`` operation to perform post-execution filtering
+  of `Job` results. This can be used with servers that do not directly support outputs selection at execution time,
+  or simply to retrieve partial results of an existing `Job`. This option also allows the selection of output array
+  elements by index using ``{outputID}/{N}`` and can be combined with ``--download`` to obtain only those results.
+- Replace the ``Redoc`` viewer in generated API documentation with ``Swagger UI``, include all supported endpoints in
+  the generated OpenAPI specification, and add links to endpoint groups (resolves
+  `#732 <https://github.com/crim-ca/weaver/issues/732>`_).
+- Improve generation of ``/api`` Swagger UI response to include endpoint-group shortcuts.
+- Add ``gzip`` compression of OpenAPI ``/json`` response used by Swagger UI to reduce response size.
+- Reduce duplicate conversion work from `colander` schema during OpenAPI generation to speed up responses.
+- Consolidate version normalization and prerelease update validation in ``weaver.utils.Version``
+  (relates to `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
+- Allow Sphinx 9 for documentation builds with ``sphinx_autodoc_typehints>=3.6.1``.
 
 Fixes:
 ------
-- No change.
+- Fix process version links and version-history listings for semantic versions with suffixes such as ``0.1.3.dev10``.
+  Correct ``latest-version``, ``version-history``, ``predecessor-version``, ``successor-version`` and ``working-copy``
+  links. Add ``current`` and ``working-copy-of`` links and make ``self`` and ``alternate`` links representation-aware
+  (resolves `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
+- Fix HTML job listing tables overflowing the available page width when zoomed
+  (`#1121 <https://github.com/crim-ca/weaver/issues/1121>`_).
+- Fix ``PATCH /processes/{id}`` not applying an updated ``description`` when the `Process` already defined
+  the legacy ``abstract`` field, since the latter took precedence when reporting the description.
+- Fix ``Installation`` and ``Configuration`` links of the ``README.rst`` header resolving to external URLs
+  instead of their sections, caused by conflicting inline named hyperlink targets.
 
 .. _changes_6.18.0:
 
@@ -31,10 +58,24 @@ Changes:
 - Add Python 3.15 as experimental support in CI.
 - Drop Python 3.10 EOL support.
 - Use an upstream `cwltool` release with the rootless EUID/EGID fix instead of the conflicting fork dependency.
+- Update to ``prov`` 3.3 to produce `PROV-JSONLD <https://www.w3.org/submissions/prov-jsonld/>`_
+  rather than PROV-O as JSON-LD (fixes `#1009 <https://github.com/crim-ca/weaver/issues/1009>`_).
+- Create ``ProcessRun`` as an ``Activity`` rather than an ``Entity`` to satisfy
+  `PROV-CONSTRAINTS <https://www.w3.org/TR/2013/REC-prov-constraints-20130430/#entity-activity-disjoint_text>`_
+  requirement for disjoint activity and entity (as of ``prov>=3.0.0``).
+- Remove relationships in the generated PROV that are inconsistent with the changes to ``ProcessRun``, since they are
+  not defined for ``Activity``.
+- Remove inconsistent and redundant timestamps from the generated PROV.
+- Ensure that the user agent in the PROV document is created as a ``SoftwareAgent`` not a ``Person`` with recent
+  versions of ``prov`` that more strongly enforce update-only ``ProvRecord``.
+- Add a skill with example input data (in ``weaver/wps_restapi/examples``) for the ``EchoProcess`` and a script to
+  regenerate the PROV example data for the OpenAPI definition.
 
 Fixes:
 ------
-- No change.
+- Correct the ``install-cairo-dependencies`` check in the Makefile to avoid failure if ``ldconfig`` is not available,
+  such as on non-Linux systems.
+- Avoid linting installed virtual environments in ``make check``.
 
 .. _changes_6.17.0:
 
