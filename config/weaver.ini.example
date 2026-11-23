@@ -247,6 +247,8 @@ use = egg:gunicorn#main
 bind = 0.0.0.0:4001
 workers = 10
 timeout = 10
+# enable fast C parser (gunicorn[fast] dependency) instead of Python native
+http_parser = fast
 
 # --- waitress ---
 # use = egg:waitress#main

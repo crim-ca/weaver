@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+- Use ``gunicorn[fast]`` to leverage the faster HTTP C parser instead of Python native implementation.
 - Replace the ``Redoc`` viewer in generated API documentation with ``Swagger UI``, include all supported endpoints in
   the generated OpenAPI specification, and add links to endpoint groups (resolves
   `#732 <https://github.com/crim-ca/weaver/issues/732>`_).
