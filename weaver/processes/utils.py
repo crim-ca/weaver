@@ -6,8 +6,9 @@ import pathlib
 import warnings
 from copy import deepcopy
 from email import message_from_bytes
+from email.encoders import encode_noop
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urljoin, urlparse
 
@@ -488,36 +489,35 @@ def _get_multipart_content(content, request):
         raise HTTPBadRequest(f"Invalid multipart content format: {exc}")
 
 
-def _load_deploy_item(item):
-    # type: (Union[str, JSON]) -> Tuple[JSON, str, bool]
+def _create_deploy_part(item, json_type, yaml_type):
+    # type: (Union[str, JSON], str, str) -> Tuple[JSON, MIMEApplication]
     """
-    Load a :term:`CWL` or :term:`Process` description while retaining its original :term:`JSON` or :term:`YAML` text.
+    Create a multipart part from a :term:`CWL` or :term:`Process` description, retaining its original text.
 
     :param item: File path or URL (``str``) to load, or an already parsed ``dict`` (represented as :term:`JSON`).
-    :returns: ``tuple`` of (parsed contents, text contents, whether the text contents are :term:`YAML`)
+    :param json_type: ``Content-Type`` of the part when the contents are :term:`JSON`.
+    :param yaml_type: ``Content-Type`` of the part when the contents are :term:`YAML`.
+    :returns: ``tuple`` of (parsed contents, multipart part)
     """
     if isinstance(item, dict):
-        return item, json.dumps(item, indent=2), False
-    body = load_file(item, text=True)
-    if isinstance(body, bytes):
-        body = body.decode("utf-8")
-    try:
-        json.loads(body)
-        is_yaml = False
-    except ValueError:
-        is_yaml = True
-    return yaml.safe_load(body), body, is_yaml
-
-
-def _create_deploy_part(body, is_yaml, json_type, yaml_type):
-    # type: (str, bool, str, str) -> MIMEText
-    """
-    Create a multipart part with the text contents and the ``Content-Type`` matching their :term:`JSON`/:term:`YAML`.
-    """
-    part = MIMEText(body, _subtype="yaml" if is_yaml else "json", _charset="utf-8")
-    # Replace the default text/* Content-Type with the application/* one
-    part.replace_header("Content-Type", yaml_type if is_yaml else json_type)
-    return part
+        data, body, content_type = item, json.dumps(item, indent=2), json_type
+    else:
+        body = load_file(item, text=True)
+        if isinstance(body, bytes):
+            body = body.decode("utf-8")
+        data = yaml.safe_load(body)
+        try:
+            json.loads(body)
+            content_type = json_type
+        except ValueError:
+            content_type = yaml_type
+    part = MIMEApplication(
+        body.encode("utf-8"),
+        _subtype=content_type.rsplit("/", 1)[-1],
+        _encoder=encode_noop,
+    )
+    part.set_param("charset", "utf-8")
+    return data, part
 
 
 def create_multipart_deploy(
@@ -556,7 +556,7 @@ def create_multipart_deploy(
 
     # Add CWL parts
     for idx, cwl_item in enumerate(cwl_files):
-        cwl_data, cwl_body, cwl_yaml = _load_deploy_item(cwl_item)
+        cwl_data, part = _create_deploy_part(cwl_item, ContentType.APP_CWL_JSON, ContentType.APP_CWL_YAML)
 
         cwl_class = cwl_data.get("class", "")
         is_workflow = cwl_class == "Workflow"
@@ -575,7 +575,6 @@ def create_multipart_deploy(
                 # First workflow becomes the main one
                 main_workflow_cid = cwl_id
 
-        part = _create_deploy_part(cwl_body, cwl_yaml, ContentType.APP_CWL_JSON, ContentType.APP_CWL_YAML)
         part.add_header("Content-ID", f"<{cwl_id}@{url}>")
         part.add_header("Content-Location", cwl_id)
 
@@ -585,8 +584,7 @@ def create_multipart_deploy(
     if process_description:
         descriptions = process_description if isinstance(process_description, list) else [process_description]
         for description in descriptions:
-            desc_data, desc_body, desc_yaml = _load_deploy_item(description)
-            desc_part = _create_deploy_part(desc_body, desc_yaml, ContentType.APP_JSON, ContentType.APP_YAML)
+            desc_data, desc_part = _create_deploy_part(description, ContentType.APP_JSON, ContentType.APP_YAML)
             # a description without 'id' refers to the main CWL, prefix avoids collision with the CWL part Content-ID
             desc_id = get_process_description_id(desc_data) or main_workflow_cid or cwl_ids[0]
             desc_part.add_header("Content-ID", create_content_id(f"process-description-{desc_id}", url))
