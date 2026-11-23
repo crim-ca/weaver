@@ -116,7 +116,6 @@ api_spec_json = get_openapi_json(
     use_refs=True,
     container=config,
 )
-api_spec_json["tags"].sort(key=lambda tag: (tag["name"] == "Deprecated Endpoints", tag["name"]))
 if not os.path.isdir(DOC_BLD_ROOT):
     os.makedirs(DOC_BLD_ROOT)
 with open(api_spec_file, mode="w", encoding="utf-8") as f:

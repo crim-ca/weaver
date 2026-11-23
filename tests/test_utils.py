@@ -60,6 +60,7 @@ from weaver.utils import (
     Version,
     VersionFormat,
     VersionLevel,
+    accepts_gzip_encoding,
     apply_number_with_unit,
     assert_sane_name,
     bytes2str,
@@ -2698,6 +2699,24 @@ def test_explode_headers(test_headers, expect_headers, expect_get_all):
     results = explode_headers(test_headers)
     assert list(results.items()) == expect_headers
     assert results.getall("Link") == expect_get_all
+
+
+@pytest.mark.parametrize(
+    ["accept_encoding", "expected"],
+    [
+        ("gzip", True),
+        ("br, gzip", True),
+        ("gzip;q=0", False),
+        ("gzip;q=0.5, identity;q=1", False),
+        ("gzip;q=0.5, identity;q=0.3", True),
+        ("gzip;q=invalid", False),
+    ],
+)
+def test_accepts_gzip_encoding(accept_encoding, expected):
+    """
+    Tests gzip response negotiation against supported and excluded encoding preferences.
+    """
+    assert accepts_gzip_encoding(accept_encoding) is expected
 
 
 @pytest.mark.parametrize(

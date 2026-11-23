@@ -15,6 +15,9 @@ Changes:
 - Replace the ``Redoc`` viewer in generated API documentation with ``Swagger UI``, include all supported endpoints in
   the generated OpenAPI specification, and add links to endpoint groups (resolves
   `#732 <https://github.com/crim-ca/weaver/issues/732>`_).
+- Improve generation of ``/api`` Swagger UI response to include endpoint-group shortcuts.
+- Add ``gzip`` compression of OpenAPI ``/json`` response used by Swagger UI to reduce response size.
+- Reduce duplicate conversion work from `colander` schema during OpenAPI generation to speed up responses.
 - Consolidate version normalization and prerelease update validation in ``weaver.utils.Version``
   (relates to `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 - Allow Sphinx 9 for documentation builds with ``sphinx_autodoc_typehints>=3.6.1``.
