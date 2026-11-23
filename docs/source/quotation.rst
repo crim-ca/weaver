@@ -14,6 +14,13 @@ cost of a :term:`Process` before execution and associate a :term:`Bill` with an 
 Quotation endpoints are enabled by the ``weaver.quotation`` setting and are available only in supported deployment
 modes.
 
+A quote request uses the same input payload as a :term:`Job` execution, with values matching the selected
+:term:`Process` definition (see :ref:`Process Execution <proc_op_execute>`). It creates a :term:`Quote`, not a
+:term:`Job`. The estimate can be returned synchronously or asynchronously. Once available, the :term:`Quote` awaits
+validation and approval. It must be marked as paid before it can be submitted for execution. Executing the paid quote
+creates a linked :term:`Job` and :term:`Bill`. See :ref:`Quote Estimation <quote_estimation>`,
+:ref:`Billing <quotation_billing>` and :ref:`API and Examples <quotation_api_examples>` for details.
+
 .. seealso::
     - |ogc-proc-ext-quotation|_
     - |ogc-proc-ext-billing|_
@@ -89,9 +96,9 @@ Billing
 ==========
 
 Executing a :term:`Quote` is a separate operation from estimating it. Submit ``POST /quotations/{quote_id}`` after the
-quote has been marked as paid. An unpaid quote is rejected with HTTP 402. When execution is accepted, `Weaver` creates
-a :term:`Bill` linked to the quote and resulting :term:`Job` and returns the bill and quote identifiers with the job
-response.
+quote has been marked as paid. An unpaid quote is rejected with ``HTTP 402``. When execution is accepted, `Weaver`
+creates a :term:`Bill` linked to the quote and resulting :term:`Job`. The job response includes the bill and quote
+identifiers.
 
 Use ``GET /bills`` to list :term:`Bill` identifiers and ``GET /bills/{bill_id}`` to retrieve a :term:`Bill`.
 `Weaver` records the :term:`Quotation` and execution relationship. These endpoints do not process payments.
