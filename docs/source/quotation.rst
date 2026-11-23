@@ -143,3 +143,8 @@ For example, the following requests a :term:`Quote`, then retrieves its current 
 
 Use the interactive :term:`API` reference at ``${WEAVER_URL}/api`` for the complete request and response schemas, query
 parameters and status details. Quote execution requires the quote to be paid before the ``POST`` request.
+
+.. warning::
+    Access control for :term:`Quotation` and :term:`Billing` endpoints is not managed directly by `Weaver`. These
+    endpoints can expose sensitive information. The server operator is responsible for restricting access, for example
+    by placing them behind an appropriately configured security proxy.
