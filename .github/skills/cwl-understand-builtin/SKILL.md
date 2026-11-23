@@ -76,7 +76,7 @@ steps:
     out: [output]
 ```
 
-### file2string_array
+### `file2string_array`
 
 Convert a file to an array of strings (one per line).
 

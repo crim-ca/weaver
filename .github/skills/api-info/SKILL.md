@@ -110,30 +110,30 @@ Accept: application/json
 
 ### Server Information
 
-- **title**: Service title
-- **description**: Service description
-- **attribution**: Copyright and attribution
-- **configuration**: Weaver mode (EMS, ADES, HYBRID)
+- `title`: Service title
+- `description`: Service description
+- `attribution`: Copyright and attribution
+- `configuration`: Weaver mode (EMS, ADES, HYBRID)
 
 ### Contact Information
 
-- **name**: Organization name
-- **url**: Organization website
-- **email**: Contact email (if provided)
+- `name`: Organization name
+- `url`: Organization website
+- `email`: Contact email (if provided)
 
 ### Links
 
-- **service-desc**: OpenAPI specification
-- **processes**: Process listing endpoint
-- **jobs**: Job listing endpoint
-- **providers**: Provider listing endpoint
-- **conformance**: Conformance declaration
+- `service-desc`: OpenAPI specification
+- `processes`: Process listing endpoint
+- `jobs`: Job listing endpoint
+- `providers`: Provider listing endpoint
+- `conformance`: Conformance declaration
 
 ## Configuration Modes
 
-- **EMS**: Execution Management Service (orchestrates remote ADES)
-- **ADES**: Application Deployment and Execution Service (local execution)
-- **HYBRID**: Both EMS and ADES capabilities
+- `EMS`: Execution Management Service (orchestrates remote ADES)
+- `ADES`: Application Deployment and Execution Service (local execution)
+- `HYBRID`: Both EMS and ADES capabilities
 
 ## Use Cases
 

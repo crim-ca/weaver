@@ -11,6 +11,7 @@ import tempfile
 import warnings
 from datetime import date
 from typing import TYPE_CHECKING, cast
+from urllib.parse import urlsplit
 
 import colander
 import mock
@@ -36,7 +37,6 @@ from tests.utils import (
     setup_mongodb_processstore,
     setup_mongodb_servicestore
 )
-from weaver.compat import Version
 from weaver.datatype import Job, Process, Service
 from weaver.execute import (
     ExecuteControlOption,
@@ -50,7 +50,7 @@ from weaver.notify import decrypt_email
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema, JobStatusType
 from weaver.processes.wps_testing import WpsTestProcess
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
-from weaver.utils import compute_file_digest_multibase, explode_headers, get_path_kvp, now
+from weaver.utils import Version, compute_file_digest_multibase, explode_headers, get_path_kvp, now
 from weaver.visibility import Visibility
 from weaver.warning import TimeZoneInfoAlreadySetWarning
 from weaver.wps.utils import get_wps_output_url
@@ -379,6 +379,24 @@ class WpsRestApiJobsTest(JobUtils):
         assert "table-jobs" in resp.text
         jobs = [line for line in resp.text.splitlines() if "job-list-item" in line]
         assert len(jobs) == 6
+
+    @pytest.mark.html
+    def test_get_jobs_html_table_resizes_to_content_width(self):
+        """
+        Tests that the HTML jobs table uses responsive sizing and wraps long cell values.
+        """
+        resp = self.app.get(sd.jobs_service.path, headers=self.html_headers)
+        stylesheet = resp.html.find("link", href=lambda href: href and "style.css" in href)
+        assert stylesheet
+
+        css_path = urlsplit(stylesheet["href"]).path
+        css_resp = self.app.get(css_path)
+        assert css_resp.status_code == 200
+        assert ".table-jobs {" in css_resp.text
+        assert "width: 100%;" in css_resp.text
+        assert "table-layout: fixed;" in css_resp.text
+        assert "overflow-wrap: anywhere;" in css_resp.text
+        assert ".table-jobs progress {\n    max-width: 100%;\n}" in css_resp.text
 
     @pytest.mark.html
     def test_get_jobs_groups_html_unsupported(self):

@@ -22,6 +22,7 @@ import pytz
 import responses
 from beaker.cache import cache_region
 from mypy_boto3_s3.literals import RegionName
+from packaging.version import InvalidVersion, Version as PackageVersion
 from pyramid.httpexceptions import (
     HTTPConflict,
     HTTPCreated,
@@ -56,7 +57,10 @@ from weaver.utils import (
     NullType,
     OutputMethod,
     PathMatchingMethod,
+    Version,
+    VersionFormat,
     VersionLevel,
+    accepts_gzip_encoding,
     apply_number_with_unit,
     assert_sane_name,
     bytes2str,
@@ -77,7 +81,6 @@ from weaver.utils import (
     get_secure_path,
     get_ssl_verify_option,
     get_url_without_query,
-    is_update_version,
     is_valid_url,
     localize_datetime,
     make_dirs,
@@ -198,7 +201,88 @@ def test_is_url_valid():
     assert is_valid_url(None) is False
 
 
-def test_is_update_version():
+@pytest.mark.parametrize("version,expected,parts", [
+    (None, "0.0.0", (0, 0, 0)),
+    (0, "0.0.0", (0, 0, 0)),
+    (1, "1.0.0", (1, 0, 0)),
+    (1.2, "1.2.0", (1, 2, 0)),
+    ("1", "1.0.0", (1, 0, 0)),
+    ("1.2", "1.2.0", (1, 2, 0)),
+    ("1.2.3", "1.2.3", (1, 2, 3)),
+    ([], "0.0.0", (0, 0, 0)),
+    ((), "0.0.0", (0, 0, 0)),
+    ([1], "1.0.0", (1, 0, 0)),
+    ((1, 2), "1.2.0", (1, 2, 0)),
+    ([1, 2, 3], "1.2.3", (1, 2, 3)),
+    ((1, 2, 3), "1.2.3", (1, 2, 3)),
+    (PackageVersion("1.2"), "1.2.0", (1, 2, 0)),
+    (Version("1.2"), "1.2.0", (1, 2, 0)),
+    ("0.1.3.dev10", "0.1.3.dev10", (0, 1, 3)),
+    ("v1.2-dev1", "1.2.0.dev1", (1, 2, 0)),
+    ("1.2rc1", "1.2.0rc1", (1, 2, 0)),
+    ("1!2.3rc1", "1!2.3.0rc1", (2, 3, 0)),
+    ("1.2.post1.dev2+LOCAL", "1.2.0.post1.dev2+local", (1, 2, 0)),
+    (PackageVersion("1.2.dev1"), "1.2.0.dev1", (1, 2, 0)),
+    (Version("1.2.dev1"), "1.2.0.dev1", (1, 2, 0)),
+])
+def test_version_representations(version, expected, parts):
+    """
+    Tests normalization of supported input representations and suffix-preserving output formats.
+    """
+    result = Version(version)
+    assert str(result) == expected
+    assert result.as_format(VersionFormat.STRING) == expected
+    assert result.as_format(VersionFormat.OBJECT) is result
+    assert result.as_format(VersionFormat.PARTS) == parts
+    assert Version(result) == result
+
+
+@pytest.mark.parametrize("version", ["not-a-version", "1.2.invalid", object()])
+def test_version_invalid(version):
+    """
+    Tests that invalid versions are rejected rather than silently defaulted.
+    """
+    with pytest.raises(InvalidVersion):
+        Version(version)
+
+
+@pytest.mark.parametrize("version,level,expected", [
+    ("0.1.0", VersionLevel.PATCH, False),
+    ("1.0.1", VersionLevel.PATCH, False),
+    ("1.2.1", VersionLevel.PATCH, False),
+    ("1.2.3", VersionLevel.PATCH, False),
+    ("1.3.0", VersionLevel.PATCH, False),
+    ("1.3.1", VersionLevel.PATCH, False),
+    ("1.4.5", VersionLevel.PATCH, False),  # no 1.4.x to update from
+    ("0.1.0", VersionLevel.MINOR, False),
+    ("0.1.4", VersionLevel.MINOR, False),
+    ("1.2.5", VersionLevel.MINOR, False),
+    ("1.3.2", VersionLevel.MINOR, False),
+    ("2.0.0", VersionLevel.MINOR, False),  # no 2.x to update from
+    ("2.1.3", VersionLevel.MINOR, False),
+    ("0.1.0", VersionLevel.MAJOR, False),
+    ("0.1.4", VersionLevel.MAJOR, False),
+    ("0.2.0", VersionLevel.MAJOR, False),
+    ("0.2.9", VersionLevel.MAJOR, False),
+    ("1.2.5", VersionLevel.MAJOR, False),
+    ("1.3.2", VersionLevel.MAJOR, False),
+    ("1.4.0", VersionLevel.MAJOR, False),
+    ("0.1.3", VersionLevel.PATCH, True),
+    ("1.2.5", VersionLevel.PATCH, True),
+    ("1.3.2", VersionLevel.PATCH, True),
+    ("0.2.0", VersionLevel.MINOR, True),
+    ("0.2.1", VersionLevel.MINOR, True),
+    ("0.3.0", VersionLevel.MINOR, True),
+    ("1.4.0", VersionLevel.MINOR, True),
+    ("1.5.0", VersionLevel.MINOR, True),
+    ("2.0.0", VersionLevel.MAJOR, True),
+    ("2.1.3", VersionLevel.MAJOR, True),
+])
+@pytest.mark.parametrize("version_format", VersionFormat.values())
+def test_version_is_update(version, level, expected, version_format):
+    """
+    Tests semantic update levels for existing release branches across supported representations.
+    """
     versions = [
         "0.1.2",
         "1.0.3",
@@ -207,43 +291,40 @@ def test_is_update_version():
         "1.2.4",
         "1.3.1",
     ]
-    random.shuffle(versions)  # function must not depend on input order
+    random.shuffle(versions)  # method must not depend on input order
+    versions = [Version(value).as_format(version_format) for value in versions]
+    version = Version(version).as_format(version_format)
+    assert Version(version).is_update(iter(versions), level) is expected
 
-    assert not is_update_version("0.1.0", versions, VersionLevel.PATCH)
-    assert not is_update_version("1.0.1", versions, VersionLevel.PATCH)
-    assert not is_update_version("1.2.1", versions, VersionLevel.PATCH)
-    assert not is_update_version("1.2.3", versions, VersionLevel.PATCH)
-    assert not is_update_version("1.3.0", versions, VersionLevel.PATCH)
-    assert not is_update_version("1.3.1", versions, VersionLevel.PATCH)
-    assert not is_update_version("1.4.5", versions, VersionLevel.PATCH)  # no 1.4.x to update from
 
-    assert not is_update_version("0.1.0", versions, VersionLevel.MINOR)
-    assert not is_update_version("0.1.4", versions, VersionLevel.MINOR)
-    assert not is_update_version("1.2.5", versions, VersionLevel.MINOR)
-    assert not is_update_version("1.3.2", versions, VersionLevel.MINOR)
-    assert not is_update_version("2.0.0", versions, VersionLevel.MINOR)  # no 2.x to update from
-    assert not is_update_version("2.1.3", versions, VersionLevel.MINOR)
-
-    assert not is_update_version("0.1.0", versions, VersionLevel.MAJOR)
-    assert not is_update_version("0.1.4", versions, VersionLevel.MAJOR)
-    assert not is_update_version("0.2.0", versions, VersionLevel.MAJOR)
-    assert not is_update_version("0.2.9", versions, VersionLevel.MAJOR)
-    assert not is_update_version("1.2.5", versions, VersionLevel.MAJOR)
-    assert not is_update_version("1.3.2", versions, VersionLevel.MAJOR)
-    assert not is_update_version("1.4.0", versions, VersionLevel.MAJOR)
-
-    assert is_update_version("0.1.3", versions, VersionLevel.PATCH)
-    assert is_update_version("1.2.5", versions, VersionLevel.PATCH)
-    assert is_update_version("1.3.2", versions, VersionLevel.PATCH)
-
-    assert is_update_version("0.2.0", versions, VersionLevel.MINOR)
-    assert is_update_version("0.2.1", versions, VersionLevel.MINOR)
-    assert is_update_version("0.3.0", versions, VersionLevel.MINOR)
-    assert is_update_version("1.4.0", versions, VersionLevel.MINOR)
-    assert is_update_version("1.5.0", versions, VersionLevel.MINOR)
-
-    assert is_update_version("2.0.0", versions, VersionLevel.MAJOR)
-    assert is_update_version("2.1.3", versions, VersionLevel.MAJOR)
+@pytest.mark.parametrize("version,taken_versions,level,expected", [
+    ("0.1.3.dev1", [], VersionLevel.PATCH, True),
+    ("0.1.3.dev1", ["0.1.3.dev1"], VersionLevel.PATCH, False),
+    ("0.1.3.dev2", ["0.1.3.dev1"], VersionLevel.PATCH, True),
+    ("0.1.3.dev10", ["0.1.3.dev2"], VersionLevel.PATCH, True),
+    ("0.1.3.dev2", ["0.1.3.dev10"], VersionLevel.PATCH, False),
+    ("0.1.3.dev2", ["0.1.3.dev1", "0.1.3.dev10"], VersionLevel.PATCH, False),
+    ("0.1.3", ["0.1.3.dev1"], VersionLevel.PATCH, True),
+    ("0.1.3.dev1", ["0.1.3"], VersionLevel.PATCH, False),
+    ("0.1.3rc1", ["0.1.3.dev1"], VersionLevel.PATCH, True),
+    ("0.1.4.dev1", ["0.1.3"], VersionLevel.PATCH, True),
+    ("0.1.3.dev2", ["0.1.3.dev1", "0.2.0"], VersionLevel.PATCH, True),
+    ("0.1.3.dev2", ["0.1.3.dev1", "0.1.4.dev1"], VersionLevel.PATCH, False),
+    ("0.1.3.dev2", ["0.1.3.dev1"], VersionLevel.MINOR, False),
+    ("0.1.3.dev2", ["0.1.3.dev1"], VersionLevel.MAJOR, False),
+    ("0.2.0.dev1", ["0.1.3.dev1"], VersionLevel.MINOR, True),
+    ("0.2.0.dev2", ["0.2.0.dev1"], VersionLevel.MINOR, False),
+    ("1.0.0.dev1", ["0.1.3.dev1"], VersionLevel.MAJOR, True),
+    ("1.0.0.dev2", ["1.0.0.dev1"], VersionLevel.MAJOR, False),
+])
+@pytest.mark.parametrize("version_format", [VersionFormat.STRING, VersionFormat.OBJECT])
+def test_version_is_update_with_suffix(version, taken_versions, level, expected, version_format):
+    """
+    Tests that update validation respects suffix ordering without bypassing required release-level changes.
+    """
+    version = Version(version).as_format(version_format)
+    versions = [Version(value).as_format(version_format) for value in taken_versions]
+    assert Version(version).is_update(versions, level) is expected
 
 
 def test_get_url_without_query():
@@ -2618,6 +2699,24 @@ def test_explode_headers(test_headers, expect_headers, expect_get_all):
     results = explode_headers(test_headers)
     assert list(results.items()) == expect_headers
     assert results.getall("Link") == expect_get_all
+
+
+@pytest.mark.parametrize(
+    ["accept_encoding", "expected"],
+    [
+        ("gzip", True),
+        ("br, gzip", True),
+        ("gzip;q=0", False),
+        ("gzip;q=0.5, identity;q=1", False),
+        ("gzip;q=0.5, identity;q=0.3", True),
+        ("gzip;q=invalid", False),
+    ],
+)
+def test_accepts_gzip_encoding(accept_encoding, expected):
+    """
+    Tests gzip response negotiation against supported and excluded encoding preferences.
+    """
+    assert accepts_gzip_encoding(accept_encoding) is expected
 
 
 @pytest.mark.parametrize(
