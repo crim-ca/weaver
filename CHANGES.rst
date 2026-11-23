@@ -21,12 +21,26 @@ Changes:
   (relates to `opengeospatial/ogcapi-processes#616 <https://github.com/opengeospatial/ogcapi-processes/issues/616>`_,
   resolves `#977 <https://github.com/crim-ca/weaver/issues/977>`_,
   resolves `#990 <https://github.com/crim-ca/weaver/issues/990>`_).
+- Replace the ``Redoc`` viewer in generated API documentation with ``Swagger UI``, include all supported endpoints in
+  the generated OpenAPI specification, and add links to endpoint groups (resolves
+  `#732 <https://github.com/crim-ca/weaver/issues/732>`_).
+- Improve generation of ``/api`` Swagger UI response to include endpoint-group shortcuts.
+- Add ``gzip`` compression of OpenAPI ``/json`` response used by Swagger UI to reduce response size.
+- Reduce duplicate conversion work from `colander` schema during OpenAPI generation to speed up responses.
+- Consolidate version normalization and prerelease update validation in ``weaver.utils.Version``
+  (relates to `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 - Allow Sphinx 9 for documentation builds with ``sphinx_autodoc_typehints>=3.6.1``.
 
 Fixes:
 ------
+- Fix process version links and version-history listings for semantic versions with suffixes such as ``0.1.3.dev10``.
+  Correct ``latest-version``, ``version-history``, ``predecessor-version``, ``successor-version`` and ``working-copy``
+  links. Add ``current`` and ``working-copy-of`` links and make ``self`` and ``alternate`` links representation-aware
+  (resolves `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 - Fix HTML job listing tables overflowing the available page width when zoomed
   (`#1121 <https://github.com/crim-ca/weaver/issues/1121>`_).
+- Fix ``Installation`` and ``Configuration`` links of the ``README.rst`` header resolving to external URLs
+  instead of their sections, caused by conflicting inline named hyperlink targets.
 
 .. _changes_6.18.0:
 
