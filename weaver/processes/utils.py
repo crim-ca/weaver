@@ -59,7 +59,7 @@ from weaver.utils import (
     Version,
     VersionFormat,
     VersionLevel,
-    as_version_major_minor_patch,
+    create_content_id,
     fully_qualified_name,
     generate_diff,
     get_any_id,
