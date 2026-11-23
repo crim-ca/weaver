@@ -12,6 +12,9 @@ Changes
 
 Changes:
 --------
+- Expand usage documentation with service discovery, configuration and caching, bounding-box and multiple-input
+  examples, workflow chaining, and quotation and billing operations 
+  (resolves `#61 <https://github.com/crim-ca/weaver/issues/61>`_).
 - Implement the `CLI` ``replace`` operation to update an existing `Process` definition
   (resolves `#906 <https://github.com/crim-ca/weaver/issues/906>`_).
 - Add ``--output-id`` option (multiple allowed) to `CLI` ``execute`` and ``update_job`` operations to

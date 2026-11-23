@@ -121,6 +121,13 @@ deployed in `Weaver` using an URL reference to an WPS-1/2 process through the us
 locally. This allows a remote server offering limited functionalities (e.g.: no REST or `OGC API` bindings supported)
 to provide them through `Weaver`.
 
+The :term:`WPS`-1/2 endpoint is a single configured :term:`URL` where requests select operations such as
+``GetCapabilities``, ``DescribeProcess`` or ``Execute`` using :term:`WPS` parameters. :term:`OGC API - Processes`
+instead exposes separate resource URLs and uses :term:`JSON` bodies for :term:`Process` descriptions and :term:`Job`
+submissions.
+`Weaver` can expose both interfaces for the same local :term:`Process`. Details and request examples are in
+:ref:`OpenAPI Specification`, :ref:`wps_endpoint` and the :ref:`tutorial`.
+
 A minimal :ref:`Deploy <proc_op_deploy>` request body for this kind of process could be as follows:
 
 .. code-block:: JSON
@@ -2332,8 +2339,29 @@ input where ``EOImage`` was specified and will be forwarded to the underlying :t
 BoundingBox Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: provide example and details, (crs, dimensions, etc.)
-.. todo:: cross-reference :ref:`cwl-io-types` for more details/examples
+A bounding box is a spatial extent represented by coordinates. It can be two-dimensional or three-dimensional,
+depending on the selected :term:`CRS`. For an :term:`OGC API - Processes` execution, submit it as an inline ``bbox``
+input. Coordinates follow the order required by the specified :term:`CRS`. The example uses CRS84 longitude/latitude
+order:
+
+.. code-block:: json
+
+    {
+      "inputs": {
+        "area": {
+          "bbox": [-120.0, 30.0, -110.0, 40.0],
+          "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+        }
+      }
+    }
+
+The :term:`Process` must declare ``area`` as a bounding-box input and support the selected :term:`CRS`. If ``crs`` is
+omitted, the service applies its default :term:`CRS`. :term:`WPS` clients provide the same extent through the
+``BoundingBoxData`` input representation. Since :term:`CWL` has no native bounding-box type, `Weaver` maps it to
+:term:`JSON` content in a CWL ``File`` with the ``ogc-bbox`` format.
+
+.. seealso::
+    :ref:`CWL I/O Types <cwl-io-types>` describes the mapping and its limitations.
 
 .. _proc_col_inputs:
 
@@ -2555,10 +2583,27 @@ Collection Outputs
 Multiple Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: repeating IDs example for WPS multi-inputs
+When a :term:`Process` input allows multiple occurrences, :term:`OGC API - Processes` represents them as an array under
+one input ID. For example, an input named ``files`` can receive two file references as follows:
+
+.. code-block:: json
+
+    {
+      "inputs": {
+        "files": [
+          {"href": "https://example.org/first.nc"},
+          {"href": "https://example.org/second.nc"}
+        ]
+      }
+    }
+
+In :term:`WPS` :term:`XML`, submit one ``wps:Input`` element for each value and repeat the same ``ows:Identifier``.
+`Weaver` groups these repeated inputs and maps them to the corresponding multi-occurrence input representation in
+:term:`OGC API - Processes` and :term:`CWL`. The input's ``minOccurs`` and ``maxOccurs`` constraints apply to the
+total number of submitted values.
 
 .. seealso::
-    - :ref:`Multiple and Optional Values`
+    - :ref:`Multiple and Optional Values <cwl-array-null-values>`
 
 .. _proc_multi_outputs:
 
@@ -3715,10 +3760,19 @@ but are still available for use when requested.
 Workflow (Chaining Step Processes)
 --------------------------------------
 
-.. todo:: add details, explanation done in below reference
+An :term:`OGC API - Processes` :term:`Workflow` is deployed as a :term:`CWL` ``Workflow``. Each step's ``run`` field
+identifies a separate, already-deployed `Weaver` :term:`Process` by process ID or by a supported process/package
+:term:`URL`.
+Deploy the step processes before deploying the :term:`Workflow` so `Weaver` can resolve and validate their input and
+output definitions. Inputs and outputs between connected steps must have compatible types and formats.
+
+When the :term:`Workflow` is executed, `Weaver` runs each step on the :term:`ADES` selected for its inputs by the
+configured :term:`Data Source`, then passes the step results to dependent steps. This requires an :term:`EMS` or
+``HYBRID`` configuration.
 
 .. seealso::
+    :ref:`CWL Workflow <app_pkg_workflow>` describes step reference formats, package examples and deployment
+    requirements.
 
-    - :ref:`app_pkg_workflow`
     - :ref:`proc_workflow_ops`
     - :ref:`Workflow` process type
