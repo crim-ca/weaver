@@ -13,6 +13,28 @@ Changes
 Changes:
 --------
 - Use ``gunicorn[fast]`` to leverage the faster HTTP C parser instead of Python native implementation.
+- Add support for multiple `Process` description parts in multipart deployment, allowing the main `Workflow` and each
+  sub-`CWL` to define their own description. Descriptions are linked to their `CWL` part by matching ``id`` fields
+  (or ``Content-ID``/``Content-Location`` references), and a description without ``id`` applies to the main `Workflow`.
+- Add support for deploying a ``processDescription`` and ``executionUnit`` pair as a single `JSON` or `YAML` multipart
+  part using ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-deploy-process``, equivalent to a distinct
+  `CWL` part and `Process` description part of matching ``id``
+  (relates to `opengeospatial/ogcapi-processes#616 <https://github.com/opengeospatial/ogcapi-processes/issues/616>`_,
+  resolves `#977 <https://github.com/crim-ca/weaver/issues/977>`_,
+  resolves `#990 <https://github.com/crim-ca/weaver/issues/990>`_).
+- Update from Node 24 to Node 26 in `base.dockerfile`.
+- Expand usage documentation with service discovery, configuration and caching, bounding-box and multiple-input
+  examples, workflow chaining, and quotation and billing operations 
+  (resolves `#61 <https://github.com/crim-ca/weaver/issues/61>`_).
+- Implement the `CLI` ``replace`` operation to update an existing `Process` definition
+  (resolves `#906 <https://github.com/crim-ca/weaver/issues/906>`_).
+- Add ``--output-id`` option (multiple allowed) to `CLI` ``execute`` and ``update_job`` operations to
+  provide the inverse option from ``--output-filter``, which can be easier when the set of desired outputs is smaller.
+  This also aligns with the "*output selection*" approach defined by `OGC API - Processes`.
+- Add ``--output-id`` option (multiple allowed) to `CLI` ``results`` operation to perform post-execution filtering
+  of `Job` results. This can be used with servers that do not directly support outputs selection at execution time,
+  or simply to retrieve partial results of an existing `Job`. This option also allows the selection of output array
+  elements by index using ``{outputID}/{N}`` and can be combined with ``--download`` to obtain only those results.
 - Replace the ``Redoc`` viewer in generated API documentation with ``Swagger UI``, include all supported endpoints in
   the generated OpenAPI specification, and add links to endpoint groups (resolves
   `#732 <https://github.com/crim-ca/weaver/issues/732>`_).
@@ -31,6 +53,8 @@ Fixes:
   (resolves `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 - Fix HTML job listing tables overflowing the available page width when zoomed
   (`#1121 <https://github.com/crim-ca/weaver/issues/1121>`_).
+- Fix ``PATCH /processes/{id}`` not applying an updated ``description`` when the `Process` already defined
+  the legacy ``abstract`` field, since the latter took precedence when reporting the description.
 - Fix ``Installation`` and ``Configuration`` links of the ``README.rst`` header resolving to external URLs
   instead of their sections, caused by conflicting inline named hyperlink targets.
 

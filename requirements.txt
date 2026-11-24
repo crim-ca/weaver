@@ -36,17 +36,17 @@ cornice
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
 cryptography>=50.0.2
-# https://github.com/common-workflow-language/cwltool/pull/2207 adds rootless EUID/EGID support in upstream cwltool.
-# cwltool>=3.1.20260315121657 is the first upstream release that includes it.
-cwltool>=3.1.20260315121657
+# cwltool>=3.3.20261106131234 is the main branch where the below prov PR pin derives from
+cwltool>=3.3.20261106131234
 # https://github.com/common-workflow-language/cwltool/pull/2349 updates to prov 3.3.0 (needed for PROV-JSONLD)
 cwltool @ git+https://github.com/crim-ca/cwltool.git@707e261270c341d21dd2b27e567260215cc7a8c8
 # cwlprov-py fork with prov 3.3.0 (needed for the command-line tool)
+# corresponds to 0.7.0 version of https://github.com/common-workflow-language/cwlprov-py/pull/49
 cwlprov @ git+https://github.com/crim-ca/cwlprov-py.git@5df46d45badb8eb6d3c30b29f4016bf2afdd4029
 cwl-utils>=0.47
 # Pin prov to 3.3.0 to avoid any unexpected incompatibilities
 prov==3.3.0
-dnspython>=2.8.0  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
+dnspython>=2.9.2  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
 docker>=7.2.0
 duration
 esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
@@ -124,7 +124,7 @@ requests_toolbelt @ git+https://github.com/crim-ca/requests-toolbelt.git@patch-m
 ruamel.yaml>=0.19.1
 # force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
 # employed by cwltool -> schema-salad -> mistune
-schema-salad>=8.10.20260825112551,<9
+schema-salad>=8.10.20261106141337,<9
 shapely
 simplejson
 urllib3>=2.8.0

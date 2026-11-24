@@ -27,17 +27,17 @@ Register an external WPS or OGC API - Processes service as a remote provider.
 
 ### Required
 
-- **provider_id** (string): Unique provider identifier
-- **url** (string): Provider service URL
+- `provider_id` (string): Unique provider identifier
+- `url` (string): Provider service URL
 
 ### Optional
 
-- **type** (string): Provider type
+- `type` (string): Provider type
   - `wps`: WPS 1.0/2.0 service
   - `ogcapi`: OGC API - Processes
   - `esgf`: ESGF processing service
-- **public** (boolean): Whether provider is publicly accessible (default: true)
-- **auth** (object): Authentication credentials (if required)
+- `public` (boolean): Whether provider is publicly accessible (default: true)
+- `auth` (object): Authentication credentials (if required)
 
 ## CLI Usage
 
@@ -163,9 +163,9 @@ weaver capabilities -u $WEAVER_URL -P institution-b
 
 ## Error Handling
 
-- **409 Conflict**: Provider ID already exists
-- **400 Bad Request**: Invalid URL or parameters
-- **503 Service Unavailable**: Cannot connect to provider URL
+- `409 Conflict`: Provider ID already exists
+- `400 Bad Request`: Invalid URL or parameters
+- `503 Service Unavailable`: Cannot connect to provider URL
 
 ## Related Skills
 
