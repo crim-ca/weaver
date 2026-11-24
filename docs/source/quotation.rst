@@ -9,11 +9,22 @@ Quotation and Billing
     :local:
     :depth: 3
 
+`Weaver` implements the :term:`OGC API - Processes` :term:`Quotation` and :term:`Billing` extensions to estimate the
+cost of a :term:`Process` before execution and associate a :term:`Bill` with an execution made from a :term:`Quote`.
+Quotation endpoints are enabled by the ``weaver.quotation`` setting and are available only in supported deployment
+modes.
 
-.. todo::
-    - Summary description
-    - Refer to |ogc-proc-ext-quotation|_ and |ogc-proc-ext-billing|_
-    - Refer to :ref:`conf_quotation`
+A quote request uses the same input payload as a :term:`Job` execution, with values matching the selected
+:term:`Process` definition (see :ref:`Process Execution <proc_op_execute>`). It creates a :term:`Quote`, not a
+:term:`Job`. The estimate can be returned synchronously or asynchronously. Once available, the :term:`Quote` awaits
+validation and approval. It must be marked as paid before it can be submitted for execution. Executing the paid quote
+creates a linked :term:`Job` and :term:`Bill`. See :ref:`Quote Estimation <quote_estimation>`,
+:ref:`Billing <quotation_billing>` and :ref:`API and Examples <quotation_api_examples>` for details.
+
+.. seealso::
+    - |ogc-proc-ext-quotation|_
+    - |ogc-proc-ext-billing|_
+    - :ref:`Configuration of Quotation Estimation <conf_quotation>`
 
 .. _quote_estimation:
 .. _quotation_quote_estimator:
@@ -21,25 +32,47 @@ Quotation and Billing
 Quote Estimation
 ================
 
-.. todo::
-    - purpose/description
-    - Detail |quote-estimator|
+An :term:`Quote Estimator` is configured per :term:`Process`. It combines a flat rate and resource rates with either
+constant values or estimators for values such as duration, memory, storage, CPU and GPU use. An estimator model can be
+supplied as an :term:`ONNX` model in the configuration, with process inputs mapped to model features. The resulting
+:term:`Quote` includes a total, currency and optional cost breakdown.
+
+The :term:`Process` must have a supported :term:`Application Package` and estimator configuration. Estimator
+configuration can be retrieved, replaced or reset at ``/processes/{process_id}/estimator``. A :term:`Quotation`
+request submits the :term:`Process` parameters to ``POST /processes/{process_id}/quotations``. Its response identifies
+the :term:`Quote` resource, which can be retrieved at ``/quotations/{quote_id}``. Estimation can complete
+synchronously or return an accepted response for later retrieval, depending on the ``Prefer`` header and available
+execution time.
+
+.. code-block:: shell
+
+    curl -X POST "${WEAVER_URL}/processes/my-process/quotations" \
+         -H "Content-Type: application/json" \
+         -d '{"inputs": {"source": {"href": "https://example.org/input.nc"}}}'
 
 .. _quotation_estimator_model:
 
 Quote Estimator Model
 ---------------------
 
-.. todo::
-    models vs constants, |ONNX-long|_ generalization
+Each cost component can use a numeric constant or a model that predicts the component from selected :term:`Process`
+inputs. For example, a constant ``duration_estimator`` is suitable when the expected duration does not depend on
+inputs, while an :term:`ONNX` model can estimate duration from input features such as file size. The estimator
+configuration maps :term:`Process` input IDs to model input names or indices. A component's estimate is multiplied by
+its corresponding rate and added to any flat rate to calculate the total.
+
+The model must be in :term:`ONNX` format and produce a single numeric estimate for the selected output. The schema
+provides the supported estimator and mapping fields.
 
 .. _quotation_estimator_config:
 
 Quote Estimator Configuration
 -----------------------------
 
-.. todo::
-    describe
+The :term:`JSON` configuration contains a ``config`` object defining rates and estimators, and an ``inputs`` object
+describing the :term:`Process` input features used for estimation. Optional ``outputs`` can assign weights to process
+outputs. Each estimator may be a constant or an :term:`ONNX` model with an optional mapping from model inputs to
+:term:`Process` input IDs. Custom components are supported when their names end in ``_rate`` and ``_estimator``.
 
 .. literalinclude:: ../../weaver/schemas/quotation/quote-estimator.yaml
     :caption: |quote-estimation-config|_ schema
@@ -50,8 +83,8 @@ Quote Estimator Configuration
 Quote Estimation Result
 -----------------------
 
-.. todo::
-    describe
+The :term:`Quote` result contains a non-negative ``total`` and its currency. Additional fields provide the estimate,
+rate and calculated cost for each component. The quote resource also reports its status and links.
 
 .. literalinclude:: ../../weaver/schemas/quotation/quote-estimation-result.yaml
     :caption: |quote-estimation-result|_ schema
@@ -62,23 +95,56 @@ Quote Estimation Result
 Billing
 ==========
 
-.. todo::
-    - Link between Quotation, Execution and Billing
+Executing a :term:`Quote` is a separate operation from estimating it. Submit ``POST /quotations/{quote_id}`` after the
+quote has been marked as paid. An unpaid quote is rejected with ``HTTP 402``. When execution is accepted, `Weaver`
+creates a :term:`Bill` linked to the quote and resulting :term:`Job`. The job response includes the bill and quote
+identifiers.
+
+Use ``GET /bills`` to list :term:`Bill` identifiers and ``GET /bills/{bill_id}`` to retrieve a :term:`Bill`.
+`Weaver` records the :term:`Quotation` and execution relationship. These endpoints do not process payments.
 
 .. _quotation_currency_conversion:
 
 Currency Conversion
 ===================
 
-.. todo::
-    - Detail |currency-converter| (see ``weaver/quotation/estimation.py``)
+The requested :term:`Quote` currency can be supplied with the ``X-Weaver-Currency`` header. If it is omitted,
+`Weaver` uses ``weaver.quotation_currency_default``. Currency conversion is optional. Configure
+``weaver.quotation_currency_converter`` and its corresponding token to use one of the supported exchange-rate
+services: ``openexchangerates``, ``currencylayer``, ``exchangeratesapi``, ``fixer``, ``allratestoday``,
+``scrapper`` or ``custom``. ``allratestoday`` does not require a token. ``custom`` also requires a converter
+:term:`URL`.
+See :ref:`Configuration of Quotation Estimation <conf_quotation>` for all related settings. If no converter is
+configured or a conversion fails, the :term:`Quote` remains in the estimator's or configured default currency.
 
 .. _quotation_api_examples:
 
 API and Examples
 ================
 
-.. todo::
-    - Detail API endpoints
-    - Example requests
-    - include design UML schemas (request/response state flow)
+The main :term:`Quotation` and :term:`Billing` operations are:
+
+* ``GET``, ``PUT`` or ``DELETE /processes/{process_id}/estimator`` to inspect, set or reset a :term:`Process` estimator.
+* ``POST /processes/{process_id}/quotations`` to request a :term:`Quote`, then ``GET /quotations/{quote_id}`` to
+  inspect it.
+* ``POST /quotations/{quote_id}`` to execute a paid :term:`Quote`.
+* ``GET /quotations`` and ``GET /bills`` to list :term:`Quotation` and :term:`Bill` records.
+* ``GET /bills/{bill_id}`` to retrieve a :term:`Bill`.
+
+For example, the following requests a :term:`Quote`, then retrieves its current status and estimate using the returned
+``Location`` :term:`URL`:
+
+.. code-block:: shell
+
+    curl -i -X POST "${WEAVER_URL}/processes/my-process/quotations" \
+         -H "Content-Type: application/json" \
+         -d '{"inputs": {"source": {"href": "https://example.org/input.nc"}}}'
+    curl "${QUOTE_URL}"
+
+Use the interactive :term:`API` reference at ``${WEAVER_URL}/api`` for the complete request and response schemas, query
+parameters and status details. Quote execution requires the quote to be paid before the ``POST`` request.
+
+.. warning::
+    Access control for :term:`Quotation` and :term:`Billing` endpoints is not managed directly by `Weaver`. These
+    endpoints can expose sensitive information. The server operator is responsible for restricting access, for example
+    by placing them behind an appropriately configured security proxy.

@@ -1,3 +1,4 @@
+import gzip
 import itertools
 import json
 import unittest
@@ -10,6 +11,7 @@ import pyramid.testing
 import pytest
 from parameterized import parameterized
 from pyramid.httpexceptions import HTTPForbidden, HTTPFound, HTTPUnauthorized
+from pyramid.request import Request
 from webtest import TestApp as WebTestApp
 
 from tests.functional.utils import WpsConfigBase
@@ -119,10 +121,17 @@ class GenericApiRoutesTestCase(WpsConfigBase):
         assert html_conformance
 
     def test_swagger_api_format(self):
+        """
+        Tests that the runtime OpenAPI viewer exposes all tag shortcuts and compressed specifications.
+        """
         resp = self.app.get(sd.api_swagger_ui_service.path)
         assert resp.status_code == 200
         assert resp.content_type == ContentType.TEXT_HTML
         assert f"<title>{sd.API_TITLE}</title>" in resp.text
+        assert resp.text.index('id="swagger-ui"') < resp.text.index('id="api-tag-shortcuts"')
+        assert 'document.querySelector("#swagger-ui .info .description")' in resp.text
+        assert resp.text.index("Deprecated Endpoints") > resp.text.index("WPS</a>")
+        assert resp.text.count('href="#operations-tag-') == 20
 
         resp = self.app.get(sd.openapi_json_service.path, headers=self.json_headers)
         assert resp.status_code == 200
@@ -132,6 +141,27 @@ class GenericApiRoutesTestCase(WpsConfigBase):
         assert "paths" in resp.json
         assert "openapi" in resp.json
         assert "basePath" in resp.json
+        tag_names = [tag["name"] for tag in resp.json["tags"]]
+        assert tag_names[-1] == sd.TAG_DEPRECATED
+        assert tag_names[:-1] == sorted(tag_names[:-1])
+        assert "Content-Encoding" not in resp.headers
+        assert resp.headers["Vary"] == "Accept-Encoding"
+
+        gzip_resp = Request.blank(
+            sd.openapi_json_service.path,
+            headers={"Accept-Encoding": "gzip"},
+        ).get_response(self.app.app)
+        assert gzip_resp.status_code == 200
+        assert gzip_resp.headers["Content-Encoding"] == "gzip"
+        assert gzip_resp.headers["Vary"] == "Accept-Encoding"
+        assert len(gzip_resp.body) < len(resp.body)
+        assert json.loads(gzip.decompress(gzip_resp.body))["tags"][-1]["name"] == sd.TAG_DEPRECATED
+
+        uncompressed_resp = Request.blank(
+            sd.openapi_json_service.path,
+            headers={"Accept-Encoding": "gzip;q=0"},
+        ).get_response(self.app.app)
+        assert "Content-Encoding" not in uncompressed_resp.headers
 
     def test_swagger_api_redirect_format_explicit(self):
         resp = self.app.get(sd.api_swagger_ui_service.path, params={"f": OutputFormat.HTML})
