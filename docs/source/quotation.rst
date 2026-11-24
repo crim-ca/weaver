@@ -11,8 +11,8 @@ Quotation and Billing
 
 `Weaver` implements the :term:`OGC API - Processes` :term:`Quotation` and :term:`Billing` extensions to estimate the
 cost of a :term:`Process` before execution and associate a :term:`Bill` with an execution made from a :term:`Quote`.
-Quotation endpoints are enabled by the ``weaver.quotation`` setting and are available only in supported deployment
-modes.
+Quotation endpoints are enabled by the :confval:`weaver.quotation` setting and are available only in supported
+deployment modes.
 
 A quote request uses the same input payload as a :term:`Job` execution, with values matching the selected
 :term:`Process` definition (see :ref:`Process Execution <proc_op_execute>`). It creates a :term:`Quote`, not a
@@ -109,11 +109,11 @@ Currency Conversion
 ===================
 
 The requested :term:`Quote` currency can be supplied with the ``X-Weaver-Currency`` header. If it is omitted,
-`Weaver` uses ``weaver.quotation_currency_default``. Currency conversion is optional. Configure
-``weaver.quotation_currency_converter`` and its corresponding token to use one of the supported exchange-rate
-services: ``openexchangerates``, ``currencylayer``, ``exchangeratesapi``, ``fixer``, ``allratestoday``,
-``scrapper`` or ``custom``. ``allratestoday`` does not require a token. ``custom`` also requires a converter
-:term:`URL`.
+`Weaver` uses :confval:`weaver.quotation_currency_default`. Currency conversion is optional. Configure
+:confval:`weaver.quotation_currency_converter` and :confval:`weaver.quotation_currency_token` to use one of the
+supported exchange-rate services such as ``openexchangerates``, ``currencylayer``, ``exchangeratesapi``, ``fixer``,
+``allratestoday``, ``scrapper`` or ``custom``. ``allratestoday`` does not require a token.
+The ``custom`` option also requires a converter :term:`URL`.
 See :ref:`Configuration of Quotation Estimation <conf_quotation>` for all related settings. If no converter is
 configured or a conversion fails, the :term:`Quote` remains in the estimator's or configured default currency.
 

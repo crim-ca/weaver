@@ -21,6 +21,7 @@ Changes:
   (relates to `opengeospatial/ogcapi-processes#616 <https://github.com/opengeospatial/ogcapi-processes/issues/616>`_,
   resolves `#977 <https://github.com/crim-ca/weaver/issues/977>`_,
   resolves `#990 <https://github.com/crim-ca/weaver/issues/990>`_).
+- Update from Node 24 to Node 26 in `base.dockerfile`.
 - Expand usage documentation with service discovery, configuration and caching, bounding-box and multiple-input
   examples, workflow chaining, and quotation and billing operations 
   (resolves `#61 <https://github.com/crim-ca/weaver/issues/61>`_).
