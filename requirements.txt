@@ -46,7 +46,7 @@ cwlprov @ git+https://github.com/crim-ca/cwlprov-py.git@5df46d45badb8eb6d3c30b29
 cwl-utils>=0.47
 # Pin prov to 3.3.0 to avoid any unexpected incompatibilities
 prov==3.3.0
-dnspython>=2.8.0  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
+dnspython>=2.9.2  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
 docker>=7.2.0
 duration
 esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
