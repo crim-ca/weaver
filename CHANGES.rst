@@ -12,6 +12,15 @@ Changes
 
 Changes:
 --------
+- Add support for multiple `Process` description parts in multipart deployment, allowing the main `Workflow` and each
+  sub-`CWL` to define their own description. Descriptions are linked to their `CWL` part by matching ``id`` fields
+  (or ``Content-ID``/``Content-Location`` references), and a description without ``id`` applies to the main `Workflow`.
+- Add support for deploying a ``processDescription`` and ``executionUnit`` pair as a single `JSON` or `YAML` multipart
+  part using ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-deploy-process``, equivalent to a distinct
+  `CWL` part and `Process` description part of matching ``id``
+  (relates to `opengeospatial/ogcapi-processes#616 <https://github.com/opengeospatial/ogcapi-processes/issues/616>`_,
+  resolves `#977 <https://github.com/crim-ca/weaver/issues/977>`_,
+  resolves `#990 <https://github.com/crim-ca/weaver/issues/990>`_).
 - Update from Node 24 to Node 26 in `base.dockerfile`.
 - Expand usage documentation with service discovery, configuration and caching, bounding-box and multiple-input
   examples, workflow chaining, and quotation and billing operations 
