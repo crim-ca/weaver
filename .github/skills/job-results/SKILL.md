@@ -24,12 +24,12 @@ Retrieve output results from a successfully completed job.
 
 ### Required
 
-- **job_id** (string): Job identifier
+- `job_id` (string): Job identifier
 
 ### Optional
 
-- **output_dir** (path): Directory to download output files
-- **download** (boolean): Whether to download files locally
+- `output_dir` (path): Directory to download output files
+- `download` (boolean): Whether to download files locally
 
 ## CLI Usage
 
@@ -90,8 +90,8 @@ Result format depends on output type:
 
 ## Error Handling
 
-- **404 Not Found**: Job does not exist
-- **400 Bad Request**: Job not yet completed or failed
+- `404 Not Found`: Job does not exist
+- `400 Bad Request`: Job not yet completed or failed
 
 ## Related Skills
 

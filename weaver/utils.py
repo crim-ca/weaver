@@ -39,6 +39,7 @@ from celery.app import Celery
 from dateutil.parser import parse as parse_dt
 from multiformats import multibase, multihash
 from mypy_boto3_s3.literals import RegionName
+from packaging.version import Version as PackageVersion
 from pyramid.config import Configurator
 from pyramid.exceptions import ConfigurationError
 from pyramid.httpexceptions import (
@@ -66,7 +67,6 @@ from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
 
 from weaver.base import Constants, ExtendedEnum
-from weaver.compat import Version
 from weaver.exceptions import WeaverException
 from weaver.formats import (
     ZARR_METADATA_FILES,
@@ -679,6 +679,35 @@ def get_header(header_name,         # type: str
     return default
 
 
+def accepts_gzip_encoding(accept_encoding):
+    # type: (str) -> bool
+    """
+    Determines whether gzip is an acceptable response encoding.
+    """
+    qualities = {}
+    for offer in accept_encoding.split(","):
+        parts = offer.strip().split(";")
+        coding = parts[0].lower()
+        if not coding:
+            continue
+        quality = 1.0
+        for parameter in parts[1:]:
+            name, separator, value = parameter.strip().partition("=")
+            if name.lower() == "q":
+                try:
+                    quality = float(value) if separator else 0.0
+                except ValueError:
+                    quality = 0.0
+                if not 0.0 <= quality <= 1.0:
+                    quality = 0.0
+                break
+        qualities.setdefault(coding, quality)
+
+    gzip_quality = qualities.get("gzip", qualities.get("*", 0.0))
+    identity_quality = qualities.get("identity", 0.0 if qualities.get("*") == 0.0 else 1.0)
+    return gzip_quality > 0.0 and gzip_quality >= identity_quality
+
+
 def get_cookie_headers(header_container, cookie_header_name="Cookie"):
     # type: (AnyHeadersContainer, Optional[str]) -> HeadersType
     """
@@ -1012,141 +1041,123 @@ class VersionLevel(Constants):
 
 class VersionFormat(Constants):
     OBJECT = "object"  # Version
-    STRING = "string"  # "x.y.z"
-    PARTS = "parts"    # tuple/list
+    STRING = "string"  # "x.y.z" with optional suffix
+    PARTS = "parts"    # (major, minor, patch), without suffix
 
 
-@overload
-def as_version_major_minor_patch(version, version_format):
-    # type: (AnyVersion, Literal[VersionFormat.OBJECT]) -> Version
-    ...
-
-
-@overload
-def as_version_major_minor_patch(version, version_format):
-    # type: (AnyVersion, Literal[VersionFormat.STRING]) -> str
-    ...
-
-
-@overload
-def as_version_major_minor_patch(version, version_format):
-    # type: (AnyVersion, Literal[VersionFormat.PARTS]) -> Tuple[int, int, int]
-    ...
-
-
-@overload
-def as_version_major_minor_patch(version):
-    # type: (AnyVersion) -> Tuple[int, int, int]
-    ...
-
-
-def as_version_major_minor_patch(version, version_format=VersionFormat.PARTS):
-    # type: (Optional[AnyVersion], VersionFormat) -> AnyVersion
+class Version(PackageVersion):
     """
-    Generates a ``MAJOR.MINOR.PATCH`` version with padded zeros for any missing parts.
+    Normalizes supported version representations using :mod:`packaging.version`.
+
+    Release numbers are padded to at least ``MAJOR.MINOR.PATCH``. String and object representations retain
+    prerelease, development, postrelease and local suffixes. The parts representation contains only release numbers.
+    A missing version defaults to ``0.0.0`` for processes deployed without an explicit version.
     """
-    if isinstance(version, (str, float, int)):
-        ver_parts = list(Version(str(version)).version)
-    elif isinstance(version, (list, tuple)):
-        ver_parts = [int(part) for part in version]
-    else:
-        ver_parts = []  # default "0.0.0" for backward compatibility
-    ver_parts = ver_parts[:3]
-    ver_tuple = tuple(ver_parts + [0] * max(0, 3 - len(ver_parts)))
-    if version_format in [VersionFormat.STRING, VersionFormat.OBJECT]:
-        ver_str = ".".join(str(part) for part in ver_tuple)
+
+    def __init__(self, version=None):
+        # type: (Optional[AnyVersion]) -> None
+        if version is None:
+            version = "0.0.0"  # default for backward compatibility with unversioned processes
+        elif isinstance(version, (list, tuple)):
+            version = ".".join(str(int(part)) for part in version) or "0.0.0"
+        super().__init__(str(version))
+        if len(self.release) < 3:
+            release = ".".join(str(part) for part in (self.major, self.minor, self.micro))
+            base_version = f"{self.epoch}!{release}" if self.epoch else release
+            super().__init__(str(self).replace(self.base_version, base_version, 1))
+
+    @property
+    def patch(self):
+        # type: () -> int
+        """
+        Semantic version alias for :attr:`micro`.
+        """
+        return self.micro
+
+    @overload
+    def as_format(self, version_format=VersionFormat.STRING):
+        # type: (Literal[VersionFormat.STRING]) -> str
+        ...
+
+    @overload
+    def as_format(self, version_format):
+        # type: (Literal[VersionFormat.OBJECT]) -> Version
+        ...
+
+    @overload
+    def as_format(self, version_format):
+        # type: (Literal[VersionFormat.PARTS]) -> Tuple[int, int, int]
+        ...
+
+    def as_format(self, version_format=VersionFormat.STRING):
+        # type: (VersionFormat) -> AnyVersion
+        """
+        Obtains the requested representation, preserving suffixes except for release-only parts.
+        """
         if version_format == VersionFormat.STRING:
-            return ver_str
-        return Version(ver_str)
-    return ver_tuple
+            return str(self)
+        if version_format == VersionFormat.OBJECT:
+            return self
+        if version_format == VersionFormat.PARTS:
+            return self.major, self.minor, self.patch
+        raise NotImplementedError(f"Unknown version format: {version_format!s}")
 
-
-def is_update_version(version, taken_versions, version_level=VersionLevel.PATCH):
-    # type: (AnyVersion, Iterable[AnyVersion], VersionLevel) -> TypeGuard[AnyVersion]
-    """
-    Determines if the version corresponds to an available update version of specified level compared to existing ones.
-
-    If the specified version corresponds to an older version compared to available ones (i.e.: a taken more recent
-    version also exists), the specified version will have to fit within the version level range to be considered valid.
-    For example, requesting ``PATCH`` level will require that the specified version is greater than the last available
-    version against other existing versions with equivalent ``MAJOR.MINOR`` parts. If ``1.2.0`` and ``2.0.0`` were
-    taken versions, and ``1.2.3`` has to be verified as the update version, it will be considered valid since its
-    ``PATCH`` number ``3`` is greater than all other ``1.2.x`` versions (it falls within the ``[1.2.x, 1.3.x[`` range).
-    Requesting instead ``MINOR`` level will require that the specified version is greater than the last available
-    version against existing versions of same  ``MAJOR`` part only. Using again the same example values, ``1.3.0``
-    would be valid since its ``MINOR`` part ``3`` is greater than any other ``1.x`` taken versions. On the other hand,
-    version ``1.2.4`` would not be valid as ``x = 2`` is already taken by other versions considering same ``1.x``
-    portion (``PATCH`` part is ignored in this case since ``MINOR`` is requested, and ``2.0.0`` is ignored as not the
-    same ``MAJOR`` portion of ``1`` as the tested version). Finally, requesting a ``MAJOR`` level will require
-    necessarily that the specified version is greater than all other existing versions for update, since ``MAJOR`` is
-    the highest possible semantic part, and higher parts are not available to define an upper version bound.
-
-    .. note::
-        As long as the version level is respected, the actual number of this level and all following ones can be
-        anything as long as they are not taken. For example, ``PATCH`` with existing ``1.2.3`` does not require that
-        the update version be ``1.2.4``. It can be ``1.2.5``, ``1.2.24``, etc. as long as ``1.2.x`` is respected.
-        Similarly, ``MINOR`` update can provide any ``PATCH`` number, since ``1.x`` only must be respected. From
-        existing ``1.2.3``, ``MINOR`` update could specify ``1.4.99`` as valid version. The ``PATCH`` part does not
-        need to start back at ``0``.
-
-    :param version: Version to validate as potential update revision.
-    :param taken_versions: Existing versions that cannot be reused.
-    :param version_level: Minimum level to consider availability of versions as valid revision number for update.
-    :return: Status of availability of the version.
-    """
-
-    def _pad_incr(_parts, _index=None):  # type: (Tuple[int, ...], Optional[int]) -> Tuple[int, ...]
+    def is_update(self, taken_versions, version_level=VersionLevel.PATCH):
+        # type: (Iterable[AnyVersion], VersionLevel) -> bool
         """
-        Pads versions to always have 3 parts in case some were omitted, then increment part index if requested.
+        Determines if this version is an available update at the specified level compared to existing versions.
+
+        If this version corresponds to an older version compared to available ones (i.e.: a taken more recent
+        version also exists), this version will have to fit within the version level range to be considered valid.
+        For example, requesting ``PATCH`` level will require that this version is greater than the last available
+        version against other existing versions with equivalent ``MAJOR.MINOR`` parts. If ``1.2.0`` and ``2.0.0`` were
+        taken versions, and ``1.2.3`` has to be verified as the update version, it will be considered valid since its
+        ``PATCH`` number ``3`` is greater than all other ``1.2.x`` versions
+        (it falls within the ``[1.2.x, 1.3.x[`` range).
+        Requesting instead ``MINOR`` level will require that this version is greater than the last available
+        version against existing versions of same ``MAJOR`` part only. Using again the same example values, ``1.3.0``
+        would be valid since its ``MINOR`` part ``3`` is greater than any other ``1.x`` taken versions.
+        On the other hand, version ``1.2.4`` would not be valid as ``x = 2`` is already taken by other versions
+        considering the same ``1.x`` portion. The ``PATCH`` part is ignored since ``MINOR`` is requested.
+        The ``2.0.0`` revision is ignored because its ``MAJOR`` portion differs from ``1`` of this version.
+        Finally, requesting a ``MAJOR`` level will require
+        necessarily that this version is greater than all other existing versions and increments the ``MAJOR`` part.
+        Since ``MAJOR`` is the highest possible semantic part, higher parts are not available to define an upper bound.
+
+        .. note::
+            As long as the version level is respected, the actual number of this level and all following ones can be
+            anything as long as they are not taken. For example, ``PATCH`` with existing ``1.2.3`` does not require that
+            the update version be ``1.2.4``. It can be ``1.2.5``, ``1.2.24``, etc. as long as ``1.2.x`` is respected.
+            Similarly, ``MINOR`` update can provide any ``PATCH`` number, since ``1.x`` only must be respected. From
+            existing ``1.2.3``, ``MINOR`` update could specify ``1.4.99`` as valid version. The ``PATCH`` part does not
+            need to start back at ``0``.
+
+        Suffix-only changes are also ``PATCH`` revisions. For example, ``1.2.3.dev2`` can update ``1.2.3.dev1``
+        at ``PATCH`` level, but not at ``MINOR`` or ``MAJOR`` level. Full version ordering still applies within
+        the ``MAJOR.MINOR`` branch. Thus ``1.2.3.dev2`` is unavailable if ``1.2.3.dev10`` or ``1.2.3`` already exists.
+
+        :param taken_versions: Existing versions that cannot be reused.
+        :param version_level: Minimum level to consider availability of versions as valid revision number for update.
+        :return: Status of availability of this version.
         """
-        _parts = list(_parts) + [0] * max(0, 3 - len(_parts))
-        if _index is not None:
-            _parts[_index] += 1
-        return tuple(_parts)
-
-    if not taken_versions:
-        return True
-
-    version = as_version_major_minor_patch(version)
-    other_versions = sorted([as_version_major_minor_patch(ver) for ver in taken_versions])
-    ver_min = other_versions[0]
-    for ver in other_versions:  # find versions just above and below specified
-        if ver == version:
-            return False
-        if version < ver:
-            # if next versions are at the same semantic level as requested one,
-            # then not an update version since another higher one is already defined
-            # handle MAJOR separately since it can only be the most recent one
-            if version_level == VersionLevel.MINOR:
-                if _pad_incr(version[:1]) == _pad_incr(ver[:1]):
-                    return False
-            elif version_level == VersionLevel.PATCH:
-                if _pad_incr(version[:2]) == _pad_incr(ver[:2]):
-                    return False
-            break
-        ver_min = ver
-    else:
-        # major update must be necessarily the last version,
-        # so no lower version found to break out of loop
+        if version_level not in VersionLevel.values():
+            raise NotImplementedError(f"Unknown version level: {version_level!s}")
+        versions = [Version(version) for version in taken_versions]
+        if not versions:
+            return True
+        # Handle MAJOR separately since it can only be the most recent version.
+        # No higher semantic part is available to define an upper version bound.
         if version_level == VersionLevel.MAJOR:
-            return _pad_incr(version[:1]) > _pad_incr(other_versions[-1][:1])
-
-    # if found previous version and next version was not already taken
-    # the requested one must be one above previous one at same semantic level,
-    # and must be one below the upper semantic level to be an available version
-    # (eg: if PATCH requested and found min=1.3.4, then max=1.4.0, version can be anything in between)
-    if version_level == VersionLevel.MAJOR:
-        min_version = _pad_incr(ver_min[:1], 0)
-        max_version = (float("inf"), float("inf"), float("inf"))
-    elif version_level == VersionLevel.MINOR:
-        min_version = _pad_incr(ver_min[:2], 1)
-        max_version = _pad_incr(ver_min[:1], 0)
-    elif version_level == VersionLevel.PATCH:
-        min_version = _pad_incr(ver_min[:3], 2)
-        max_version = _pad_incr(ver_min[:2], 1)
-    else:
-        raise NotImplementedError(f"Unknown version level: {version_level!s}")
-    return min_version <= tuple(version) < max_version
+            return self.major > max(version.major for version in versions)
+        # A higher existing version at the same semantic level prevents an update.
+        # Unrelated major branches must not prevent minor or patch updates to older branches.
+        versions = [version for version in versions if version.major == self.major]
+        if version_level == VersionLevel.MINOR:
+            return bool(versions) and self.minor > max(version.minor for version in versions)
+        # The revision must be above the previous one at the same level and below the upper semantic level.
+        # For PATCH from 1.3.4, the upper bound is 1.4.0. An existing major/minor branch is required.
+        versions = [version for version in versions if version.minor == self.minor]
+        return bool(versions) and self > max(versions)
 
 
 def is_uuid(maybe_uuid):

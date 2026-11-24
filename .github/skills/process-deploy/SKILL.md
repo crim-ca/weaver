@@ -25,16 +25,16 @@ Deploy a new process or application package to Weaver using CWL (Common Workflow
 
 ### Required
 
-- **process_id** (string): Unique identifier for the process (lowercase, hyphens allowed)
-- **package** (CWL object or file path): Application package definition
+- `process_id` (string): Unique identifier for the process (lowercase, hyphens allowed)
+- `package` (CWL object or file path): Application package definition
   - Can be CWL YAML/JSON file
   - Can be reference URL to remote process
   - Can be inline CWL document
 
 ### Optional
 
-- **visibility** (string): Process visibility ("public" or "private"), default: "public"
-- **auth** (auth handler): Authentication for protected endpoints
+- `visibility` (string): Process visibility (`public` or `private`), default: `public`
+- `auth` (auth handler): Authentication for protected endpoints
 
 ## CLI Usage
 
@@ -95,14 +95,14 @@ curl -X POST \
 }
 ```
 
-**Note**: Response may include additional fields such as `links`, `keywords`, and extended `process` details. See
-[API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
+**Note**: Response may include additional fields such as `links`, `keywords`, and extended `process` details.
+See [API documentation](https://pavics-weaver.readthedocs.io/en/latest/api.html) for complete response schemas.
 
 ## Error Handling
 
-- **409 Conflict**: Process with this ID already exists
-- **400 Bad Request**: Invalid CWL definition or parameters
-- **401 Unauthorized**: Authentication required
+- `409 Conflict`: Process with this ID already exists
+- `400 Bad Request`: Invalid CWL definition or parameters
+- `401 Unauthorized`: Authentication required
 
 ## Related Skills
 

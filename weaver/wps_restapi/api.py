@@ -26,7 +26,7 @@ from simplejson import JSONDecodeError
 from weaver import __meta__
 from weaver.formats import ContentType, OutputFormat, guess_target_format
 from weaver.owsexceptions import OWSException
-from weaver.utils import get_header, get_registry, get_settings, get_weaver_url
+from weaver.utils import accepts_gzip_encoding, get_header, get_registry, get_settings, get_weaver_url
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import CorniceOpenAPI
@@ -1035,6 +1035,7 @@ def get_openapi_json(
         base_path=swagger_base_path,
         openapi_spec=3,
     )
+    swagger_json["tags"].sort(key=lambda tag: (tag["name"] == sd.TAG_DEPRECATED, tag["name"]))
     swagger_json["externalDocs"] = sd.API_DOCS
     return swagger_json
 
@@ -1063,7 +1064,11 @@ def openapi_json(request):  # noqa: F811
     LOGGER.debug("Request app URL:   [%s]", request.url)
     LOGGER.debug("Weaver config URL: [%s]", weaver_server_url)
     spec = openapi_json_cached(base_url=weaver_server_url, use_docstring_summary=True, container=request)
-    return HTTPOk(json=spec, content_type=ContentType.APP_OAS_JSON)
+    response = HTTPOk(json=spec, content_type=ContentType.APP_OAS_JSON)
+    response.vary = "Accept-Encoding"
+    if accepts_gzip_encoding(request.headers.get("Accept-Encoding", "")):
+        response.encode_content("gzip")
+    return response
 
 
 @cache_region("doc", sd.api_swagger_ui_service.name)

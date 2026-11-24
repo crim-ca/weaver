@@ -27,15 +27,15 @@ List jobs with filtering, pagination, and sorting capabilities.
 
 ### Optional
 
-- **process** (string): Filter by process ID
-- **provider** (string): Filter by provider ID
-- **status** (string): Filter by job status (running, succeeded, failed, etc.)
-- **limit** (integer): Maximum number of results (default: 10)
-- **page** (integer): Page number for pagination (default: 0)
-- **sort** (string): Sort order (e.g., "created:desc")
-- **tags** (list): Filter by job tags
-- **date** (string): Filter by date range
-- **detail** (boolean): Include detailed information
+- `process` (string): Filter by process ID
+- `provider` (string): Filter by provider ID
+- `status` (string): Filter by job status (running, succeeded, failed, etc.)
+- `limit` (integer): Maximum number of results (default: 10)
+- `page` (integer): Page number for pagination (default: 0)
+- `sort` (string): Sort order (e.g., "created:desc")
+- `tags` (list): Filter by job tags
+- `date` (string): Filter by date range
+- `detail` (boolean): Include detailed information
 
 ## CLI Usage
 
@@ -117,11 +117,11 @@ curl -X GET \
 
 ## Job Status Values
 
-- **accepted**: Job received and queued
-- **running**: Job is currently executing
-- **succeeded**: Job completed successfully
-- **failed**: Job failed with errors
-- **dismissed**: Job was cancelled by user
+- `accepted`: Job received and queued
+- `running`: Job is currently executing
+- `succeeded`: Job completed successfully
+- `failed`: Job failed with errors
+- `dismissed`: Job was cancelled by user
 
 ## Filtering Examples
 

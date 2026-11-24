@@ -357,7 +357,7 @@ Installation of `Weaver` from source can be performed instead of using the Docke
 .. note::
 
     For more details, please refer to
-    the `Installation <https://pavics-weaver.readthedocs.io/en/latest/installation.html>`_
+    the `Installation <https://pavics-weaver.readthedocs.io/en/latest/installation.html>`__
     section of the documentation.
 
 ----------------
@@ -374,7 +374,7 @@ Setting the operational mode of `Weaver` (`EMS`/`ADES`/`HYBRID`) is accomplished
 .. note::
 
     For more details, please refer to
-    the `Configuration <https://pavics-weaver.readthedocs.io/en/latest/configuration.html>`_
+    the `Configuration <https://pavics-weaver.readthedocs.io/en/latest/configuration.html>`__
     section of the documentation.
 
 .. _weaver.ini.example: ./config/weaver.ini.example

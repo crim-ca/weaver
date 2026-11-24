@@ -29,7 +29,6 @@ from pyramid.httpexceptions import (
 )
 from pyramid.settings import asbool
 
-from weaver.compat import Version
 from weaver.config import (
     WEAVER_CONFIG_DIR,
     WEAVER_DEFAULT_WPS_PROCESSES_CONFIG,
@@ -57,9 +56,9 @@ from weaver.processes.convert import get_field, normalize_ordered_io, set_field
 from weaver.processes.types import ProcessType
 from weaver.store.base import StoreJobs, StoreProcesses, StoreServices
 from weaver.utils import (
+    Version,
     VersionFormat,
     VersionLevel,
-    as_version_major_minor_patch,
     fully_qualified_name,
     generate_diff,
     get_any_id,
@@ -69,7 +68,6 @@ from weaver.utils import (
     get_settings,
     get_url_without_query,
     is_remote_file,
-    is_update_version,
     load_file,
     parse_content_id,
     request_extra,
@@ -1518,9 +1516,9 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
     # then check that new version is within available range against target process for required update level
     new_version = process.version if process.version else _bump_process_version(process_overwrite.version, update_level)
     taken_versions = store.find_versions(process.id, VersionFormat.STRING)  # string format for output if error
-    if not is_update_version(new_version, taken_versions, update_level):
-        new_version = as_version_major_minor_patch(new_version, VersionFormat.STRING)
-        ref_version = as_version_major_minor_patch(process_overwrite.version, VersionFormat.STRING)
+    if not Version(new_version).is_update(taken_versions, update_level):
+        new_version = Version(new_version).as_format(VersionFormat.STRING)
+        ref_version = Version(process_overwrite.version).as_format(VersionFormat.STRING)
         if new_version in taken_versions:
             http_error = HTTPConflict
             message = "Process version conflicts with already taken revisions."
@@ -1561,9 +1559,9 @@ def _update_deploy_process_version(process, process_overwrite, update_level, con
     # add more version information to already handled error to better report the real conflict of revisions if any
     except (ProcessRegistrationError, HTTPConflict):
         if old_version is not None:
-            old_version = as_version_major_minor_patch(old_version, VersionFormat.STRING)
+            old_version = Version(old_version).as_format(VersionFormat.STRING)
         if new_version is not None:
-            new_version = as_version_major_minor_patch(new_version, VersionFormat.STRING)
+            new_version = Version(new_version).as_format(VersionFormat.STRING)
         raise HTTPConflict(json={
             "type": sd.OGC_API_PROC_PART2_EXC_DUPLICATED_PROCESS_URI,
             "title": "Process definition conflict.",
@@ -1579,7 +1577,7 @@ def _bump_process_version(version, update_level):
     """
     Obtain the relevant version with specified level incremented by one.
     """
-    new_version = list(as_version_major_minor_patch(version, VersionFormat.PARTS))
+    new_version = list(Version(version).as_format(VersionFormat.PARTS))
     if update_level == VersionLevel.PATCH:
         new_version[2] += 1
     elif update_level == VersionLevel.MINOR:
@@ -1674,7 +1672,10 @@ def _apply_process_metadata(process, update_data):  # pylint: disable=R1260,too-
                 if unique and isinstance(value, list):
                     value = list(dict.fromkeys(value))  # not set to preserve order
                 if current != value:
-                    set_field(dest, target, value)
+                    if isinstance(dest, Process) and target == "description":
+                        dest.description = value  # preserve precedence over legacy 'abstract' field
+                    else:
+                        set_field(dest, target, value)
                     any_change = True
         return any_change
 
