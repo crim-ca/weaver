@@ -206,9 +206,9 @@
 .. |PROV-JSON| replace:: PROV-JSON
 .. _PROV-JSON: https://www.w3.org/submissions/prov-json/
 .. |PROV-OGC-JSON| replace:: PROV-OGC-JSON
-.. _PROV-OGC-JSON: https://ogcincubator.github.io/bblock-prov-schema/
+.. _PROV-OGC-JSON: https://ogcincubator.github.io/bblock-prov-schema/bblock/ogc.ogc-utils.prov
 .. |PROV-OGC-JSON-ACTIVITY| replace:: PROV-OGC-JSON-ACTIVITY
-.. _PROV-OGC-JSON-ACTIVITY: https://ogcincubator.github.io/bblock-prov-schema/
+.. _PROV-OGC-JSON-ACTIVITY: https://ogcincubator.github.io/bblock-prov-schema/bblock/ogc.ogc-utils.prov-activity
 .. |PROV-JSONLD| replace:: PROV-JSONLD
 .. _PROV-JSONLD: https://www.w3.org/submissions/prov-jsonld/
 .. |PROV-N| replace:: PROV-N

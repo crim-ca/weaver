@@ -3242,7 +3242,8 @@ Following is a table of available formats and corresponding endpoints offered by
       - Description
     * - ``/jobs/{jobID}/prov``
       - |PROV-JSON|_
-      - ``application/json`` or ``application/provenance+json``
+      - ``application/provenance+json`` or ``application/json`` using profile
+        ``https://www.w3.org/submissions/prov-json/``.
       - :term:`Provenance` metadata using :term:`JSON` representation.
     * - ``/jobs/{jobID}/prov``
       - |PROV-JSON|_ as :term:`YAML`
