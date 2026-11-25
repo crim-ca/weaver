@@ -12,6 +12,7 @@ Changes
 
 Changes:
 --------
+- Use ``gunicorn[fast]`` to leverage the faster HTTP C parser instead of Python native implementation.
 - Add support for multiple `Process` description parts in multipart deployment, allowing the main `Workflow` and each
   sub-`CWL` to define their own description. Descriptions are linked to their `CWL` part by matching ``id`` fields
   (or ``Content-ID``/``Content-Location`` references), and a description without ``id`` applies to the main `Workflow`.
