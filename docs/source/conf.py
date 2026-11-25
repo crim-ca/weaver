@@ -477,6 +477,8 @@ linkcheck_ignore = [
     # ignore stackoverflow redirects causing failures
     # https://github.com/orgs/sphinx-doc/discussions/12032
     r"https://stackoverflow\.com/.*",
+    # GitHub Pages hosted SPAs which return 404 for everything (https://github.com/orgs/community/discussions/64096)
+    r"https://ogcincubator.github.io/.*/.+",
 ]
 linkcheck_anchors_ignore = [
     "xml-object",  # https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md
