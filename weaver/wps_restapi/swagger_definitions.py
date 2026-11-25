@@ -281,6 +281,9 @@ OGC_API_PROC_PROFILE_RESULTS_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-results
 OGC_API_PROC_PROFILE_JOB_DESC_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/job-description"
 OGC_API_PROC_PROFILE_JOB_LIST_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/jobs-list"
 OGC_API_PROC_PROFILE_OGC_VALUES_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-values"
+# WIP: profile URI not yet defined by the OGC Standard, it must be integrated on that side to become official
+#   https://github.com/opengeospatial/ogcapi-processes/issues/616
+OGC_API_PROC_PROFILE_DEPLOY_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-deploy-process"
 
 # Following are legacy definitions from OGC Testebeds and EO Apps Best Practices.
 # Therefore, leave them in 'http' for any operation relying on them explicitly (no auto https/versionless handling).
@@ -614,10 +617,22 @@ class Tag(ExtendedSchemaNode):
     schema_type = String
     description = "Identifier with optional tagged version forming a unique reference."
     # ranges used to remove starting/ending ^$ characters
+    # Allow prerelease and development suffixes in tagged process references.
     pattern = re.compile(
         rf"{SLUG.pattern.pattern[:-1]}"
-        rf"(:{SemanticVersion(v_prefix=False, rc_suffix=False).pattern[1:-1]})?$"
+        rf"(:{SemanticVersion(v_prefix=False, rc_suffix=True).pattern[1:-1]})?$"
     )
+
+    @classmethod
+    def pattern_for(cls, process_id):
+        # type: (str) -> str
+        """
+        Obtains the process tag pattern for a specific process identifier.
+        """
+        slug_pattern = SLUG.pattern.pattern[:-1]
+        if not cls.pattern.pattern.startswith(slug_pattern):
+            raise RuntimeError("Tag pattern must start with the generic process identifier pattern.")
+        return f"^{re.escape(process_id)}{cls.pattern.pattern[len(slug_pattern):]}"
 
 
 class URL(ExtendedSchemaNode):
@@ -7722,6 +7737,12 @@ class DeployBodyCWL(Deploy):
 
 
 class DeployBodyMultipart(Deploy):
+    description = (
+        "Multipart deployment of related CWL parts, each optionally accompanied by a Process description part "
+        "(JSON or YAML). Parts can be annotated with 'Content-Profile' headers of either "
+        f"[{OGC_API_PROC_PROFILE_PROC_DESC_URI}] for a Process description, or "
+        f"[{OGC_API_PROC_PROFILE_DEPLOY_URI}] for a combined 'processDescription' and 'executionUnit' (WIP)."
+    )
     examples = {
         "DeployMultipartCWL": {
             "summary": "Deploy a workflow process from multipart CWL definition.",

@@ -38,7 +38,6 @@ from webtest import TestApp, TestResponse
 
 from weaver import __name__ as __package__
 from weaver.app import main as weaver_app
-from weaver.compat import Version
 from weaver.config import WEAVER_DEFAULT_INI_CONFIG, WeaverConfiguration, get_weaver_config_file
 from weaver.database import get_db
 from weaver.datatype import Service
@@ -46,6 +45,7 @@ from weaver.formats import ContentType
 from weaver.store.mongodb import MongodbJobStore, MongodbProcessStore, MongodbServiceStore
 from weaver.utils import (
     AWS_S3_REGIONS,
+    Version,
     bytes2str,
     fetch_file,
     generate_diff,

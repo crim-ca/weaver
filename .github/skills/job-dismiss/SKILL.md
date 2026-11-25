@@ -26,7 +26,7 @@ Cancel a running or pending job and mark it as dismissed.
 
 ### Required
 
-- **job_id** (string): Job identifier to cancel
+- `job_id` (string): Job identifier to cancel
 
 ## CLI Usage
 
@@ -85,9 +85,9 @@ curl -X DELETE \
 
 ## Error Handling
 
-- **404 Not Found**: Job does not exist
-- **403 Forbidden**: Insufficient permissions
-- **410 Gone**: Job already dismissed
+- `404 Not Found`: Job does not exist
+- `403 Forbidden`: Insufficient permissions
+- `410 Gone`: Job already dismissed
 
 ## Related Skills
 

@@ -12,6 +12,36 @@ Changes
 
 Changes:
 --------
+- Add support for multiple `Process` description parts in multipart deployment, allowing the main `Workflow` and each
+  sub-`CWL` to define their own description. Descriptions are linked to their `CWL` part by matching ``id`` fields
+  (or ``Content-ID``/``Content-Location`` references), and a description without ``id`` applies to the main `Workflow`.
+- Add support for deploying a ``processDescription`` and ``executionUnit`` pair as a single `JSON` or `YAML` multipart
+  part using ``Content-Profile: https://www.opengis.net/def/profile/OGC/0/ogc-deploy-process``, equivalent to a distinct
+  `CWL` part and `Process` description part of matching ``id``
+  (relates to `opengeospatial/ogcapi-processes#616 <https://github.com/opengeospatial/ogcapi-processes/issues/616>`_,
+  resolves `#977 <https://github.com/crim-ca/weaver/issues/977>`_,
+  resolves `#990 <https://github.com/crim-ca/weaver/issues/990>`_).
+- Update from Node 24 to Node 26 in `base.dockerfile`.
+- Expand usage documentation with service discovery, configuration and caching, bounding-box and multiple-input
+  examples, workflow chaining, and quotation and billing operations 
+  (resolves `#61 <https://github.com/crim-ca/weaver/issues/61>`_).
+- Implement the `CLI` ``replace`` operation to update an existing `Process` definition
+  (resolves `#906 <https://github.com/crim-ca/weaver/issues/906>`_).
+- Add ``--output-id`` option (multiple allowed) to `CLI` ``execute`` and ``update_job`` operations to
+  provide the inverse option from ``--output-filter``, which can be easier when the set of desired outputs is smaller.
+  This also aligns with the "*output selection*" approach defined by `OGC API - Processes`.
+- Add ``--output-id`` option (multiple allowed) to `CLI` ``results`` operation to perform post-execution filtering
+  of `Job` results. This can be used with servers that do not directly support outputs selection at execution time,
+  or simply to retrieve partial results of an existing `Job`. This option also allows the selection of output array
+  elements by index using ``{outputID}/{N}`` and can be combined with ``--download`` to obtain only those results.
+- Replace the ``Redoc`` viewer in generated API documentation with ``Swagger UI``, include all supported endpoints in
+  the generated OpenAPI specification, and add links to endpoint groups (resolves
+  `#732 <https://github.com/crim-ca/weaver/issues/732>`_).
+- Improve generation of ``/api`` Swagger UI response to include endpoint-group shortcuts.
+- Add ``gzip`` compression of OpenAPI ``/json`` response used by Swagger UI to reduce response size.
+- Reduce duplicate conversion work from `colander` schema during OpenAPI generation to speed up responses.
+- Consolidate version normalization and prerelease update validation in ``weaver.utils.Version``
+  (relates to `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 - Allow Sphinx 9 for documentation builds with ``sphinx_autodoc_typehints>=3.6.1``.
 - Add ``PROV-OGC-JSON`` and ``PROV-OGC-JSON-ACTIVITY`` formats, selectable using the ``format`` / ``f`` parameter or the
   ``Accept-Profile`` header, and returning OGC Provenance Chain and Activity JSON (resolves `#1017
@@ -19,9 +49,17 @@ Changes:
 
 Fixes:
 ------
+- Fix process version links and version-history listings for semantic versions with suffixes such as ``0.1.3.dev10``.
+  Correct ``latest-version``, ``version-history``, ``predecessor-version``, ``successor-version`` and ``working-copy``
+  links. Add ``current`` and ``working-copy-of`` links and make ``self`` and ``alternate`` links representation-aware
+  (resolves `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 - Fix HTML job listing tables overflowing the available page width when zoomed
   (`#1121 <https://github.com/crim-ca/weaver/issues/1121>`_).
 - Correct `Swagger-UI` to show the correct profiles for the provenance endpoint.
+- Fix ``PATCH /processes/{id}`` not applying an updated ``description`` when the `Process` already defined
+  the legacy ``abstract`` field, since the latter took precedence when reporting the description.
+- Fix ``Installation`` and ``Configuration`` links of the ``README.rst`` header resolving to external URLs
+  instead of their sections, caused by conflicting inline named hyperlink targets.
 
 .. _changes_6.18.0:
 
