@@ -5,6 +5,7 @@ downloads
 ## Environment
 env
 venv
+.venv/
 
 ## Conda
 environment.yml
@@ -20,6 +21,7 @@ node_modules
 celeryconfig*
 celery-config*
 celerybeat-schedule.*
+celerybeat-schedule
 
 ## Python / Extensions etc.
 *~
@@ -109,5 +111,3 @@ archive
 
 ## old project sources
 [Bb]in
-.venv/
-celerybeat-schedule
