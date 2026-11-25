@@ -69,9 +69,6 @@ kombu>=5.7.0,<6
 lark==1.2.2
 lxml
 mako
-# force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
-# employed by cwltool -> schema-salad -> mistune
-#mistune>=2.0.3,<2.1
 # multiformats for digestMultibase (W3C VC Data Integrity)
 # provides multibase and multihash encoding for resource integrity verification
 multiformats>=0.3.1.post4
@@ -122,8 +119,6 @@ requests_file
 # FIXME: https://github.com/requests/toolbelt/pull/380
 requests_toolbelt @ git+https://github.com/crim-ca/requests-toolbelt.git@patch-multipart
 ruamel.yaml>=0.19.1
-# force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
-# employed by cwltool -> schema-salad -> mistune
 schema-salad>=8.10.20261106141337,<9
 shapely
 simplejson
