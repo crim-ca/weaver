@@ -130,7 +130,7 @@ request toward the service.
     - |requests-magpie-auth|_
 
 .. |requests-magpie-auth| replace:: ``requests_magpie.MagpieAuth``
-.. _requests-magpie-auth: https://github.com/Ouranosinc/requests-magpie/blob/master/requests_magpie.py
+.. _requests-magpie-auth: https://github.com/Ouranosinc/requests-magpie/blob/main/requests_magpie.py
 
 When using the :ref:`cli_commands`, the specific :py:class:`weaver.cli.AuthHandler` implementation to employ
 must be provided using the ``--auth-handler``/``--auth-class`` (``-aC``) argument. This can be an importable (installed)
