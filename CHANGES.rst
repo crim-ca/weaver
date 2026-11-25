@@ -43,6 +43,9 @@ Changes:
 - Consolidate version normalization and prerelease update validation in ``weaver.utils.Version``
   (relates to `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 - Allow Sphinx 9 for documentation builds with ``sphinx_autodoc_typehints>=3.6.1``.
+- Add ``PROV-OGC-JSON`` and ``PROV-OGC-JSON-ACTIVITY`` formats, selectable using the ``format`` / ``f`` parameter or the
+  ``Accept-Profile`` header, and returning OGC Provenance Chain and Activity JSON (resolves `#1017
+  <https://github.com/crim-ca/weaver/issues/1017>`_).
 
 Fixes:
 ------
@@ -52,6 +55,7 @@ Fixes:
   (resolves `#1122 <https://github.com/crim-ca/weaver/issues/1122>`_).
 - Fix HTML job listing tables overflowing the available page width when zoomed
   (`#1121 <https://github.com/crim-ca/weaver/issues/1121>`_).
+- Correct `Swagger-UI` to show the correct profiles for the provenance endpoint.
 - Fix ``PATCH /processes/{id}`` not applying an updated ``description`` when the `Process` already defined
   the legacy ``abstract`` field, since the latter took precedence when reporting the description.
 - Fix ``Installation`` and ``Configuration`` links of the ``README.rst`` header resolving to external URLs

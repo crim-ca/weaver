@@ -105,7 +105,11 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({}, {"Accept": ContentType.APP_JSON}),
         ({}, {"Accept": ContentType.APP_PROV_JSON}),
         ({}, {"Accept": f"{ContentType.APP_PROV_JSON}; charset=utf-8"}),
-        ({}, {"Accept": f"{ContentType.APP_JSON}; profile=https://www.w3.org/ns/prov"}),
+        ({},
+         {"Accept":
+          f"{ContentType.APP_JSON}; "
+          f"profile={ProvenanceFormat.as_profile(ProvenanceFormat.PROV_JSON)}"}
+         ),
     ])
     def test_job_prov_json(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -148,12 +152,109 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert ended_id is not None
 
     @parameterized.expand([
+        ({"f": ProvenanceFormat.PROV_OGC_JSON_ACTIVITY}, {}),
+        ({"f": "ogc-json-activity"}, {}),
+        ({"profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON_ACTIVITY)},
+         {}),
+        ({}, {"Accept": f"{ContentType.APP_JSON}; "
+              f"profile={ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON_ACTIVITY)}"}),
+        ({}, {"Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON_ACTIVITY)}),
+    ])
+    def test_job_prov_ogc_json_object(self, queries, headers):
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        # Make sure it is application/json and not application/provenance+json
+        assert resp.content_type == ContentType.APP_JSON
+        prov = resp.json
+        # Make sure it is an activity
+        assert isinstance(prov, dict)
+        assert "id" in prov
+        assert prov["id"] == f"urn:uuid:{self.job_id}"
+        assert "provType" in prov
+        assert prov["provType"] == "Activity"
+        # It should use activityType for extra types
+        assert "activityType" in prov
+        assert isinstance(prov["activityType"], list)
+        # It should use startedAtTime, not startTime
+        assert "startTime" not in prov
+        assert "startedAtTime" in prov
+        # It should be nested
+        assert "wasAssociatedWith" in prov
+        assert (isinstance(prov["wasAssociatedWith"], dict)
+                or isinstance(prov["wasAssociatedWith"], list)
+                and any(isinstance(obj, dict) for obj in prov["wasAssociatedWith"]))
+        # It should contain reverse relations for otherwise unreachable objects
+        assert "generated" in prov
+        assert any(isinstance(obj, dict) for obj in prov["generated"])
+
+    @parameterized.expand([
+        ({"f": ProvenanceFormat.PROV_OGC_JSON}, {}),
+        ({"f": "ogc-json"}, {}),
+        ({"profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON)},
+         {}),
+        ({}, {"Accept": f"{ContentType.APP_JSON}; "
+              f"profile={ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON)}"}),
+        ({}, {"Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON)}),
+    ])
+    def test_job_prov_ogc_json_list(self, queries, headers):
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        # Make sure it is application/json and not application/provenance+json
+        assert resp.content_type == ContentType.APP_JSON
+        prov = resp.json
+        # Make sure it contains activities, entities and agents
+        assert isinstance(prov, list)
+        assert all("id" in obj for obj in prov)
+        assert all("provType" in obj for obj in prov)
+        assert all("activityType" in obj
+                   for obj in prov
+                   if obj["provType"] == "Activity")
+        # It should use startedAtTime, not startTime
+        assert all("startTime" not in obj for obj in prov)
+        assert any("startedAtTime" in obj for obj in prov)
+        # It should not be nested
+        for obj in prov:
+            assoc = obj.get("wasAssociatedWith")
+            if assoc is None:
+                continue
+            assert isinstance(assoc, (str, list))
+            if isinstance(assoc, list):
+                assert all(isinstance(ref, str) for ref in assoc)
+        # It should not contain reverse relations
+        assert all("generated" not in obj for obj in prov)
+
+    @parameterized.expand([
+        ({},
+         {"Accept": ContentType.APP_YAML,
+          "Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON)}),
+        ({},
+         {"Accept": ContentType.APP_YAML,
+          "Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON_ACTIVITY)}),
+    ])
+    def test_job_prov_ogc_yaml(self, queries, headers):
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        # Ensure that we declare the result as YAML
+        assert resp.content_type == ContentType.APP_YAML
+        prov = resp.text
+        # Ensure that we get actual YAML
+        assert "id:" in prov
+
+    @parameterized.expand([
         ({"f": "ld+json"}, {}),
         ({"f": "ld%2Bjson"}, {}),
         ({"f": "jsonld"}, {}),
         ({"f": ProvenanceFormat.PROV_JSONLD}, {}),
         ({}, {"Accept": ContentType.APP_JSONLD}),
-        ({}, {"Accept": f"{ContentType.APP_JSONLD}; profile=https://www.w3.org/TR/prov-jsonld/"}),
+        ({}, {"Accept": f"{ContentType.APP_JSONLD}; "
+              f"profile={ProvenanceFormat.as_profile(ProvenanceFormat.PROV_JSONLD)}"}),
+        ({}, {"Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_JSONLD)}),
     ])
     def test_job_prov_json_ld(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -248,6 +349,8 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({"f": "turtle"}, {}),
         ({"f": ProvenanceFormat.PROV_TURTLE}, {}),
         ({}, {"Accept": ContentType.TEXT_TURTLE}),
+        ({}, {"Accept": ContentType.TEXT_TURTLE,
+              "Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_TURTLE)}),
     ])
     def test_job_prov_ttl(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -265,6 +368,8 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({"f": "nt"}, {}),
         ({"f": ProvenanceFormat.PROV_NT}, {}),
         ({}, {"Accept": ContentType.APP_NT}),
+        ({}, {"Accept": ContentType.APP_NT,
+              "Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_NT)}),
     ])
     def test_job_prov_nt(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -313,6 +418,69 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert "type" in resp.json, "Error response must include 'type' field"
         assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI
         assert "detail" in resp.json
+
+    @parameterized.expand([
+        ({}, {"Accept-Profile": "http://example.org/unknown"}),
+        ({}, {"Accept": ContentType.APP_JSON,
+              "Accept-Profile": "http://example.org/unknown"}),
+    ])
+    def test_job_prov_unsupported_profile(self, queries, headers):
+        """
+        Test unsupported profile returns 406 Not Acceptable with proper error type.
+        """
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers, expect_errors=True)
+        assert resp.status_code == 406, f"Expected 406, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        assert "type" in resp.json, "Error response must include 'type' field"
+        assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI
+        assert "detail" in resp.json
+
+    @parameterized.expand([
+        # PROV_NT and PROV_TURTLE share the same profile, so a media type is needed
+        ({}, {"Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_NT)}),
+    ])
+    def test_job_prov_ambiguous_profile(self, queries, headers):
+        """
+        Test ambiguous profile returns 406 Not Acceptable with proper error type.
+        """
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers, expect_errors=True)
+        assert resp.status_code == 406, f"Expected 406, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        assert "type" in resp.json, "Error response must include 'type' field"
+        assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI
+        assert "detail" in resp.json
+
+    @parameterized.expand([
+        (ContentType.APP_JSON, ProvenanceFormat.as_profile(ProvenanceFormat.PROV_XML)),
+        (ContentType.APP_JSON, ProvenanceFormat.as_profile(ProvenanceFormat.PROV_N)),
+    ])
+    def test_job_prov_incompatible_media_type_profile(self, content_type, profile):
+        prov_url = f"{self.job_url}/prov"
+        headers = {"Accept": f"{content_type}; profile={profile}"}
+        resp = self.app.get(prov_url, headers=headers, expect_errors=True)
+        assert resp.status_code == 406, f"Expected 406, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI
+        assert "detail" in resp.json
+
+    @parameterized.expand([
+        ({"f": ProvenanceFormat.PROV_XML}, ContentType.APP_PROV_XML),
+        ({"f": ProvenanceFormat.PROV_JSON}, ContentType.APP_PROV_JSON),
+    ])
+    def test_job_prov_format_query_precedence_over_profile(self, queries, expected_content_type):
+        """
+        Test that an explicit ``f`` query takes precedence over any ``Accept-Profile``, even unknown ones.
+        """
+        prov_url = f"{self.job_url}/prov"
+        for profile in [
+            ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON),
+            "http://example.org/unknown",
+        ]:
+            resp = self.app.get(prov_url, params=queries, headers={"Accept-Profile": profile})
+            assert resp.status_code == 200
+            assert resp.content_type == expected_content_type
 
     @parameterized.expand([
         ({}, {}),
