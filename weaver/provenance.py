@@ -182,14 +182,12 @@ class ProvenanceFormat(Constants):
     @classmethod
     def from_profile(cls, profile, content_type=None):
         # type: (str, Optional[AnyContentType]) -> Optional["ProvenanceFormat"]
-        """
-        Resolve a profile to a :class:`ProvenanceFormat`.
+        """Resolve a profile to a :class:`ProvenanceFormat`.
 
-        Because some profiles are shared by multiple formats, the
-        requested :term:`Media-Type` can be used to disambiguate them.
+        Because some profiles are shared by multiple formats, the requested :term:`Media-Type` can be used to
+        disambiguate them.
 
-        :param content_type: Optional content type to disambiguate
-        provenance formats that share the same profile.
+        :param content_type: Optional content type to disambiguate provenance formats that share the same profile.
         """
         if content_type:
             for prov_format, prov_profile in cls._profiles.items():

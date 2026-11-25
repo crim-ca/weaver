@@ -105,7 +105,11 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({}, {"Accept": ContentType.APP_JSON}),
         ({}, {"Accept": ContentType.APP_PROV_JSON}),
         ({}, {"Accept": f"{ContentType.APP_PROV_JSON}; charset=utf-8"}),
-        ({}, {"Accept": f"{ContentType.APP_JSON}; profile=https://www.w3.org/submissions/prov-json/"}),
+        ({},
+         {"Accept":
+          f"{ContentType.APP_JSON}; "
+          f"profile={ProvenanceFormat.as_profile(ProvenanceFormat.PROV_JSON)}"}
+         ),
     ])
     def test_job_prov_json(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -150,13 +154,11 @@ class TestJobProvenance(TestJobProvenanceBase):
     @parameterized.expand([
         ({"f": ProvenanceFormat.PROV_OGC_JSON_ACTIVITY}, {}),
         ({"f": "ogc-json-activity"}, {}),
-        ({"profile": "https://ogcincubator.github.io"
-          "/bblock-prov-schema/build/annotated/ogc-utils/prov-activity/schema.json"}, {}),
+        ({"profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON_ACTIVITY)},
+         {}),
         ({}, {"Accept": f"{ContentType.APP_JSON}; "
-              "profile=https://ogcincubator.github.io"
-              "/bblock-prov-schema/build/annotated/ogc-utils/prov-activity/schema.json"}),
-        ({}, {"Accept-Profile": "https://ogcincubator.github.io"
-              "/bblock-prov-schema/build/annotated/ogc-utils/prov-activity/schema.json"}),
+              f"profile={ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON_ACTIVITY)}"}),
+        ({}, {"Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON_ACTIVITY)}),
     ])
     def test_job_prov_ogc_json_object(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -190,11 +192,11 @@ class TestJobProvenance(TestJobProvenanceBase):
     @parameterized.expand([
         ({"f": ProvenanceFormat.PROV_OGC_JSON}, {}),
         ({"f": "ogc-json"}, {}),
+        ({"profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON)},
+         {}),
         ({}, {"Accept": f"{ContentType.APP_JSON}; "
-              "profile=https://ogcincubator.github.io"
-              "/bblock-prov-schema/build/annotated/ogc-utils/prov/schema.json"}),
-        ({}, {"Accept-Profile": "https://ogcincubator.github.io"
-              "/bblock-prov-schema/build/annotated/ogc-utils/prov/schema.json"}),
+              f"profile={ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON)}"}),
+        ({}, {"Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON)}),
     ])
     def test_job_prov_ogc_json_list(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -228,12 +230,10 @@ class TestJobProvenance(TestJobProvenanceBase):
     @parameterized.expand([
         ({},
          {"Accept": ContentType.APP_YAML,
-          "Accept-Profile": "https://ogcincubator.github.io"
-          "/bblock-prov-schema/build/annotated/ogc-utils/prov/schema.json"}),
+          "Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON)}),
         ({},
          {"Accept": ContentType.APP_YAML,
-          "Accept-Profile": "https://ogcincubator.github.io"
-          "/bblock-prov-schema/build/annotated/ogc-utils/prov-activity/schema.json"}),
+          "Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON_ACTIVITY)}),
     ])
     def test_job_prov_ogc_yaml(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -252,8 +252,9 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({"f": "jsonld"}, {}),
         ({"f": ProvenanceFormat.PROV_JSONLD}, {}),
         ({}, {"Accept": ContentType.APP_JSONLD}),
-        ({}, {"Accept": f"{ContentType.APP_JSONLD}; profile=https://www.w3.org/submissions/prov-jsonld/"}),
-        ({}, {"Accept-Profile": "https://www.w3.org/submissions/prov-jsonld/"}),
+        ({}, {"Accept": f"{ContentType.APP_JSONLD}; "
+              f"profile={ProvenanceFormat.as_profile(ProvenanceFormat.PROV_JSONLD)}"}),
+        ({}, {"Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_JSONLD)}),
     ])
     def test_job_prov_json_ld(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -349,7 +350,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({"f": ProvenanceFormat.PROV_TURTLE}, {}),
         ({}, {"Accept": ContentType.TEXT_TURTLE}),
         ({}, {"Accept": ContentType.TEXT_TURTLE,
-              "Accept-Profile": "https://www.w3.org/TR/prov-o/"}),
+              "Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_TURTLE)}),
     ])
     def test_job_prov_ttl(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -368,7 +369,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({"f": ProvenanceFormat.PROV_NT}, {}),
         ({}, {"Accept": ContentType.APP_NT}),
         ({}, {"Accept": ContentType.APP_NT,
-              "Accept-Profile": "https://www.w3.org/TR/prov-o/"}),
+              "Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_NT)}),
     ])
     def test_job_prov_nt(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -436,8 +437,24 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert "detail" in resp.json
 
     @parameterized.expand([
-        (ContentType.APP_JSON, "https://www.w3.org/TR/prov-xml/"),
-        (ContentType.APP_JSON, "https://www.w3.org/TR/prov-n/"),
+        # PROV_NT and PROV_TURTLE share the same profile, so a media type is needed
+        ({}, {"Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_NT)}),
+    ])
+    def test_job_prov_ambiguous_profile(self, queries, headers):
+        """
+        Test ambiguous profile returns 406 Not Acceptable with proper error type.
+        """
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers, expect_errors=True)
+        assert resp.status_code == 406, f"Expected 406, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        assert "type" in resp.json, "Error response must include 'type' field"
+        assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI
+        assert "detail" in resp.json
+
+    @parameterized.expand([
+        (ContentType.APP_JSON, ProvenanceFormat.as_profile(ProvenanceFormat.PROV_XML)),
+        (ContentType.APP_JSON, ProvenanceFormat.as_profile(ProvenanceFormat.PROV_N)),
     ])
     def test_job_prov_incompatible_media_type_profile(self, content_type, profile):
         prov_url = f"{self.job_url}/prov"
@@ -458,7 +475,7 @@ class TestJobProvenance(TestJobProvenanceBase):
         """
         prov_url = f"{self.job_url}/prov"
         for profile in [
-            "https://ogcincubator.github.io/bblock-prov-schema/build/annotated/ogc-utils/prov/schema.json",
+            ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON),
             "http://example.org/unknown",
         ]:
             resp = self.app.get(prov_url, params=queries, headers={"Accept-Profile": profile})
