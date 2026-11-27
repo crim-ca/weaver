@@ -2,12 +2,15 @@
 Stores to read/write data to from/to `MongoDB` using pymongo.
 """
 import copy
+import datetime
 import logging
 import re
 import uuid
 from typing import TYPE_CHECKING, cast
 
 import pymongo
+from pygeofilter import ast
+from pygeofilter.values import Interval
 from pymongo.collation import Collation
 from pymongo.collection import ReturnDocument
 from pymongo.errors import DuplicateKeyError
@@ -44,7 +47,6 @@ from weaver.processes.types import ProcessType
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
-from weaver.store.filters import FIELD_ARRAY, FIELD_DATETIME, FIELD_SCALAR, FilterTranslator
 from weaver.utils import (
     Version,
     VersionFormat,
@@ -64,7 +66,6 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    import datetime
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
     from typing_extensions import TypedDict
 
@@ -91,6 +92,8 @@ if TYPE_CHECKING:
         MetadataQueryScope
     )
     from weaver.visibility import AnyVisibility
+
+    FilterFields = Dict[str, Tuple[Any, str]]
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
     MongodbAggregateValue = Union[
@@ -130,6 +133,10 @@ if TYPE_CHECKING:
     MongodbAggregateStep = Union[MongodbValue, MongodbAggregateExpression]
     MongodbAggregatePipeline = List[Dict[str, Union[str, Dict[str, MongodbAggregateStep]]]]
 
+FIELD_SCALAR = "scalar"
+FIELD_ARRAY = "array"
+FIELD_DATETIME = "datetime"
+
 _LICENSE_LINKS = {"$concatArrays": [{"$ifNull": ["$metadata", []]}, {"$ifNull": ["$additional_links", []]}]}
 _LICENSE_HREFS = {"$map": {
     "input": {"$filter": {
@@ -160,6 +167,182 @@ JOB_FILTER_FIELDS = {
 }
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _invalid_filter(description, value=None):
+    # type: (str, Optional[Any]) -> ListingInvalidParameter
+    return ListingInvalidParameter(json={
+        "description": description,
+        "cause": "filter",
+        "value": str(value),
+    })
+
+
+def _filter_datetime(value):
+    # type: (Any) -> datetime.datetime
+    if isinstance(value, datetime.datetime):
+        return value if value.tzinfo else value.replace(tzinfo=datetime.timezone.utc)
+    if isinstance(value, datetime.date):
+        return datetime.datetime(value.year, value.month, value.day, tzinfo=datetime.timezone.utc)
+    raise _invalid_filter("Filter value is not a valid datetime.", value)
+
+
+def _filter_like_regex(node):
+    # type: (ast.Like) -> str
+    regex = ""
+    chars = iter(node.pattern)
+    for char in chars:
+        if char == node.escapechar:
+            regex += re.escape(next(chars, ""))
+        elif char == node.wildcard:
+            regex += ".*"
+        elif char == node.singlechar:
+            regex += "."
+        else:
+            regex += re.escape(char)
+    return f"^{regex}$"
+
+
+class MongoFilterTranslator(object):
+    """
+    Translates parsed `CQL2` expressions into `MongoDB` aggregation expressions.
+    """
+
+    _COMPARISONS = {
+        ast.Equal: "$eq",
+        ast.NotEqual: "$ne",
+        ast.LessThan: "$lt",
+        ast.LessEqual: "$lte",
+        ast.GreaterThan: "$gt",
+        ast.GreaterEqual: "$gte",
+    }
+
+    def __init__(self, fields, resolvers=None):
+        # type: (FilterFields, Optional[Dict[str, Callable[[Any], List[Any]]]]) -> None
+        """
+        Initializes the MongoDB filter translator.
+
+        :param fields: Mapping of queryable names to MongoDB expressions and value kinds.
+        :param resolvers: Mapping of queryable names to functions expanding equivalent values.
+        """
+        self.fields = fields
+        self.resolvers = resolvers or {}
+
+    def translate(self, node):
+        # type: (AstType) -> JSON
+        """
+        Translates a `pygeofilter` AST node into a `MongoDB` aggregation expression.
+
+        :raises ListingInvalidParameter: If the expression refers to unsupported properties or operators.
+        """
+        if isinstance(node, ast.And):
+            return {"$and": [self.translate(node.lhs), self.translate(node.rhs)]}
+        if isinstance(node, ast.Or):
+            return {"$or": [self.translate(node.lhs), self.translate(node.rhs)]}
+        if isinstance(node, ast.Not):
+            return {"$not": [self.translate(node.sub_node)]}
+        if isinstance(node, ast.Include):
+            return {"$literal": True}
+        if isinstance(node, tuple(self._COMPARISONS)):
+            return self._compare(node)
+        if isinstance(node, ast.Between):
+            expr, kind = self._field(node.lhs)
+            result = {"$and": [
+                {"$gte": [expr, self._value(node.low, kind)]},
+                {"$lte": [expr, self._value(node.high, kind)]},
+            ]}
+            return {"$not": [result]} if node.not_ else result
+        if isinstance(node, ast.Like):
+            expr, _ = self._field(node.lhs)
+            result = {"$regexMatch": {
+                "input": {"$ifNull": [expr, ""]},
+                "regex": _filter_like_regex(node),
+                "options": "i" if node.nocase else "",
+            }}
+            return {"$not": [result]} if node.not_ else result
+        if isinstance(node, ast.In):
+            return self._contain(node)
+        if isinstance(node, ast.IsNull):
+            expr, _ = self._field(node.lhs)
+            result = {"$eq": [{"$ifNull": [expr, None]}, None]}
+            return {"$not": [result]} if node.not_ else result
+        if isinstance(node, ast.TemporalPredicate):
+            return self._temporal(node)
+        raise _invalid_filter("Unsupported filter operation.", type(node).__name__)
+
+    def _field(self, node):
+        # type: (AstType) -> Tuple[Any, str]
+        if not isinstance(node, ast.Attribute) or node.name not in self.fields:
+            raise _invalid_filter("Unsupported filter property.", getattr(node, "name", node))
+        return self.fields[node.name]
+
+    def _values(self, name, value):
+        # type: (str, Any) -> List[Any]
+        resolver = self.resolvers.get(name)
+        return resolver(value) if resolver else [value]
+
+    @staticmethod
+    def _value(value, kind):
+        # type: (Any, str) -> Any
+        if isinstance(value, ast.Node):
+            raise _invalid_filter("Filter comparison between properties is not supported.", value)
+        if kind == FIELD_DATETIME:
+            return _filter_datetime(value)
+        return value
+
+    def _compare(self, node):
+        # type: (ast.Comparison) -> JSON
+        name = getattr(node.lhs, "name", None)
+        expr, kind = self._field(node.lhs)
+        operator = self._COMPARISONS[type(node)]
+        if kind == FIELD_ARRAY:
+            if operator not in ["$eq", "$ne"]:
+                raise _invalid_filter("Unsupported filter operation for array property.", name)
+            result = {"$in": [self._value(node.rhs, kind), {"$ifNull": [expr, []]}]}
+            return result if operator == "$eq" else {"$not": [result]}
+        values = self._values(name, node.rhs)
+        if len(values) > 1 and operator in ["$eq", "$ne"]:
+            result = {"$in": [expr, values]}
+            return result if operator == "$eq" else {"$not": [result]}
+        return {operator: [expr, self._value(values[0], kind)]}
+
+    def _contain(self, node):
+        # type: (ast.In) -> JSON
+        name = getattr(node.lhs, "name", None)
+        expr, kind = self._field(node.lhs)
+        values = [value for item in node.sub_nodes for value in self._values(name, item)]
+        values = [self._value(value, kind) for value in values]
+        if kind == FIELD_ARRAY:
+            result = {"$gt": [{"$size": {"$setIntersection": [{"$ifNull": [expr, []]}, values]}}, 0]}
+        else:
+            result = {"$in": [expr, values]}
+        return {"$not": [result]} if node.not_ else result
+
+    def _temporal(self, node):
+        # type: (ast.TemporalPredicate) -> JSON
+        expr, kind = self._field(node.lhs)
+        if kind != FIELD_DATETIME:
+            raise _invalid_filter(
+                "Temporal filter operation requires a datetime property.",
+                getattr(node.lhs, "name", None),
+            )
+        rhs = node.rhs
+        start, end = (rhs.start, rhs.end) if isinstance(rhs, Interval) else (rhs, rhs)
+        start = _filter_datetime(start) if start is not None else None
+        end = _filter_datetime(end) if end is not None else None
+        within = [{"$gte": [expr, start]}] if start else []
+        within += [{"$lte": [expr, end]}] if end else []
+        if isinstance(node, ast.TimeAfter):
+            return {"$gt": [expr, end or start]}
+        if isinstance(node, ast.TimeBefore):
+            return {"$lt": [expr, start or end]}
+        if isinstance(node, ast.TimeEquals):
+            return {"$eq": [expr, start]}
+        if isinstance(node, ast.TimeDisjoint):
+            return {"$not": [{"$and": within}]} if within else {"$literal": False}
+        if isinstance(node, (ast.TimeDuring, ast.TimeOverlaps, ast.TimeOverlappedBy)):
+            return {"$and": within} if within else {"$literal": True}
+        raise _invalid_filter("Unsupported temporal filter operation.", type(node).__name__)
 
 
 class MongodbStore(object):
@@ -834,7 +1017,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             types = [value for item in process_type.split(",") for value in ProcessType.resolve(item)]
             conditions.append({"type": {"$in": types}})
         if filter_ast:
-            translator = FilterTranslator(PROCESS_FILTER_FIELDS, PROCESS_FILTER_RESOLVERS)
+            translator = MongoFilterTranslator(PROCESS_FILTER_FIELDS, PROCESS_FILTER_RESOLVERS)
             conditions.append({"$expr": translator.translate(filter_ast)})
         return conditions
 
@@ -1323,7 +1506,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         search_filters.update(self._apply_access_filter(access, request))
         search_filters.update(self._apply_datetime_filter(datetime_interval))
         if filter_ast:
-            translator = FilterTranslator(JOB_FILTER_FIELDS)
+            translator = MongoFilterTranslator(JOB_FILTER_FIELDS)
             search_filters.setdefault("$and", []).append({"$expr": translator.translate(filter_ast)})
 
         # minimal operation, only search for matches and sort them
