@@ -824,8 +824,8 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                        version=None,        # type: Optional[str]
                        sortby=None,         # type: Optional[str]
                        datetime_interval=None,  # type: Optional[DatetimeIntervalType]
-                       license_ref=None,    # type: Optional[str]
-                       process_type=None,   # type: Optional[str]
+                       license=None,        # type: Optional[str]
+                       type=None,           # type: Optional[str]
                        filter_ast=None,     # type: Optional[AstType]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         """
@@ -862,8 +862,8 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             Comma-separated fields optionally prefixed with ``+`` (ascending) or ``-`` (descending).
             Fields without prefix use their default direction. Takes precedence over :paramref:`sort`.
         :param datetime_interval: Interval that the process ``created`` datetime must match.
-        :param license_ref: License reference (``href`` or ``title``) of a ``license`` link or metadata of the process.
-        :param process_type:
+        :param license: License reference (``href`` or ``title``) of a ``license`` link or metadata of the process.
+        :param type:
             Comma-separated :class:`ProcessType` (case-insensitive) or equivalent resource type URIs.
             Any of the specified types must match.
         :param filter_ast: Parsed `CQL2` filter expression matched against the supported queryable properties.
@@ -947,7 +947,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             search_filters["$and"] = metadata_conditions
 
         search_conditions = self._apply_search_filter(
-            keywords, title, description, q, query, version, license_ref, process_type, filter_ast,
+            keywords, title, description, q, query, version, license, type, filter_ast,
         )
         if search_conditions:
             search_filters.setdefault("$and", []).extend(search_conditions)
@@ -997,8 +997,8 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                              q,             # type: Optional[str]
                              query,         # type: Optional[str]
                              version,       # type: Optional[str]
-                             license_ref,   # type: Optional[str]
-                             process_type,  # type: Optional[str]
+                             license,       # type: Optional[str]
+                             type,          # type: Optional[str]
                              filter_ast,    # type: Optional[AstType]
                              ):             # type: (...) -> List[MongodbAggregateExpression]
         """
@@ -1020,10 +1020,10 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                 conditions.append(MongodbProcessStore._apply_query_filter(expression))
         if version:
             conditions.append(MongodbProcessStore._apply_version_filter(version))
-        if license_ref:
-            conditions.append(MongodbProcessStore._apply_license_filter(license_ref))
-        if process_type:
-            types = [value for item in process_type.split(",") for value in ProcessType.resolve(item)]
+        if license:
+            conditions.append(MongodbProcessStore._apply_license_filter(license))
+        if type:
+            types = [value for item in type.split(",") for value in ProcessType.resolve(item)]
             conditions.append({"type": {"$in": types}})
         if filter_ast:
             translator = MongoFilterTranslator.for_processes()
@@ -1031,14 +1031,14 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         return conditions
 
     @staticmethod
-    def _apply_license_filter(license_ref):
+    def _apply_license_filter(license):
         # type: (str) -> MongodbAggregateExpression
         """
         Matches the reference of any entry of the process ``metadata`` or ``links`` with a ``license`` role or relation.
         """
         license_rel = {"$regex": r"(^|/)license$"}
-        reference = {"$or": [{"href": license_ref}, {
-            "title": {"$regex": f"^{re.escape(license_ref)}$", "$options": "i"}}]}
+        reference = {"$or": [{"href": license}, {
+            "title": {"$regex": f"^{re.escape(license)}$", "$options": "i"}}]}
         return {"$or": [
             {field: {"$elemMatch": {"$and": [{"$or": [{"rel": license_rel}, {"role": license_rel}]}, reference]}}}
             for field in ["metadata", "additional_links"]

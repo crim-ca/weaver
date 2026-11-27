@@ -130,8 +130,8 @@ class StoreProcesses(StoreInterface):
                        version=None,        # type: Optional[str]
                        sortby=None,         # type: Optional[str]
                        datetime_interval=None,  # type: Optional[DatetimeIntervalType]
-                       license_ref=None,    # type: Optional[str]
-                       process_type=None,   # type: Optional[str]
+                       license=None,        # type: Optional[str]
+                       type=None,           # type: Optional[str]
                        filter_ast=None,     # type: Optional[AstType]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         raise NotImplementedError

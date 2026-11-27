@@ -102,8 +102,6 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
     metadata_filters = parse_metadata_query_filters(request)
     store = get_db(request).get_store(StoreProcesses)
     search_param = resolve_queryables_params({**search_param, **{"sort": paging_param.pop("sort", None)}})
-    search_param["license_ref"] = search_param.pop("license", None)
-    search_param["process_type"] = search_param.pop("type", None)
     processes, total_local_processes = store.list_processes(
         visibility=Visibility.PUBLIC,
         total=True,
