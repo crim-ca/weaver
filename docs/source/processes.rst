@@ -121,6 +121,13 @@ deployed in `Weaver` using an URL reference to an WPS-1/2 process through the us
 locally. This allows a remote server offering limited functionalities (e.g.: no REST or `OGC API` bindings supported)
 to provide them through `Weaver`.
 
+The :term:`WPS`-1/2 endpoint is a single configured :term:`URL` where requests select operations such as
+``GetCapabilities``, ``DescribeProcess`` or ``Execute`` using :term:`WPS` parameters. :term:`OGC API - Processes`
+instead exposes separate resource URLs and uses :term:`JSON` bodies for :term:`Process` descriptions and :term:`Job`
+submissions.
+`Weaver` can expose both interfaces for the same local :term:`Process`. Details and request examples are in
+:ref:`OpenAPI Specification`, :ref:`wps_endpoint` and the :ref:`tutorial`.
+
 A minimal :ref:`Deploy <proc_op_deploy>` request body for this kind of process could be as follows:
 
 .. code-block:: JSON
@@ -656,6 +663,18 @@ to the following table. When a combination of the below items occur, the higher 
     +-------------+-----------+----------------------------+-----------------------------------------------------------+
 
 .. note::
+    Changes limited to additional version sub-parts, such as ``.dev0`` or ``.rc1``, are interpreted as ``PATCH``
+    semantic revisions. They follow the same procedure as regular ``PATCH`` updates. Submit an HTTP ``PATCH`` request
+    with an explicit ``version`` and changes permitted at the ``PATCH`` level in the table above. A suffix-only
+    change cannot satisfy an update that requires a ``MINOR`` or ``MAJOR`` revision.
+
+    The requested version must be unused and greater than every existing revision in the same ``MAJOR.MINOR``
+    branch. Development suffix numbers are compared numerically (i.e., ``1.2.3.dev0 < 1.2.3.dev1 < ... < 1.2.3``).
+    Therefore, ``1.2.3.dev1`` cannot update an existing ``1.2.3``, or be added if ``1.2.4`` already exists.
+    Omitting ``version`` increments the regular numeric revision instead of the suffix. For a ``PATCH`` update
+    from ``1.2.3.dev0``, the automatically selected version is ``1.2.4``.
+
+.. note::
     For all applicable fields of updating a :term:`Process`, refer to the schema of |update-req|_.
     For replacing a :term:`Process`, refer instead to the schema of |replace-req|_. The replacement request contents
     are extremely similar to the :ref:`Deploy <proc_op_deploy>` schema since the full :term:`Process` definition must
@@ -869,7 +888,7 @@ should be specified. If omitted, `Weaver` defaults to |asynchronous|_ execution.
 explicitly, ``Prefer: respond-async`` should be used. Otherwise, the |synchronous|_ execution can be requested
 with ``Prefer: wait=X`` where ``X`` is the duration in seconds to wait for a response. If no worker becomes available
 within that time, or if this value is greater than
-the ``weaver.execute_sync_max_wait`` setting (see :ref:`detail <weaver-execute-sync-max-wait>`), the :term:`Job` will
+the :confval:`weaver.execute_sync_max_wait` setting, the :term:`Job` will
 resume |asynchronously|_ and the response will be returned. Furthermore, |synchronous|_ and |asynchronous|_ execution of
 a :term:`Process` can only be requested for corresponding ``jobControlOptions`` it reports as supported in
 its :ref:`Process Description <proc_op_describe>`. It is important to provide the ``jobControlOptions`` parameter with
@@ -2033,8 +2052,9 @@ combinations.
 
 .. [#file2http]
     When a |file_scheme| (or empty scheme) maps to a local file that needs to be exposed externally for
-    another remote process, the conversion to |http_scheme| scheme employs setting ``weaver.wps_output_url`` to form
-    the result URL reference. The file is placed in ``weaver.wps_output_dir`` to expose it as HTTP(S) endpoint.
+    another remote process, the conversion to |http_scheme| scheme employs setting
+    :confval:`weaver.wps_output_url` to form the result URL reference.
+    The file is placed in :confval:`weaver.wps_output_dir` to expose it as HTTP(S) endpoint.
     Note that the HTTP(S) servicing of the file is not handled by `Weaver` itself. It is assumed that the server
     where `Weaver` is hosted or another service takes care of this task.
 
@@ -2363,8 +2383,29 @@ input where ``EOImage`` was specified and will be forwarded to the underlying :t
 BoundingBox Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: provide example and details, (crs, dimensions, etc.)
-.. todo:: cross-reference :ref:`cwl-io-types` for more details/examples
+A bounding box is a spatial extent represented by coordinates. It can be two-dimensional or three-dimensional,
+depending on the selected :term:`CRS`. For an :term:`OGC API - Processes` execution, submit it as an inline ``bbox``
+input. Coordinates follow the order required by the specified :term:`CRS`. The example uses CRS84 longitude/latitude
+order:
+
+.. code-block:: json
+
+    {
+      "inputs": {
+        "area": {
+          "bbox": [-120.0, 30.0, -110.0, 40.0],
+          "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+        }
+      }
+    }
+
+The :term:`Process` must declare ``area`` as a bounding-box input and support the selected :term:`CRS`. If ``crs`` is
+omitted, the service applies its default :term:`CRS`. :term:`WPS` clients provide the same extent through the
+``BoundingBoxData`` input representation. Since :term:`CWL` has no native bounding-box type, `Weaver` maps it to
+:term:`JSON` content in a CWL ``File`` with the ``ogc-bbox`` format.
+
+.. seealso::
+    :ref:`CWL I/O Types <cwl-io-types>` describes the mapping and its limitations.
 
 .. _proc_col_inputs:
 
@@ -2586,10 +2627,27 @@ Collection Outputs
 Multiple Inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: repeating IDs example for WPS multi-inputs
+When a :term:`Process` input allows multiple occurrences, :term:`OGC API - Processes` represents them as an array under
+one input ID. For example, an input named ``files`` can receive two file references as follows:
+
+.. code-block:: json
+
+    {
+      "inputs": {
+        "files": [
+          {"href": "https://example.org/first.nc"},
+          {"href": "https://example.org/second.nc"}
+        ]
+      }
+    }
+
+In :term:`WPS` :term:`XML`, submit one ``wps:Input`` element for each value and repeat the same ``ows:Identifier``.
+`Weaver` groups these repeated inputs and maps them to the corresponding multi-occurrence input representation in
+:term:`OGC API - Processes` and :term:`CWL`. The input's ``minOccurs`` and ``maxOccurs`` constraints apply to the
+total number of submitted values.
 
 .. seealso::
-    - :ref:`Multiple and Optional Values`
+    - :ref:`Multiple and Optional Values <cwl-array-null-values>`
 
 .. _proc_multi_outputs:
 
@@ -2651,12 +2709,14 @@ To work around this limitation, there are two potential solutions.
 Outputs Location
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-By default, :term:`Job` results will be hosted under the endpoint configured by ``weaver.wps_output_url`` and
-``weaver.wps_output_path``, and will be stored under directory defined by ``weaver.wps_output_dir`` setting.
+By default, :term:`Job` results will be hosted under the endpoint configured by :confval:`weaver.wps_output_url` and
+:confval:`weaver.wps_output_path`, and will be stored under the directory defined by
+:confval:`weaver.wps_output_dir`.
 
 .. warning::
     Hosting of results from the file system is **NOT** handled by `Weaver` itself. The API will only *report* the
-    expected endpoints using configured ``weaver.wps_output_url``. It is up to an alternate service or the platform
+    expected endpoints using configured :confval:`weaver.wps_output_url`.
+    It is up to an alternate service or the platform
     provider that serves the `Weaver` application to provide the external hosting and availability of files online
     as desired.
 
@@ -2671,8 +2731,8 @@ avoid conflicts. Therefore, outputs will be available with the following locatio
     {WPS_OUTPUT_URL}/{JOB_UUID}/{outputID}/{output.ext}     # results of the job if successful
 
 .. note::
-    Value ``WPS_OUTPUT_URL`` in above example is resolved accordingly with ``weaver.wps_output_url``,
-    ``weaver.wps_output_path`` and ``weaver.url``, as per :ref:`conf_settings` details.
+    Value ``WPS_OUTPUT_URL`` in above example is resolved accordingly with :confval:`weaver.wps_output_url`,
+    :confval:`weaver.wps_output_path` and :confval:`weaver.url`, as per :ref:`conf_settings` details.
 
 .. note::
     When the ``{output.ext}`` part corresponds to a :ref:`CWL Directory Type <cwl-dir>`,
@@ -2699,8 +2759,9 @@ For example, providing ``X-WPS-Output-Context: project/test-1`` will result in o
     The path also **CANNOT** start by ``/``. In such cases, an HTTP error will be immediately raised indicating
     the symbols that where rejected when detected within ``X-WPS-Output-Context`` header.
 
-If desired, parameter ``weaver.wps_output_context`` can also be defined in the :ref:`conf_settings` in order to employ
-a default directory location nested under ``weaver.wps_output_dir`` when ``X-WPS-Output-Context`` header is omitted
+If desired, parameter :confval:`weaver.wps_output_context` can also be defined in the :ref:`conf_settings` in order
+to employ a default directory location nested under :confval:`weaver.wps_output_dir` when the
+``X-WPS-Output-Context`` header is omitted
 from the request. By default, this parameter is not defined (empty) in order to store :term:`Job` results directly under
 the configured :term:`WPS` output directory.
 
@@ -2719,7 +2780,7 @@ Notification Subscribers
 When submitting a :term:`Job` for execution, it is possible to provide the ``notification_email`` field.
 Doing so will tell `Weaver` to send an email to the specified address with *successful* or *failure* details
 upon :term:`Job` completion. The format of the email is configurable from `weaver.ini.example`_ file with
-email-specific settings (see: :ref:`Email Configuration <weaver-wps-email>`).
+email-specific settings (see: :confval:`Email Configuration <weaver.wps_email_[...]>`).
 
 Alternatively to ``notification_email``, the ``subscribers`` field of the :term:`API` can be employed during :term:`Job`
 submission. Using this field will take precedence over ``notification_email`` for corresponding email and status
@@ -3285,8 +3346,23 @@ Following is a table of available formats and corresponding endpoints offered by
       - Description
     * - ``/jobs/{jobID}/prov``
       - |PROV-JSON|_
-      - ``application/json``
+      - ``application/provenance+json`` or ``application/json`` using profile
+        ``https://www.w3.org/submissions/prov-json/``.
       - :term:`Provenance` metadata using :term:`JSON` representation.
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-JSON|_ as :term:`YAML`
+      - ``application/yaml``
+      - :term:`Provenance` metadata using :term:`JSON` representation, serialized as :term:`YAML`.
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-OGC-JSON|_
+      - ``application/json`` using profile
+        ``https://ogcincubator.github.io/bblock-prov-schema/build/annotated/ogc-utils/prov/schema.json``
+      - :term:`Provenance` metadata using flat OGC Provenance Chain :term:`JSON` representation.
+    * - ``/jobs/{jobID}/prov``
+      - |PROV-OGC-JSON-ACTIVITY|_
+      - ``application/json`` using profile
+        ``https://ogcincubator.github.io/bblock-prov-schema/build/annotated/ogc-utils/prov-activity/schema.json``
+      - :term:`Provenance` metadata using nested OGC Provenance Activity :term:`JSON` representation.
     * - ``/jobs/{jobID}/prov``
       - |PROV-JSONLD|_
       - ``application/ld+json``
@@ -3336,9 +3412,16 @@ Following is a table of available formats and corresponding endpoints offered by
       - ``text/plain``
       - Same as their respective definitions above, but for a specific step of a :term:`Workflow`.
 
+Provenance formats can be requested using the same mechanism described in :ref:`proc_content_negotiation`.  Because the
+:term:`Media-Type` is ambiguous for provenance data, it is recommended to either:
+
+- Use the |PROV|_ Format name with the ``format`` parameter, for example ``?f=PROV-OGC-JSON``.
+- Explicitly request the desired profile using one of the mechanisms described in
+  :ref:`proc_content_negotiation_profile_order`.
+
 .. seealso::
     This feature is enabled by default. Its functionality and the corresponding :term:`API` endpoints
-    can be controlled using :ref:`Configuration Option <weaver-cwl-prov>` ``weaver.cwl_prov``.
+    can be controlled using the :confval:`weaver.cwl_prov` configuration option.
 
 .. note::
     Although not directly encoded within the above :ref:`Provenance Representations <table-job-prov>`, entities
@@ -3579,10 +3662,11 @@ Transformed Output Considerations
 
 .. versionadded:: 6.12.0
 
-From a client perspective, output :ref:`content-negotiation` produced directly by an originally deployed :term:`Process`
-definition or through an alternate format :term:`Transform` uses the same mechanisms. All supported :term:`Media-Types`
-by a given :term:`Process` output are described in the same manner. However, the underlying :term:`Process` definition
-composes that set of supported formats by combining the *native* formats declared in the :term:`Process` definition
+From a client perspective, output :ref:`proc_content_negotiation` produced directly by an originally
+deployed :term:`Process` definition or through an alternate format :term:`Transform` uses the same mechanisms.
+All supported :term:`Media-Types` by a given :term:`Process` output are described in the same manner.
+However, the underlying :term:`Process` definition composes that set of supported formats by combining
+the *native* formats declared in the :term:`Process` definition
 (which may come from the declared :ref:`Deployment Metadata <proc_op_deploy>` and/or :term:`Application Package`)
 and any additional transformation formats builtin within `Weaver`.
 
@@ -3685,9 +3769,9 @@ again for that input within the :ref:`Execute <proc_op_execute>` request body.
 WPS Endpoint
 ---------------
 
-This endpoint is available if ``weaver.wps`` setting was enabled (``true`` by default).
+This endpoint is available if :confval:`weaver.wps` setting was enabled (``true`` by default).
 The specific location where :term:`WPS` requests it will be accessible depends on the resolution
-of relevant :ref:`conf_settings`, namely ``weaver.wps_path`` and ``weaver.wps_url``.
+of relevant :ref:`conf_settings`, namely :confval:`weaver.wps_path` and :confval:`weaver.wps_url`.
 
 Details regarding contents for each request is provided in schemas under |wps-req|_.
 
@@ -3745,10 +3829,19 @@ but are still available for use when requested.
 Workflow (Chaining Step Processes)
 --------------------------------------
 
-.. todo:: add details, explanation done in below reference
+An :term:`OGC API - Processes` :term:`Workflow` is deployed as a :term:`CWL` ``Workflow``. Each step's ``run`` field
+identifies a separate, already-deployed `Weaver` :term:`Process` by process ID or by a supported process/package
+:term:`URL`.
+Deploy the step processes before deploying the :term:`Workflow` so `Weaver` can resolve and validate their input and
+output definitions. Inputs and outputs between connected steps must have compatible types and formats.
+
+When the :term:`Workflow` is executed, `Weaver` runs each step on the :term:`ADES` selected for its inputs by the
+configured :term:`Data Source`, then passes the step results to dependent steps. This requires an :term:`EMS` or
+``HYBRID`` configuration.
 
 .. seealso::
+    :ref:`CWL Workflow <app_pkg_workflow>` describes step reference formats, package examples and deployment
+    requirements.
 
-    - :ref:`app_pkg_workflow`
     - :ref:`proc_workflow_ops`
     - :ref:`Workflow` process type

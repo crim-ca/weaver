@@ -1614,15 +1614,19 @@ class SchemaRefMappingSchema(ExtendedNodeInterface, ExtendedSchemaBase):
         for schema_key, schema_ref in schema_fields:
             if self._is_schema_ref(schema_ref):
                 schema_field = f"${schema_key}"
-                schema = ExtendedSchemaNode(
-                    colander.String(),
-                    name=schema_field,
-                    title=schema_field,
-                    missing=schema_ref,
-                    default=schema_ref,
-                    validator=colander.OneOf([schema_ref])
-                )
-                schema_result[schema_field] = schema.deserialize(cstruct.get(schema_field))
+                # Inject the known reference directly and validate only conflicting existing values.
+                schema_value = cstruct.get(schema_field, schema_ref)
+                if schema_value != schema_ref:
+                    schema = ExtendedSchemaNode(
+                        colander.String(),
+                        name=schema_field,
+                        title=schema_field,
+                        missing=schema_ref,
+                        default=schema_ref,
+                        validator=colander.OneOf([schema_ref])
+                    )
+                    schema.deserialize(schema_value)
+                schema_result[schema_field] = schema_value
 
         schema_result.update(cstruct)
         schema_result.update(schema_extra or {})

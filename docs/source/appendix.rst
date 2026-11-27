@@ -209,7 +209,7 @@ Glossary
     MIME-types
         | Multipurpose Internet Mail Extensions
         | Format representation of the referenced element, often represented by :term:`IANA` or :term:`EDAM` ontologies.
-          More recent `Media-Type` naming is employed for the general use of ``Content-Type`` data representation in
+          More recent :term:`Media-Type` naming is employed for the general use of ``Content-Type`` data representation in
           multiple situations and contexts.
 
         .. seealso::
@@ -328,7 +328,7 @@ Glossary
 
     Transform
         Additional :term:`Media-Type` transformation operations that can augment a native :term:`Process`
-        definition to offer supplementary :ref:`content-negotiation` capabilities of its :term:`Job` results.
+        definition to offer supplementary :ref:`proc_content_negotiation` capabilities of its :term:`Job` results.
 
         .. seealso::
             Refer to :ref:`proc_content_negotiation_transforms` section for more details.

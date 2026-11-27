@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 from parameterized import parameterized
 
+from tests.functional import TEST_DATA_ROOT
 from tests.functional.utils import ResourcesUtil, WpsConfigBase
 from tests.utils import mocked_execute_celery, mocked_sub_requests, mocked_wps_output
 from weaver.formats import ContentType, OutputFormat
@@ -104,7 +105,11 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({}, {"Accept": ContentType.APP_JSON}),
         ({}, {"Accept": ContentType.APP_PROV_JSON}),
         ({}, {"Accept": f"{ContentType.APP_PROV_JSON}; charset=utf-8"}),
-        ({}, {"Accept": f"{ContentType.APP_JSON}; profile=https://www.w3.org/ns/prov"}),
+        ({},
+         {"Accept":
+          f"{ContentType.APP_JSON}; "
+          f"profile={ProvenanceFormat.as_profile(ProvenanceFormat.PROV_JSON)}"}
+         ),
     ])
     def test_job_prov_json(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -115,6 +120,131 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov = resp.json
         assert "prefix" in prov
         assert "wfprov" in prov["prefix"]
+        # Ensure that our activity was both started and ended
+        assert "activity" in prov
+        assert isinstance(prov["activity"], dict)
+        start_time = None
+        started_id = None
+        for key, values in prov["activity"].items():
+            if not isinstance(values, list):
+                values = [values]
+            for record in values:
+                if "prov:startTime" in record:
+                    start_time = record["prov:startTime"]
+                    started_id = key
+                    break
+        assert start_time is not None
+        assert started_id is not None
+        # In JSON we will have a wasEndedBy for that activity
+        assert "wasEndedBy" in prov
+        assert isinstance(prov["wasEndedBy"], dict)
+        end_time = None
+        ended_id = None
+        for key, values in prov["wasEndedBy"].items():
+            if not isinstance(values, list):
+                values = [values]
+            for record in values:
+                ended_id = record.get("prov:activity")
+                if ended_id == started_id:
+                    end_time = record.get("prov:time")
+                    break
+        assert end_time is not None
+        assert ended_id is not None
+
+    @parameterized.expand([
+        ({"f": ProvenanceFormat.PROV_OGC_JSON_ACTIVITY}, {}),
+        ({"f": "ogc-json-activity"}, {}),
+        ({"profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON_ACTIVITY)},
+         {}),
+        ({}, {"Accept": f"{ContentType.APP_JSON}; "
+              f"profile={ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON_ACTIVITY)}"}),
+        ({}, {"Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON_ACTIVITY)}),
+    ])
+    def test_job_prov_ogc_json_object(self, queries, headers):
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        # Make sure it is application/json and not application/provenance+json
+        assert resp.content_type == ContentType.APP_JSON
+        prov = resp.json
+        # Make sure it is an activity
+        assert isinstance(prov, dict)
+        assert "id" in prov
+        assert prov["id"] == f"urn:uuid:{self.job_id}"
+        assert "provType" in prov
+        assert prov["provType"] == "Activity"
+        # It should use activityType for extra types
+        assert "activityType" in prov
+        assert isinstance(prov["activityType"], list)
+        # It should use startedAtTime, not startTime
+        assert "startTime" not in prov
+        assert "startedAtTime" in prov
+        # It should be nested
+        assert "wasAssociatedWith" in prov
+        assert (isinstance(prov["wasAssociatedWith"], dict)
+                or isinstance(prov["wasAssociatedWith"], list)
+                and any(isinstance(obj, dict) for obj in prov["wasAssociatedWith"]))
+        # It should contain reverse relations for otherwise unreachable objects
+        assert "generated" in prov
+        assert any(isinstance(obj, dict) for obj in prov["generated"])
+
+    @parameterized.expand([
+        ({"f": ProvenanceFormat.PROV_OGC_JSON}, {}),
+        ({"f": "ogc-json"}, {}),
+        ({"profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON)},
+         {}),
+        ({}, {"Accept": f"{ContentType.APP_JSON}; "
+              f"profile={ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON)}"}),
+        ({}, {"Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON)}),
+    ])
+    def test_job_prov_ogc_json_list(self, queries, headers):
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        # Make sure it is application/json and not application/provenance+json
+        assert resp.content_type == ContentType.APP_JSON
+        prov = resp.json
+        # Make sure it contains activities, entities and agents
+        assert isinstance(prov, list)
+        assert all("id" in obj for obj in prov)
+        assert all("provType" in obj for obj in prov)
+        assert all("activityType" in obj
+                   for obj in prov
+                   if obj["provType"] == "Activity")
+        # It should use startedAtTime, not startTime
+        assert all("startTime" not in obj for obj in prov)
+        assert any("startedAtTime" in obj for obj in prov)
+        # It should not be nested
+        for obj in prov:
+            assoc = obj.get("wasAssociatedWith")
+            if assoc is None:
+                continue
+            assert isinstance(assoc, (str, list))
+            if isinstance(assoc, list):
+                assert all(isinstance(ref, str) for ref in assoc)
+        # It should not contain reverse relations
+        assert all("generated" not in obj for obj in prov)
+
+    @parameterized.expand([
+        ({},
+         {"Accept": ContentType.APP_YAML,
+          "Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON)}),
+        ({},
+         {"Accept": ContentType.APP_YAML,
+          "Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON_ACTIVITY)}),
+    ])
+    def test_job_prov_ogc_yaml(self, queries, headers):
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers)
+        assert resp.status_code == 200
+        assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
+        # Ensure that we declare the result as YAML
+        assert resp.content_type == ContentType.APP_YAML
+        prov = resp.text
+        # Ensure that we get actual YAML
+        assert "id:" in prov
 
     @parameterized.expand([
         ({"f": "ld+json"}, {}),
@@ -122,7 +252,9 @@ class TestJobProvenance(TestJobProvenanceBase):
         ({"f": "jsonld"}, {}),
         ({"f": ProvenanceFormat.PROV_JSONLD}, {}),
         ({}, {"Accept": ContentType.APP_JSONLD}),
-        ({}, {"Accept": f"{ContentType.APP_JSONLD}; profile=https://www.w3.org/TR/prov-jsonld/"}),
+        ({}, {"Accept": f"{ContentType.APP_JSONLD}; "
+              f"profile={ProvenanceFormat.as_profile(ProvenanceFormat.PROV_JSONLD)}"}),
+        ({}, {"Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_JSONLD)}),
     ])
     def test_job_prov_json_ld(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -131,9 +263,51 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert len(list(filter(lambda header: header[0] == "Content-Type", resp.headerlist))) == 1
         assert resp.content_type == ContentType.APP_JSONLD
         prov = resp.json
-        assert isinstance(prov, list)
-        assert bool(prov), "Must not be an empty list."
-        assert all(isinstance(obj, object) and "@id" in obj and "@type" in obj for obj in prov)
+        assert isinstance(prov, dict)
+        # Verify that we have PROV-JSONLD (not just PROV-O in JSON-LD)
+        assert "@context" in prov, "PROV-JSONLD must contain @context"
+        # Verify PROV context, but then replace it with local one to avoid network accesses
+        try:
+            idx = prov["@context"].index("https://openprovenance.org/prov-jsonld/context.jsonld")
+            prov["@context"][idx] = f"file://{TEST_DATA_ROOT}/prov_context.jsonld"
+        except ValueError:
+            pytest.fail("PROV-JSONLD context missing from @context")
+        assert "@graph" in prov, "PROV-JSONLD must contain @graph"
+        graph = prov["@graph"]
+        assert bool(graph), "JSON-LD @graph not be an empty list."
+        assert all(isinstance(obj, dict)
+                   and isinstance(obj.get("@type"), str)
+                   for obj in graph), "Every object must have a @type as a single string value"
+
+        # Verify that we have @id references for URIs in the graph
+        id_ref_terms = ["foaf:account", "wfprov:wasEnactedBy", "wfprov:describedByProcess"]
+        for obj in graph:
+            for term in id_ref_terms:
+                if term not in obj:
+                    continue
+                values = obj[term]
+                assert isinstance(values, list) and values, f"Unexpected empty/invalid value for {term}: {obj}"
+                for value in values:
+                    assert isinstance(value, dict), f"Expected a dictionary for {term}, got {value}"
+                    assert "@id" in value, f"Expected an @id reference for {term}, got {value}"
+        # Ensure that our activity was started and ended
+        start_id = end_id = None
+        start_time = end_time = None
+        for obj in graph:
+            if obj.get("@type") == "Activity":
+                start_id = obj.get("@id")
+                start_time = obj.get("startTime")
+                break
+        assert start_id is not None
+        assert start_time is not None
+        for obj in graph:
+            if obj.get("@type") == "End":
+                end_id = obj.get("activity")
+                if end_id == start_id:
+                    end_time = obj.get("time")
+                    break
+        assert end_id is not None
+        assert end_time is not None
 
     @parameterized.expand([
         ({"f": OutputFormat.YAML}, {}),
@@ -168,11 +342,15 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.content_type == ContentType.APP_PROV_XML
         prov = resp.text
         assert "<prov:document xmlns:wfprov" in prov
+        assert "<prov:startTime" in prov
+        assert "<prov:wasEndedBy" in prov
 
     @parameterized.expand([
         ({"f": "turtle"}, {}),
         ({"f": ProvenanceFormat.PROV_TURTLE}, {}),
         ({}, {"Accept": ContentType.TEXT_TURTLE}),
+        ({}, {"Accept": ContentType.TEXT_TURTLE,
+              "Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_TURTLE)}),
     ])
     def test_job_prov_ttl(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -182,11 +360,16 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.content_type == ContentType.TEXT_TURTLE
         prov = resp.text
         assert "@prefix cwlprov: " in prov
+        # Start and end are expressed differently in RDF
+        assert "startedAtTime" in prov
+        assert "qualifiedEnd" in prov
 
     @parameterized.expand([
         ({"f": "nt"}, {}),
         ({"f": ProvenanceFormat.PROV_NT}, {}),
         ({}, {"Accept": ContentType.APP_NT}),
+        ({}, {"Accept": ContentType.APP_NT,
+              "Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_NT)}),
     ])
     def test_job_prov_nt(self, queries, headers):
         prov_url = f"{self.job_url}/prov"
@@ -197,6 +380,9 @@ class TestJobProvenance(TestJobProvenanceBase):
         prov = resp.text
         assert "_:N" in prov
         assert "wfprov" in prov
+        # Start and end are expressed differently in RDF
+        assert "startedAtTime" in prov
+        assert "qualifiedEnd" in prov
 
     @parameterized.expand([
         ({"f": "n"}, {}),
@@ -212,6 +398,8 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert resp.content_type == ContentType.TEXT_PROVN
         prov = resp.text
         assert "prov:type='wfprov:WorkflowEngine'" in prov
+        # No explicit start time in PROV-N
+        assert "wasEndedBy" in prov
 
     @parameterized.expand([
         ({}, {"Accept": "application/unsupported"}),
@@ -230,6 +418,69 @@ class TestJobProvenance(TestJobProvenanceBase):
         assert "type" in resp.json, "Error response must include 'type' field"
         assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI
         assert "detail" in resp.json
+
+    @parameterized.expand([
+        ({}, {"Accept-Profile": "http://example.org/unknown"}),
+        ({}, {"Accept": ContentType.APP_JSON,
+              "Accept-Profile": "http://example.org/unknown"}),
+    ])
+    def test_job_prov_unsupported_profile(self, queries, headers):
+        """
+        Test unsupported profile returns 406 Not Acceptable with proper error type.
+        """
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers, expect_errors=True)
+        assert resp.status_code == 406, f"Expected 406, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        assert "type" in resp.json, "Error response must include 'type' field"
+        assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI
+        assert "detail" in resp.json
+
+    @parameterized.expand([
+        # PROV_NT and PROV_TURTLE share the same profile, so a media type is needed
+        ({}, {"Accept-Profile": ProvenanceFormat.as_profile(ProvenanceFormat.PROV_NT)}),
+    ])
+    def test_job_prov_ambiguous_profile(self, queries, headers):
+        """
+        Test ambiguous profile returns 406 Not Acceptable with proper error type.
+        """
+        prov_url = f"{self.job_url}/prov"
+        resp = self.app.get(prov_url, params=queries, headers=headers, expect_errors=True)
+        assert resp.status_code == 406, f"Expected 406, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        assert "type" in resp.json, "Error response must include 'type' field"
+        assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI
+        assert "detail" in resp.json
+
+    @parameterized.expand([
+        (ContentType.APP_JSON, ProvenanceFormat.as_profile(ProvenanceFormat.PROV_XML)),
+        (ContentType.APP_JSON, ProvenanceFormat.as_profile(ProvenanceFormat.PROV_N)),
+    ])
+    def test_job_prov_incompatible_media_type_profile(self, content_type, profile):
+        prov_url = f"{self.job_url}/prov"
+        headers = {"Accept": f"{content_type}; profile={profile}"}
+        resp = self.app.get(prov_url, headers=headers, expect_errors=True)
+        assert resp.status_code == 406, f"Expected 406, got {resp.status_code}"
+        assert resp.content_type == ContentType.APP_JSON
+        assert resp.json["type"] == sd.OGC_API_PROC_PART5_EXC_PROV_UNSUPPORTED_FORMAT_URI
+        assert "detail" in resp.json
+
+    @parameterized.expand([
+        ({"f": ProvenanceFormat.PROV_XML}, ContentType.APP_PROV_XML),
+        ({"f": ProvenanceFormat.PROV_JSON}, ContentType.APP_PROV_JSON),
+    ])
+    def test_job_prov_format_query_precedence_over_profile(self, queries, expected_content_type):
+        """
+        Test that an explicit ``f`` query takes precedence over any ``Accept-Profile``, even unknown ones.
+        """
+        prov_url = f"{self.job_url}/prov"
+        for profile in [
+            ProvenanceFormat.as_profile(ProvenanceFormat.PROV_OGC_JSON),
+            "http://example.org/unknown",
+        ]:
+            resp = self.app.get(prov_url, params=queries, headers={"Accept-Profile": profile})
+            assert resp.status_code == 200
+            assert resp.content_type == expected_content_type
 
     @parameterized.expand([
         ({}, {}),

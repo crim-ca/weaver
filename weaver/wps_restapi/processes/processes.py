@@ -124,7 +124,7 @@ def get_processes(request):
     links = asbool(params.get("links", True))
     detail = asbool(params.get("detail", True))
     ignore = asbool(params.get("ignore", True))
-    if request.accept == ContentType.TEXT_HTML:
+    if guess_target_format(request) == ContentType.TEXT_HTML:
         detail = ignore = True
     try:
         # get local processes and filter according to schema validity
@@ -360,7 +360,7 @@ def get_local_process(request):
             ]
             return Response(offering, headerlist=headers)
         elif ctype == ContentType.APP_YAML:
-            offering = process.offering(schema, provider=provider)
+            offering = process.offering(schema, request=request, provider=provider)
             content = OutputFormat.convert(offering, OutputFormat.YAML)
             headers = [
                 ("Link", make_link_header(f"{proc_url}?f=json", rel="alternate", type=ctype_json)),
@@ -372,7 +372,7 @@ def get_local_process(request):
             ]
             return HTTPOk(headers=headers, content_type=ctype, charset="utf-8", body=content)
         elif ctype == ContentType.APP_JSON:
-            offering = process.offering(schema, provider=provider)
+            offering = process.offering(schema, request=request, provider=provider)
             request.response.content_type = ctype_json
             request.response.headers.extend([
                 ("Link", make_link_header(f"{proc_url}?f=xml", rel="alternate", type=ctype_xml)),
@@ -383,7 +383,7 @@ def get_local_process(request):
             ])
             return Box(offering)
         else:  # HTML
-            offering = process.offering(ProcessSchema.OGC, provider=provider)
+            offering = process.offering(ProcessSchema.OGC, request=request, provider=provider)
             request.response.headers.extend([
                 ("Link", make_link_header(f"{proc_url}?f=json", rel="alternate", type=ctype_json)),
                 ("Link", make_link_header(f"{proc_url}?f=yaml", rel="alternate", type=ctype_yaml)),

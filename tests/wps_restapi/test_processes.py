@@ -622,6 +622,112 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         expect = list(zip(revisions, versions))
         assert result == expect
 
+    def test_process_links_with_semver_suffix(self):
+        """
+        Tests process links and revision listing for a version with a semantic suffix.
+        """
+        # Deploy two prerelease revisions to exercise working-copy and versioned links.
+        p_id = "test-process-version-links"
+        old_version = "0.1.3.dev10"
+        latest_version = "0.1.4.dev1"
+        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version=old_version)
+        response = self.app.patch_json(
+            f"/processes/{p_id}",
+            params={"title": "Latest revision", "version": latest_version},
+            headers=self.json_headers
+        )
+        assert response.status_code == 200
+        old_tagged_id = f"{p_id}:{old_version}"
+        latest_tagged_id = f"{p_id}:{latest_version}"
+        proc_url = f"https://localhost/processes/{p_id}"
+
+        # An untagged request describes the working copy and points to its latest revision.
+        response = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert response.status_code == 200
+        links = {link["rel"]: link for link in response.json["links"]}
+        assert links["self"]["href"] == proc_url
+        assert links["current"]["href"] == proc_url
+        assert links["latest-version"]["href"] == f"{proc_url}:{latest_version}"
+        assert links["working-copy-of"]["href"] == f"{proc_url}:{latest_version}"
+        alternate_links = {
+            (link["href"], link.get("type")) for link in response.json["links"] if link["rel"] == "alternate"
+        }
+        assert (f"{proc_url}?f=html", ContentType.TEXT_HTML) in alternate_links
+
+        # An explicit latest tag still describes a revision, not the working copy.
+        latest = self.app.get(f"/processes/{latest_tagged_id}", headers=self.json_headers)
+        assert latest.status_code == 200
+        latest_links = {link["rel"]: link for link in latest.json["links"]}
+        assert latest_links["self"]["href"] == f"{proc_url}:{latest_version}"
+        assert latest_links["current"]["href"] == proc_url
+        assert latest_links["working-copy"]["href"] == proc_url
+        assert latest_links["latest-version"]["href"] == f"{proc_url}:{latest_version}"
+        assert latest_links["predecessor-version"]["href"] == f"{proc_url}:{old_version}"
+        assert "working-copy-of" not in latest_links
+        assert "successor-version" not in latest_links
+        latest_alternates = {
+            link["href"] for link in latest.json["links"] if link["rel"] == "alternate"
+        }
+        assert f"{proc_url}:{latest_version}?f=xml" in latest_alternates
+        assert f"{proc_url}:{latest_version}?f=html" in latest_alternates
+
+        # An older tag retains its version in self and alternate links.
+        revision = self.app.get(f"/processes/{old_tagged_id}", headers=self.json_headers)
+        assert revision.status_code == 200
+        revision_links = {link["rel"]: link for link in revision.json["links"]}
+        assert revision_links["self"]["href"] == f"{proc_url}:{old_version}"
+        assert revision_links["working-copy"]["href"] == proc_url
+        assert revision_links["latest-version"]["href"] == f"{proc_url}:{latest_version}"
+        assert revision_links["successor-version"]["href"] == f"{proc_url}:{latest_version}"
+        assert "working-copy-of" not in revision_links
+        revision_alternates = {
+            link["href"] for link in revision.json["links"] if link["rel"] == "alternate"
+        }
+        assert f"{proc_url}:{old_version}?f=xml" in revision_alternates
+        assert f"{proc_url}:{old_version}?f=html" in revision_alternates
+
+        # A version query resolves to the same canonical tagged description.
+        query_revision = self.app.get(
+            f"/processes/{p_id}?version={old_version}",
+            headers=self.json_headers
+        )
+        assert query_revision.status_code == 200
+        query_links = {link["rel"]: link for link in query_revision.json["links"]}
+        assert query_links["self"]["href"] == f"{proc_url}:{old_version}"
+        assert query_links["working-copy"]["href"] == proc_url
+
+        # JSON history includes both prereleases and points to the latest tagged revision.
+        history_url = urllib.parse.urlparse(links["version-history"]["href"])
+        history_path = f"{history_url.path}?{history_url.query}"
+        history_json = self.app.get(history_path, headers=self.json_headers)
+        assert history_json.status_code == 200
+        assert history_json.json["processes"] == [old_tagged_id, latest_tagged_id]
+        listing_links = {link["rel"]: link for link in history_json.json["links"]}
+        assert listing_links["latest-version"]["href"] == f"{proc_url}:{latest_version}"
+
+        # Negotiated HTML history renders full descriptions despite detail=false.
+        history = self.app.get(
+            history_path,
+            headers={"Accept": ContentType.TEXT_HTML}
+        )
+        assert history.status_code == 200
+        assert history.content_type == ContentType.TEXT_HTML
+        assert old_tagged_id in history.text and latest_tagged_id in history.text
+
+        # An explicit HTML format makes the self link unambiguously HTML.
+        html = self.app.get(f"/processes/{p_id}?f=html")
+        assert html.status_code == 200
+        assert f'href="{proc_url}?f=json"' in html.text
+        self_link = html.html.find("div", string="self").parent.find_next_sibling("dd").find("a")
+        assert self_link["href"] == f"{proc_url}?f=html"
+
+        # Accept negotiation produces the same explicit HTML self link.
+        html = self.app.get(f"/processes/{p_id}", headers={"Accept": ContentType.TEXT_HTML})
+        assert html.status_code == 200
+        assert html.content_type == ContentType.TEXT_HTML
+        self_link = html.html.find("div", string="self").parent.find_next_sibling("dd").find("a")
+        assert self_link["href"] == f"{proc_url}?f=html"
+
     @mocked_remote_server_requests_wps1([
         resources.TEST_REMOTE_SERVER_URL,
         resources.TEST_REMOTE_SERVER_WPS1_GETCAP_XML,
@@ -4145,6 +4251,37 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "PATCH revision expected. Since previous did not have a version, "
             "it should be assumed 0.0.0, making this revision 0.0.1."
         )
+
+    @parameterized.expand([
+        ("0.1.3.dev1", "0.1.3.dev2", 200),
+        ("0.1.3.dev1", "0.1.3", 200),
+        ("0.1.3.dev1", "0.1.4.dev1", 200),
+        ("0.1.3.dev1", "0.1.3.dev1", 409),
+        ("0.1.3.dev10", "0.1.3.dev2", 422),
+        ("0.1.3", "0.1.3.dev1", 422),
+    ])
+    def test_update_process_prerelease_revision(self, old_version, new_version, status_code):
+        """
+        Tests prerelease update ordering and conflicts through the local process API.
+        """
+        p_id = "test-update-prerelease"
+        self.deploy_process_CWL_direct(ContentType.APP_JSON, process_id=p_id, version=old_version)
+        response = self.app.patch_json(
+            f"/processes/{p_id}",
+            params={"title": "Updated prerelease", "version": new_version},
+            headers=self.json_headers,
+            expect_errors=status_code != 200
+        )
+        assert response.status_code == status_code
+        current = self.app.get(f"/processes/{p_id}", headers=self.json_headers)
+        assert current.json["version"] == (new_version if status_code == 200 else old_version)
+        if status_code != 200:
+            assert response.json["cause"]["version"] == new_version
+            assert response.json["cause"]["reference"] == old_version
+            assert response.json["cause"]["revisions"] == [old_version]
+        else:
+            old_revision = self.app.get(f"/processes/{p_id}:{old_version}", headers=self.json_headers)
+            assert old_revision.json["version"] == old_version
 
     def test_update_process_older_valid(self):
         """

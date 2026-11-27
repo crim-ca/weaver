@@ -247,6 +247,12 @@ use = egg:gunicorn#main
 bind = 0.0.0.0:4001
 workers = 10
 timeout = 10
+# enable fast C parser (gunicorn[fast] dependency) instead of Python native (equivalent behaviour but gains free speedup)
+# by default, 'http_parser = auto' is employed if this setting is omitted
+# since Weaver will include the extra dependency, 'fast' should be the resolved reference by 'auto' or omission
+# if the native Python approach is desired for whichever reason, 'http_parser = python' will have to be set explicitly
+# (see https://gunicorn.org/asgi/#fast-http-parser)
+http_parser = fast
 
 # --- waitress ---
 # use = egg:waitress#main

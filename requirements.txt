@@ -36,15 +36,17 @@ cornice
 #cornice_swagger>=0.7.0
 cornice-swagger @ git+https://github.com/fmigneault/cornice.ext.swagger.git@openapi-3
 cryptography>=50.0.2
-# https://github.com/common-workflow-language/cwltool/pull/2207 adds rootless EUID/EGID support in upstream cwltool.
-# cwltool>=3.1.20260315121657 is the first upstream release that includes it.
-cwltool>=3.1.20260315121657
-# cwltool>=3.1.20241217163858,<3.2  # first version that provides CWLProv, required across all Python versions
-# for some reason, not the same release number,
-# but same code as https://github.com/common-workflow-language/cwlprov/tree/0.6.0
-cwlprov==0.2.1
+# cwltool>=3.3.20261106131234 is the main branch where the below prov PR pin derives from
+cwltool>=3.3.20261106131234
+# https://github.com/common-workflow-language/cwltool/pull/2349 updates to prov 3.3.0 (needed for PROV-JSONLD)
+cwltool @ git+https://github.com/crim-ca/cwltool.git@707e261270c341d21dd2b27e567260215cc7a8c8
+# cwlprov-py fork with prov 3.3.0 (needed for the command-line tool)
+# corresponds to 0.7.0 version of https://github.com/common-workflow-language/cwlprov-py/pull/49
+cwlprov @ git+https://github.com/crim-ca/cwlprov-py.git@5df46d45badb8eb6d3c30b29f4016bf2afdd4029
 cwl-utils>=0.47
-dnspython>=2.8.0  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
+# Pin prov to 3.3.0 to avoid any unexpected incompatibilities
+prov==3.3.0
+dnspython>=2.9.2  # not directly required, pinned by Snyk to avoid a vulnerability; via pymongo dependency
 docker>=7.2.0
 duration
 esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
@@ -53,10 +55,10 @@ esgf-compute-api @ git+https://github.com/ESGF/esgf-compute-api.git@v2.3.7
 geotiff>=0.2.10
 # gunicorn >20 breaks some config.ini loading parameters (paste)
 # use pserve to continue supporting config.ini with paste settings
-gunicorn>=26.2.0
+gunicorn[fast]>=27.0.1
 # reduced dependencies contrains to let packages update to latest (https://github.com/vinitkumar/json2xml/issues/157)
 # even more reduced dependency constraints (https://github.com/vinitkumar/json2xml/pull/195)
-json2xml==7.1.1
+json2xml==8.0.0
 jsonschema>=4.26.0
 # FIXME: kombu for pymongo>=4 not yet released as 5.3.0 (only pre-releases available)
 # - https://github.com/crim-ca/weaver/issues/386
@@ -67,14 +69,11 @@ kombu>=5.7.0,<6
 lark==1.2.2
 lxml
 mako
-# force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
-# employed by cwltool -> schema-salad -> mistune
-#mistune>=2.0.3,<2.1
 # multiformats for digestMultibase (W3C VC Data Integrity)
 # provides multibase and multihash encoding for resource integrity verification
 multiformats>=0.3.1.post4
 mypy_boto3_s3
-numpy>=2.2.6
+numpy>=2.4.6
 # esgf-compute-api (cwt) needs oauthlib but doesn't add it in their requirements
 oauthlib
 owslib==0.35.0
@@ -93,7 +92,7 @@ pygeofilter[fes,backend-native]>=0.4.0
 # - https://github.com/crim-ca/weaver/issues/386
 # - https://github.com/celery/kombu/pull/1536
 # - https://github.com/celery/celery/pull/7834
-pymongo>=4.18.3  # either (pymongo>=4, kombu>=5.3.0b2) or (pymongo<4, celery<5.2)
+pymongo>=4.20.1  # either (pymongo>=4, kombu>=5.3.0b2) or (pymongo<4, celery<5.2)
 # FIXME: setuptools/pkg_resources deprecated dependency
 #   (https://github.com/Pylons/pyramid/issues/3731, https://github.com/pypa/setuptools/pull/5007)
 # below setuptools pin is placed here purposely instead of 'requirements-sys.txt' in order to keep it
@@ -120,9 +119,7 @@ requests_file
 # FIXME: https://github.com/requests/toolbelt/pull/380
 requests_toolbelt @ git+https://github.com/crim-ca/requests-toolbelt.git@patch-multipart
 ruamel.yaml>=0.19.1
-# force use of later mistune (https://github.com/common-workflow-language/schema_salad/pull/619#issuecomment-1346025607)
-# employed by cwltool -> schema-salad -> mistune
-schema-salad>=8.10.20260825112551,<9
+schema-salad>=8.10.20261106141337,<9
 shapely
 simplejson
 urllib3>=2.8.0

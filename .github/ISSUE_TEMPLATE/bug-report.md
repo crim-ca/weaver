@@ -31,7 +31,7 @@ Steps to reproduce the behavior:
     Also, please complete the following information.
 -->
 
-- OS: \[e.g. Linux|Windows] (if running locally)
-- Browser \[e.g. chrome, safari] (if running as a service)
-- Instance: \[ADES|EMS|Hybrid] and URL
-- Version \["1.2.3", see `/versions` endpoint]
+- OS: `[Linux, Windows, etc.]` (if running locally)
+- Browser `[chrome, firefox, safari, etc.]` (if running as a service)
+- Instance: `[ADES|EMS|HYBRID]` and URL
+- Version `["1.2.3"]` (see `/versions` endpoint or `make version`)

@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
     import psutil
 
-    from weaver.compat import Version
+    from weaver.utils import Version
 
     if hasattr(os, "PathLike"):
         FileSystemPathType = Union[os.PathLike, str]

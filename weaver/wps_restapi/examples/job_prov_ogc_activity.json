@@ -1,0 +1,382 @@
+{
+  "id": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c",
+  "provType": "Activity",
+  "name": "Run of workflow/packed.cwl#main",
+  "activityType": [
+    "wfprov:ProcessRun",
+    "wfprov:WorkflowRun"
+  ],
+  "startedAtTime": "2026-11-20T14:11:52.720253+00:00",
+  "atLocation": "https://hirondelle.crim.ca/weaver/processes/EchoProcess/jobs/57e9d06a-0aa1-4560-98a1-2c127e11c51c",
+  "wfprov:wasEnactedBy": {
+    "id": "urn:uuid:c6e00880-e085-4ab6-ac69-c0ac993f07c9",
+    "provType": "Agent",
+    "name": "cwltool 3.3.20261106131235.dev26+g707e26127",
+    "agentType": [
+      "prov:SoftwareAgent",
+      "wfprov:WorkflowEngine"
+    ],
+    "actedOnBehalfOf": {
+      "id": "urn:uuid:17a696a5-ee1f-4b3e-8ee4-c360c19f34e7",
+      "provType": "Agent",
+      "name": "weaver-worker",
+      "agentType": "foaf:OnlineAccount",
+      "atLocation": "https://hirondelle.crim.ca/weaver",
+      "cwlprov:hostname": "hirondelle.crim.ca",
+      "foaf:accountName": "weaver-worker",
+      "actedOnBehalfOf": {
+        "id": "urn:uuid:e8c0fbf5-c485-43f7-b789-9887c013c029",
+        "provType": "Agent",
+        "name": "weaver-worker@crim-ca/weaver:6.18.0",
+        "agentType": [
+          "prov:SoftwareAgent",
+          "schema:SoftwareApplication"
+        ],
+        "foaf:name": "weaver-worker@crim-ca/weaver:6.18.0",
+        "foaf:account": "urn:uuid:17a696a5-ee1f-4b3e-8ee4-c360c19f34e7",
+        "schema:name": "weaver-worker@crim-ca/weaver:6.18.0",
+        "hadDelegate": [
+          "urn:uuid:17a696a5-ee1f-4b3e-8ee4-c360c19f34e7",
+          {
+            "id": "urn:hash::sha1:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11",
+            "provType": "Agent",
+            "name": "Weaver internal WPS used for demo and testing.",
+            "agentType": "prov:SoftwareAgent",
+            "generalEntity": {
+              "id": "urn:hash::sha1:644e201526525f62152815a76a2dc773450f3dd9",
+              "provType": "Entity",
+              "name": "Source code repository",
+              "entityType": "schema:SoftwareSourceCode",
+              "atLocation": "https://github.com/crim-ca/weaver",
+              "wasAttributedTo": {
+                "id": "urn:hash::sha1:3102f6d7a018ebae572f457d711ed7e1e7a11bc2",
+                "provType": "Agent",
+                "agentType": "prov:Organization",
+                "foaf:name": "Computer Research Institute of Montréal",
+                "schema:name": "Computer Research Institute of Montréal",
+                "contributed": "urn:hash::sha1:644e201526525f62152815a76a2dc773450f3dd9"
+              },
+              "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+            },
+            "specificEntity": "https://doi.org/10.5281/zenodo.14210717",
+            "atLocation": "https://hirondelle.crim.ca/weaver",
+            "actedOnBehalfOf": [
+              "urn:uuid:e8c0fbf5-c485-43f7-b789-9887c013c029",
+              {
+                "id": "urn:hash::sha1:838cdfa4bbf09d1aedd26d79b46bfa8778ede2e0",
+                "provType": "Agent",
+                "name": "Server Provider",
+                "agentType": "prov:Organization",
+                "foaf:name": "Computer Research Institute of Montréal (CRIM)",
+                "schema:name": "Computer Research Institute of Montréal (CRIM)",
+                "atLocation": "http://pavics-weaver.readthedocs.org/en/latest/",
+                "hadDelegate": "urn:hash::sha1:0887ad6b6cd79b28db70bfe8b60f5e489a2edf11"
+              }
+            ]
+          }
+        ]
+      },
+      "hadDelegate": "urn:uuid:c6e00880-e085-4ab6-ac69-c0ac993f07c9"
+    },
+    "wasAssociateFor": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+  },
+  "wfprov:describedByProcess": {
+    "id": "urn:hash::sha1:3074a57368a31e0f562f819313be239fbdd327e1",
+    "provType": "Entity",
+    "name": "Process Description",
+    "entityType": "wfdesc:Process",
+    "atLocation": "https://hirondelle.crim.ca/weaver/processes/EchoProcess"
+  },
+  "wasAssociatedWith": "urn:uuid:c6e00880-e085-4ab6-ac69-c0ac993f07c9",
+  "used": [
+    "urn:hash::sha1:644e201526525f62152815a76a2dc773450f3dd9",
+    {
+      "id": "urn:hash::sha1:0cf60d40470fde378076afacf5812f961208a018",
+      "provType": "Entity",
+      "value": [
+        "Value2"
+      ],
+      "entityType": "wfprov:Artifact",
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c",
+      "wasGeneratedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    {
+      "id": "urn:uuid:1455b416-5441-4861-a75f-95e5a589d87e",
+      "provType": "Entity",
+      "value": [
+        9.81
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    {
+      "id": "urn:hash::sha1:d88aaa302517127d82182445af28a866c379e7ac",
+      "provType": "Entity",
+      "value": [
+        "2026-10-08T21:15:05.071416"
+      ],
+      "entityType": "wfprov:Artifact",
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c",
+      "wasGeneratedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    {
+      "id": "urn:uuid:6679364b-8c4e-42bb-b5aa-3199c6a14a69",
+      "provType": "Entity",
+      "value": [
+        3.1416
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    {
+      "id": "urn:uuid:74e830a1-ce04-409d-8246-ef1db3d12287",
+      "provType": "Entity",
+      "entityType": [
+        "prov:Collection",
+        "wfprov:Artifact"
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    {
+      "id": "urn:uuid:35f9edbd-4937-4c25-b27e-379e6128d416",
+      "provType": "Entity",
+      "entityType": [
+        "wf4ever:File",
+        "wfprov:Artifact"
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c",
+      "generalEntity": {
+        "id": "urn:hash::sha1:387a00b69dd6112551d5167f4498e05a89166eb0",
+        "provType": "Entity",
+        "entityType": "wfprov:Artifact",
+        "specificEntity": [
+          "urn:uuid:35f9edbd-4937-4c25-b27e-379e6128d416",
+          {
+            "id": "urn:uuid:af56c9b2-9d9e-4e04-8b9b-05324864a377",
+            "provType": "Entity",
+            "entityType": [
+              "wf4ever:File",
+              "wfprov:Artifact"
+            ],
+            "cwlprov:basename": "input",
+            "cwlprov:nameroot": "input",
+            "cwlprov:nameext": "",
+            "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c",
+            "generalEntity": "urn:hash::sha1:387a00b69dd6112551d5167f4498e05a89166eb0",
+            "wasGeneratedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+          }
+        ]
+      }
+    },
+    {
+      "id": "urn:uuid:b6bce66f-20d9-4536-8fdf-a80e6a530efa",
+      "provType": "Entity",
+      "entityType": [
+        "prov:Collection",
+        "wfprov:Artifact"
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    {
+      "id": "urn:uuid:58355480-5c9e-4816-bcf4-7aba0a64723d",
+      "provType": "Entity",
+      "entityType": [
+        "wf4ever:File",
+        "wfprov:Artifact"
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c",
+      "generalEntity": {
+        "id": "urn:hash::sha1:fc6f6f7466a49edf8dd6d0aa6d30457c85263b2d",
+        "provType": "Entity",
+        "entityType": "wfprov:Artifact",
+        "specificEntity": [
+          "urn:uuid:58355480-5c9e-4816-bcf4-7aba0a64723d",
+          {
+            "id": "urn:uuid:8c3ad3e7-4ddb-4ac0-8a33-bea641c745da",
+            "provType": "Entity",
+            "entityType": [
+              "wf4ever:File",
+              "wfprov:Artifact"
+            ],
+            "cwlprov:basename": "input_9jzae01l",
+            "cwlprov:nameroot": "input_9jzae01l",
+            "cwlprov:nameext": "",
+            "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c",
+            "generalEntity": "urn:hash::sha1:fc6f6f7466a49edf8dd6d0aa6d30457c85263b2d",
+            "wasGeneratedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+          }
+        ]
+      }
+    },
+    {
+      "id": "urn:uuid:6c495dbc-c70a-488e-85ac-971c8a478519",
+      "provType": "Entity",
+      "entityType": [
+        "prov:Collection",
+        "wfprov:Artifact"
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    {
+      "id": "urn:uuid:64f0f1fe-ee95-4ed2-857d-7ecf23f012fd",
+      "provType": "Entity",
+      "entityType": [
+        "wf4ever:File",
+        "wfprov:Artifact"
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c",
+      "generalEntity": {
+        "id": "urn:hash::sha1:f421813fc7dea73d182e0d89307b5ba45128a9b5",
+        "provType": "Entity",
+        "entityType": "wfprov:Artifact",
+        "specificEntity": [
+          "urn:uuid:64f0f1fe-ee95-4ed2-857d-7ecf23f012fd",
+          {
+            "id": "urn:uuid:8d0527fd-9a8d-4bf3-a649-ee3a5ffce1d8",
+            "provType": "Entity",
+            "entityType": [
+              "wf4ever:File",
+              "wfprov:Artifact"
+            ],
+            "cwlprov:basename": "input_fyqgjmql",
+            "cwlprov:nameroot": "input_fyqgjmql",
+            "cwlprov:nameext": "",
+            "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c",
+            "generalEntity": "urn:hash::sha1:f421813fc7dea73d182e0d89307b5ba45128a9b5",
+            "wasGeneratedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+          }
+        ]
+      }
+    },
+    {
+      "id": "urn:uuid:bfb1f574-8cea-4548-9168-b7176e4f04ac",
+      "provType": "Entity",
+      "value": [
+        9.81
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    {
+      "id": "urn:uuid:7491c7c3-38fa-4b09-ad41-58ef26c1233c",
+      "provType": "Entity",
+      "value": [
+        3.1416
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    {
+      "id": "urn:uuid:3e129c97-cf95-47f1-95fb-b0a0dfbdae69",
+      "provType": "Entity",
+      "entityType": [
+        "prov:Collection",
+        "wfprov:Artifact"
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    "urn:uuid:af56c9b2-9d9e-4e04-8b9b-05324864a377",
+    {
+      "id": "urn:uuid:c4e15377-2d8e-4560-a791-d29d2cf745e3",
+      "provType": "Entity",
+      "entityType": [
+        "prov:Collection",
+        "wfprov:Artifact"
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    "urn:uuid:8c3ad3e7-4ddb-4ac0-8a33-bea641c745da",
+    {
+      "id": "urn:uuid:92dad43c-7c0f-4772-856f-1006e27568bc",
+      "provType": "Entity",
+      "entityType": [
+        "prov:Collection",
+        "wfprov:Artifact"
+      ],
+      "wasUsedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    "urn:uuid:8d0527fd-9a8d-4bf3-a649-ee3a5ffce1d8"
+  ],
+  "generated": [
+    "urn:hash::sha1:0cf60d40470fde378076afacf5812f961208a018",
+    {
+      "id": "urn:uuid:efdab33d-9ebd-46dd-b2ab-91d5a8b09093",
+      "provType": "Entity",
+      "value": [
+        9.81
+      ],
+      "wasGeneratedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    "urn:hash::sha1:d88aaa302517127d82182445af28a866c379e7ac",
+    {
+      "id": "urn:uuid:bf9a65e9-4acd-4f3f-bf9d-607a6017188c",
+      "provType": "Entity",
+      "value": [
+        3.1416
+      ],
+      "wasGeneratedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    {
+      "id": "urn:uuid:8f1d5d34-443d-4088-adf6-b8675bb2ccde",
+      "provType": "Entity",
+      "entityType": [
+        "prov:Collection",
+        "wfprov:Artifact"
+      ],
+      "wasGeneratedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    "urn:uuid:af56c9b2-9d9e-4e04-8b9b-05324864a377",
+    {
+      "id": "urn:uuid:6b453680-78f4-4005-b8ac-dd6765824c4f",
+      "provType": "Entity",
+      "entityType": [
+        "prov:Collection",
+        "wfprov:Artifact"
+      ],
+      "wasGeneratedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    "urn:uuid:8c3ad3e7-4ddb-4ac0-8a33-bea641c745da",
+    {
+      "id": "urn:uuid:fbc1cb55-279e-4fad-9b77-2911a3413976",
+      "provType": "Entity",
+      "entityType": [
+        "prov:Collection",
+        "wfprov:Artifact"
+      ],
+      "wasGeneratedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    "urn:uuid:8d0527fd-9a8d-4bf3-a649-ee3a5ffce1d8",
+    {
+      "id": "urn:uuid:06bdacb3-2d37-4dd5-be2a-3f7620d8ff7f",
+      "provType": "Entity",
+      "entityType": [
+        "wf4ever:File",
+        "wfprov:Artifact"
+      ],
+      "cwlprov:basename": "stderr.log",
+      "cwlprov:nameroot": "stderr",
+      "cwlprov:nameext": ".log",
+      "generalEntity": {
+        "id": "urn:hash::sha1:da39a3ee5e6b4b0d3255bfef95601890afd80709",
+        "provType": "Entity",
+        "entityType": "wfprov:Artifact",
+        "specificEntity": "urn:uuid:06bdacb3-2d37-4dd5-be2a-3f7620d8ff7f"
+      },
+      "wasGeneratedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    },
+    {
+      "id": "urn:uuid:80b9eace-6fd2-4b49-baf7-23bc2df9ad7d",
+      "provType": "Entity",
+      "entityType": [
+        "wf4ever:File",
+        "wfprov:Artifact"
+      ],
+      "cwlprov:basename": "stdout.log",
+      "cwlprov:nameroot": "stdout",
+      "cwlprov:nameext": ".log",
+      "generalEntity": {
+        "id": "urn:hash::sha1:adc83b19e793491b1c6ea0fd8b46cd9f32e592fc",
+        "provType": "Entity",
+        "entityType": "wfprov:Artifact",
+        "specificEntity": "urn:uuid:80b9eace-6fd2-4b49-baf7-23bc2df9ad7d"
+      },
+      "wasGeneratedBy": "urn:uuid:57e9d06a-0aa1-4560-98a1-2c127e11c51c"
+    }
+  ]
+}
