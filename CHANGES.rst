@@ -33,6 +33,9 @@ Changes:
   (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
 - Add ``CQL2`` ``filter`` query parameter on ``GET /processes`` and ``GET /jobs``
   (resolves `#640 <https://github.com/crim-ca/weaver/issues/640>`_).
+- Add `CLI` support for job listing ``datetime``, ``sortby``, ``filter`` and ``filter-lang`` parameters
+  (resolves `#640 <https://github.com/crim-ca/weaver/issues/640>`_ and
+  `#643 <https://github.com/crim-ca/weaver/issues/643>`_).
 - Add ``/queryables/processes`` and ``/queryables/jobs`` descriptions generated from supported listing parameters,
   with discovery links (resolves `#646 <https://github.com/crim-ca/weaver/issues/646>`_).
 - Add `OGC API - Records` sorting, filtering and ``cql-filter`` conformance classes

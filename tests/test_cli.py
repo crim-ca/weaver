@@ -69,6 +69,37 @@ def test_cli_url_required_in_client_or_param():
 
 
 @pytest.mark.cli
+def test_cli_jobs_discovery_options():
+    """
+    Tests that CLI discovery options are forwarded as job listing query parameters.
+    """
+    with mock.patch.object(WeaverClient, "_request", return_value=mock.sentinel.response) as request:
+        with mock.patch.object(WeaverClient, "_parse_result", return_value=OperationResult(True, message="ok")):
+            run_command(
+                [
+                    "jobs",
+                    "-u",
+                    "https://fake.domain.com",
+                    "--sortby=-created,status",
+                    "--datetime=2025-01-01T00:00:00Z/2025-12-31T23:59:59Z",
+                    "--filter",
+                    "status = 'successful'",
+                    "--filter-lang",
+                    "cql2-text",
+                ],
+                entrypoint=weaver_cli,
+            )
+        params = request.call_args.kwargs["params"]
+
+    assert params == {
+        "sortby": "-created,status",
+        "datetime": "2025-01-01T00:00:00Z/2025-12-31T23:59:59Z",
+        "filter": "status = 'successful'",
+        "filter-lang": "cql2-text",
+    }
+
+
+@pytest.mark.cli
 def test_cli_url_override_by_operation():
     with mock.patch("weaver.cli.WeaverClient._parse_inputs", return_value=OperationResult()):
         client = WeaverClient(url="https://fake.domain.com")

@@ -2374,6 +2374,7 @@ class WeaverClient(object):
         request_retries=None,   # type: Optional[int]
         output_format=None,     # type: Optional[AnyOutputFormat]
         sort=None,              # type: Optional[Sort]
+        sortby=None,            # type: Optional[str]
         page=None,              # type: Optional[int]
         limit=None,             # type: Optional[int]
         status=None,            # type: Optional[Union[AnyStatusSearch, List[AnyStatusSearch]]]
@@ -2382,6 +2383,9 @@ class WeaverClient(object):
         process=None,           # type: Optional[str]
         provider=None,          # type: Optional[str]
         tags=None,              # type: Optional[Union[str, List[str]]]
+        datetime=None,          # type: Optional[str]
+        filter=None,            # type: Optional[str]
+        filter_lang=None,       # type: Optional[str]
     ):                          # type: (...) -> OperationResult
         """
         Obtain a listing of :term:`Job`.
@@ -2401,7 +2405,8 @@ class WeaverClient(object):
         :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
-        :param sort: Sorting field to list jobs. Name must be one of the fields supported by job objects.
+        :param sort: Deprecated sorting field. Use ``sortby`` instead.
+        :param sortby: Comma-separated sorting fields with optional ascending or descending prefixes.
         :param page: Paging index to list jobs.
         :param limit: Amount of jobs to list per page.
         :param status: Filter job listing only to matching status. If multiple are provided, must match one of them.
@@ -2410,6 +2415,9 @@ class WeaverClient(object):
         :param process: Obtain jobs executed only by matching :term:`Process`.
         :param provider: Obtain jobs only matching remote :term:`Provider`.
         :param tags: Obtain jobs filtered by matching tags. Jobs must match all tags simultaneously, not one of them.
+        :param datetime: Filter jobs by their creation datetime or interval.
+        :param filter: CQL2 filter expression to match jobs.
+        :param filter_lang: Language used to parse the CQL2 filter expression.
         :returns: Retrieved status of the job.
         """
         base_url = self._get_url(url)
@@ -2422,6 +2430,8 @@ class WeaverClient(object):
             query["limit"] = limit
         if sort is not None:
             query["sort"] = sort
+        if sortby is not None:
+            query["sortby"] = sortby
         if isinstance(status, (str, Status, StatusCategory)) and status:
             status = str(getattr(status, "value", status)).split(",")  # consider enum or plain single/multi string
         if isinstance(status, list) and status:
@@ -2439,6 +2449,12 @@ class WeaverClient(object):
             tags = ",".join(tags)
         if isinstance(tags, str) and tags:
             query["tags"] = tags
+        if isinstance(datetime, str) and datetime:
+            query["datetime"] = datetime
+        if isinstance(filter, str) and filter:
+            query["filter"] = filter
+        if isinstance(filter_lang, str) and filter_lang:
+            query["filter-lang"] = filter_lang
         resp = self._request("GET", jobs_url, params=query,
                              headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
@@ -4337,6 +4353,22 @@ def make_parser():
     op_jobs.add_argument(
         "-fT", "--tags", dest="tags", type=str.lower, nargs="+",
         help="Filter job listing only to matching tags. Jobs must match all tags simultaneously, not one of them."
+    )
+    op_jobs.add_argument(
+        "--sortby", dest="sortby",
+        help="Sort jobs by comma-separated fields, prefixing fields with '+' or '-' to set their direction."
+    )
+    op_jobs.add_argument(
+        "--datetime", dest="datetime",
+        help="Filter jobs by creation datetime or interval."
+    )
+    op_jobs.add_argument(
+        "--filter", dest="filter",
+        help="Filter jobs with a CQL2 expression."
+    )
+    op_jobs.add_argument(
+        "--filter-lang", dest="filter_lang",
+        help="Language used to parse the CQL2 filter expression."
     )
 
     op_dismiss = WeaverArgumentParser(
