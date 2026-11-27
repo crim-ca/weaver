@@ -5738,7 +5738,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
     def test_get_processes_filter_by_search_queries(self, _, query, match):
         # type: (str, JSON, bool) -> None
         """
-        Tests process discovery with literal text, keyword expressions and exact versions.
+        Tests process queryables with literal text, keyword expressions and exact versions.
         """
         p_id = "test-process-search-queries"
         self.process_store.save_process(Process(
@@ -5855,7 +5855,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
     def test_get_processes_filter_by_search_order(self, _, query, expected):
         # type: (str, JSON, List[str]) -> None
         """
-        Tests signed multi-field sorting and explicit order with the existing discovery aggregation.
+        Tests signed multi-field sorting and explicit order with the existing listing aggregation.
         """
         for suffix, version in [("a", "2.0.0"), ("b", "1.0.0"), ("c", "1.0.0")]:
             self.process_store.save_process(Process(

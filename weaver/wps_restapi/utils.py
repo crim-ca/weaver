@@ -11,10 +11,10 @@ from pyramid.events import BeforeRender, subscriber
 from pyramid.httpexceptions import HTTPBadRequest, HTTPSuccessful, HTTPUnprocessableEntity, status_map
 
 from weaver import __meta__
-from weaver.utils import get_header, get_settings, get_weaver_url
+from weaver.utils import get_header, get_request_args, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import OAS3TypeConversionDispatcher
-from weaver.wps_restapi.filter import FilterSchema
+from weaver.wps_restapi.filter import FilterLanguage
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional
@@ -38,16 +38,16 @@ def get_query_params(request):
     """
     Obtains the request query parameters with the ``datetime`` ``+`` offset restored from its decoded space.
     """
-    params = dict(request.params)
+    params = dict(get_request_args(request))
     if params.get("datetime", False):
         params["datetime"] = params["datetime"].replace(" ", "+")
     return params
 
 
-def resolve_discovery_params(params):
+def resolve_queryables_params(params):
     # type: (Dict[str, Any]) -> Dict[str, Any]
     """
-    Converts validated discovery query parameters into the arguments supported by the listing search of the stores.
+    Converts validated queryable query parameters into the arguments supported by the listing search of the stores.
 
     The deprecated ``sort`` is interpreted as ``sortby``. The ``datetime`` and ``filter`` expressions are parsed.
 
@@ -69,9 +69,10 @@ def resolve_discovery_params(params):
     filter_lang = params.pop("filter-lang", None)
     params.pop("filter-crs", None)
     if filter_expr:
-        filter_lang = filter_lang or ("cql2-text" if isinstance(filter_expr, str) else "cql2-json")
+        default_lang = FilterLanguage.CQL2_TEXT if isinstance(filter_expr, str) else FilterLanguage.CQL2_JSON
+        filter_lang = filter_lang or default_lang
         try:
-            params["filter_ast"] = FilterSchema().validate(filter_expr, filter_lang)
+            params["filter_ast"] = sd.FilterSchema().validate(filter_expr, filter_lang)
         except colander.Invalid as exc:
             raise HTTPBadRequest(json={
                 "error": "ListingInvalidParameter",

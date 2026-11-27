@@ -61,7 +61,7 @@ LOGGER = logging.getLogger(__name__)
 def get_process_queryables(request):
     # type: (PyramidRequest) -> JSON
     """
-    Describes supported process discovery parameters.
+    Describes supported process queryables.
     """
     return get_queryables_schema(sd.GetProcessesQuery(), request.path_url)
 

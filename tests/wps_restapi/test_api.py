@@ -115,7 +115,7 @@ class GenericApiRoutesTestCase(WpsConfigBase):
             self.fail(f"expected valid response format as defined in schema [{ex!s}]")
 
     @pytest.mark.ogc_records
-    def test_conformance_records_discovery(self):
+    def test_conformance_records_queryables(self):
         resp = self.app.get("/conformance", headers=self.json_headers)
         records = "http://www.opengis.net/spec/ogcapi-records-1/1.0"
         for name in ["sorting", "filtering", "cql-filter"]:

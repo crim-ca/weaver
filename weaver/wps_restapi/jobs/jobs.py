@@ -62,7 +62,7 @@ from weaver.wps_restapi.jobs.utils import (
     validate_service_process
 )
 from weaver.wps_restapi.providers.utils import get_service
-from weaver.wps_restapi.utils import get_query_params, get_queryables_schema, resolve_discovery_params
+from weaver.wps_restapi.utils import get_query_params, get_queryables_schema, resolve_queryables_params
 
 if TYPE_CHECKING:
     from typing import Iterable, List
@@ -83,7 +83,7 @@ LOGGER = get_task_logger(__name__)
 def get_job_queryables(request):
     # type: (PyramidRequest) -> JSON
     """
-    Describes supported job discovery parameters.
+    Describes supported job queryables.
     """
     return get_queryables_schema(sd.GetJobsQueries(), request.path_url)
 
@@ -160,7 +160,7 @@ def get_queried_jobs(request):
             "value": repr_json(ex.value or params, force_string=False),
         })
 
-    params = resolve_discovery_params(params)
+    params = resolve_queryables_params(params)
     service, process = validate_service_process(request)
     LOGGER.debug("Job search queries (raw):\n%s", repr_json(params, indent=2))
     for param_name in ["process", "processID", "provider", "service"]:

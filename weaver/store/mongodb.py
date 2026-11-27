@@ -60,13 +60,7 @@ from weaver.utils import (
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.filter import (
-    JOB_FILTER_FIELDS,
-    PROCESS_FILTER_FIELDS,
-    parse_keyword_query,
-    parse_search_query,
-    parse_version_range
-)
+from weaver.wps_restapi.filter import parse_keyword_query, parse_search_query, parse_version_range
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
@@ -158,7 +152,7 @@ class MongoFilterTranslator(object):
         "in": "$$this.href",
     }}
     _PROCESS_MONGO_FIELDS = {
-        "identifier": ("$identifier", _FIELD_SCALAR),
+        "id": ("$identifier", _FIELD_SCALAR),
         "title": ({"$ifNull": ["$title", "$identifier"]}, _FIELD_SCALAR),
         "description": ({"$cond": ["$abstract", "$abstract", {"$ifNull": ["$description", ""]}]}, _FIELD_SCALAR),
         "keywords": ("$keywords", _FIELD_ARRAY),
@@ -170,8 +164,8 @@ class MongoFilterTranslator(object):
     _JOB_MONGO_FIELDS = {
         "id": ("$id", _FIELD_SCALAR),
         "status": ("$status", _FIELD_SCALAR),
-        "process": ("$process", _FIELD_SCALAR),
-        "service": ("$service", _FIELD_SCALAR),
+        "processID": ("$process", _FIELD_SCALAR),
+        "provider": ("$service", _FIELD_SCALAR),
         "created": ("$created", _FIELD_DATETIME),
         "started": ("$started", _FIELD_DATETIME),
         "finished": ("$finished", _FIELD_DATETIME),
@@ -190,23 +184,21 @@ class MongoFilterTranslator(object):
     @classmethod
     def for_processes(cls):
         # type: (Type[MongoFilterTranslator]) -> MongoFilterTranslator
-        return cls(PROCESS_FILTER_FIELDS, cls._PROCESS_MONGO_FIELDS, cls._PROCESS_VALUE_RESOLVERS)
+        return cls(cls._PROCESS_MONGO_FIELDS, cls._PROCESS_VALUE_RESOLVERS)
 
     @classmethod
     def for_jobs(cls):
         # type: (Type[MongoFilterTranslator]) -> MongoFilterTranslator
-        return cls(JOB_FILTER_FIELDS, cls._JOB_MONGO_FIELDS)
+        return cls(cls._JOB_MONGO_FIELDS)
 
-    def __init__(self, query_fields, mongo_fields, resolvers=None):
-        # type: (Dict[str, str], MongoFilterFields, Optional[Dict[str, Callable[[Any], List[Any]]]]) -> None
+    def __init__(self, mongo_fields, resolvers=None):
+        # type: (MongoFilterFields, Optional[Dict[str, Callable[[Any], List[Any]]]]) -> None
         """
         Initializes the MongoDB filter translator.
 
-        :param query_fields: Mapping of API queryable names to datatype field names.
-        :param mongo_fields: Mapping of datatype fields to MongoDB expressions and value kinds.
+        :param mongo_fields: Mapping of API queryable names to MongoDB expressions and value kinds.
         :param resolvers: Mapping of queryable names to functions expanding equivalent values.
         """
-        self.query_fields = query_fields
         self.mongo_fields = mongo_fields
         self.resolvers = resolvers or {}
 
@@ -290,10 +282,9 @@ class MongoFilterTranslator(object):
         # type: (AstType) -> Tuple[Any, str]
         if not isinstance(node, ast.Attribute):
             raise self._invalid_filter("Unsupported filter property.", getattr(node, "name", node))
-        field_name = self.query_fields.get(node.name)
-        if field_name not in self.mongo_fields:
+        if node.name not in self.mongo_fields:
             raise self._invalid_filter("Unsupported filter property.", node.name)
-        return self.mongo_fields[field_name]
+        return self.mongo_fields[node.name]
 
     def _values(self, name, value):
         # type: (str, Any) -> List[Any]
@@ -1011,7 +1002,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                              filter_ast,    # type: Optional[AstType]
                              ):             # type: (...) -> List[MongodbAggregateExpression]
         """
-        Builds process discovery conditions for the existing listing aggregation.
+        Builds process queryables conditions for the existing listing aggregation.
         """
         conditions = []  # type: List[MongodbAggregateExpression]
         if keywords:

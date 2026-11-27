@@ -94,7 +94,7 @@ from weaver.wps.utils import (
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
+from weaver.wps_restapi.utils import get_query_params, get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Literal, NoReturn, Optional, Sequence, Tuple, Type, Union
@@ -292,10 +292,7 @@ def get_job_list_links(job_total, filters, grouped, request):
     base_url = get_wps_restapi_base_url(request)
 
     # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
-    kvp_params = {param: value for param, value in request.params.items() if param != "page"}
-    # patch datetime that have some extra character manipulation (reapply '+' auto-converted to ' ' by params parser)
-    if "datetime" in kvp_params:
-        kvp_params["datetime"] = kvp_params["datetime"].replace(" ", "+")
+    kvp_params = {param: value for param, value in get_query_params(request).items() if param != "page"}
     kvp_params = {
         urllib.parse.quote(key, safe=""): urllib.parse.quote(value, safe="")
         for key, value in kvp_params.items()
@@ -345,7 +342,7 @@ def get_job_list_links(job_total, filters, grouped, request):
 
     links.append({
         "href": base_url + sd.jobs_queryables_service.path, "rel": sd.OGC_API_REL_QUERYABLES_URI,
-        "type": ContentType.APP_JSON, "title": "Supported job discovery parameters."
+        "type": ContentType.APP_JSON, "title": "Supported job queryables."
     })
 
     if not grouped:

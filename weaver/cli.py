@@ -77,6 +77,7 @@ from weaver.utils import (
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.constants import ConformanceCategory
+from weaver.wps_restapi.filter import FilterLanguage
 
 if TYPE_CHECKING:
     from typing import (
@@ -3364,7 +3365,7 @@ def add_process_search_options(parser):
     )
     parser.add_argument(
         "--filter-lang", dest="filter_lang",
-        choices=sd.AnyFilterLanguage().validator.choices, type=str.lower,
+        choices=FilterLanguage.values(), type=str.lower,
         help="Language used to parse the CQL filter expression."
     )
     parser.add_argument(
@@ -4524,7 +4525,7 @@ def make_parser():
         help="Filter jobs with a CQL2 expression."
     )
     op_jobs.add_argument(
-        "--filter-lang", dest="filter_lang", choices=sd.AnyFilterLanguage().validator.choices, type=str.lower,
+        "--filter-lang", dest="filter_lang", choices=FilterLanguage.values(), type=str.lower,
         help="Language used to parse the CQL2 filter expression."
     )
     op_jobs.add_argument(
