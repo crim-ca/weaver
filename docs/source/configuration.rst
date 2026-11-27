@@ -649,16 +649,24 @@ Mapping entries support the following fields:
     * - Field
       - Description
     * - ``url``
-      - Remote :term:`WPS` endpoint. A :term:`URL` may target a ``GetCapabilities`` listing or a specific
-        ``DescribeProcess`` response.
+      - Remote :term:`WPS` endpoint. A :term:`URL` may target a ``GetCapabilities`` listing request
+        or a specific ``DescribeProcess`` request. If using a ``DescribeProcess`` reference,
+        the ``id`` configuration may be omitted as it can be inferred from the ``identifier``
+        parameter required by that request. An alternate ``name`` may be provided to allow a registration
+        of a :term:`Remote Process` identifier that does not conform to :term:`Process` identifier registration
+        rules imposed by `Weaver`.
     * - ``id``
-      - Optional process identifier or list of identifiers to register from the remote service. This field applies to
-        ``processes`` entries. If omitted, all processes available from the endpoint are registered.
+      - Optional :term:`Process` identifier or list of identifiers to register from the remote :term:`Provider`.
+        This field applies to ``processes`` entries.
+        If omitted, all processes discovered from the endpoint are registered.
     * - ``name``
-      - Optional service name. If omitted, `Weaver` derives a valid service name from the endpoint host name.
+      - Optional :term:`Provider` name to employ as identifier for `Weaver` endpoints.
+        It must respect the SLUG pattern allowed by the :term:`API`.
+        If omitted, `Weaver` derives a valid :term:`Provider` name from the host name of the `url`.
     * - ``visible``
-      - Optional boolean that controls whether the registered process or provider processes are visible. The default is
-        ``false``.
+      - Optional boolean that controls whether the registered :term:`Process` or :term:`Provider`
+        processes are visible. The default is ``false``. Set this to ``true`` if access to the processes
+        is managed by another external method.
 
 .. note::
     Processes defined under ``processes`` section registered into `Weaver` will correspond to a local snapshot of
