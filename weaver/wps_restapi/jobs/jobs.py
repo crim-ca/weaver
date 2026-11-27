@@ -62,8 +62,7 @@ from weaver.wps_restapi.jobs.utils import (
     validate_service_process
 )
 from weaver.wps_restapi.providers.utils import get_service
-from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
-from weaver.wps_restapi.utils import get_queryables_schema
+from weaver.wps_restapi.utils import get_query_params, get_queryables_schema, resolve_discovery_params
 
 if TYPE_CHECKING:
     from typing import Iterable, List
@@ -148,10 +147,7 @@ def get_queried_jobs(request):
     """
 
     settings = get_settings(request)
-    params = dict(request.params)
-    if params.get("datetime", False):
-        # replace white space with '+' since request.params replaces '+' with whitespaces when parsing
-        params["datetime"] = params["datetime"].replace(" ", "+")
+    params = get_query_params(request)
 
     try:
         params = sd.GetJobsQueries().deserialize(params)
@@ -164,6 +160,7 @@ def get_queried_jobs(request):
             "value": repr_json(ex.value or params, force_string=False),
         })
 
+    params = resolve_discovery_params(params)
     service, process = validate_service_process(request)
     LOGGER.debug("Job search queries (raw):\n%s", repr_json(params, indent=2))
     for param_name in ["process", "processID", "provider", "service"]:
@@ -186,14 +183,6 @@ def get_queried_jobs(request):
     filters["max_duration"] = filters.pop("maxDuration", None)
     filters["job_type"] = filters.pop("type", None)
 
-    dti = datetime_interval_parser(params["datetime"]) if params.get("datetime", False) else None
-    if dti and dti.get("before", False) and dti.get("after", False) and dti["after"] > dti["before"]:
-        raise HTTPUnprocessableEntity(json={
-            "code": "InvalidDateFormat",
-            "description": "Datetime at the start of the interval must be less than the datetime at the end."
-        })
-    filters["datetime_interval"] = dti
-    filters.pop("datetime", None)
     LOGGER.debug("Job search queries (processed):\n%s", repr_json(filters, indent=2))
 
     store = get_db(request).get_store(StoreJobs)

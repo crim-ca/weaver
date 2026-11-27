@@ -2,6 +2,7 @@ import io
 import math
 import os
 import shutil
+import urllib.parse
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast, overload
 from urllib.parse import unquote_plus
@@ -295,6 +296,10 @@ def get_job_list_links(job_total, filters, grouped, request):
     # patch datetime that have some extra character manipulation (reapply '+' auto-converted to ' ' by params parser)
     if "datetime" in kvp_params:
         kvp_params["datetime"] = kvp_params["datetime"].replace(" ", "+")
+    kvp_params = {
+        urllib.parse.quote(key, safe=""): urllib.parse.quote(value, safe="")
+        for key, value in kvp_params.items()
+    }
     alt_kvp = deepcopy(kvp_params)
 
     # request job uses general endpoint, obtain the full path if any service/process was given as alternate location
@@ -337,6 +342,11 @@ def get_job_list_links(job_total, filters, grouped, request):
             "href": get_path_kvp(alt_path, page=cur_page, **alt_kvp), "rel": "alternate",
             "type": ContentType.APP_JSON, "title": "Alternate endpoint with equivalent set of filtered jobs."
         })
+
+    links.append({
+        "href": base_url + sd.jobs_queryables_service.path, "rel": sd.OGC_API_REL_QUERYABLES_URI,
+        "type": ContentType.APP_JSON, "title": "Supported job discovery parameters."
+    })
 
     if not grouped:
         links.append({

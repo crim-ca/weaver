@@ -32,14 +32,16 @@ List jobs with filtering, pagination, and sorting capabilities.
 - **status** (string): Filter by job status (running, succeeded, failed, etc.)
 - **limit** (integer): Maximum number of results (default: 10)
 - **page** (integer): Page number for pagination (default: 0)
-- **sort** (string): Sort order (e.g., "created:desc")
+- **sortby** (string): Signed, comma-separated sorting fields, such as `-created,status`
+- **sort** (string): Deprecated alias of **sortby**. Cannot be combined with it.
+- **filter** (string): CQL2 expression, with optional **filter-lang**
 - **tags** (list): Filter by job tags
 - **date** (string): Filter by date range
 - **detail** (boolean): Include detailed information
 
 ## CLI Usage
 
-`GET /jobs/queryables` describes the supported API listing parameters as JSON Schema.
+`GET /queryables/jobs` describes the supported API listing parameters as JSON Schema.
 It is linked from the landing page using `http://www.opengis.net/def/rel/ogc/1.0/queryables`.
 
 ```bash

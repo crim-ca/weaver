@@ -546,16 +546,23 @@ The ``GET /processes`` listing supports the following search parameters for loca
   Either bound can be open using ``..``, such as ``version=1.0.0/..``.
   By default, only the latest revision of each process is searched.
   Use ``revisions=true`` to include older revisions, optionally with ``process={processID}``.
-- ``sortby`` specifies comma-separated sorting fields, with ``+`` for ascending (default) or ``-`` for descending.
-  For example, ``sortby=+id,-version``. Alternatively, use ``sort=id&order=DESC`` to set an explicit direction.
-  Do not combine ``sortby`` with ``sort`` or ``order``.
+- ``datetime`` matches the process ``created`` time, as an instant or an interval such as ``2024-01-01T00:00:00Z/..``.
+- ``type`` matches comma-separated process types, case-insensitively, such as ``workflow``, ``application`` or ``wps``.
+  The `OGC API - Records` resource type URIs of `WPS` and `OGC API - Processes` are also accepted.
+- ``license`` matches the ``href`` or ``title`` of a ``license`` link relation within ``metadata`` or ``links``.
+- ``filter`` applies a `CQL2` expression (``filter-lang`` defaults to ``cql2-text`` or ``cql2-json``) over the
+  queryable properties of the listing, including temporal functions applied on ``created``.
+  The same parameter is available on ``GET /jobs``.
+- ``sortby`` specifies comma-separated sorting fields, with ``+`` for ascending or ``-`` for descending.
+  Fields without prefix use their default direction. For example, ``sortby=+id,-version``.
+  The deprecated ``sort`` is interpreted as ``sortby``, and both cannot be provided together.
 
 Different search parameters are combined with AND. They can be used with metadata filters, sorting, pagination and
 ``detail=false``. Filtering occurs before pagination, and ``total`` counts all matching public processes.
 Terms are not regular expressions. Empty terms are invalid.
 These searches cannot be combined with ``providers=true``, since remote provider listings cannot apply the filters.
 URL-encode search values, in particular ``+`` as ``%2B``, to avoid interpreting it as a space in a query string.
-The ``/processes/queryables`` and ``/jobs/queryables`` endpoints describe the parameters supported by each listing
+The ``/queryables/processes`` and ``/queryables/jobs`` endpoints describe the parameters supported by each listing
 as JSON Schema. Both are discoverable from the landing page using the
 ``http://www.opengis.net/def/rel/ogc/1.0/queryables`` link relation.
 

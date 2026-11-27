@@ -21,14 +21,26 @@ Changes:
   (partially resolves `#644 <https://github.com/crim-ca/weaver/issues/644>`_).
 - Add exact and inclusive ``lower/upper`` version range filtering on ``GET /processes``
   (resolves `#627 <https://github.com/crim-ca/weaver/issues/627>`_).
-- Add ``sortby`` signed multi-field sorting and ``sort``/``order`` support on ``GET /processes``
+- Add ``sortby`` signed multi-field sorting on ``GET /processes`` and ``GET /jobs``, and deprecate ``sort``
   (resolves `#643 <https://github.com/crim-ca/weaver/issues/643>`_).
-- Add ``/processes/queryables`` and ``/jobs/queryables`` descriptions generated from supported listing parameters,
+- Add ``created`` datetime to `Process` and ``datetime`` query parameter on ``GET /processes`` matching it
+  (partially resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
+- Add ``type`` query parameter on ``GET /processes`` matching `Process` types or `OGC API - Records` resource type URIs
+  (resolves `#642 <https://github.com/crim-ca/weaver/issues/642>`_ and
+  `#645 <https://github.com/crim-ca/weaver/issues/645>`_).
+- Add ``license`` query parameter on ``GET /processes`` matching ``license`` links or metadata
+  (partially resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
+- Add ``CQL2`` ``filter`` query parameter on ``GET /processes`` and ``GET /jobs``
+  (resolves `#640 <https://github.com/crim-ca/weaver/issues/640>`_).
+- Add ``/queryables/processes`` and ``/queryables/jobs`` descriptions generated from supported listing parameters,
   with discovery links (partially resolves `#646 <https://github.com/crim-ca/weaver/issues/646>`_).
+- Add `OGC API - Records` sorting, filtering and ``cql-filter`` conformance classes
+  (partially resolves `#641 <https://github.com/crim-ca/weaver/issues/641>`_).
 
 Fixes:
 ------
-- No change.
+- Fix ``_recursive_replace`` handling of non-string keys in `Process` and `Job` definitions.
+- Fix paging links of ``GET /jobs`` not URL-encoding the provided query parameters.
 
 .. _changes_6.18.0:
 

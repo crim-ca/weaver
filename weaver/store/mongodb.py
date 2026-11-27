@@ -44,6 +44,7 @@ from weaver.processes.types import ProcessType
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.store.base import StoreBills, StoreJobs, StoreProcesses, StoreQuotes, StoreServices, StoreVault
+from weaver.store.filters import FIELD_ARRAY, FIELD_DATETIME, FIELD_SCALAR, FilterTranslator
 from weaver.utils import (
     VersionFormat,
     as_version_major_minor_patch,
@@ -67,6 +68,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple, Union
     from typing_extensions import TypedDict
 
+    from pygeofilter.ast import AstType
     from pymongo.collection import Collection
 
     from weaver.execute import AnyExecuteMode, AnyExecuteResponse, AnyExecuteReturnPreference
@@ -127,6 +129,35 @@ if TYPE_CHECKING:
     ]
     MongodbAggregateStep = Union[MongodbValue, MongodbAggregateExpression]
     MongodbAggregatePipeline = List[Dict[str, Union[str, Dict[str, MongodbAggregateStep]]]]
+
+_LICENSE_LINKS = {"$concatArrays": [{"$ifNull": ["$metadata", []]}, {"$ifNull": ["$additional_links", []]}]}
+_LICENSE_HREFS = {"$map": {
+    "input": {"$filter": {
+        "input": _LICENSE_LINKS,
+        "cond": {"$or": [{"$eq": ["$$this.rel", "license"]}, {"$eq": ["$$this.role", "license"]}]},
+    }},
+    "in": "$$this.href",
+}}
+PROCESS_FILTER_FIELDS = {
+    "id": ("$identifier", FIELD_SCALAR),
+    "title": ({"$ifNull": ["$title", "$identifier"]}, FIELD_SCALAR),
+    "description": ({"$cond": ["$abstract", "$abstract", {"$ifNull": ["$description", ""]}]}, FIELD_SCALAR),
+    "keywords": ("$keywords", FIELD_ARRAY),
+    "version": ("$version", FIELD_SCALAR),
+    "type": ("$type", FIELD_SCALAR),
+    "license": ({"$arrayElemAt": [_LICENSE_HREFS, 0]}, FIELD_SCALAR),
+    "created": ("$created", FIELD_DATETIME),
+}
+PROCESS_FILTER_RESOLVERS = {"type": ProcessType.resolve}
+JOB_FILTER_FIELDS = {
+    "id": ("$id", FIELD_SCALAR),
+    "status": ("$status", FIELD_SCALAR),
+    "processID": ("$process", FIELD_SCALAR),
+    "provider": ("$service", FIELD_SCALAR),
+    "created": ("$created", FIELD_DATETIME),
+    "started": ("$started", FIELD_DATETIME),
+    "finished": ("$finished", FIELD_DATETIME),
+}
 
 LOGGER = logging.getLogger(__name__)
 
@@ -279,6 +310,43 @@ class ListingMixin(object):
             })
         sort_order = pymongo.DESCENDING if sort in (Sort.FINISHED, Sort.CREATED) else pymongo.ASCENDING
         return {sort: sort_order}
+
+    @classmethod
+    def _apply_sortby(cls, sortby, sort_default, sort_allowed, aliases=None):
+        # type: (Optional[str], AnySortType, Iterable[AnySortType], Optional[Dict[str, List[str]]]) -> Dict[str, int]
+        """
+        Resolves comma-separated sorting fields that can be prefixed by ``+`` (ascending) or ``-`` (descending).
+
+        Fields without prefix employ their default direction. A leading space is interpreted as ``+``,
+        since an unescaped ``+`` in a query string is decoded as a space.
+        Aliases map a field to one or many equivalent fields of the database representation.
+        """
+        sort_fields = {}  # type: MongodbAggregateSortOrder
+        for term in sortby.split(",") if sortby else [sort_default]:
+            term = f"+{term[1:]}" if term.startswith(" ") else term
+            name = term.lstrip("+-")
+            direction = {"+": pymongo.ASCENDING, "-": pymongo.DESCENDING}.get(term[:1])
+            for field in (aliases or {}).get(name, [name]):
+                for key, default_direction in cls._apply_sort_method(field, sort_default, sort_allowed).items():
+                    sort_fields[key] = direction or default_direction
+        return sort_fields
+
+    @staticmethod
+    def _apply_datetime_filter(datetime_interval):
+        # type: (Optional[DatetimeIntervalType]) -> MongodbAggregateExpression
+        search_filters = {}
+        if datetime_interval is not None:
+            if datetime_interval.get("after", False):
+                search_filters["$gte"] = datetime_interval["after"]
+
+            if datetime_interval.get("before", False):
+                search_filters["$lte"] = datetime_interval["before"]
+
+            if datetime_interval.get("match", False):
+                search_filters = datetime_interval["match"]
+
+            return {"created": search_filters}
+        return {}
 
     @staticmethod
     def _apply_total_result(search_pipeline, extra_pipeline):
@@ -563,7 +631,10 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                        query=None,          # type: Optional[str]
                        version=None,        # type: Optional[str]
                        sortby=None,         # type: Optional[str]
-                       order=None,          # type: Optional[str]
+                       datetime_interval=None,  # type: Optional[DatetimeIntervalType]
+                       license_ref=None,    # type: Optional[str]
+                       process_type=None,   # type: Optional[str]
+                       filter_ast=None,     # type: Optional[AstType]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         """
         Lists all processes in database, optionally filtered by `visibility`.
@@ -595,8 +666,15 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             Phrase search across title, description and keywords with comma-separated OR groups.
             Boundary-prefixed ``+`` and ``-`` introduce AND and NOT terms. Other signs are literal.
         :param version: Exact process version or inclusive ``lower/upper`` range with ``..`` for open bounds.
-        :param sortby: Comma-separated fields prefixed with ``+`` (ascending) or ``-`` (descending).
-        :param order: Explicit ``ASC`` or ``DESC`` direction applied to ``sort``.
+        :param sortby:
+            Comma-separated fields optionally prefixed with ``+`` (ascending) or ``-`` (descending).
+            Fields without prefix use their default direction. Takes precedence over :paramref:`sort`.
+        :param datetime_interval: Interval that the process ``created`` datetime must match.
+        :param license_ref: License reference (``href`` or ``title``) of a ``license`` link or metadata of the process.
+        :param process_type:
+            Comma-separated :class:`ProcessType` (case-insensitive) or equivalent resource type URIs.
+            Any of the specified types must match.
+        :param filter_ast: Parsed `CQL2` filter expression matched against the supported queryable properties.
         :returns:
             List of sorted, and possibly page-filtered, processes matching queries.
             If ``total`` was requested, return a tuple of this list and the number of processes.
@@ -676,24 +754,26 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                     metadata_conditions.append({scope: {"$elemMatch": {"metadata": {"$elemMatch": elem_match}}}})
             search_filters["$and"] = metadata_conditions
 
-        search_conditions = self._apply_search_filter(keywords, title, description, q, query, version)
+        search_conditions = self._apply_search_filter(
+            keywords, title, description, q, query, version, license_ref, process_type, filter_ast,
+        )
         if search_conditions:
             search_filters.setdefault("$and", []).extend(search_conditions)
+        search_filters.update(self._apply_datetime_filter(datetime_interval))
 
-        # processes do not have 'created', but ObjectID in '_id' has the particularity of embedding creation time
-        if sort == Sort.CREATED:
-            sort = "_id"
-        # replace equivalent aliases to corresponding fields in db
-        if sort in [Sort.ID, Sort.PROCESS]:
-            sort = Sort.ID_LONG
-        sort_allowed = list(SortMethods.PROCESS) + ["_id"]
-        sort_fields = self._apply_sort_method(sort, Sort.ID_LONG, sort_allowed)
-        if revisions and sort in [Sort.ID, Sort.ID_LONG, Sort.PROCESS]:
+        # processes saved before 'created' existed can still be matched with the creation time embedded in '_id'
+        insert_fields.append({"$set": {"created": {"$ifNull": ["$created", {"$toDate": "$_id"}]}}})
+        sort_id = [Sort.ID_LONG, Sort.VERSION] if revisions else [Sort.ID_LONG]
+        sort_fields = self._apply_sortby(
+            sortby or sort, Sort.ID, SortMethods.PROCESS,
+            {Sort.ID: sort_id, Sort.PROCESS: sort_id, Sort.ID_LONG: sort_id},
+        )
+        if revisions and Sort.VERSION in sort_fields and Sort.ID_LONG in sort_fields:
             # If listing many revisions, sort by version on top of ID to make listing more natural.
             # Because the "latest version" is saved with 'id' only while "older revisions" are saved with 'id:version',
             # that more recent version would always appear first since alphabetical sort: 'id' (latest) < 'id:version'.
             # Work around this by dynamically reassigning 'id' by itself.
-            insert_fields = [
+            insert_fields += [
                 {"$set": {"id_version": {"$split": ["$identifier", ":"]}}},
                 {"$set": {"identifier": {"$arrayElemAt": ["$id_version", 0]}}},
                 # Don't set the 'version' field with index=1 here since an explicit 'null' from parsing 'id_version'
@@ -701,8 +781,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                 # where 'id' does not contain ':' (therefore 'null' result from '$split') although that latest process
                 # is a revision that *should* have the 'version' value provided for the previous version to be created.
             ]
-            sort_fields = {"identifier": pymongo.ASCENDING, "version": pymongo.ASCENDING}
-        sort_method = [{"$sort": self._apply_process_order(sort_fields, sortby, order)}]
+        sort_method = [{"$sort": sort_fields}]
 
         search_pipeline = insert_fields + [{"$match": search_filters}] + resolve_filter + sort_method
         paging_pipeline = self._apply_paging_pipeline(page, limit)
@@ -719,28 +798,6 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             return items, total
         return [Process(item) for item in found]
 
-    @classmethod
-    def _apply_process_order(cls, sort_fields, sortby, order):
-        # type: (MongodbAggregateSortOrder, Optional[str], Optional[str]) -> MongodbAggregateSortOrder
-        """
-        Applies explicit sorting directions without changing the existing default ordering.
-        """
-        if sortby:
-            ordered_fields = {}
-            for term in sortby.split(","):
-                field = term.lstrip("+-")
-                field = {Sort.ID: Sort.ID_LONG, Sort.PROCESS: Sort.ID_LONG, Sort.CREATED: "_id"}.get(field, field)
-                direction = pymongo.DESCENDING if term.startswith("-") else pymongo.ASCENDING
-                validated = cls._apply_sort_method(field, Sort.ID_LONG, list(SortMethods.PROCESS) + ["_id"])
-                ordered_fields.update({key: direction for key in validated})
-            return ordered_fields
-        if order:
-            if order.upper() not in ["ASC", "DESC"]:
-                raise ListingInvalidParameter(json={"description": "Invalid sorting order.", "value": order})
-            direction = pymongo.ASCENDING if order.upper() == "ASC" else pymongo.DESCENDING
-            return {key: direction for key in sort_fields}
-        return sort_fields
-
     @staticmethod
     def _apply_search_filter(keywords,      # type: Optional[str]
                              title,         # type: Optional[str]
@@ -748,6 +805,9 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                              q,             # type: Optional[str]
                              query,         # type: Optional[str]
                              version,       # type: Optional[str]
+                             license_ref,   # type: Optional[str]
+                             process_type,  # type: Optional[str]
+                             filter_ast,    # type: Optional[AstType]
                              ):             # type: (...) -> List[MongodbAggregateExpression]
         """
         Builds process discovery conditions for the existing listing aggregation.
@@ -768,7 +828,29 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                 conditions.append(MongodbProcessStore._apply_query_filter(expression))
         if version:
             conditions.append(MongodbProcessStore._apply_version_filter(version))
+        if license_ref:
+            conditions.append(MongodbProcessStore._apply_license_filter(license_ref))
+        if process_type:
+            types = [value for item in process_type.split(",") for value in ProcessType.resolve(item)]
+            conditions.append({"type": {"$in": types}})
+        if filter_ast:
+            translator = FilterTranslator(PROCESS_FILTER_FIELDS, PROCESS_FILTER_RESOLVERS)
+            conditions.append({"$expr": translator.translate(filter_ast)})
         return conditions
+
+    @staticmethod
+    def _apply_license_filter(license_ref):
+        # type: (str) -> MongodbAggregateExpression
+        """
+        Matches the reference of any entry of the process ``metadata`` or ``links`` with a ``license`` role or relation.
+        """
+        license_rel = {"$regex": r"(^|/)license$"}
+        reference = {"$or": [{"href": license_ref}, {
+            "title": {"$regex": f"^{re.escape(license_ref)}$", "$options": "i"}}]}
+        return {"$or": [
+            {field: {"$elemMatch": {"$and": [{"$or": [{"rel": license_rel}, {"role": license_rel}]}, reference]}}}
+            for field in ["metadata", "additional_links"]
+        ]}
 
     @staticmethod
     def _apply_query_filter(query):
@@ -1174,6 +1256,8 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                   access=None,              # type: Optional[str]
                   status=None,              # type: Optional[AnyStatusSearch, List[AnyStatusSearch]]
                   sort=None,                # type: Optional[AnySortType]
+                  sortby=None,              # type: Optional[str]
+                  filter_ast=None,          # type: Optional[AstType]
                   page=0,                   # type: Optional[int]
                   limit=10,                 # type: Optional[int]
                   min_duration=None,        # type: Optional[int]
@@ -1238,12 +1322,15 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         search_filters.update(self._apply_tags_filter(tags))
         search_filters.update(self._apply_access_filter(access, request))
         search_filters.update(self._apply_datetime_filter(datetime_interval))
+        if filter_ast:
+            translator = FilterTranslator(JOB_FILTER_FIELDS)
+            search_filters.setdefault("$and", []).append({"$expr": translator.translate(filter_ast)})
 
         # minimal operation, only search for matches and sort them
         pipeline = [{"$match": search_filters}]  # expected for all filters except 'duration'
         self._apply_duration_filter(pipeline, min_duration, max_duration)
 
-        sort_method = {"$sort": self._apply_sort_method(sort, Sort.CREATED, SortMethods.JOB)}
+        sort_method = {"$sort": self._apply_sortby(sortby or sort, Sort.CREATED, SortMethods.JOB)}
         pipeline.append(sort_method)
 
         # results by group categories or with job list paging
@@ -1394,23 +1481,6 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         elif status:
             search_filters["status"] = str(status[0])
         return search_filters
-
-    @staticmethod
-    def _apply_datetime_filter(datetime_interval):
-        # type: (Optional[DatetimeIntervalType]) -> MongodbAggregateExpression
-        search_filters = {}
-        if datetime_interval is not None:
-            if datetime_interval.get("after", False):
-                search_filters["$gte"] = datetime_interval["after"]
-
-            if datetime_interval.get("before", False):
-                search_filters["$lte"] = datetime_interval["before"]
-
-            if datetime_interval.get("match", False):
-                search_filters = datetime_interval["match"]
-
-            return {"created": search_filters}
-        return {}
 
     @staticmethod
     def _apply_duration_filter(pipeline, min_duration, max_duration):

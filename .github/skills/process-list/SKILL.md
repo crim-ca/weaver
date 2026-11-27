@@ -60,11 +60,15 @@ weaver capabilities -u $WEAVER_URL --detail
 - **version** (string): Exact version or inclusive `lower/upper` interval. Use `..` for an open bound.
   Add **revisions=true** to search older revisions.
 - **sortby** (string): Signed, comma-separated sorting fields, such as `+id,-version`.
-- **order** (string): `ASC` or `DESC` applied to **sort**. Cannot be combined with **sortby**.
+- **sort** (string): Deprecated alias of **sortby**. Cannot be combined with it.
+- **datetime** (string): Instant or interval matched against the process `created` time.
+- **type** (string): Comma-separated process types (case-insensitive) or Records resource type URIs.
+- **license** (string): Href or title of a `license` link or metadata.
+- **filter** (string): CQL2 expression, with optional **filter-lang**.
 
 Different filters combine with AND and apply before pagination. They cannot be combined with `providers=true`.
 Empty terms are invalid. URL-encode values, particularly `+` as `%2B`.
-`GET /processes/queryables` describes the supported listing parameters as JSON Schema.
+`GET /queryables/processes` describes the supported listing parameters as JSON Schema.
 
 ```bash
 curl --get "${WEAVER_URL}/processes" \

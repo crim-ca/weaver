@@ -112,6 +112,12 @@ class GenericApiRoutesTestCase(WpsConfigBase):
         except colander.Invalid as ex:
             self.fail(f"expected valid response format as defined in schema [{ex!s}]")
 
+    def test_conformance_records_discovery(self):
+        resp = self.app.get("/conformance", headers=self.json_headers)
+        records = "http://www.opengis.net/spec/ogcapi-records-1/1.0"
+        for name in ["sorting", "filtering", "cql-filter"]:
+            assert f"{records}/conf/{name}" in resp.json["conformsTo"]
+
     def test_conformance_html(self):
         resp = self.app.get("/conformance", headers=self.json_headers)
         assert resp.status_code == 200

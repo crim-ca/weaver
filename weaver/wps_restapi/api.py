@@ -102,6 +102,7 @@ def get_conformance(category, settings):
     ogcapi_proc_part5 = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"  # provenance
     ogcapi_proc_part6 = "http://www.opengis.net/spec/ogcapi-processes-6/1.0"  # versioning (proposal, not yet defined)
     ogcapi_proc_apppkg = "http://www.opengis.net/spec/eoap-bp/1.0"
+    ogcapi_records = "http://www.opengis.net/spec/ogcapi-records-1/1.0"  # discovery of processes and jobs
     # FIXME: https://github.com/crim-ca/weaver/issues/412
     # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
     ogcapi_proc_enabled = asbool(settings.get("weaver.wps_restapi", True))
@@ -728,6 +729,12 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_apppkg}/conf/plt-stage-out",
         f"{ogcapi_proc_apppkg}/req/plt-stage-out",
         # f"{ogcapi_proc_apppkg}/req/plt-stage-out/stac-stage",
+        f"{ogcapi_records}/conf/sorting",
+        f"{ogcapi_records}/req/sorting",
+        f"{ogcapi_records}/conf/filtering",
+        f"{ogcapi_records}/req/filtering",
+        f"{ogcapi_records}/conf/cql-filter",
+        f"{ogcapi_records}/req/cql-filter",
     ]) if ogcapi_proc_enabled else []
 
     conformance = ows_wps_conformance + ogcapi_proc_conformance
@@ -831,11 +838,11 @@ def api_frontpage_body(settings):
             {"href": weaver_process_url,
              "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes", "type": ContentType.APP_JSON,
              "title": "Processes offered by this service."},
-            {"href": f"{weaver_process_url}/queryables",
-             "rel": "http://www.opengis.net/def/rel/ogc/1.0/queryables", "type": ContentType.APP_JSON,
+            {"href": f"{weaver_url}{sd.processes_queryables_service.path}",
+             "rel": sd.OGC_API_REL_QUERYABLES_URI, "type": ContentType.APP_JSON,
              "title": "Supported process discovery parameters."},
-            {"href": f"{weaver_jobs_url}/queryables",
-             "rel": "http://www.opengis.net/def/rel/ogc/1.0/queryables", "type": ContentType.APP_JSON,
+            {"href": f"{weaver_url}{sd.jobs_queryables_service.path}",
+             "rel": sd.OGC_API_REL_QUERYABLES_URI, "type": ContentType.APP_JSON,
              "title": "Supported job discovery parameters."},
             {"href": sd.OGC_API_REPO_URL,
              "rel": "ogcapi-processes-repository", "type": ContentType.TEXT_HTML,

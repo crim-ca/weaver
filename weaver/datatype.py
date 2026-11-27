@@ -2569,6 +2569,11 @@ class Process(Base):
         # type: () -> Optional[JSON]
         return self.get("owsContext")
 
+    created = LocalizedDateTimeProperty(
+        doc="Creation datetime of the process. Revisions are distinct entries, so there is no update datetime.",
+        default_now=True,
+    )
+
     # wps, workflow, etc.
     @property
     def type(self):
@@ -2655,7 +2660,7 @@ class Process(Base):
         new = {}
         for k in pkg:
             # find modified key with replace matches
-            c_k = k
+            c_k = cast(str, k)
             for c in Process._character_codes:
                 c_f = c[index_from]
                 c_t = c[index_to]
@@ -2763,6 +2768,7 @@ class Process(Base):
             "executeEndpoint": self.executeEndpoint,
             "owsContext": self.owsContext,
             "type": self.type,
+            "created": self.created,
             "package": self._encode(self.package),
             "payload": self._encode(self.payload),
             "visibility": self.visibility,

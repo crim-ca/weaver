@@ -21,7 +21,7 @@ from weaver.typedefs import MetadataQueryScope, PreferHeaderHandling
 from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import get_wps_restapi_base_url
+from weaver.wps_restapi.utils import get_query_params, get_wps_restapi_base_url, resolve_discovery_params
 
 if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple
@@ -91,13 +91,7 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
             "value": list(paging_names.intersection(request.params))
         })
 
-    search_param = sd.ProcessSearchQuery(unknown="ignore").deserialize(request.params)
-    if "sortby" in search_param and any(param in request.params for param in ["sort", "order"]):
-        raise HTTPBadRequest(json={
-            "description": "Cannot combine 'sortby' with 'sort' or 'order'.",
-            "error": "ListingInvalidParameter",
-            "value": list(search_param),
-        })
+    search_param = sd.ProcessSearchQuery(unknown="ignore").deserialize(get_query_params(request))
     if with_providers and search_param:
         raise HTTPBadRequest(json={
             "description": "Cannot combine process search parameters with providers full listing query.",
@@ -106,6 +100,9 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
         })
     metadata_filters = parse_metadata_query_filters(request)
     store = get_db(request).get_store(StoreProcesses)
+    search_param = resolve_discovery_params({**search_param, **{"sort": paging_param.pop("sort", None)}})
+    search_param["license_ref"] = search_param.pop("license", None)
+    search_param["process_type"] = search_param.pop("type", None)
     processes, total_local_processes = store.list_processes(
         visibility=Visibility.PUBLIC,
         total=True,
@@ -343,6 +340,8 @@ def get_process_list_links(request, paging, total, provider=None):
         links.append({"href": prov_url, "rel": "up", "type": ContentType.APP_JSON, "title": "Provider description."})
     else:
         links.extend([
+            {"href": base_url + sd.processes_queryables_service.path, "rel": sd.OGC_API_REL_QUERYABLES_URI,
+             "type": ContentType.APP_JSON, "title": "Supported process discovery parameters."},
             {"href": sd.OGC_API_PROC_PROFILE_PROC_LIST_URI, "rel": "profile", "title": "Process listing profile."},
             {"href": f"{base_url}/", "rel": "up", "type": ContentType.APP_JSON, "title": "API entrypoint."}
         ])

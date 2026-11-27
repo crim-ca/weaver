@@ -319,14 +319,14 @@ class WpsRestApiJobsTest(JobUtils):
         """
         Tests that job queryables advertise actual supported filters without a duplicate hand-maintained schema.
         """
-        resp = self.app.get("/jobs/queryables", headers=self.json_headers)
+        resp = self.app.get("/queryables/jobs", headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         jsonschema.Draft7Validator.check_schema(resp.json)
         assert set(resp.json["properties"]) == {child.name for child in sd.GetJobsQueries().children}
         landing = self.app.get("/", headers=self.json_headers)
         assert any(
             link["rel"] == "http://www.opengis.net/def/rel/ogc/1.0/queryables"
-            and link["href"].endswith("/jobs/queryables")
+            and link["href"].endswith("/queryables/jobs")
             for link in landing.json["links"]
         )
 
@@ -1069,6 +1069,56 @@ class WpsRestApiJobsTest(JobUtils):
         schema_prefix = sd.GetProcessJobsQuery.__name__
         assert not resp.json["components"]["parameters"][f"{schema_prefix}.page"]["required"]
         assert not resp.json["components"]["parameters"][f"{schema_prefix}.limit"]["required"]
+
+    @pytest.mark.oap_part1
+    def test_get_jobs_sortby(self):
+        """
+        Tests that ``sortby`` applies signed fields, with ``-created`` as the default direction of ``created``.
+        """
+        for query, reverse in [
+            ({}, True), ({"sortby": "-created"}, True), ({"sortby": "created"}, True),
+            ({"sortby": "%2Bcreated"}, False), ({"sort": "created"}, True),
+        ]:
+            path = get_path_kvp(sd.jobs_service.path, detail=True, **query)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200, resp.text
+            created = [job["created"] for job in resp.json["jobs"]]
+            assert len(created) > 1
+            assert created == sorted(created, reverse=reverse), query
+
+    @pytest.mark.oap_part1
+    def test_get_jobs_sortby_conflict(self):
+        path = get_path_kvp(sd.jobs_service.path, sort="created", sortby="-created")
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
+        assert resp.json["error"] == "ListingInvalidParameter"
+
+    @pytest.mark.oap_part1
+    def test_get_jobs_filter_cql2(self):
+        """
+        Tests that a CQL2 ``filter`` is applied by the same job listing aggregation as the other query parameters.
+        """
+        path = get_path_kvp(sd.jobs_service.path, detail=False, status=Status.SUCCESSFUL)
+        expected = self.app.get(path, headers=self.json_headers).json["jobs"]
+        assert expected
+        path = get_path_kvp(sd.jobs_service.path, detail=False, filter=f"status = '{Status.SUCCESSFUL}'")
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert sorted(resp.json["jobs"]) == sorted(expected)
+
+        path = get_path_kvp(
+            sd.jobs_service.path, detail=False, filter="created AFTER 2000-01-01T00:00:00Z", **{"filter-lang": "ecql"}
+        )
+        total = self.app.get(get_path_kvp(sd.jobs_service.path, detail=False), headers=self.json_headers).json["total"]
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json["total"] == total
+
+    @pytest.mark.oap_part1
+    def test_get_jobs_filter_cql2_invalid(self):
+        path = get_path_kvp(sd.jobs_service.path, filter="unknown = 'x'")
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
 
     def test_get_jobs_filter_by_tags_single(self):
         path = get_path_kvp(sd.jobs_service.path, tags="unique", detail=False)

@@ -32,6 +32,7 @@ import yaml
 from babel.numbers import list_currencies
 from colander import All, DateTime, Email as EmailRegex, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
+from lark.exceptions import LarkError
 from pygeofilter.backends.cql2_json import to_cql2
 from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, fes, jfe
 
@@ -116,6 +117,7 @@ from weaver.processes.constants import (
     JobStatusType,
     ProcessSchema
 )
+from weaver.processes.types import ProcessType
 from weaver.provenance import ProvenanceFormat
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
@@ -276,6 +278,7 @@ OGC_API_PROC_REL_BASE_URI = "https://www.opengis.net/def/rel/ogc/1.0"
 OGC_API_PROC_REL_EXCEPTIONS_URI = f"{OGC_API_PROC_REL_BASE_URI}/exceptions"
 OGC_API_PROC_REL_EXECUTE_URI = f"{OGC_API_PROC_REL_BASE_URI}/execute"
 OGC_API_PROC_REL_PROCESSES_URI = f"{OGC_API_PROC_REL_BASE_URI}/processes"
+OGC_API_REL_QUERYABLES_URI = "http://www.opengis.net/def/rel/ogc/1.0/queryables"
 OGC_API_PROC_REL_PROCESS_DESC_URI = f"{OGC_API_PROC_REL_BASE_URI}/process-desc"
 OGC_API_PROC_REL_JOB_RESULTS_URI = f"{OGC_API_PROC_REL_BASE_URI}/results"
 OGC_API_PROC_REL_JOB_LIST_URI = f"{OGC_API_PROC_REL_BASE_URI}/job-list"
@@ -447,7 +450,7 @@ bills_service = Service(name="bills", path="/bills")
 bill_service = Service(name="bill", path=f"{bills_service.path}/{{bill_id}}")
 
 jobs_service = Service(name="jobs", path="/jobs")
-jobs_queryables_service = Service(name="jobs_queryables", path=f"{jobs_service.path}/queryables")
+jobs_queryables_service = Service(name="jobs_queryables", path="/queryables/jobs")
 job_service = Service(name="job", path=f"{jobs_service.path}/{{job_id}}")
 job_results_service = Service(name="job_results", path=f"{job_service.path}/results")
 job_result_value_service = Service(name="job_result_value", path=f"{job_results_service.path}/{{output_id}}")
@@ -473,7 +476,7 @@ job_prov_run_id_service = Service(name="job_prov_run_id", path=f"{job_prov_servi
 job_prov_runs_service = Service(name="job_prov_runs", path=f"{job_prov_service.path}/runs")
 
 processes_service = Service(name="processes", path="/processes")
-processes_queryables_service = Service(name="processes_queryables", path=f"{processes_service.path}/queryables")
+processes_queryables_service = Service(name="processes_queryables", path="/queryables/processes")
 process_service = Service(name="process", path=f"{processes_service.path}/{{process_id}}")
 process_quotes_service = Service(name="process_quotes", path=process_service.path + quotes_service.path)
 process_quote_service = Service(name="process_quote", path=process_service.path + quote_service.path)
@@ -1869,7 +1872,7 @@ class FilterSchema(ExtendedMappingSchema):
         # type: (Union[JSON, str], str) -> FilterAstType
         try:
             return self.parse(filter_expr, filter_lang)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, LarkError) as exc:
             raise colander.Invalid(
                 node=self,
                 msg="Invalid filter expression could not be parsed against specified language.",
@@ -1912,7 +1915,7 @@ class FilterSchema(ExtendedMappingSchema):
                 )
             return result
         if not filter_lang:
-            filter_lang = "cql2-text" if isinstance(filter, str) else "cql2-json"
+            filter_lang = "cql2-text" if isinstance(filter_expr, str) else "cql2-json"
         # perform conversion to validate
         # but don't return the converted CQL2-JSON to preserve the original definition where called (storage/dispatch)
         # conversion can be done as needed to obtain a uniform representation locally
@@ -2524,7 +2527,6 @@ class JobTitle(ExtendedSchemaNode):
 class JobSortEnum(ExtendedSchemaNode):
     schema_type = String
     title = "JobSortingMethod"
-    default = Sort.CREATED
     example = Sort.CREATED
     validator = OneOf(SortMethods.JOB)
 
@@ -2532,7 +2534,6 @@ class JobSortEnum(ExtendedSchemaNode):
 class ProcessSortEnum(ExtendedSchemaNode):
     schema_type = String
     title = "ProcessSortMethod"
-    default = Sort.ID
     example = Sort.CREATED
     validator = OneOf(SortMethods.PROCESS)
 
@@ -2540,7 +2541,14 @@ class ProcessSortEnum(ExtendedSchemaNode):
 class ProcessSortByEnum(ExtendedSchemaNode):
     schema_type = String
     fields_pattern = "|".join(sorted(SortMethods.PROCESS))
-    validator = Regex(rf"^[+-]?(?:{fields_pattern})(?:,[+-]?(?:{fields_pattern}))*$")
+    # leading space is a decoded '+' in query strings
+    validator = Regex(rf"^[+\- ]?(?:{fields_pattern})(?:,[+\- ]?(?:{fields_pattern}))*$")
+
+
+class JobSortByEnum(ExtendedSchemaNode):
+    schema_type = String
+    fields_pattern = "|".join(sorted(SortMethods.JOB))
+    validator = Regex(rf"^[+\- ]?(?:{fields_pattern})(?:,[+\- ]?(?:{fields_pattern}))*$")
 
 
 class QuoteSortEnum(ExtendedSchemaNode):
@@ -4550,7 +4558,9 @@ class ProcessCollection(ExtendedMappingSchema):
 
 
 class ProcessPagingQuery(ExtendedMappingSchema):
-    sort = ProcessSortEnum(missing=drop)
+    sort = ProcessSortEnum(
+        missing=drop, deprecated=True, description="Deprecated. Use 'sortby' instead. Cannot be combined with it.",
+    )
     # if page is omitted but limit provided, use reasonable zero by default
     page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(allow_string=True), missing=None, default=None, validator=Range(min=1),
@@ -8058,7 +8068,7 @@ class PagingQueries(ExtendedMappingSchema):
                                schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml")
 
 
-class GetJobsQueries(PagingQueries):
+class GetJobsQueries(PagingQueries, FilterSchema):
     # note:
     #   This schema is also used to generate any missing defaults during filter parameter handling.
     #   Items with default value are added if omitted, except 'default=null' which are removed after handling by alias.
@@ -8091,7 +8101,17 @@ class GetJobsQueries(PagingQueries):
     provider = AnyIdentifier(missing=drop, default=None, description="Identifier of service provider to filter search.")
     type = JobTypeEnum(missing=drop, default=null,
                        description="Filter jobs only to matching type (note: 'service' and 'provider' are aliases).")
-    sort = JobSortEnum(missing=drop)
+    sort = JobSortEnum(
+        missing=drop, deprecated=True, description="Deprecated. Use 'sortby' instead. Cannot be combined with it.",
+    )
+    sortby = JobSortByEnum(
+        missing=drop, example="-created,status",
+        description=(
+            "Comma-separated sorting fields, with '+' for ascending or '-' for descending. "
+            "Fields without prefix use their default direction. "
+            "Cannot be combined with the deprecated 'sort'. URL-encode '+' as '%2B'."
+        ),
+    )
     access = JobAccess(missing=drop, default=None)
     tags = JobTagsCommaSeparated()
 
@@ -8576,18 +8596,37 @@ class ProcessVersionExpression(ProcessSearchExpression):
     parser = staticmethod(parse_version_range)
 
 
-class ProcessSearchQuery(ExtendedMappingSchema):
+class ProcessTypeExpression(ExtendedSchemaNode):
+    schema_type = String
+    example = "workflow,wps"
+    validator = Regex(r"^\s*[^,\s]+(?:\s*,\s*[^,\s]+)*\s*$")
+    description = (
+        "Comma-separated process types, where any must match (case-insensitive). "
+        f"Supported types are {', '.join(ProcessType.values())}. "
+        "Resource type URIs are also supported, namely "
+        f"{', '.join(ProcessType.uris())}."
+    )
+
+
+class ProcessSearchQuery(FilterSchema):
     sortby = ProcessSortByEnum(
         missing=drop, example="+id,-version",
         description=(
-            "Comma-separated sorting fields, with '+' for ascending (default) or '-' for descending. "
-            "Cannot be combined with 'sort' or 'order'. URL-encode '+' as '%2B'."
+            "Comma-separated sorting fields, with '+' for ascending or '-' for descending. "
+            "Fields without prefix use their default direction. "
+            "Cannot be combined with the deprecated 'sort'. URL-encode '+' as '%2B'."
         ),
     )
-    order = ExtendedSchemaNode(
-        String(), missing=drop, example="DESC", validator=OneOfCaseInsensitive(["ASC", "DESC"]),
-        description="Direction applied to 'sort'. Defaults to the existing direction when omitted.",
+    datetime = DateTimeInterval(
+        missing=drop, default=None,
+        description="Filter locally registered processes by creation datetime or interval.",
     )
+    license_search = ExtendedSchemaNode(
+        String(), name="license", missing=drop, example="https://spdx.org/licenses/Apache-2.0",
+        validator=Length(min=1),
+        description="Filter locally registered processes with a 'license' link or metadata matching its href or title.",
+    )
+    type_search = ProcessTypeExpression(name="type", missing=drop)
     keywords = ProcessKeywordExpression(
         missing=drop, example="climate,netcdf|grib",
         description=(

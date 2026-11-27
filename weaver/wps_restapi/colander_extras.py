@@ -3110,6 +3110,8 @@ class OAS3ParameterConverter(ParameterConverter):
                 if param not in self.reserved_params:
                     param_schema[param] = param_spec.pop(param)
             param_spec["schema"] = param_schema
+        if param_spec["schema"].get("default") is colander.drop:
+            param_spec["schema"].pop("default")
         if isinstance(schema_node, OAS3Parameter):
             param_spec.update(schema_node.convert())
         return param_spec
