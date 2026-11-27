@@ -2368,7 +2368,7 @@ class Process(Base):
         return self.split_version(self.id)[-1] is None
 
     created = LocalizedDateTimeProperty(
-        doc="Creation datetime of the process. Revisions are distinct entries, so there is no update datetime.",
+        doc="Creation datetime of the process.",
         default_now=True,
     )
 

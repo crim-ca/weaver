@@ -21,7 +21,8 @@ from weaver.typedefs import MetadataQueryScope, PreferHeaderHandling
 from weaver.utils import VersionFormat, get_header, get_path_kvp, get_settings, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.utils import get_query_params, get_wps_restapi_base_url, resolve_queryables_params
+from weaver.wps_restapi.queryables import get_queryables_params, resolve_queryables_params
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Dict, List, Optional, Tuple
@@ -91,7 +92,7 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
             "value": list(paging_names.intersection(request.params))
         })
 
-    search_param = sd.ProcessSearchQuery(unknown="ignore").deserialize(get_query_params(request))
+    search_param = sd.ProcessSearchQuery(unknown="ignore").deserialize(get_queryables_params(request))
     if with_providers and search_param:
         raise HTTPBadRequest(json={
             "description": "Cannot combine process search parameters with providers full listing query.",

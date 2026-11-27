@@ -35,7 +35,6 @@ from weaver.store.base import StoreJobs, StoreProcesses
 from weaver.utils import clean_json_text_body, fully_qualified_name, get_any_id, get_header, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.filter import get_queryables_schema
 from weaver.wps_restapi.processes.utils import (
     get_process_list_links,
     get_process_package_response,
@@ -43,6 +42,7 @@ from weaver.wps_restapi.processes.utils import (
 )
 from weaver.wps_restapi.providers.providers import describe_provider_process
 from weaver.wps_restapi.providers.utils import get_provider_id, get_provider_services
+from weaver.wps_restapi.queryables import get_queryables_schema
 
 if TYPE_CHECKING:
     from pyramid.config import Configurator

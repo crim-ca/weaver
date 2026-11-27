@@ -94,7 +94,8 @@ from weaver.wps.utils import (
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import resolve_process_tag
 from weaver.wps_restapi.providers.utils import forbid_local_only
-from weaver.wps_restapi.utils import get_query_params, get_wps_restapi_base_url
+from weaver.wps_restapi.queryables import get_queryables_params
+from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Literal, NoReturn, Optional, Sequence, Tuple, Type, Union
@@ -292,7 +293,7 @@ def get_job_list_links(job_total, filters, grouped, request):
     base_url = get_wps_restapi_base_url(request)
 
     # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
-    kvp_params = {param: value for param, value in get_query_params(request).items() if param != "page"}
+    kvp_params = {param: value for param, value in get_queryables_params(request).items() if param != "page"}
     kvp_params = {
         urllib.parse.quote(key, safe=""): urllib.parse.quote(value, safe="")
         for key, value in kvp_params.items()
