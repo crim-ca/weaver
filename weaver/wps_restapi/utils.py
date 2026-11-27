@@ -13,7 +13,6 @@ from pyramid.httpexceptions import HTTPBadRequest, HTTPSuccessful, HTTPUnprocess
 from weaver import __meta__
 from weaver.utils import get_header, get_request_args, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.colander_extras import OAS3TypeConversionDispatcher
 from weaver.wps_restapi.filter import FilterLanguage
 
 if TYPE_CHECKING:
@@ -24,7 +23,6 @@ if TYPE_CHECKING:
         AnyRequestType,
         AnySettingsContainer,
         HeadersType,
-        JSON,
         Params,
         Return,
         SettingsType
@@ -90,16 +88,6 @@ def resolve_queryables_params(params):
             })
         params["datetime_interval"] = dti
     return params
-
-
-def get_queryables_schema(schema, schema_id):
-    # type: (colander.SchemaNode, str) -> JSON
-    """
-    Describes supported collection parameters using the same schema that validates listing requests.
-    """
-    queryables = OAS3TypeConversionDispatcher()(schema)
-    queryables["$id"] = schema_id
-    return queryables
 
 
 class HTTPHeadFileResponse(HTTPSuccessful):

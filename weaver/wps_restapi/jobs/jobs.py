@@ -44,6 +44,7 @@ from weaver.store.base import StoreJobs
 from weaver.transform.utils import extend_alternate_formats
 from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.filter import get_queryables_schema
 from weaver.wps_restapi.jobs.utils import (
     deploy_multipart_job_workflow,
     dismiss_job_task,
@@ -62,7 +63,7 @@ from weaver.wps_restapi.jobs.utils import (
     validate_service_process
 )
 from weaver.wps_restapi.providers.utils import get_service
-from weaver.wps_restapi.utils import get_query_params, get_queryables_schema, resolve_queryables_params
+from weaver.wps_restapi.utils import get_query_params, resolve_queryables_params
 
 if TYPE_CHECKING:
     from typing import Iterable, List

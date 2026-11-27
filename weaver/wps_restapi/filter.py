@@ -6,9 +6,14 @@ import shlex
 from typing import TYPE_CHECKING
 
 from weaver.base import Constants
+from weaver.wps_restapi.colander_extras import OAS3TypeConversionDispatcher
 
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple
+
+    import colander
+
+    from weaver.typedefs import JSON
 
 
 class FilterLanguage(Constants):
@@ -100,3 +105,13 @@ def parse_version_range(value):
     if lower is not None and upper is not None and lower > upper:
         raise ValueError("The lower version bound exceeds the upper bound.")
     return lower, upper
+
+
+def get_queryables_schema(schema, schema_id):
+    # type: (colander.SchemaNode, str) -> JSON
+    """
+    Describes supported collection parameters using the same schema that validates listing requests.
+    """
+    queryables = OAS3TypeConversionDispatcher()(schema)
+    queryables["$id"] = schema_id
+    return queryables
