@@ -8,8 +8,6 @@ license: Apache-2.0
 compatibility: Requires Weaver API access.
 metadata:
   author: fmigneault
-  contributors:
-    - GitHub Copilot
 ---
 
 # List Jobs
