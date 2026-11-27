@@ -5799,16 +5799,39 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.json["total"] == len(expected)
 
     @parameterized.expand([
-        ("keywords", " "), ("keywords", ",climate"), ("keywords", "climate,"),
-        ("keywords", ""), ("title", ""), ("description", ""), ("q", ""), ("query", ""), ("version", ""),
-        ("keywords", "climate||netcdf"), ("keywords", "climate| "),
-        ("keywords", "!"), ("keywords", "climate,~"), ("keywords", "!!climate"),
-        ("q", ","), ("q", "other,,subset"), ("q", "subset, "),
-        ("q", " "), ("title", " "), ("description", " "), ("version", "invalid"),
-        ("query", "+"), ("query", "-"), ("query", "climate +"), ("query", "climate,"),
-        ("query", ",climate"), ("query", '"climate'), ("query", " "),
-        ("version", "../.."), ("version", "2.0.0/1.0.0"), ("version", "1.0.0//2.0.0"),
-        ("sortby", "unknown"), ("sortby", "id,"),
+        ("keywords", " "),
+        ("keywords", ",climate"),
+        ("keywords", "climate,"),
+        ("keywords", ""),
+        ("title", ""),
+        ("description", ""),
+        ("q", ""),
+        ("query", ""),
+        ("version", ""),
+        ("keywords", "climate||netcdf"),
+        ("keywords", "climate| "),
+        ("keywords", "!"),
+        ("keywords", "climate,~"),
+        ("keywords", "!!climate"),
+        ("q", ","),
+        ("q", "other,,subset"),
+        ("q", "subset, "),
+        ("q", " "),
+        ("title", " "),
+        ("description", " "),
+        ("version", "invalid"),
+        ("query", "+"),
+        ("query", "-"),
+        ("query", "climate +"),
+        ("query", "climate,"),
+        ("query", ",climate"),
+        ("query", '"climate'),
+        ("query", " "),
+        ("version", "../.."),
+        ("version", "2.0.0/1.0.0"),
+        ("version", "1.0.0//2.0.0"),
+        ("sortby", "unknown"),
+        ("sortby", "id,"),
     ])
     @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_invalid(self, field, value):
@@ -5842,7 +5865,9 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.status_code == 200, resp.text
         assert resp.json["processes"] == [f"test-search-order-{suffix}" for suffix in expected]
 
-    @parameterized.expand([({"sort": "id"},)])
+    @parameterized.expand([
+        ({"sort": "id"},),
+    ])
     @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_order_conflict(self, query):
         # type: (JSON) -> None
@@ -5993,7 +6018,14 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         links = [link for link in resp.json["links"] if link["rel"] == sd.OGC_API_REL_QUERYABLES_URI]
         assert links and links[0]["href"].endswith("/queryables/processes")
 
-    @parameterized.expand(["keywords", "title", "description", "q", "query", "version"])
+    @parameterized.expand([
+        "keywords",
+        "title",
+        "description",
+        "q",
+        "query",
+        "version",
+    ])
     @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_providers(self, field):
         # type: (str) -> None
@@ -6007,7 +6039,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.status_code == 400, resp.text
         assert resp.json["error"] == "ListingInvalidParameter"
 
-    @parameterized.expand([True, False])
+    @parameterized.expand([
+        True,
+        False,
+    ])
     @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_paging(self, detail):
         # type: (bool) -> None
@@ -6069,7 +6104,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.status_code == 200, resp.text
         assert (p_id in [proc["id"] for proc in resp.json["processes"]]) is match
 
-    @parameterized.expand([False, True])
+    @parameterized.expand([
+        False,
+        True,
+    ])
     @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_version_revisions(self, revisions):
         # type: (bool) -> None
