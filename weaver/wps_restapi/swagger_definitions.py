@@ -13,7 +13,8 @@ The definitions are also employed to generate the `OpenAPI` definitions reported
 on `Weaver`'s `ReadTheDocs` page.
 """
 # pylint: disable=C0103,invalid-name
-# pylint: disable=E0241,duplicate-bases
+# Public schema names are re-exported for consumers.
+# pylint: disable=E0241,duplicate-bases,unused-import
 
 import datetime
 import inspect
@@ -118,11 +119,7 @@ from weaver.provenance import ProvenanceFormat
 from weaver.quotation.status import QuoteStatus
 from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
-from weaver.utils import (
-    AWS_S3_BUCKET_REFERENCE_PATTERN,
-    load_file,
-    repr_json
-)
+from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, load_file
 from weaver.visibility import Visibility
 from weaver.wps_restapi.colander_extras import (
     NO_DOUBLE_SLASH_PATTERN,

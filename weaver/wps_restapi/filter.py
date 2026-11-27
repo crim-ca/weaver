@@ -1,13 +1,14 @@
 """
 Parsing and schema definitions for API filter expressions.
 """
+# pylint: disable=E0241,duplicate-bases
 import re
 import shlex
 from functools import cache
 from typing import TYPE_CHECKING
 
 import colander
-from colander import Length, OneOf, Regex, drop, null
+from colander import Length, OneOf, drop, null
 from lark.exceptions import LarkError
 from pygeofilter.backends.cql2_json import to_cql2
 from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, fes, jfe
