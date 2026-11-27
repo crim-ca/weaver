@@ -5792,7 +5792,9 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 title=title, keywords=["search-terms-fixture"] + keywords,
             ))
         resp = self.app.get("/processes", params={
-            field: value, "keywords": "search-terms-fixture", "detail": "false",
+            field: value,
+            "keywords": "search-terms-fixture",
+            "detail": "false",
         }, headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert set(resp.json["processes"]) == {f"test-search-terms-{suffix}" for suffix in expected}
@@ -5860,7 +5862,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 id=f"test-search-order-{suffix}", package={}, visibility=Visibility.PUBLIC,
                 version=version, keywords=["search-order"],
             ))
-        query.update({"keywords": "search-order", "detail": "false"})
+        query.update({
+            "keywords": "search-order",
+            "detail": "false",
+        })
         resp = self.app.get("/processes", params=query, headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert resp.json["processes"] == [f"test-search-order-{suffix}" for suffix in expected]
@@ -5898,7 +5903,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 created=datetime.datetime.fromisoformat(created),
                 keywords=["datetime-search"],
             ))
-        query.update({"keywords": "datetime-search", "detail": "false", "sortby": "-id"})
+        query.update({
+            "keywords": "datetime-search",
+            "detail": "false",
+            "sortby": "-id",
+        })
         resp = self.app.get("/processes", params=query, headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert resp.json["processes"] == [f"test-datetime-{suffix}" for suffix in sorted(expected, reverse=True)]
@@ -5931,7 +5940,12 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 id=f"test-type-{suffix}", package={}, visibility=Visibility.PUBLIC, type=proc_type,
                 keywords=["type-search"],
             ))
-        params = {"type": value, "keywords": "type-search", "detail": "false", "sortby": "id"}
+        params = {
+            "type": value,
+            "keywords": "type-search",
+            "detail": "false",
+            "sortby": "id",
+        }
         resp = self.app.get("/processes", params=params, headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert sorted(resp.json["processes"]) == sorted(f"test-type-{suffix}" for suffix in expected)
@@ -5959,7 +5973,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 id=f"test-license-{suffix}", package={}, visibility=Visibility.PUBLIC, keywords=["license-search"],
                 **kwargs
             ))
-        base = {"keywords": "license-search", "detail": "false"}
+        base = {
+            "keywords": "license-search",
+            "detail": "false",
+        }
         resp = self.app.get("/processes", params={**base, "license": apache}, headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert sorted(resp.json["processes"]) == ["test-license-link", "test-license-meta"]
@@ -5995,7 +6012,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 type=proc_type, created=datetime.datetime.fromisoformat(created),
                 keywords=["cql-search"],
             ))
-        query.update({"keywords": "cql-search", "detail": "false", "sortby": "id"})
+        query.update({
+            "keywords": "cql-search",
+            "detail": "false",
+            "sortby": "id",
+        })
         resp = self.app.get("/processes", params=query, headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert resp.json["processes"] == [f"test-filter-{suffix}" for suffix in expected]
@@ -6034,7 +6055,13 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         """
         value = "1.2.3" if field == "version" else "subset"
         resp = self.app.get(
-            "/processes", params={field: value, "providers": "true"}, headers=self.json_headers, expect_errors=True,
+            "/processes",
+            params={
+                field: value,
+                "providers": "true",
+            },
+            headers=self.json_headers,
+            expect_errors=True,
         )
         assert resp.status_code == 400, resp.text
         assert resp.json["error"] == "ListingInvalidParameter"
@@ -6061,11 +6088,19 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 metadata=[{"role": role, "href": profile, "rel": sd.OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI}]
                 if metadata else [],
             ))
-        resp = self.app.get("/processes", params={
-            "q": "search + subset & netcdf|grib", "query": "+climate -grass",
-            f"metadata[process][{role}]": profile,
-            "limit": 1, "page": 0, "detail": detail, "sort": "id",
-        }, headers=self.json_headers)
+        resp = self.app.get(
+            "/processes",
+            params={
+                "q": "search + subset & netcdf|grib",
+                "query": "+climate -grass",
+                f"metadata[process][{role}]": profile,
+                "limit": 1,
+                "page": 0,
+                "detail": detail,
+                "sort": "id",
+            },
+            headers=self.json_headers,
+        )
         assert resp.status_code == 200, resp.text
         assert resp.json["total"] == 2
         assert resp.json["count"] == 1
@@ -6123,7 +6158,10 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             id=p_id, package={}, visibility=Visibility.PUBLIC, version="2.0.0",
         ))
         resp = self.app.get("/processes", params={
-            "process": p_id, "revisions": revisions, "version": "1.0.0", "detail": "false",
+            "process": p_id,
+            "revisions": revisions,
+            "version": "1.0.0",
+            "detail": "false",
         }, headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert resp.json["processes"] == ([f"{p_id}:1.0.0"] if revisions else [])
