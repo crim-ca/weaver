@@ -325,7 +325,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert set(resp.json["properties"]) == {child.name for child in sd.GetJobsQueries().children}
         landing = self.app.get("/", headers=self.json_headers)
         assert any(
-            link["rel"] == "http://www.opengis.net/def/rel/ogc/1.0/queryables"
+            link["rel"] == sd.OGC_API_REL_QUERYABLES_URI
             and link["href"].endswith("/queryables/jobs")
             for link in landing.json["links"]
         )

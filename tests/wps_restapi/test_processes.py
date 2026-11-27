@@ -346,7 +346,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert "/queryables/jobs" in specification.json["paths"]
         landing = self.app.get("/", headers=self.json_headers)
         assert any(
-            link["rel"] == "http://www.opengis.net/def/rel/ogc/1.0/queryables"
+            link["rel"] == sd.OGC_API_REL_QUERYABLES_URI
             and link["href"].endswith("/queryables/processes")
             for link in landing.json["links"]
         )

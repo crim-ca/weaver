@@ -330,7 +330,7 @@ def get_process_list_links(request, paging, total, provider=None):
          "type": ContentType.APP_JSON, "title": "Generic query endpoint to list processes."},
         {"href": f"{proc_url}?detail=false", "rel": "preview",
          "type": ContentType.APP_JSON, "title": "Process listing summary (identifiers and count only)."},
-        {"href": f"{proc_url}?f=json", "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
+        {"href": f"{proc_url}?f=json", "rel": sd.OGC_API_PROC_REL_PROCESSES_URI,
          "type": ContentType.APP_JSON, "title": "List of registered local processes."},
         {"href": f"{proc_url}?{urllib.parse.urlencode(req_params)}", "rel": "self",
          "type": req_fmt, "title": "Current process listing."},

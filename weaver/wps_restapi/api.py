@@ -181,6 +181,12 @@ def get_conformance(category, settings):
         f"{ogcapi_common}/req/oas30",  # OpenAPI 3.0
         # ogcapi_common + "/req/simple-query",
         # ogcapi_common + "/req/umd-collection",
+        f"{ogcapi_records}/conf/sorting",
+        f"{ogcapi_records}/req/sorting",
+        f"{ogcapi_records}/conf/filtering",
+        f"{ogcapi_records}/req/filtering",
+        f"{ogcapi_records}/conf/cql-filter",
+        f"{ogcapi_records}/req/cql-filter",
         f"{ogcapi_proc_core2}/conf/core",
         f"{ogcapi_proc_core1}/conf/core",
         f"{ogcapi_proc_core1}/conf/core/api-definition-op",
@@ -729,12 +735,6 @@ def get_conformance(category, settings):
         f"{ogcapi_proc_apppkg}/conf/plt-stage-out",
         f"{ogcapi_proc_apppkg}/req/plt-stage-out",
         # f"{ogcapi_proc_apppkg}/req/plt-stage-out/stac-stage",
-        f"{ogcapi_records}/conf/sorting",
-        f"{ogcapi_records}/req/sorting",
-        f"{ogcapi_records}/conf/filtering",
-        f"{ogcapi_records}/req/filtering",
-        f"{ogcapi_records}/conf/cql-filter",
-        f"{ogcapi_records}/req/cql-filter",
     ]) if ogcapi_proc_enabled else []
 
     conformance = ows_wps_conformance + ogcapi_proc_conformance
@@ -813,7 +813,7 @@ def api_frontpage_body(settings):
     weaver_api_url_href = f"{weaver_api_url}/"
     weaver_links = [
         {"href": weaver_url_href, "rel": "self", "type": ContentType.APP_JSON, "title": "This landing page."},
-        {"href": weaver_conform_url, "rel": "http://www.opengis.net/def/rel/ogc/1.0/conformance",
+        {"href": weaver_conform_url, "rel": sd.OGC_API_PROC_REL_CONFORMANCE_URI,
          "type": ContentType.APP_JSON, "title": "Conformance classes implemented by this service."},
         {"href": __meta__.__license_url__, "rel": "license",
          "type": ContentType.TEXT_PLAIN, "title": __meta__.__license_long__}
@@ -836,7 +836,7 @@ def api_frontpage_body(settings):
              "rel": "swagger-ui", "type": ContentType.TEXT_HTML,
              "title": "WPS REST API definition of this service."},
             {"href": weaver_process_url,
-             "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes", "type": ContentType.APP_JSON,
+             "rel": sd.OGC_API_PROC_REL_PROCESSES_URI, "type": ContentType.APP_JSON,
              "title": "Processes offered by this service."},
             {"href": f"{weaver_url}{sd.processes_queryables_service.path}",
              "rel": sd.OGC_API_REL_QUERYABLES_URI, "type": ContentType.APP_JSON,
@@ -848,7 +848,7 @@ def api_frontpage_body(settings):
              "rel": "ogcapi-processes-repository", "type": ContentType.TEXT_HTML,
              "title": "OGC API - Processes schema definitions repository."},
             {"href": weaver_jobs_url,
-             "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list", "type": ContentType.APP_JSON,
+             "rel": sd.OGC_API_PROC_REL_JOB_LIST_URI, "type": ContentType.APP_JSON,
              "title": "Job search and listing endpoint of executions registered under this service."},
             {"href": sd.CWL_BASE_URL,
              "rel": "cwl-home", "type": ContentType.TEXT_HTML,

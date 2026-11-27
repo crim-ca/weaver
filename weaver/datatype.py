@@ -2367,6 +2367,11 @@ class Process(Base):
         # if ID loaded from DB contains a version, it is not the latest by design
         return self.split_version(self.id)[-1] is None
 
+    created = LocalizedDateTimeProperty(
+        doc="Creation datetime of the process. Revisions are distinct entries, so there is no update datetime.",
+        default_now=True,
+    )
+
     @property
     def name(self):
         # type: () -> str
@@ -2601,11 +2606,6 @@ class Process(Base):
     def owsContext(self):  # noqa: N802
         # type: () -> Optional[JSON]
         return self.get("owsContext")
-
-    created = LocalizedDateTimeProperty(
-        doc="Creation datetime of the process. Revisions are distinct entries, so there is no update datetime.",
-        default_now=True,
-    )
 
     # wps, workflow, etc.
     @property

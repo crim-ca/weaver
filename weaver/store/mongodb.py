@@ -55,18 +55,22 @@ from weaver.utils import (
     get_sane_name,
     get_weaver_url,
     islambda,
-    now,
-    parse_keyword_query,
-    parse_search_query,
-    parse_version_range
+    now
 )
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.filter import (
+    JOB_FILTER_FIELDS,
+    PROCESS_FILTER_FIELDS,
+    parse_keyword_query,
+    parse_search_query,
+    parse_version_range
+)
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+    from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
     from typing_extensions import TypedDict
 
     from pygeofilter.ast import AstType
@@ -93,7 +97,7 @@ if TYPE_CHECKING:
     )
     from weaver.visibility import AnyVisibility
 
-    FilterFields = Dict[str, Tuple[Any, str]]
+    MongoFilterFields = Dict[str, Tuple[Any, str]]
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
     MongodbAggregateValue = Union[
@@ -133,80 +137,46 @@ if TYPE_CHECKING:
     MongodbAggregateStep = Union[MongodbValue, MongodbAggregateExpression]
     MongodbAggregatePipeline = List[Dict[str, Union[str, Dict[str, MongodbAggregateStep]]]]
 
-FIELD_SCALAR = "scalar"
-FIELD_ARRAY = "array"
-FIELD_DATETIME = "datetime"
-
-_LICENSE_LINKS = {"$concatArrays": [{"$ifNull": ["$metadata", []]}, {"$ifNull": ["$additional_links", []]}]}
-_LICENSE_HREFS = {"$map": {
-    "input": {"$filter": {
-        "input": _LICENSE_LINKS,
-        "cond": {"$or": [{"$eq": ["$$this.rel", "license"]}, {"$eq": ["$$this.role", "license"]}]},
-    }},
-    "in": "$$this.href",
-}}
-PROCESS_FILTER_FIELDS = {
-    "id": ("$identifier", FIELD_SCALAR),
-    "title": ({"$ifNull": ["$title", "$identifier"]}, FIELD_SCALAR),
-    "description": ({"$cond": ["$abstract", "$abstract", {"$ifNull": ["$description", ""]}]}, FIELD_SCALAR),
-    "keywords": ("$keywords", FIELD_ARRAY),
-    "version": ("$version", FIELD_SCALAR),
-    "type": ("$type", FIELD_SCALAR),
-    "license": ({"$arrayElemAt": [_LICENSE_HREFS, 0]}, FIELD_SCALAR),
-    "created": ("$created", FIELD_DATETIME),
-}
-PROCESS_FILTER_RESOLVERS = {"type": ProcessType.resolve}
-JOB_FILTER_FIELDS = {
-    "id": ("$id", FIELD_SCALAR),
-    "status": ("$status", FIELD_SCALAR),
-    "processID": ("$process", FIELD_SCALAR),
-    "provider": ("$service", FIELD_SCALAR),
-    "created": ("$created", FIELD_DATETIME),
-    "started": ("$started", FIELD_DATETIME),
-    "finished": ("$finished", FIELD_DATETIME),
-}
-
 LOGGER = logging.getLogger(__name__)
-
-
-def _invalid_filter(description, value=None):
-    # type: (str, Optional[Any]) -> ListingInvalidParameter
-    return ListingInvalidParameter(json={
-        "description": description,
-        "cause": "filter",
-        "value": str(value),
-    })
-
-
-def _filter_datetime(value):
-    # type: (Any) -> datetime.datetime
-    if isinstance(value, datetime.datetime):
-        return value if value.tzinfo else value.replace(tzinfo=datetime.timezone.utc)
-    if isinstance(value, datetime.date):
-        return datetime.datetime(value.year, value.month, value.day, tzinfo=datetime.timezone.utc)
-    raise _invalid_filter("Filter value is not a valid datetime.", value)
-
-
-def _filter_like_regex(node):
-    # type: (ast.Like) -> str
-    regex = ""
-    chars = iter(node.pattern)
-    for char in chars:
-        if char == node.escapechar:
-            regex += re.escape(next(chars, ""))
-        elif char == node.wildcard:
-            regex += ".*"
-        elif char == node.singlechar:
-            regex += "."
-        else:
-            regex += re.escape(char)
-    return f"^{regex}$"
 
 
 class MongoFilterTranslator(object):
     """
     Translates parsed `CQL2` expressions into `MongoDB` aggregation expressions.
     """
+
+    _FIELD_SCALAR = "scalar"
+    _FIELD_ARRAY = "array"
+    _FIELD_DATETIME = "datetime"
+
+    _LICENSE_LINKS = {"$concatArrays": [{"$ifNull": ["$metadata", []]}, {"$ifNull": ["$additional_links", []]}]}
+    _LICENSE_HREFS = {"$map": {
+        "input": {"$filter": {
+            "input": _LICENSE_LINKS,
+            "cond": {"$or": [{"$eq": ["$$this.rel", "license"]}, {"$eq": ["$$this.role", "license"]}]},
+        }},
+        "in": "$$this.href",
+    }}
+    _PROCESS_MONGO_FIELDS = {
+        "identifier": ("$identifier", _FIELD_SCALAR),
+        "title": ({"$ifNull": ["$title", "$identifier"]}, _FIELD_SCALAR),
+        "description": ({"$cond": ["$abstract", "$abstract", {"$ifNull": ["$description", ""]}]}, _FIELD_SCALAR),
+        "keywords": ("$keywords", _FIELD_ARRAY),
+        "version": ("$version", _FIELD_SCALAR),
+        "type": ("$type", _FIELD_SCALAR),
+        "license": ({"$arrayElemAt": [_LICENSE_HREFS, 0]}, _FIELD_SCALAR),
+        "created": ("$created", _FIELD_DATETIME),
+    }
+    _JOB_MONGO_FIELDS = {
+        "id": ("$id", _FIELD_SCALAR),
+        "status": ("$status", _FIELD_SCALAR),
+        "process": ("$process", _FIELD_SCALAR),
+        "service": ("$service", _FIELD_SCALAR),
+        "created": ("$created", _FIELD_DATETIME),
+        "started": ("$started", _FIELD_DATETIME),
+        "finished": ("$finished", _FIELD_DATETIME),
+    }
+    _PROCESS_VALUE_RESOLVERS = {"type": ProcessType.resolve}
 
     _COMPARISONS = {
         ast.Equal: "$eq",
@@ -217,16 +187,62 @@ class MongoFilterTranslator(object):
         ast.GreaterEqual: "$gte",
     }
 
-    def __init__(self, fields, resolvers=None):
-        # type: (FilterFields, Optional[Dict[str, Callable[[Any], List[Any]]]]) -> None
+    @classmethod
+    def for_processes(cls):
+        # type: (Type[MongoFilterTranslator]) -> MongoFilterTranslator
+        return cls(PROCESS_FILTER_FIELDS, cls._PROCESS_MONGO_FIELDS, cls._PROCESS_VALUE_RESOLVERS)
+
+    @classmethod
+    def for_jobs(cls):
+        # type: (Type[MongoFilterTranslator]) -> MongoFilterTranslator
+        return cls(JOB_FILTER_FIELDS, cls._JOB_MONGO_FIELDS)
+
+    def __init__(self, query_fields, mongo_fields, resolvers=None):
+        # type: (Dict[str, str], MongoFilterFields, Optional[Dict[str, Callable[[Any], List[Any]]]]) -> None
         """
         Initializes the MongoDB filter translator.
 
-        :param fields: Mapping of queryable names to MongoDB expressions and value kinds.
+        :param query_fields: Mapping of API queryable names to datatype field names.
+        :param mongo_fields: Mapping of datatype fields to MongoDB expressions and value kinds.
         :param resolvers: Mapping of queryable names to functions expanding equivalent values.
         """
-        self.fields = fields
+        self.query_fields = query_fields
+        self.mongo_fields = mongo_fields
         self.resolvers = resolvers or {}
+
+    @staticmethod
+    def _invalid_filter(description, value=None):
+        # type: (str, Optional[Any]) -> ListingInvalidParameter
+        return ListingInvalidParameter(json={
+            "description": description,
+            "cause": "filter",
+            "value": str(value),
+        })
+
+    @staticmethod
+    def _filter_datetime(value):
+        # type: (Any) -> datetime.datetime
+        if isinstance(value, datetime.datetime):
+            return value if value.tzinfo else value.replace(tzinfo=datetime.timezone.utc)
+        if isinstance(value, datetime.date):
+            return datetime.datetime(value.year, value.month, value.day, tzinfo=datetime.timezone.utc)
+        raise MongoFilterTranslator._invalid_filter("Filter value is not a valid datetime.", value)
+
+    @staticmethod
+    def _filter_like_regex(node):
+        # type: (ast.Like) -> str
+        regex = ""
+        chars = iter(node.pattern)
+        for char in chars:
+            if char == node.escapechar:
+                regex += re.escape(next(chars, ""))
+            elif char == node.wildcard:
+                regex += ".*"
+            elif char == node.singlechar:
+                regex += "."
+            else:
+                regex += re.escape(char)
+        return f"^{regex}$"
 
     def translate(self, node):
         # type: (AstType) -> JSON
@@ -256,7 +272,7 @@ class MongoFilterTranslator(object):
             expr, _ = self._field(node.lhs)
             result = {"$regexMatch": {
                 "input": {"$ifNull": [expr, ""]},
-                "regex": _filter_like_regex(node),
+                "regex": self._filter_like_regex(node),
                 "options": "i" if node.nocase else "",
             }}
             return {"$not": [result]} if node.not_ else result
@@ -268,26 +284,28 @@ class MongoFilterTranslator(object):
             return {"$not": [result]} if node.not_ else result
         if isinstance(node, ast.TemporalPredicate):
             return self._temporal(node)
-        raise _invalid_filter("Unsupported filter operation.", type(node).__name__)
+        raise self._invalid_filter("Unsupported filter operation.", type(node).__name__)
 
     def _field(self, node):
         # type: (AstType) -> Tuple[Any, str]
-        if not isinstance(node, ast.Attribute) or node.name not in self.fields:
-            raise _invalid_filter("Unsupported filter property.", getattr(node, "name", node))
-        return self.fields[node.name]
+        if not isinstance(node, ast.Attribute):
+            raise self._invalid_filter("Unsupported filter property.", getattr(node, "name", node))
+        field_name = self.query_fields.get(node.name)
+        if field_name not in self.mongo_fields:
+            raise self._invalid_filter("Unsupported filter property.", node.name)
+        return self.mongo_fields[field_name]
 
     def _values(self, name, value):
         # type: (str, Any) -> List[Any]
         resolver = self.resolvers.get(name)
         return resolver(value) if resolver else [value]
 
-    @staticmethod
-    def _value(value, kind):
+    def _value(self, value, kind):
         # type: (Any, str) -> Any
         if isinstance(value, ast.Node):
-            raise _invalid_filter("Filter comparison between properties is not supported.", value)
-        if kind == FIELD_DATETIME:
-            return _filter_datetime(value)
+            raise self._invalid_filter("Filter comparison between properties is not supported.", value)
+        if kind == self._FIELD_DATETIME:
+            return self._filter_datetime(value)
         return value
 
     def _compare(self, node):
@@ -295,9 +313,9 @@ class MongoFilterTranslator(object):
         name = getattr(node.lhs, "name", None)
         expr, kind = self._field(node.lhs)
         operator = self._COMPARISONS[type(node)]
-        if kind == FIELD_ARRAY:
+        if kind == self._FIELD_ARRAY:
             if operator not in ["$eq", "$ne"]:
-                raise _invalid_filter("Unsupported filter operation for array property.", name)
+                raise self._invalid_filter("Unsupported filter operation for array property.", name)
             result = {"$in": [self._value(node.rhs, kind), {"$ifNull": [expr, []]}]}
             return result if operator == "$eq" else {"$not": [result]}
         values = self._values(name, node.rhs)
@@ -312,7 +330,7 @@ class MongoFilterTranslator(object):
         expr, kind = self._field(node.lhs)
         values = [value for item in node.sub_nodes for value in self._values(name, item)]
         values = [self._value(value, kind) for value in values]
-        if kind == FIELD_ARRAY:
+        if kind == self._FIELD_ARRAY:
             result = {"$gt": [{"$size": {"$setIntersection": [{"$ifNull": [expr, []]}, values]}}, 0]}
         else:
             result = {"$in": [expr, values]}
@@ -321,15 +339,15 @@ class MongoFilterTranslator(object):
     def _temporal(self, node):
         # type: (ast.TemporalPredicate) -> JSON
         expr, kind = self._field(node.lhs)
-        if kind != FIELD_DATETIME:
-            raise _invalid_filter(
+        if kind != self._FIELD_DATETIME:
+            raise self._invalid_filter(
                 "Temporal filter operation requires a datetime property.",
                 getattr(node.lhs, "name", None),
             )
         rhs = node.rhs
         start, end = (rhs.start, rhs.end) if isinstance(rhs, Interval) else (rhs, rhs)
-        start = _filter_datetime(start) if start is not None else None
-        end = _filter_datetime(end) if end is not None else None
+        start = self._filter_datetime(start) if start is not None else None
+        end = self._filter_datetime(end) if end is not None else None
         within = [{"$gte": [expr, start]}] if start else []
         within += [{"$lte": [expr, end]}] if end else []
         if isinstance(node, ast.TimeAfter):
@@ -342,7 +360,7 @@ class MongoFilterTranslator(object):
             return {"$not": [{"$and": within}]} if within else {"$literal": False}
         if isinstance(node, (ast.TimeDuring, ast.TimeOverlaps, ast.TimeOverlappedBy)):
             return {"$and": within} if within else {"$literal": True}
-        raise _invalid_filter("Unsupported temporal filter operation.", type(node).__name__)
+        raise self._invalid_filter("Unsupported temporal filter operation.", type(node).__name__)
 
 
 class MongodbStore(object):
@@ -1017,7 +1035,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             types = [value for item in process_type.split(",") for value in ProcessType.resolve(item)]
             conditions.append({"type": {"$in": types}})
         if filter_ast:
-            translator = MongoFilterTranslator(PROCESS_FILTER_FIELDS, PROCESS_FILTER_RESOLVERS)
+            translator = MongoFilterTranslator.for_processes()
             conditions.append({"$expr": translator.translate(filter_ast)})
         return conditions
 
@@ -1060,8 +1078,8 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         Matches semantic version intervals numerically rather than comparing version strings alphabetically.
         """
         lower, upper = parse_version_range(version)
-        if lower == upper:
-            return {"version": as_version_major_minor_patch(lower, VersionFormat.STRING)}
+        if lower is not None and lower == upper:
+            return {"version": ".".join(str(part) for part in lower)}
         version_parts = {"$map": {"input": {"$split": ["$version", "."]}, "in": {"$toInt": "$$this"}}}
         conditions = []
         for bound, operator in [(lower, "$gte"), (upper, "$lte")]:
@@ -1506,7 +1524,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         search_filters.update(self._apply_access_filter(access, request))
         search_filters.update(self._apply_datetime_filter(datetime_interval))
         if filter_ast:
-            translator = MongoFilterTranslator(JOB_FILTER_FIELDS)
+            translator = MongoFilterTranslator.for_jobs()
             search_filters.setdefault("$and", []).append({"$expr": translator.translate(filter_ast)})
 
         # minimal operation, only search for matches and sort them

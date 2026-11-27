@@ -14,6 +14,7 @@ from weaver import __meta__
 from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import OAS3TypeConversionDispatcher
+from weaver.wps_restapi.filter import FilterSchema
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional
@@ -70,7 +71,7 @@ def resolve_discovery_params(params):
     if filter_expr:
         filter_lang = filter_lang or ("cql2-text" if isinstance(filter_expr, str) else "cql2-json")
         try:
-            params["filter_ast"] = sd.FilterSchema().validate(filter_expr, filter_lang)
+            params["filter_ast"] = FilterSchema().validate(filter_expr, filter_lang)
         except colander.Invalid as exc:
             raise HTTPBadRequest(json={
                 "error": "ListingInvalidParameter",

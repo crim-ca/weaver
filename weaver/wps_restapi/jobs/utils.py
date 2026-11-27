@@ -361,7 +361,7 @@ def get_job_list_links(job_total, filters, grouped, request):
          "type": ContentType.APP_JSON, "title": "Generic query endpoint to search for jobs."},
         {"href": f"{job_path}?detail=false", "rel": "preview",
          "type": ContentType.APP_JSON, "title": "Job listing summary (UUID and count only)."},
-        {"href": job_path, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
+        {"href": job_path, "rel": sd.OGC_API_PROC_REL_JOB_LIST_URI,
          "type": ContentType.APP_JSON, "title": "List of registered jobs."},
         {"href": get_path_kvp(job_path, page=cur_page, **kvp_params), "rel": "current",
          "type": ContentType.APP_JSON, "title": "Current page of job query listing."},

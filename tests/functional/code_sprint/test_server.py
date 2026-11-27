@@ -157,8 +157,8 @@ class TestServerOGCAPIProcessesCore(ServerOGCAPIProcessesBase):
         assert result.code == 200
         links = result.body.get("links", [])
         rel_by_name = {link.get("rel"): link for link in links}
-        assert "http://www.opengis.net/def/rel/ogc/1.0/conformance" in rel_by_name
-        assert "http://www.opengis.net/def/rel/ogc/1.0/processes" in rel_by_name
+        assert sd.OGC_API_PROC_REL_CONFORMANCE_URI in rel_by_name
+        assert sd.OGC_API_PROC_REL_PROCESSES_URI in rel_by_name
 
     @pytest.mark.dependency(name="test_conformance_classes_core")
     def test_conformance_classes_core(self):

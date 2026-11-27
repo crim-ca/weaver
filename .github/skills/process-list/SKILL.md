@@ -43,6 +43,10 @@ weaver capabilities -u $WEAVER_URL -P my-provider
 
 # List with details
 weaver capabilities -u $WEAVER_URL --detail
+
+# Filter and sort process results
+weaver capabilities -u $WEAVER_URL --keywords climate --sortby=+id --sortby=-version \
+  --filter '{"op":"=","args":[{"property":"type"},"application"]}' --filter-lang cql2-json
 ```
 
 ## API Search
@@ -59,16 +63,15 @@ weaver capabilities -u $WEAVER_URL --detail
   Use `+-data` for a leading literal minus. Double quotes preserve literal punctuation.
 - **version** (string): Exact version or inclusive `lower/upper` interval. Use `..` for an open bound.
   Add **revisions=true** to search older revisions.
-- **sortby** (string): Signed, comma-separated sorting fields, such as `+id,-version`.
+- **sortby** (string or list of strings): Signed sorting fields, such as `+id,-version`.
 - **sort** (string): Deprecated alias of **sortby**. Cannot be combined with it.
 - **datetime** (string): Instant or interval matched against the process `created` time.
 - **type** (string): Comma-separated process types (case-insensitive) or Records resource type URIs.
 - **license** (string): Href or title of a `license` link or metadata.
-- **filter** (string): CQL2 expression, with optional **filter-lang**.
+- **filter** (string or JSON object/array): CQL or CQL2 expression, with optional **filter-lang** and **filter-crs**.
 
 Different filters combine with AND and apply before pagination. They cannot be combined with `providers=true`.
 Empty terms are invalid. URL-encode values, particularly `+` as `%2B`.
-`GET /queryables/processes` describes the supported listing parameters as JSON Schema.
 
 ```bash
 curl --get "${WEAVER_URL}/processes" \
@@ -89,6 +92,14 @@ result = client.capabilities()
 
 for process in result.body.get("processes", []):
     print(f"{process['id']}: {process.get('title', process['id'])}")
+
+# Filter with a CQL2-JSON expression and list-valued sorting
+result = client.capabilities(
+    keywords=["climate", "netcdf"],
+    sortby=["+id", "-version"],
+    filter={"op": "=", "args": [{"property": "type"}, "application"]},
+    filter_lang="cql2-json",
+)
 ```
 
 ## Returns

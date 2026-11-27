@@ -22,7 +22,6 @@ import os
 import re
 from copy import copy
 from decimal import Decimal
-from functools import cache
 from typing import TYPE_CHECKING
 
 import colander
@@ -32,9 +31,6 @@ import yaml
 from babel.numbers import list_currencies
 from colander import All, DateTime, Email as EmailRegex, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
-from lark.exceptions import LarkError
-from pygeofilter.backends.cql2_json import to_cql2
-from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, fes, jfe
 
 from weaver import WEAVER_SCHEMA_DIR, __meta__, ogc_definitions as ogc_def
 from weaver.config import WeaverFeature
@@ -124,11 +120,7 @@ from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
 from weaver.utils import (
     AWS_S3_BUCKET_REFERENCE_PATTERN,
-    json_hashable,
     load_file,
-    parse_keyword_query,
-    parse_search_query,
-    parse_version_range,
     repr_json
 )
 from weaver.visibility import Visibility
@@ -163,13 +155,20 @@ from weaver.wps_restapi.colander_extras import (
     XMLObject
 )
 from weaver.wps_restapi.constants import ConformanceCategory
+from weaver.wps_restapi.filter import (
+    AnyCRS,
+    AnyFilterExpression,
+    AnyFilterLanguage,
+    FilterSchema,
+    parse_keyword_query,
+    parse_search_query,
+    parse_version_range
+)
 from weaver.wps_restapi.patches import WeaverService as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Iterable, List, Tuple, Type, Union
     from typing_extensions import TypedDict
-
-    from pygeofilter.ast import AstType as FilterAstType
 
     from weaver.typedefs import DatetimeIntervalType, JSON
 
@@ -275,6 +274,7 @@ OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI = "https://www.opengis.net/def/profi
 OGC_API_PROC_PART5_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"
 
 OGC_API_PROC_REL_BASE_URI = "https://www.opengis.net/def/rel/ogc/1.0"
+OGC_API_PROC_REL_CONFORMANCE_URI = f"{OGC_API_PROC_REL_BASE_URI}/conformance"
 OGC_API_PROC_REL_EXCEPTIONS_URI = f"{OGC_API_PROC_REL_BASE_URI}/exceptions"
 OGC_API_PROC_REL_EXECUTE_URI = f"{OGC_API_PROC_REL_BASE_URI}/execute"
 OGC_API_PROC_REL_PROCESSES_URI = f"{OGC_API_PROC_REL_BASE_URI}/processes"
@@ -1777,165 +1777,6 @@ class DescribeComplexInputType(DescribeWithFormats):
 
 class DeployComplexInputType(DeployWithFormats):
     pass
-
-
-class AnyCRS(AnyOfKeywordSchema):
-    # note:
-    #   other CRS exist (EGM, NAVD, NAD, etc.)
-    #   however, only support EPSG (short form, normative from, or URI) that are supported by 'owslib.crs'
-    #   handle equivalent representations of EPSG:4326 that are also supported by 'owslib.crs'
-    _any_of = [
-        ExtendedSchemaNode(String(), pattern=re.compile(r"^urn:ogc:def:crs:EPSG::?[0-9]{4,5}$")),
-        ExtendedSchemaNode(String(), pattern=re.compile(r"^\[?EPSG::?[0-9]{4,5}\]?$")),
-        ExtendedSchemaNode(String(), pattern=re.compile(r"^https?://www\.opengis\.net/def/crs/EPSG/0/[0-9]{4,5}$")),
-        ExtendedSchemaNode(String(), validator=OneOf(ogc_def.OGC_DEF_CRS_ANY_EPSG4326)),
-    ]
-    default = ogc_def.OGC_DEF_CRS_EPSG4326_SHORT
-
-
-class AnyFilterExpression(AnyOfKeywordSchema):
-    _any_of = [
-        PermissiveMappingSchema(),
-        PermissiveSequenceSchema(validator=Length(min=1)),
-        ExtendedSchemaNode(String(), validator=Length(min=1)),
-    ]
-
-
-class AnyFilterLanguage(ExtendedSchemaNode):
-    schema_type = String
-    name = "filter-lang"
-    default = "cql2-json"
-    validator = OneOfCaseInsensitive([
-        "cql2-json",
-        "cql2-text",
-        "cql",
-        "cql-text",
-        "cql-json",
-        "ecql",
-        "simple-cql",
-        "fes",
-        "jfe"
-    ])
-    summary = "Filter expression language to use for parsing."
-    description = (
-        "Filter expression language to use for parsing. "
-        "Supports multiple variants of OGC Common Query Language (CQL), "
-        "Filter Expression Standard (FES), or JSON Filter Expression (JFE). "
-        "Values are case-insensitive."
-    )
-
-    def deserialize(self, cstruct):
-        # type: (Any) -> Union[str, colander.null]
-        if isinstance(cstruct, str):
-            cstruct = cstruct.lower()
-        return super().deserialize(cstruct)
-
-
-class FilterSchema(ExtendedMappingSchema):
-    # note:
-    #   defer format and parsing to 'pygeofilter'
-    #   to accommodate all filter expression representations, string, array and object must be allowed
-    filter = AnyFilterExpression(
-        description="Filter expression according to the specified parsing language.",
-        missing=drop,  # optional since combined within other JSON schema definitions
-    )
-    filter_crs = AnyCRS(
-        name="filter-crs",
-        missing=drop,
-        default=drop,  # override to avoid injecting it by default, remote server could use a different default
-        description="Coordinate Reference System for provided spatial properties.",
-    )
-    filter_lang = AnyFilterLanguage(
-        name="filter-lang",
-        missing=drop,
-        default=drop,  # override to avoid injecting it by default, remote server could use a different default
-        description=AnyFilterLanguage.description + (
-            " If unspecified, the filter language will default to CQL2-Text if a string was provided,"
-            " or CQL2-JSON if a JSON object or array structure is detected as the filter."
-            " For any other language, or to resolve ambiguous cases such as a CQL2-JSON encoded as literal string,"
-            " the filter language must be specified explicitly."
-        )
-    )
-
-    @staticmethod
-    @json_hashable
-    @cache
-    def parse(filter_expr, filter_lang):
-        # type: (Union[JSON, str], str) -> FilterAstType
-        parsed_expr = None
-        if filter_lang == "cql2-json":
-            parsed_expr = cql2_json.parse(filter_expr)
-        elif filter_lang == "cql2-text":
-            parsed_expr = cql2_text.parse(filter_expr)
-        elif filter_lang == "cql-json":
-            parsed_expr = cql_json.parse(filter_expr)
-        elif filter_lang in ["cql", "cql-text", "ecql", "simple-cql"]:
-            parsed_expr = ecql.parse(filter_expr)
-        elif filter_lang == "fes":
-            parsed_expr = fes.parse(filter_expr)
-        elif filter_lang == "jfe":
-            parsed_expr = jfe.parse(filter_expr)
-        if not parsed_expr:
-            raise colander.Invalid(
-                node=AnyFilterLanguage(),
-                msg="Unresolved filter expression language.",
-                value={"filter-lang": filter_lang},
-            )
-        return parsed_expr
-
-    def validate(self, filter_expr, filter_lang):
-        # type: (Union[JSON, str], str) -> FilterAstType
-        try:
-            return self.parse(filter_expr, filter_lang)
-        except (TypeError, ValueError, LarkError) as exc:
-            raise colander.Invalid(
-                node=self,
-                msg="Invalid filter expression could not be parsed against specified language.",
-                value={"filter": filter_expr, "filter-lang": filter_lang},
-            ) from exc
-
-    def convert(self, filter_expr, filter_lang):
-        # type: (Union[JSON, str], str) -> JSON
-        try:
-            parsed_expr = self.validate(filter_expr, filter_lang)
-            return to_cql2(parsed_expr)
-        except (TypeError, ValueError, NotImplementedError) as exc:
-            raise colander.Invalid(
-                node=self,
-                msg="Invalid filter expression could not be interpreted.",
-                value={"filter": filter_expr, "filter-lang": filter_lang},
-            ) from exc
-
-    def deserialize(self, cstruct):
-        # type: (JSON) -> Union[JSON, colander.null]
-        result = super().deserialize(cstruct)
-        if not result:
-            return result
-        filter_expr = result.get("filter")
-        filter_lang = result.get("filter-lang")
-        if filter_expr in [null, drop, None]:  # explicit "", {}, [] should be raised as invalid since dropped
-            if "filter" in cstruct:
-                raise colander.Invalid(
-                    node=self,
-                    msg="Invalid filter expression could not be interpreted.",
-                    value={"filter": repr_json(cstruct["filter"]), "filter-lang": filter_lang},
-                )
-            filter_crs = cstruct.get("filter-crs")
-            filter_lang = cstruct.get("filter-lang")
-            if filter_crs or filter_lang:
-                raise colander.Invalid(
-                    node=self,
-                    msg="Missing filter expression provided with CRS and/or language parameters.",
-                    value={"filter-crs": filter_crs, "filter-lang": filter_lang},
-                )
-            return result
-        if not filter_lang:
-            filter_lang = "cql2-text" if isinstance(filter_expr, str) else "cql2-json"
-        # perform conversion to validate
-        # but don't return the converted CQL2-JSON to preserve the original definition where called (storage/dispatch)
-        # conversion can be done as needed to obtain a uniform representation locally
-        self.convert(filter_expr, filter_lang)
-        return result
 
 
 class SortByExpression(ExpandStringList, ExtendedSchemaNode):
@@ -8673,13 +8514,12 @@ class ProcessSearchQuery(FilterSchema):
         missing=drop, example="subset,netcdf",
         description=(
             "Alias of 'query'. Searches partial terms and phrases across title, description and keywords. "
-            "Supports comma-separated OR groups and boundary-prefixed '+' (AND) and '-' (NOT) operators. "
-            "Applicable only to locally registered processes. URL-encode '+' as '%2B'."
+            "Applicable only to locally registered processes. See 'query' for expression syntax."
         )
     )
     query = ProcessSearchExpression(missing=drop, example="+climate +netcdf -grib,subset", description=(
         "Case-insensitive substring search across title, description and keywords. Commas separate OR groups. "
-        "A '+' (AND) or '-' (NOT) is an operator only at the beginning or after whitespace or a comma. "
+        "At the beginning or after whitespace or a comma, '+' requires a term and '-' excludes a term. "
         "Other signs are literal, so 'data-' matches 'data-analysis'. Use '+-data' for a leading literal minus. "
         "Ordinary spaces join an ordered phrase and match one or more whitespace characters. "
         "Double quotes preserve literal punctuation. URL-encode '+' as '%2B'. "

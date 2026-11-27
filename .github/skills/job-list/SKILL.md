@@ -34,8 +34,9 @@ List jobs with filtering, pagination, and sorting capabilities.
 - `page` (integer): Page number for pagination (default: 0)
 - `datetime` (string): Filter by job creation datetime or interval
 - `sort` (string): Deprecated alias of `sortby`. Cannot be combined with it
-- `sortby` (string): Signed (`+/-`) comma-separated sorting fields, such as `-created,status`
-- `filter` (string): CQL2 expression, with optional `filter-lang`
+- `sortby` (string or list): Signed (`+/-`) sorting fields, such as `["-created", "status"]`
+- `filter` (string or JSON object/array): CQL2 expression, with optional `filter-lang`
+- `filter-crs` (string): Coordinate reference system for spatial filter properties
 - `tags` (list): Filter by job tags
 - `detail` (boolean): Include detailed information
 
@@ -91,9 +92,9 @@ detailed = client.jobs(detail=True, limit=100)
 
 # Filter, sort, and restrict by creation time
 filtered = client.jobs(
-    sortby="-created,status",
-    filter="status = 'succeeded'",
-    filter_lang="cql2-text",
+    sortby=["-created", "status"],
+    filter={"op": "=", "args": [{"property": "status"}, "succeeded"]},
+    filter_lang="cql2-json",
     datetime="2026-02-01/2026-02-19",
 )
 ```

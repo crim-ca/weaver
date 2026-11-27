@@ -467,6 +467,8 @@ that define the process references and expected inputs/outputs.
 .. _`Provider requests`: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Providers
 .. _`Process requests`: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes
 
+.. _proc_revisions:
+
 Process Revisions
 ~~~~~~~~~~~~~~~~~
 
