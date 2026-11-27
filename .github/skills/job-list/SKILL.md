@@ -41,9 +41,6 @@ List jobs with filtering, pagination, and sorting capabilities.
 
 ## CLI Usage
 
-`GET /queryables/jobs` describes the supported API listing parameters as JSON Schema.
-It is linked from the landing page using `http://www.opengis.net/def/rel/ogc/1.0/queryables`.
-
 ```bash
 # List all jobs
 weaver jobs -u $WEAVER_URL
@@ -64,8 +61,10 @@ weaver jobs -u $WEAVER_URL --limit 50 --page 2
 weaver jobs -u $WEAVER_URL --sortby=-created
 
 # Filter by creation time and status
-weaver jobs -u $WEAVER_URL --datetime "2026-02-01/2026-02-19" \
-  --filter "status = 'succeeded'" --filter-lang cql2-text
+weaver jobs -u $WEAVER_URL \
+  --datetime "2026-02-01/2026-02-19" \
+  --filter "status = 'succeeded'" \
+  --filter-lang cql2-text
 ```
 
 ## Python Usage

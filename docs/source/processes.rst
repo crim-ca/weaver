@@ -443,6 +443,90 @@ Managing Processes included in Weaver ADES/EMS
 
 Following steps represent the typical steps applied to deploy a process, execute it and retrieve the results.
 
+.. _proc_op_getcap:
+.. _proc_op_describe:
+
+Access Registered Processes (GetCapabilities, DescribeProcess)
+------------------------------------------------------------------------
+
+Available processes can all be listed using |getcap-req|_ request. This request will return all locally registered
+process summaries. Other return formats and filters are also available according to provided request query parameters.
+Note that processes not marked with *public visibility* will not be listed in this result.
+
+For more specific process details, the |describe-req|_ request should be used. This will return all information
+that define the process references and expected inputs/outputs.
+
+.. note::
+    For *remote processes* (see: `Remote Provider`_), `Provider requests`_ are also available for more fine-grained
+    search of underlying processes. These processes are not necessarily listed as local processes, and will therefore
+    sometime not yield any result if using the typical ``DescribeProcess`` request on `wps_endpoint`.
+
+    All routes listed under `Process requests`_ should normally be applicable for *remote processes* by prefixing
+    them with ``/providers/{id}``.
+
+.. _`Provider requests`: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Providers
+.. _`Process requests`: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes
+
+Process Revisions
+~~~~~~~~~~~~~~~~~
+
+.. versionchanged:: 4.20
+
+With the addition of :term:`Process` revisions (see :ref:`Update Operation <proc_op_update>` below), a registered
+:term:`Process` specified only by ``{processID}`` will retrieve the latest revision of that :term:`Process`.
+A specific older revision can be obtained by adding the tagged version in the path (``{processID}:{version}``) or
+adding the request query parameter ``version``.
+
+Using revisions provided through ``PUT`` and ``PATCH`` requests, it is also possible to list specific or all existing
+revisions of a given or multiple processes simultaneously using the ``revisions`` and ``version`` query parameters with
+the |getcap-req|_ request. See :ref:`proc_listing_search` for the process listing revision query parameters.
+
+.. _proc_listing_search:
+
+Filtering Processes
+~~~~~~~~~~~~~~~~~~~
+
+The ``GET /processes`` listing supports the following search parameters for locally registered processes:
+
+- ``keywords`` matches whole keywords, case-insensitively. Comma-separated groups are combined with AND.
+  Alternatives within each group can be separated by ``|`` (OR).
+  For example, ``keywords=climate,netcdf|grib`` requires ``climate`` and either ``netcdf`` or ``grib``.
+  Prefix an individual keyword with ``!`` or ``~`` to negate it. ``keywords=climate,!grib`` excludes ``grib``.
+- ``title`` and ``description`` match literal substrings, case-insensitively.
+- ``q`` and ``query`` search partial terms against the title, description and keywords, case-insensitively.
+  Commas separate OR groups. Within a group, ``+`` combines terms with AND and ``-`` negates the following term.
+  Signs are operators only at the beginning or after whitespace or commas. Otherwise, they are literal characters.
+  For example, ``q=data-`` matches ``data-analysis`` and ``data-science``, and ``q=data+`` matches ``data+analysis``.
+  Use ``+-data`` to search a leading literal minus instead of negating ``data``.
+  Ordinary spaces join a contiguous, ordered phrase and match one or more whitespace characters.
+  For example, ``q=+climate weather +netcdf -grib`` requires the phrase ``climate weather`` and the term ``netcdf``,
+  while excluding ``grib``. It does not match ``climate data and weather``.
+  Double quotes preserve literal punctuation, such as the comma in ``query="regional,subset"``.
+- ``version`` matches an exact numeric semantic version or an inclusive ``lower/upper`` version interval.
+  For example, ``version=1.2.0/1.10.0`` compares numeric version components, not alphabetical strings.
+  Either bound can be open using ``..``, such as ``version=1.0.0/..``.
+  By default, only the latest revision of each process is searched.
+  Use ``revisions=true`` to include older revisions, optionally with ``process={processID}``.
+- ``datetime`` matches the process ``created`` time, as an instant or an interval such as ``2024-01-01T00:00:00Z/..``.
+- ``type`` matches comma-separated process types, case-insensitively, such as ``workflow``, ``application`` or ``wps``.
+  The `OGC API - Records` resource type URIs of `WPS` and `OGC API - Processes` are also accepted.
+- ``license`` matches the ``href`` or ``title`` of a ``license`` link relation within ``metadata`` or ``links``.
+- ``filter`` applies a `CQL2` expression (``filter-lang`` defaults to ``cql2-text`` or ``cql2-json``) over the
+  queryable properties of the listing, including temporal functions applied on ``created``.
+  The same parameter is available on ``GET /jobs``.
+- ``sortby`` specifies comma-separated sorting fields, with ``+`` for ascending or ``-`` for descending.
+  Fields without prefix use their default direction. For example, ``sortby=+id,-version``.
+  The deprecated ``sort`` is interpreted as ``sortby``, and both cannot be provided together.
+
+Different search parameters are combined with AND. They can be used with metadata filters, sorting, pagination and
+``detail=false``. Filtering occurs before pagination, and ``total`` counts all matching public processes.
+Terms are not regular expressions. Empty terms are invalid.
+These searches cannot be combined with ``providers=true``, since remote provider listings cannot apply the filters.
+URL-encode search values, in particular ``+`` as ``%2B``, to avoid interpreting it as a space in a query string.
+The ``/queryables/processes`` and ``/queryables/jobs`` endpoints describe the parameters supported by each listing
+as JSON Schema. Both are discoverable from the landing page using the
+``http://www.opengis.net/def/rel/ogc/1.0/queryables`` link relation.
+
 .. _proc_op_deploy:
 
 Register a New Process (Deploy)
@@ -519,85 +603,6 @@ For most traditional use cases, properties are mapped between the two interfaces
 .. seealso::
     Please refer to :ref:`application-package` chapter for any additional parameters that can be
     provided for specific types of :term:`Application Package` and :term:`Process` definitions.
-
-.. _proc_op_getcap:
-.. _proc_op_describe:
-
-Access Registered Processes (GetCapabilities, DescribeProcess)
-------------------------------------------------------------------------
-
-Available processes can all be listed using |getcap-req|_ request. This request will return all locally registered
-process summaries. Other return formats and filters are also available according to provided request query parameters.
-Note that processes not marked with *public visibility* will not be listed in this result.
-
-.. _proc_listing_search:
-
-The ``GET /processes`` listing supports the following search parameters for locally registered processes:
-
-- ``keywords`` matches whole keywords, case-insensitively. Comma-separated groups are combined with AND.
-  Alternatives within each group can be separated by ``|`` (OR).
-  For example, ``keywords=climate,netcdf|grib`` requires ``climate`` and either ``netcdf`` or ``grib``.
-  Prefix an individual keyword with ``!`` or ``~`` to negate it. ``keywords=climate,!grib`` excludes ``grib``.
-- ``title`` and ``description`` match literal substrings, case-insensitively.
-- ``q`` and ``query`` search partial terms against the title, description and keywords, case-insensitively.
-  Commas separate OR groups. Within a group, ``+`` combines terms with AND and ``-`` negates the following term.
-  Signs are operators only at the beginning or after whitespace or commas. Otherwise, they are literal characters.
-  For example, ``q=data-`` matches ``data-analysis`` and ``data-science``, and ``q=data+`` matches ``data+analysis``.
-  Use ``+-data`` to search a leading literal minus instead of negating ``data``.
-  Ordinary spaces join a contiguous, ordered phrase and match one or more whitespace characters.
-  For example, ``q=+climate weather +netcdf -grib`` requires the phrase ``climate weather`` and the term ``netcdf``,
-  while excluding ``grib``. It does not match ``climate data and weather``.
-  Double quotes preserve literal punctuation, such as the comma in ``query="regional,subset"``.
-- ``version`` matches an exact numeric semantic version or an inclusive ``lower/upper`` version interval.
-  For example, ``version=1.2.0/1.10.0`` compares numeric version components, not alphabetical strings.
-  Either bound can be open using ``..``, such as ``version=1.0.0/..``.
-  By default, only the latest revision of each process is searched.
-  Use ``revisions=true`` to include older revisions, optionally with ``process={processID}``.
-- ``datetime`` matches the process ``created`` time, as an instant or an interval such as ``2024-01-01T00:00:00Z/..``.
-- ``type`` matches comma-separated process types, case-insensitively, such as ``workflow``, ``application`` or ``wps``.
-  The `OGC API - Records` resource type URIs of `WPS` and `OGC API - Processes` are also accepted.
-- ``license`` matches the ``href`` or ``title`` of a ``license`` link relation within ``metadata`` or ``links``.
-- ``filter`` applies a `CQL2` expression (``filter-lang`` defaults to ``cql2-text`` or ``cql2-json``) over the
-  queryable properties of the listing, including temporal functions applied on ``created``.
-  The same parameter is available on ``GET /jobs``.
-- ``sortby`` specifies comma-separated sorting fields, with ``+`` for ascending or ``-`` for descending.
-  Fields without prefix use their default direction. For example, ``sortby=+id,-version``.
-  The deprecated ``sort`` is interpreted as ``sortby``, and both cannot be provided together.
-
-Different search parameters are combined with AND. They can be used with metadata filters, sorting, pagination and
-``detail=false``. Filtering occurs before pagination, and ``total`` counts all matching public processes.
-Terms are not regular expressions. Empty terms are invalid.
-These searches cannot be combined with ``providers=true``, since remote provider listings cannot apply the filters.
-URL-encode search values, in particular ``+`` as ``%2B``, to avoid interpreting it as a space in a query string.
-The ``/queryables/processes`` and ``/queryables/jobs`` endpoints describe the parameters supported by each listing
-as JSON Schema. Both are discoverable from the landing page using the
-``http://www.opengis.net/def/rel/ogc/1.0/queryables`` link relation.
-
-For more specific process details, the |describe-req|_ request should be used. This will return all information
-that define the process references and expected inputs/outputs.
-
-.. note::
-    For *remote processes* (see: `Remote Provider`_), `Provider requests`_ are also available for more fine-grained
-    search of underlying processes. These processes are not necessarily listed as local processes, and will therefore
-    sometime not yield any result if using the typical ``DescribeProcess`` request on `wps_endpoint`.
-
-    All routes listed under `Process requests`_ should normally be applicable for *remote processes* by prefixing
-    them with ``/providers/{id}``.
-
-.. _`Provider requests`: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Providers
-.. _`Process requests`: https://pavics-weaver.readthedocs.io/en/latest/api.html#tag/Processes
-
-.. versionchanged:: 4.20
-
-With the addition of :term:`Process` revisions (see :ref:`Update Operation <proc_op_update>` below), a registered
-:term:`Process` specified only by ``{processID}`` will retrieve the latest revision of that :term:`Process`.
-A specific older revision can be obtained by adding the tagged version in the path (``{processID}:{version}``) or
-adding the request query parameter ``version``.
-
-Using revisions provided through ``PUT`` and ``PATCH`` requests, it is also possible to list specific or all existing
-revisions of a given or multiple processes simultaneously using the ``revisions`` and ``version`` query parameters with
-the |getcap-req|_ request.
-
 
 .. _proc_op_undeploy:
 .. _proc_op_replace:
