@@ -69,6 +69,7 @@ def test_cli_url_required_in_client_or_param():
 
 
 @pytest.mark.cli
+@pytest.mark.ogc_records
 def test_cli_jobs_discovery_options():
     """
     Tests that CLI discovery options are forwarded as job listing query parameters.
@@ -101,6 +102,7 @@ def test_cli_jobs_discovery_options():
 
 
 @pytest.mark.cli
+@pytest.mark.ogc_records
 def test_cli_capabilities_discovery_options():
     filter_expr = {"op": "=", "args": [{"property": "id"}, "example"]}
     response = mock.Mock()
@@ -168,6 +170,7 @@ def test_cli_capabilities_discovery_options():
 
 
 @pytest.mark.cli
+@pytest.mark.ogc_records
 def test_weaver_client_capabilities_accepts_python_filter_and_sortby():
     filter_expr = {"op": "=", "args": [{"property": "id"}, "example"]}
     response = mock.Mock()

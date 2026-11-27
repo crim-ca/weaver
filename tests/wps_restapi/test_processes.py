@@ -328,7 +328,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         conf = resp.json["conformsTo"]
         assert "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/core/process-summary-links" in conf
 
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_queryables(self):
         # type: () -> None
         """
@@ -5734,7 +5734,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ("combined_match", {"q": "subset", "title": "regional", "version": "1.2.3"}, True),
         ("combined_no_match", {"q": "subset", "title": "other"}, False),
     ])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_queries(self, _, query, match):
         # type: (str, JSON, bool) -> None
         """
@@ -5773,7 +5773,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             ("substring", "clim", ["analysis", "science", "plus"]),
         ]
     ])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_term_boundaries(self, _, field, value, expected):
         # type: (str, str, str, List[str]) -> None
         """
@@ -5810,7 +5810,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ("version", "../.."), ("version", "2.0.0/1.0.0"), ("version", "1.0.0//2.0.0"),
         ("sortby", "unknown"), ("sortby", "id,"),
     ])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_invalid(self, field, value):
         # type: (str, str) -> None
         """
@@ -5826,7 +5826,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ("multi", {"sortby": "+version,-id"}, ["c", "b", "a"]),
         ("deprecated_sort", {"sort": "id"}, ["a", "b", "c"]),
     ])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_order(self, _, query, expected):
         # type: (str, JSON, List[str]) -> None
         """
@@ -5843,7 +5843,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.json["processes"] == [f"test-search-order-{suffix}" for suffix in expected]
 
     @parameterized.expand([({"sort": "id"},)])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_order_conflict(self, query):
         # type: (JSON) -> None
         """
@@ -5860,7 +5860,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ("interval", {"datetime": "2022-01-01T00:00:00Z/2024-12-31T00:00:00Z"}, ["mid"]),
         ("exact", {"datetime": "2020-01-01T00:00:00Z"}, ["old"]),
     ])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_datetime(self, _, query, expected):
         # type: (str, JSON, List[str]) -> None
         """
@@ -5878,7 +5878,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.status_code == 200, resp.text
         assert resp.json["processes"] == [f"test-datetime-{suffix}" for suffix in sorted(expected, reverse=True)]
 
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_created_default(self):
         """
         Tests that processes without explicit ``created`` receive the current time.
@@ -5892,7 +5892,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ("wps-uri", "http://www.opengis.net/def/serviceType/ogc/wps", ["wps1", "wps2"]),
         ("ogcapi-uri", "http://www.opengis.net/spec/ogcapi-processes-1/1.0", ["app"]),
     ])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_type(self, _, value, expected):
         # type: (str, str, List[str]) -> None
         """
@@ -5911,13 +5911,13 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.status_code == 200, resp.text
         assert sorted(resp.json["processes"]) == sorted(f"test-type-{suffix}" for suffix in expected)
 
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_type_unknown(self):
         resp = self.app.get("/processes", params={"type": "unknown"}, headers=self.json_headers)
         assert resp.status_code == 200
         assert resp.json["processes"] == []
 
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_license(self):
         """
         Tests that ``license`` matches metadata or links using the ``license`` role or relation.
@@ -5954,7 +5954,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "op": "t_after", "args": [{"property": "created"}, {"timestamp": "2021-01-01T00:00:00Z"}]}),
             "filter-lang": "cql2-json"}, ["b", "c"]),
     ])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_cql2(self, _, query, expected):
         # type: (str, JSON, List[str]) -> None
         """
@@ -5980,13 +5980,13 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ({"filter": "title = "},),
         ({"filter": "S_INTERSECTS(title, POINT(1 1))"},),
     ])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_cql2_invalid(self, query):
         # type: (JSON) -> None
         resp = self.app.get("/processes", params=query, headers=self.json_headers, expect_errors=True)
         assert resp.status_code in [400, 422], resp.text
 
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_queryables_link(self):
         resp = self.app.get("/processes", headers=self.json_headers)
         assert resp.status_code == 200
@@ -5994,7 +5994,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert links and links[0]["href"].endswith("/queryables/processes")
 
     @parameterized.expand(["keywords", "title", "description", "q", "query", "version"])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_providers(self, field):
         # type: (str) -> None
         """
@@ -6008,7 +6008,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert resp.json["error"] == "ListingInvalidParameter"
 
     @parameterized.expand([True, False])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_paging(self, detail):
         # type: (bool) -> None
         """
@@ -6052,7 +6052,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ("q_description_precedence", {"q": "modern"},
          {"abstract": "Legacy description", "description": "Modern description"}, False),
     ])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_fallback(self, _, query, fields, match):
         # type: (str, JSON, JSON, bool) -> None
         """
@@ -6070,7 +6070,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert (p_id in [proc["id"] for proc in resp.json["processes"]]) is match
 
     @parameterized.expand([False, True])
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_version_revisions(self, revisions):
         # type: (bool) -> None
         """

@@ -312,12 +312,11 @@ class WpsRestApiJobsTest(JobUtils):
             total += grouped_jobs["count"]
         assert total == response.json["total"]
 
-    @pytest.mark.oap_part1
-    @pytest.mark.oap_part4
+    @pytest.mark.ogc_records
     def test_get_jobs_queryables(self):
         # type: () -> None
         """
-        Tests that job queryables advertise actual supported filters without a duplicate hand-maintained schema.
+        Tests that job queryables advertise supported filters.
         """
         resp = self.app.get("/queryables/jobs", headers=self.json_headers)
         assert resp.status_code == 200, resp.text
@@ -1088,7 +1087,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert not resp.json["components"]["parameters"][f"{schema_prefix}.page"]["required"]
         assert not resp.json["components"]["parameters"][f"{schema_prefix}.limit"]["required"]
 
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_jobs_sortby(self):
         """
         Tests that ``sortby`` applies signed fields, with ``-created`` as the default direction of ``created``.
@@ -1104,14 +1103,14 @@ class WpsRestApiJobsTest(JobUtils):
             assert len(created) > 1
             assert created == sorted(created, reverse=reverse), query
 
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_jobs_sortby_conflict(self):
         path = get_path_kvp(sd.jobs_service.path, sort="created", sortby="-created")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
         assert resp.json["error"] == "ListingInvalidParameter"
 
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_jobs_filter_cql2(self):
         """
         Tests that a CQL2 ``filter`` is applied by the same job listing aggregation as the other query parameters.
@@ -1132,7 +1131,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 200, resp.text
         assert resp.json["total"] == total
 
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
     def test_get_jobs_filter_cql2_invalid(self):
         path = get_path_kvp(sd.jobs_service.path, filter="unknown = 'x'")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)

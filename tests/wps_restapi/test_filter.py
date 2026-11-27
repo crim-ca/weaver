@@ -5,9 +5,8 @@ import pytest
 
 from weaver.wps_restapi.filter import parse_keyword_query, parse_search_query, parse_version_range
 
-pytestmark = pytest.mark.oap_part1
 
-
+@pytest.mark.ogc_records
 @pytest.mark.parametrize("value, expected", [
     ("climate +netcdf -grib,subset", [[("climate", False), ("netcdf", False), ("grib", True)], [("subset", False)]]),
     ("climate+netcdf-grib", [[("climate+netcdf-grib", False)]]),
@@ -35,6 +34,7 @@ def test_parse_search_query(value, expected):
     assert parse_search_query(value) == expected
 
 
+@pytest.mark.ogc_records
 @pytest.mark.parametrize("value", ["", ",", "x,,y", "+", "-", "x +", "x -", "x +,y", 'x "unfinished'])
 def test_parse_search_query_invalid(value):
     # type: (str) -> None
@@ -45,6 +45,7 @@ def test_parse_search_query_invalid(value):
         parse_search_query(value)
 
 
+@pytest.mark.ogc_records
 def test_parse_keyword_query():
     # type: () -> None
     """
@@ -55,6 +56,7 @@ def test_parse_keyword_query():
     ]
 
 
+@pytest.mark.ogc_records
 @pytest.mark.parametrize("value, expected", [
     ("1.2", ((1, 2, 0), (1, 2, 0))),
     ("1.2.3/1.10.0", ((1, 2, 3), (1, 10, 0))),

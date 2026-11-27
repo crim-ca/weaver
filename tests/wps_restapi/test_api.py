@@ -114,6 +114,7 @@ class GenericApiRoutesTestCase(WpsConfigBase):
         except colander.Invalid as ex:
             self.fail(f"expected valid response format as defined in schema [{ex!s}]")
 
+    @pytest.mark.ogc_records
     def test_conformance_records_discovery(self):
         resp = self.app.get("/conformance", headers=self.json_headers)
         records = "http://www.opengis.net/spec/ogcapi-records-1/1.0"
