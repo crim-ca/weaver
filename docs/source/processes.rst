@@ -443,6 +443,83 @@ Managing Processes included in Weaver ADES/EMS
 
 Following steps represent the typical steps applied to deploy a process, execute it and retrieve the results.
 
+.. _proc_op_deploy:
+
+Register a New Process (Deploy)
+-----------------------------------------
+
+Deployment of a new process is accomplished through the |deploy-req|_ request.
+
+.. seealso::
+    |ogc-api-proc-part2|_ specification.
+
+The request body requires mainly two components:
+
+- | ``processDescription``:
+  | Defines the :term:`Process` identifier, metadata, inputs, outputs, and some execution specifications.
+    This mostly corresponds to *additional* information that is provided by traditional :term:`WPS`
+    or :term:`OGC API - Processes` definitions. A notable situation when this is required is when the
+    following ``executionUnit`` cannot directly resolve certain definitions specific to :term:`OGC API - Processes`,
+    such as a :term:`Media-Type` or :ref:`cwl-file-format` not explicitly handled by :term:`CWL`.
+
+- | ``executionUnit``:
+  | Defines the core details of the |app_pkg|_. This corresponds to the explicit :term:`CWL` definition
+    or other :ref:`proc_types` references that indicates how to execute the underlying application.
+
+.. _proc_op_deploy_cwl:
+
+.. note::
+    If the :term:`Process` can be directly represented and converted from the :term:`CWL`, it
+    can be directly deployed (i.e.: provided as is rather than embedding it in ``executionUnit``) when combined with
+    the appropriate ``application/cwl+json`` or ``application/cwl+yaml`` :term:`Media-Type` in ``Content-Type`` header.
+
+.. note::
+    For deploying multiple related :term:`CWL` packages (e.g., a :term:`Workflow` with dependent tools),
+    the ``multipart/related`` :term:`Media-Type` can be used in the ``Content-Type`` header to package
+    all :term:`CWL` documents in a single request. Each part should specify its own content type
+    (``application/cwl+json`` or ``application/cwl+yaml``) and unique ``Content-ID``.
+    See :ref:`proc_ogc_api_multi_cwl` and :ref:`app_pkg_multipart` for detailed multipart structure and examples.
+
+.. fixme: support process meta multipart (https://github.com/crim-ca/weaver/issues/990) - update accepted parts
+.. note::
+    Multiple :term:`CWL` packages can also be deployed using an array of ``executionUnit`` entries, where each
+    entry contains either an inline ``unit`` object or an ``href`` reference to an external :term:`CWL` document.
+    This approach resolves the multi-:term:`CWL` references in an equivalent fashion to the ``multipart/related``
+    content case described above, but allows deployment through standard :term:`JSON` request bodies without
+    requiring multipart encoding. Only :term:`CWL`-like :term:`Media-Types` are accepted to avoid ambiguities
+    with other deployment formats (e.g.: ``application/json`` or ``application/ogcapppkg+json``).
+
+.. seealso::
+    Section :ref:`cwl-wps-mapping` provides further details about notable considerations that
+    could require additional fields in ``processDescription`` for an adequate :term:`Process` definition.
+
+.. |app_pkg| replace:: Application Package
+.. _app_pkg: docs/source/package.rst
+
+Upon deploy request, `Weaver` will either respond with a successful result, or with the appropriate error message,
+whether caused by conflicting ID, invalid definitions or other parsing issues. A successful process deployment will
+result in this process to become available for following steps.
+
+.. warning::
+    When a process is deployed, it is not necessarily available immediately. This is because process *visibility* also
+    needs to be updated. The process must be made *public* to allow its discovery. Alternatively, the visibility can
+    be directly provided within the body of the deploy request to skip this extra step.
+    For specifying or updating visibility, please refer to corresponding |deploy-req|_ and |vis-req|_ requests.
+
+After deployment and visibility preconditions have been met, the corresponding process should become available
+through :ref:`DescribeProcess <proc_op_describe>` requests and other routes that depend on an existing process.
+
+Note that when a process is deployed using the :ref:`proc_wps_rest` interface, it also becomes available through the
+:ref:`proc_wps_12` interface with the same identifier and definition. Because of compatibility limitations, some
+parameters in the :ref:`proc_wps_12` side might not be perfectly mapped to the equivalent or adjusted
+:ref:`proc_wps_rest` interface, although this concerns mostly only new features such as :term:`Job` status monitoring.
+For most traditional use cases, properties are mapped between the two interfaces, but it is recommended to use the
+:ref:`proc_wps_rest` one because of the added features.
+
+.. seealso::
+    Please refer to :ref:`application-package` chapter for any additional parameters that can be
+    provided for specific types of :term:`Application Package` and :term:`Process` definitions.
+
 .. _proc_op_getcap:
 .. _proc_op_describe:
 
@@ -520,91 +597,15 @@ The ``GET /processes`` listing supports the following search parameters for loca
   Fields without prefix use their default direction. For example, ``sortby=+id,-version``.
   The deprecated ``sort`` is interpreted as ``sortby``, and both cannot be provided together.
 
-Different search parameters are combined with AND. They can be used with metadata filters, sorting, pagination and
-``detail=false``. Filtering occurs before pagination, and ``total`` counts all matching public processes.
+A process must match every supplied search parameter. Search filters are applied before pagination, and ``total`` counts
+all matching public processes. Search parameters can be combined with metadata filters, sorting, pagination and
+``detail=false``.
 Terms are not regular expressions. Empty terms are invalid.
 These searches cannot be combined with ``providers=true``, since remote provider listings cannot apply the filters.
 URL-encode search values, in particular ``+`` as ``%2B``, to avoid interpreting it as a space in a query string.
 The ``/queryables/processes`` and ``/queryables/jobs`` endpoints describe the parameters supported by each listing
 as JSON Schema. Both are discoverable from the landing page using the
 ``http://www.opengis.net/def/rel/ogc/1.0/queryables`` link relation.
-
-.. _proc_op_deploy:
-
-Register a New Process (Deploy)
------------------------------------------
-
-Deployment of a new process is accomplished through the |deploy-req|_ request.
-
-.. seealso::
-    |ogc-api-proc-part2|_ specification.
-
-The request body requires mainly two components:
-
-- | ``processDescription``:
-  | Defines the :term:`Process` identifier, metadata, inputs, outputs, and some execution specifications.
-    This mostly corresponds to *additional* information that is provided by traditional :term:`WPS`
-    or :term:`OGC API - Processes` definitions. A notable situation when this is required is when the
-    following ``executionUnit`` cannot directly resolve certain definitions specific to :term:`OGC API - Processes`,
-    such as a :term:`Media-Type` or :ref:`cwl-file-format` not explicitly handled by :term:`CWL`.
-
-- | ``executionUnit``:
-  | Defines the core details of the |app_pkg|_. This corresponds to the explicit :term:`CWL` definition
-    or other :ref:`proc_types` references that indicates how to execute the underlying application.
-
-.. _proc_op_deploy_cwl:
-
-.. note::
-    If the :term:`Process` can be directly represented and converted from the :term:`CWL`, it
-    can be directly deployed (i.e.: provided as is rather than embedding it in ``executionUnit``) when combined with
-    the appropriate ``application/cwl+json`` or ``application/cwl+yaml`` :term:`Media-Type` in ``Content-Type`` header.
-
-.. note::
-    For deploying multiple related :term:`CWL` packages (e.g., a :term:`Workflow` with dependent tools),
-    the ``multipart/related`` :term:`Media-Type` can be used in the ``Content-Type`` header to package
-    all :term:`CWL` documents in a single request. Each part should specify its own content type
-    (``application/cwl+json`` or ``application/cwl+yaml``) and unique ``Content-ID``.
-    See :ref:`proc_ogc_api_multi_cwl` and :ref:`app_pkg_multipart` for detailed multipart structure and examples.
-
-.. fixme: support process meta multipart (https://github.com/crim-ca/weaver/issues/990) - update accepted parts
-.. note::
-    Multiple :term:`CWL` packages can also be deployed using an array of ``executionUnit`` entries, where each
-    entry contains either an inline ``unit`` object or an ``href`` reference to an external :term:`CWL` document.
-    This approach resolves the multi-:term:`CWL` references in an equivalent fashion to the ``multipart/related``
-    content case described above, but allows deployment through standard :term:`JSON` request bodies without
-    requiring multipart encoding. Only :term:`CWL`-like :term:`Media-Types` are accepted to avoid ambiguities
-    with other deployment formats (e.g.: ``application/json`` or ``application/ogcapppkg+json``).
-
-.. seealso::
-    Section :ref:`cwl-wps-mapping` provides further details about notable considerations that
-    could require additional fields in ``processDescription`` for an adequate :term:`Process` definition.
-
-.. |app_pkg| replace:: Application Package
-.. _app_pkg: docs/source/package.rst
-
-Upon deploy request, `Weaver` will either respond with a successful result, or with the appropriate error message,
-whether caused by conflicting ID, invalid definitions or other parsing issues. A successful process deployment will
-result in this process to become available for following steps.
-
-.. warning::
-    When a process is deployed, it is not necessarily available immediately. This is because process *visibility* also
-    needs to be updated. The process must be made *public* to allow its discovery. Alternatively, the visibility can
-    be directly provided within the body of the deploy request to skip this extra step.
-    For specifying or updating visibility, please refer to corresponding |deploy-req|_ and |vis-req|_ requests.
-
-After deployment and visibility preconditions have been met, the corresponding process should become available
-through :ref:`DescribeProcess <proc_op_describe>` requests and other routes that depend on an existing process.
-
-Note that when a process is deployed using the :ref:`proc_wps_rest` interface, it also becomes available through the
-:ref:`proc_wps_12` interface with the same identifier and definition. Because of compatibility limitations, some
-parameters in the :ref:`proc_wps_12` side might not be perfectly mapped to the equivalent or adjusted
-:ref:`proc_wps_rest` interface, although this concerns mostly only new features such as :term:`Job` status monitoring.
-For most traditional use cases, properties are mapped between the two interfaces, but it is recommended to use the
-:ref:`proc_wps_rest` one because of the added features.
-
-.. seealso::
-    Please refer to :ref:`application-package` chapter for any additional parameters that can be
-    provided for specific types of :term:`Application Package` and :term:`Process` definitions.
 
 .. _proc_op_undeploy:
 .. _proc_op_replace:

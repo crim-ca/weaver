@@ -45,32 +45,37 @@ weaver capabilities -u $WEAVER_URL -P my-provider
 weaver capabilities -u $WEAVER_URL --detail
 
 # Filter and sort process results
-weaver capabilities -u $WEAVER_URL --keywords climate --sortby=+id --sortby=-version \
-  --filter '{"op":"=","args":[{"property":"type"},"application"]}' --filter-lang cql2-json
+weaver capabilities -u $WEAVER_URL \
+  --keywords climate \
+  --sortby +id \
+  --sortby -version \
+  --filter '{"op":"=","args":[{"property":"type"},"application"]}' \
+  --filter-lang cql2-json
 ```
 
 ## API Search
 
 `GET /processes` supports these additional parameters for locally registered public processes:
 
-- **keywords** (string): Whole-keyword, case-insensitive matches. Use `,` for AND and `|` for OR within a group.
+- `keywords` (string): Whole-keyword, case-insensitive matches. Use `,` for AND and `|` for OR within a group.
   Prefix a keyword with `!` or `~` for NOT.
-- **title**, **description** (string): Case-insensitive literal substring searches.
-- **q**, **query** (string): Partial terms searched across title, description and keywords, with `,` for OR,
+- `title`, `description` (string): Case-insensitive literal substring searches.
+- `q`, `query` (string): Partial terms searched across title, description and keywords, with `,` for OR,
   `+` for AND and `-` for NOT. Signs are operators only at the beginning or after whitespace or commas.
   Other signs are literal: `data-` matches `data-analysis` and `data-science`.
   Ordinary spaces join an ordered phrase and match one or more whitespace characters.
   Use `+-data` for a leading literal minus. Double quotes preserve literal punctuation.
-- **version** (string): Exact version or inclusive `lower/upper` interval. Use `..` for an open bound.
-  Add **revisions=true** to search older revisions.
-- **sortby** (string or list of strings): Signed sorting fields, such as `+id,-version`.
-- **sort** (string): Deprecated alias of **sortby**. Cannot be combined with it.
-- **datetime** (string): Instant or interval matched against the process `created` time.
-- **type** (string): Comma-separated process types (case-insensitive) or Records resource type URIs.
-- **license** (string): Href or title of a `license` link or metadata.
-- **filter** (string or JSON object/array): CQL or CQL2 expression, with optional **filter-lang** and **filter-crs**.
+- `version` (string): Exact version or inclusive `lower/upper` interval. Use `..` for an open bound.
+  Add `revisions=true` to search older revisions.
+- `sortby` (string or list of strings): Signed sorting fields, such as `+id,-version`.
+- `sort` (string): Deprecated alias of `sortby`. Cannot be combined with it.
+- `datetime` (string): Instant or interval matched against the process `created` time.
+- `type` (string): Comma-separated process types (case-insensitive) or Records resource type URIs.
+- `license` (string): URL or title of a `license` link or metadata.
+- `filter` (string or JSON object/array): CQL or CQL2 expression, with optional `filter-lang` and `filter-crs`.
 
-Different filters combine with AND and apply before pagination. They cannot be combined with `providers=true`.
+When multiple filters are supplied, a process must match all of them. Filtering happens before pagination.
+Filters cannot be combined with `providers=true`.
 Empty terms are invalid. URL-encode values, particularly `+` as `%2B`.
 
 ```bash
