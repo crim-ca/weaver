@@ -145,6 +145,23 @@ class GenericApiRoutesTestCase(WpsConfigBase):
         assert any(href.endswith("/processes") for href in catalogs)
         assert any(href.endswith("/jobs") for href in catalogs)
 
+    @pytest.mark.ogc_records
+    def test_landing_page_catalog_links_resolve_to_records(self):
+        """
+        Tests that each ``ogc-catalog`` link resolves to a listing whose ``recordsArrayName`` names its records.
+        """
+        resp = self.app.get("/", headers=self.json_headers)
+        catalogs = [link for link in resp.json["links"] if link["rel"] == sd.OGC_API_REL_CATALOG_URI]
+        assert all(link["type"] == ContentType.APP_JSON for link in catalogs)
+        found = set()
+        for link in catalogs:
+            listing = self.app.get(link["href"], headers=self.json_headers)
+            assert listing.status_code == 200, listing.text
+            name = listing.json["recordsArrayName"]
+            assert isinstance(listing.json[name], list)
+            found.add(name)
+        assert found == {"processes", "jobs"}
+
     def test_conformance_html(self):
         resp = self.app.get("/conformance", headers=self.json_headers)
         assert resp.status_code == 200
