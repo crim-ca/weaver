@@ -85,6 +85,7 @@ STAC_COLLECTION_SUFFIX = "-collection"
 STAC_COLLECTION_FILE = "collection.json"
 STAC_ITEMS_DIR = "items"
 STAC_ITEMS_FILE = f"{STAC_ITEMS_DIR}/index.json"
+# STAC 1.1 uses 'other' because no SPDX license is known for the job results.
 STAC_LICENSE = "other"
 STAC_API_MARKER = ".stac-api"
 STAC_PROCESSING_LEVEL = "L4"
