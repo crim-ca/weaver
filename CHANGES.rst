@@ -52,8 +52,10 @@ Changes:
   (resolves `#646 <https://github.com/crim-ca/weaver/issues/646>`_).
 - Add `OGC API - Records` sorting, filtering and ``cql-filter`` conformance classes
   (resolves `#641 <https://github.com/crim-ca/weaver/issues/641>`_).
-- Interpret ``+`` literally in request query strings as defined by :rfc:`3986` instead of converting it into a space.
-  A space must be encoded as ``%20``.
+- Interpret ``+`` literally in request query strings, as defined by
+  `RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986>`_, instead of applying the form-style conversion
+  into a space. This allows ``+`` operators and ``+`` signs of ``q``, ``query``, ``sortby`` and ``datetime`` parameters
+  to be provided directly. A space must now be encoded as ``%20``.
 
 Fixes:
 ------
