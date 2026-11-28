@@ -19,7 +19,6 @@ from weaver.collections.stac import (
     AmbiguousCollectionItems,
     JobCollection,
     generate_job_collection,
-    get_collection_dir_name,
     get_item_path,
     get_tiff_byte_order,
     is_wgs84,
@@ -90,7 +89,7 @@ def test_job_collection_url_path(context, expect):
     with tempfile.TemporaryDirectory() as tmp:
         settings = make_settings(tmp)
         job = make_job(context=context)
-        name = get_collection_dir_name(job.id)
+        name = job.collection_dir_name()
         assert name == f"{job.id}-collection"
         assert job.collection_url(settings) == f"https://localhost/wpsoutputs/{expect}{name}/{STAC_COLLECTION_FILE}"
         assert job.collection_path(settings) == os.path.join(tmp, *filter(None, expect.split("/")), name)

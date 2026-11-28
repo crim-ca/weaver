@@ -30,8 +30,10 @@ from importlib import metadata as importlib_metadata
 from typing import TYPE_CHECKING
 from urllib.parse import quote, urlparse
 
+import rasterio
 from dateutil.parser import isoparse
 from pyramid.settings import asbool
+from rasterio.warp import transform_bounds
 
 from weaver import ogc_definitions as ogc_def
 from weaver.__meta__ import __source_repository__, __title__, __version__
@@ -54,13 +56,6 @@ from weaver.utils import (
 )
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
 from weaver.wps_restapi import swagger_definitions as sd
-
-try:
-    import rasterio
-    from rasterio.warp import transform_bounds
-except ImportError:  # pragma: no cover
-    rasterio = None
-    transform_bounds = None
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional, Tuple
@@ -104,14 +99,6 @@ class AmbiguousCollectionItems(ValueError):
     """
     Indicates that geo-like output arrays cannot be unambiguously aligned into STAC Items.
     """
-
-
-def get_collection_dir_name(job_id):
-    # type: (Any) -> str
-    """
-    Obtains the name of the directory that contains the :term:`STAC` documents of the :term:`Job`.
-    """
-    return f"{job_id}{STAC_COLLECTION_SUFFIX}"
 
 
 def get_item_path(item_id):
@@ -378,8 +365,6 @@ def get_raster_bbox(file_path):
     """
     Obtains the bounding box of a georeferenced raster (e.g.: GeoTIFF) as longitude/latitude, if supported.
     """
-    if rasterio is None:  # pragma: no cover
-        return None
     try:
         with rasterio.open(file_path) as dataset:
             if dataset.crs is None:
@@ -858,7 +843,7 @@ class JobCollection(object):
         """
         Resolves a public static URL for an asset stored alongside the collection.
         """
-        rel_path = os.path.join(os.path.dirname(self.job.result_path()), get_collection_dir_name(self.job.id))
+        rel_path = os.path.join(os.path.dirname(self.job.result_path()), self.job.collection_dir_name())
         rel_path = f"{rel_path}/{path}".replace(os.sep, "/")
         return f"{self.out_url}/{quote(rel_path, safe='/')}"
 

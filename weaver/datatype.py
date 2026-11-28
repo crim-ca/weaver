@@ -43,8 +43,8 @@ from weaver.collections.stac import (
     STAC_API_DATA_ACCESS,
     STAC_API_MARKER,
     STAC_COLLECTION_FILE,
+    STAC_COLLECTION_SUFFIX,
     get_collection_api_path,
-    get_collection_dir_name,
     get_item_path
 )
 from weaver.collections.utils import collection_api_url, collection_enabled
@@ -1546,6 +1546,13 @@ class Job(Base, LoggerHandler):
                 ])
         return links
 
+    def collection_dir_name(self):
+        # type: () -> str
+        """
+        Obtain the name of the directory that contains the :term:`STAC` documents of the :term:`Job`.
+        """
+        return f"{self.id}{STAC_COLLECTION_SUFFIX}"
+
     def collection_url(self, container=None, extra_path=None):
         # type: (Optional[AnySettingsContainer], Optional[str]) -> URL
         """
@@ -1559,7 +1566,7 @@ class Job(Base, LoggerHandler):
             return f"{api_url}/collections/{self.id}{get_collection_api_path(extra_path)}"
         out_url = get_wps_output_url(container).rstrip("/")
         base_path = self.result_path()
-        coll_dir = os.path.join(os.path.dirname(base_path), get_collection_dir_name(self.id))
+        coll_dir = os.path.join(os.path.dirname(base_path), self.collection_dir_name())
         return f"{out_url}/{coll_dir}/{extra_path or STAC_COLLECTION_FILE}"
 
     def collection_path(self, container=None, extra_path=None):
@@ -1571,7 +1578,7 @@ class Job(Base, LoggerHandler):
         :param extra_path: Path relative to the collection directory, or ``None`` for the directory itself.
         """
         base_path = self.result_path()
-        coll_dir = os.path.join(os.path.dirname(base_path), get_collection_dir_name(self.id))
+        coll_dir = os.path.join(os.path.dirname(base_path), self.collection_dir_name())
         coll_path = os.path.join(get_wps_output_dir(container), coll_dir)
         return os.path.join(coll_path, extra_path) if extra_path else coll_path
 
