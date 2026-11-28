@@ -756,6 +756,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert len(resp.json["processes"]) == total
         assert len(resp.json["providers"]) == 1
         prov = resp.json["providers"][0]
+        assert resp.json["recordsArrayName"] == "processes"
+        assert "recordsArrayName" not in prov, "Records array name applies to the top-level listing only."
         assert "id" in prov and prov["id"] == test_svc_id
         assert "processes" in prov and isinstance(prov["processes"], list)
         assert all(isinstance(proc, str) for proc in prov["processes"])
