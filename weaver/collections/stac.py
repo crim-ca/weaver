@@ -105,14 +105,14 @@ FILE_LOCAL_PATH_REGEX = re.compile(r"^[^\r\n\t\\:'\"/]+(/[^\r\n\t\\:'\"/]+)*/?$"
 
 class AmbiguousCollectionItems(ValueError):
     """
-    Indicates that geo-like output arrays cannot be unambiguously aligned into STAC Items.
+    Indicates that geo-like output arrays cannot be unambiguously aligned into :term:`STAC` :term:`Items <Item>`.
     """
 
 
 def get_item_path(item_id):
     # type: (str) -> str
     """
-    Obtains the path of a :term:`STAC` Item relative to the collection directory, according to the item ID.
+    Obtains the path of a :term:`STAC` :term:`Item` relative to the :term:`Collection` directory, according to its ID.
 
     The path follows the ``items/{itemID}`` convention of the :term:`STAC` API, with an explicit file extension.
     """
@@ -123,7 +123,7 @@ def get_item_path(item_id):
 def get_collection_api_path(extra_path=None):
     # type: (Optional[str]) -> str
     """
-    Converts a path relative to the static collection directory into the equivalent :term:`STAC` API sub-path.
+    Converts a path relative to the static :term:`Collection` directory into the equivalent :term:`STAC` API sub-path.
     """
     if not extra_path or extra_path == STAC_COLLECTION_FILE:
         return ""
@@ -439,7 +439,7 @@ def get_geojson_geometry(bbox):
 
 class JobCollection(object):
     """
-    Builder of the :term:`STAC` Collection and Items that represent the results of a :term:`Job`.
+    Builder of the :term:`STAC` :term:`Collection` and :term:`Items <Item>` that represent the results of a :term:`Job`.
     """
 
     def __init__(self, job, settings, results, process=None):
@@ -449,8 +449,8 @@ class JobCollection(object):
 
         :param job: Successful :term:`Job` which generated the results.
         :param settings: Application settings to resolve server endpoints and output locations.
-        :param results: Results of the job using the :term:`OGC` mapping representation with resolved ``href`` values.
-        :param process: Process definition from which the results were generated, if available.
+        :param results: Results of the :term:`Job` using the :term:`OGC` mapping with resolved ``href`` values.
+        :param process: :term:`Process` definition from which the results were generated, if available.
         """
         self.job = job
         self.settings = get_settings(settings)
@@ -496,7 +496,7 @@ class JobCollection(object):
     def output_definition(self, output_id):
         # type: (str) -> JSON
         """
-        Obtains the process description of the output ID if available.
+        Obtains the :term:`Process` description of the output ID if available.
         """
         outputs = self.process.outputs if self.process is not None else None
         for output in outputs or []:
@@ -562,7 +562,7 @@ class JobCollection(object):
     def output_format(self, output_id, result=None):
         # type: (str, Any) -> JSON
         """
-        Resolves the applicable output format from the result or process description.
+        Resolves the applicable output format from the result or :term:`Process` description.
         """
         if isinstance(result, dict) and isinstance(result.get("format"), dict):
             return result["format"]
@@ -590,7 +590,7 @@ class JobCollection(object):
     def is_geospatial_result(self, output_id, result):
         # type: (str, Any) -> bool
         """
-        Identifies outputs whose arrays can determine the spatial itemization of the collection.
+        Identifies outputs whose arrays can determine the spatial itemization of the :term:`Collection`.
         """
         media_type = clean_media_type_format(self.output_media_type(output_id), strip_parameters=True)
         media_type = media_type.lower() if media_type else None
@@ -632,7 +632,7 @@ class JobCollection(object):
     def resolve_item_count(self):
         # type: () -> None
         """
-        Resolves a shared Item count from geo-like output arrays, rejecting ambiguous cardinalities.
+        Resolves a shared :term:`Item` count from geo-like output arrays, rejecting ambiguous cardinalities.
         """
         array_lengths = {
             out_id: len(result)
@@ -686,7 +686,7 @@ class JobCollection(object):
     def make_datetime_properties(self, item_index):
         # type: (int) -> JSON
         """
-        Generates the :term:`STAC` Item temporal properties from the references found, or the :term:`Job` time.
+        Generates the :term:`STAC` :term:`Item` temporal properties from the references found, or the :term:`Job` time.
         """
         times = [
             dt
@@ -754,7 +754,7 @@ class JobCollection(object):
     def make_processing_expression(self):
         # type: () -> Optional[JSON]
         """
-        Generates the Processing Extension expression using the process description and the submitted inputs.
+        Generates the *Processing* extension expression using the :term:`Process` description and submitted inputs.
         """
         if self.process is None:
             return None
@@ -835,7 +835,7 @@ class JobCollection(object):
     def collection_asset_url(self, path):
         # type: (str) -> URL
         """
-        Resolves a public static URL for an asset stored alongside the collection.
+        Resolves a public static URL for an :term:`Asset` stored alongside the :term:`Collection`.
         """
         rel_path = os.path.join(os.path.dirname(self.job.result_path()), self.job.collection_dir_name())
         rel_path = f"{rel_path}/{path}".replace(os.sep, "/")
@@ -844,7 +844,7 @@ class JobCollection(object):
     def make_reference_asset(self, item, title, output_id=None):
         # type: (JSON, str, Optional[str]) -> JSON
         """
-        Generates a referenced asset with the corresponding Processing and File extension metadata.
+        Generates a referenced :term:`Asset` with the corresponding *Processing* and *File* extension metadata.
         """
         href = get_any_value(item, data=False)
         media_type = self.get_media_type(item)
@@ -889,7 +889,7 @@ class JobCollection(object):
     def item_output_value(self, result, item_index):
         # type: (Any, int) -> Any
         """
-        Obtains an output value aligned to the Item, or the scalar value shared by all Items.
+        Obtains an output value aligned to the :term:`Item`, or the scalar value shared by all :term:`Items <Item>`.
         """
         if not isinstance(result, list):
             return result
@@ -900,7 +900,7 @@ class JobCollection(object):
     def make_assets(self, item_index):
         # type: (int) -> Tuple[Dict[str, JSON], JSON]
         """
-        Generates the :term:`STAC` Assets and literal values of outputs aligned to an Item.
+        Generates the :term:`STAC` :term:`Assets <Asset>` and literal values of outputs aligned to an :term:`Item`.
         """
         assets = {}  # type: Dict[str, JSON]
         values = {}  # type: JSON
@@ -939,7 +939,8 @@ class JobCollection(object):
     def make_collection_assets(self):
         # type: () -> Dict[str, JSON]
         """
-        Generates Collection-level assets for execution metadata and output arrays not aligned to Items.
+        Generates :term:`Collection`-level :term:`Assets <Asset>` for metadata and arrays not aligned to
+        :term:`Items <Item>`.
         """
         self.asset_documents = {}
         assets = {}  # type: Dict[str, JSON]
@@ -992,7 +993,7 @@ class JobCollection(object):
     def make_provenance_asset(self):
         # type: () -> Optional[JSON]
         """
-        Generates the asset of the :term:`Provenance` record of the :term:`Job`, copied alongside the collection.
+        Generates a :term:`Collection` :term:`Asset` for the :term:`Job` :term:`Provenance` record.
         """
         if not self.prov_enabled:
             return None
@@ -1012,7 +1013,7 @@ class JobCollection(object):
     def write_asset_documents(self):
         # type: () -> None
         """
-        Writes generated JSON assets under the collection directory.
+        Writes generated :term:`JSON` :term:`Assets <Asset>` under the :term:`Collection` directory.
         """
         for path, content in self.asset_documents.items():
             self.write_json(os.path.join(self.collection_dir, path), content)
@@ -1020,7 +1021,7 @@ class JobCollection(object):
     def make_item(self, item_index):
         # type: (int) -> JSON
         """
-        Generates an Item representing a shared result instance across aligned output IDs.
+        Generates an :term:`Item` representing a shared result instance across aligned output IDs.
         """
         output_ids = [
             output_id for output_id, result in self.results.items()
@@ -1098,7 +1099,7 @@ class JobCollection(object):
     def make_extent(self, items):
         # type: (Dict[str, JSON]) -> JSON
         """
-        Generates the :term:`STAC` Collection extent that contains the extents of all Items.
+        Generates the :term:`STAC` :term:`Collection` extent that contains the extents of all :term:`Items <Item>`.
 
         If no spatial extent could be found from any result, the whole world is indicated as per :term:`STAC` guidance.
         """
@@ -1119,7 +1120,7 @@ class JobCollection(object):
     def make_item_collection(self, items):
         # type: (Dict[str, JSON]) -> JSON
         """
-        Generates the :term:`STAC` ItemCollection that lists Items, equivalent to ``/collections/{id}/items``.
+        Generates the :term:`STAC` ``ItemCollection`` listing :term:`Items <Item>`, like ``/collections/{id}/items``.
         """
         items_url = self.job.collection_url(self.settings, STAC_ITEMS_FILE)
         return {
@@ -1139,7 +1140,7 @@ class JobCollection(object):
     def make_collection(self, items):
         # type: (Dict[str, JSON]) -> JSON
         """
-        Generates the :term:`STAC` Collection of the :term:`Job` results.
+        Generates the :term:`STAC` :term:`Collection` of the :term:`Job` results.
         """
         output_ids = list(self.results)
         process = self.process
@@ -1213,9 +1214,9 @@ class JobCollection(object):
     def write(self):
         # type: () -> Path
         """
-        Generates and writes all :term:`STAC` documents to the collection directory of the :term:`Job`.
+        Generates and writes all :term:`STAC` documents to the :term:`Collection` directory of the :term:`Job`.
 
-        :returns: Path of the collection document.
+        :returns: Path of the :term:`Collection` document.
         """
         self.resolve_extents()
         self.make_collection_assets()
@@ -1237,9 +1238,9 @@ class JobCollection(object):
     def post(self, items):
         # type: (Dict[str, JSON]) -> Path
         """
-        Publishes the :term:`STAC` Collection and Items to the configured :term:`STAC` API instead of static files.
+        Publishes the :term:`Collection` and :term:`Items <Item>` to the :term:`STAC` API instead of static files.
 
-        :returns: Path of the local marker file indicating the location of the published collection.
+        :returns: Path of the local marker file indicating the location of the published :term:`Collection`.
         """
         staging = collection_api_url(self.settings, staging=True)
         coll_url = f"{staging}/collections"
@@ -1271,16 +1272,17 @@ class JobCollection(object):
 def generate_job_collection(job, settings, results, process=None, force=False):
     # type: (Job, AnySettingsContainer, ExecutionResults, Optional[Process], bool) -> Optional[Path]
     """
-    Generates the static :term:`STAC` Collection and Items of a successful :term:`Job` according to its results.
+    Generates the static :term:`STAC` :term:`Collection` and :term:`Items <Item>` of a successful :term:`Job`.
 
-    Errors are logged and ignored to avoid impacting the :term:`Job` status when the collection cannot be generated.
+    Errors are logged and ignored to avoid impacting the :term:`Job` status when the :term:`Collection`
+    cannot be generated.
 
-    :param job: Successful job for which to generate the collection.
+    :param job: Successful :term:`Job` for which to generate the :term:`Collection`.
     :param settings: Application settings.
-    :param results: Results of the job using the :term:`OGC` mapping representation with resolved ``href`` values.
-    :param process: Process definition from which the results were generated, if available.
-    :param force: Regenerate the collection even if it already exists. Otherwise, the existing one is reused.
-    :returns: Path of the collection document, or ``None`` if disabled, not applicable or on failure.
+    :param results: Results of the :term:`Job` using the :term:`OGC` mapping with resolved ``href`` values.
+    :param process: :term:`Process` definition from which the results were generated, if available.
+    :param force: Regenerate the :term:`Collection` even if it already exists. Otherwise, the existing one is reused.
+    :returns: Path of the :term:`Collection` document, or ``None`` if disabled, not applicable or on failure.
     """
     if not collection_enabled(settings):
         return None
