@@ -577,17 +577,19 @@ definitions. The same :term:`OGC API - Records` search capabilities are availabl
       - Description
       - Examples
     * - ``keywords``
-      - Matches whole keywords, case-insensitively.
+      - Matches whole entries of the :term:`Process` ``keywords`` field, case-insensitively.
         Comma-separated groups are combined with AND.
         Alternatives within a group are separated by ``|`` (OR).
         An individual keyword is negated using a ``!`` or ``~`` prefix.
       - | ``keywords=climate,netcdf|grib``
         | ``keywords=climate,!grib``
     * - ``title``, ``description``
-      - Matches literal substrings, case-insensitively.
+      - Matches literal substrings of the :term:`Process` ``title`` and ``description`` fields respectively,
+        case-insensitively.
       - | ``title=Subset``
     * - ``q``, ``query``
-      - Searches partial terms against the title, description and keywords, case-insensitively.
+      - Searches partial terms against the ``title``, ``description`` and ``keywords`` fields at once,
+        case-insensitively.
         Commas separate alternatives (OR). Within an alternative, ``+`` requires the following term (AND),
         and ``-`` excludes it. Spaces join terms as an ordered phrase.
         Double quotes preserve literal punctuation. A sign is an operator only at the start of a term.
@@ -596,35 +598,38 @@ definitions. The same :term:`OGC API - Records` search capabilities are availabl
         | ``q=data-`` (literal ``-``)
         | ``query="regional,subset"``
     * - ``version``
-      - Matches an exact semantic version or an inclusive ``lower/upper`` interval.
-        Either bound can be left open using ``..``. Versions are compared numerically.
+      - Matches the :term:`Process` ``version`` field using an exact semantic version or an inclusive
+        ``lower/upper`` interval. Either bound can be left open using ``..``.
+        Versions are compared numerically.
       - | ``version=1.2.0``
         | ``version=1.2.0/1.10.0``
         | ``version=1.0.0/..``
     * - ``revisions``, ``process``
       - Only the latest revision of each :term:`Process` is searched by default.
-        Use ``revisions=true`` to include older revisions, optionally restricted using ``process={processID}``.
+        Use the ``revisions=true`` query parameter to include older revisions, optionally restricted to
+        a single :term:`Process` using the ``process={processID}`` query parameter.
       - | ``revisions=true&version=1.0.0/..``
     * - ``datetime``
-      - Matches the :term:`Process` ``created`` time, as an instant or an interval.
+      - Matches the :term:`Process` ``created`` field, using an instant or an interval.
       - | ``datetime=2024-01-01T00:00:00Z/..``
     * - ``type``
-      - Matches comma-separated :term:`Process` types, case-insensitively.
+      - Matches the :term:`Process` ``type`` field against comma-separated values, case-insensitively.
         The :term:`OGC API - Records` resource type URIs of :term:`WPS` and :term:`OGC API - Processes`
         are also accepted.
       - | ``type=workflow,application``
         | ``type=wps``
     * - ``license``
-      - Matches the ``href`` or ``title`` of a ``license`` link relation provided in the :term:`Process`
-        ``metadata`` or ``links``.
+      - Matches the ``href`` or ``title`` of a link with the ``license`` relation (``rel``) provided in the
+        :term:`Process` ``metadata`` or ``links`` fields.
       - | ``license=apache``
     * - ``filter``, ``filter-lang``, ``filter-crs``
-      - Applies a `CQL2` expression over the queryable properties. The language defaults to ``cql2-text``
-        or ``cql2-json`` according to the contents provided.
+      - Applies a `CQL2` expression over the queryable fields (see the ``/queryables/processes`` endpoint below).
+        The ``filter-lang`` query parameter defaults to ``cql2-text`` or ``cql2-json`` according to the
+        ``filter`` contents provided.
       - | ``filter=version >= '1.2.0' AND type = 'workflow'``
     * - ``sortby``
-      - Comma-separated sorting fields. Each field is prefixed by ``+`` for ascending or ``-`` for descending order.
-        Fields without prefix use their default direction.
+      - Comma-separated :term:`Process` fields to sort by. Each field is prefixed by ``+`` for ascending or
+        ``-`` for descending order. Fields without prefix use their default direction.
       - | ``sortby=+id,-version``
 
 A :term:`Process` must match every supplied parameter, and ``total`` in the response counts all matching public
