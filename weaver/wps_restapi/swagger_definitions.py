@@ -243,6 +243,12 @@ OGC_API_PROC_PART1_EXC_NO_SUCH_JOB_URI = f"{OGC_API_PROC_PART1_EXC_BASE_URI}/no-
 OGC_API_PROC_PART1_EXC_NO_SUCH_OUTPUT_URI = f"{OGC_API_PROC_PART1_EXC_BASE_URI}/no-such-output"
 OGC_API_PROC_PART1_EXC_RESULT_NOT_AVAILABLE_URI = f"{OGC_API_PROC_PART1_EXC_BASE_URI}/result-not-available"
 OGC_API_PROC_PART1_EXC_RESULT_NOT_READY_URI = f"{OGC_API_PROC_PART1_EXC_BASE_URI}/result-not-ready"
+OGC_API_PROC_PART1_EXC_UNSUPPORTED_COLLECTION_OUTPUT_URI = (
+    f"{OGC_API_PROC_PART1_EXC_BASE_URI}/unsupported-collection-output"
+)
+OGC_API_PROC_PART1_EXC_AMBIGUOUS_COLLECTION_OUTPUT_URI = (
+    f"{OGC_API_PROC_PART1_EXC_BASE_URI}/ambiguous-collection-output"
+)
 
 OGC_API_PROC_PART2_EXC_BASE_URI = "https://www.opengis.net/def/exceptions/ogcapi-processes-2/1.0"
 OGC_API_PROC_PART2_EXC_IMMUTABLE_PROCESS_URI = f"{OGC_API_PROC_PART2_EXC_BASE_URI}/immutable-process"
@@ -284,6 +290,8 @@ OGC_API_PROC_PROFILE_OGC_VALUES_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-valu
 # WIP: profile URI not yet defined by the OGC Standard, it must be integrated on that side to become official
 #   https://github.com/opengeospatial/ogcapi-processes/issues/616
 OGC_API_PROC_PROFILE_DEPLOY_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-deploy-process"
+OGC_API_PROC_PROFILE_COLLECTION_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-collection"
+OGC_API_PROC_FORMAT_STAC_URI = "http://www.opengis.net/def/format/ogcapi-processes/0/stac"
 
 # Following are legacy definitions from OGC Testebeds and EO Apps Best Practices.
 # Therefore, leave them in 'http' for any operation relying on them explicitly (no auto https/versionless handling).
@@ -929,6 +937,7 @@ class AcceptProfileHeader(URI):
             OGC_API_PROC_PROFILE_RESULTS_URI,
             OGC_API_PROC_PROFILE_JOB_DESC_URI,
             OGC_API_PROC_PROFILE_JOB_LIST_URI,
+            OGC_API_PROC_PROFILE_COLLECTION_URI,
             OGC_WPS_1_SCHEMA_JOB_STATUS_URI,
             OPENEO_API_SCHEMA_JOB_STATUS_URI,
         ],
@@ -1191,6 +1200,7 @@ class LinkRelationship(ExtendedMappingSchema):
 class LinkBase(LinkLanguage, MetadataBase):
     href = URL(description="Hyperlink reference.")
     type = MediaType(description="IANA identifier of content-type located at the link.", missing=drop)
+    profile = URL(description="Profile of the representation located at the link.", missing=drop)
 
 
 class Link(LinkRelationship, LinkBase, LinkId):
@@ -1682,6 +1692,18 @@ class InputOutputDescriptionMeta(ExtendedMappingSchema):
         for child in self.children:
             if child.name in ["keywords", "metadata"]:
                 child.missing = drop
+
+
+class DataAccessAPIs(ExtendedSequenceSchema):
+    api = URL(description="Data access API conformance or specification URI.")
+
+
+class OutputDataAccessAPIs(ExtendedMappingSchema):
+    dataAccessAPIs = DataAccessAPIs(
+        missing=drop,
+        description="Data access APIs available for the output when collection responses are enabled. "
+                    "Empty if the output cannot be represented as a collection (e.g.: literal or bounding box).",
+    )
 
 
 class InputOutputDescriptionSchema(ExtendedMappingSchema):
@@ -2357,6 +2379,7 @@ class DescribeOutputType(AllOfKeywordSchema):
         DescriptionType(),
         InputOutputDescriptionMeta(),
         InputOutputDescriptionSchema(),
+        OutputDataAccessAPIs(),
         DescribeOutputTypeDefinition(),
     ]
 
@@ -2609,7 +2632,21 @@ class JobExecuteSubscribers(ExtendedMappingSchema):
     )
 
 
-class LaunchJobQuerystring(ExtendedMappingSchema):
+class JobResponseQuery(ExtendedMappingSchema):
+    response = JobResponseOptionsEnum(
+        missing=drop,
+        description=(
+            "Alias of the 'response' execution body parameter. "
+            "When 'collection' is specified, the job results are also generated as a STAC collection, "
+            "and the response redirects to it. When 'landingPage' is specified, the redirect targets the root of "
+            "the configured STAC API, which must be enabled. Other collection profiles requested with "
+            "'Accept-Profile' or 'response[profile]' respond with HTTP 406 (Problem Details). "
+            f"(see for more details: {DOC_URL}/processes.html#proc-op-job-collection)."
+        ),
+    )
+
+
+class LaunchJobQuerystring(JobResponseQuery):
     tags = JobTagsCommaSeparated()
 
 
@@ -2686,6 +2723,10 @@ class LocalProcessQuery(ExtendedMappingSchema):
         "Specific process version to locate. "
         "If process ID was requested with tagged 'id:version' revision format, this parameter is ignored."
     ))
+
+
+class LocalProcessExecuteQuery(LocalProcessQuery, JobResponseQuery):
+    pass
 
 
 class LocalProcessPath(ExtendedMappingSchema):
@@ -3894,6 +3935,9 @@ class KVPResponseProfile(ExtendedSchemaNode, OAS3Parameter):
         "whereas the ``profile`` query applies to the "
         "[*Job Status*](https://pavics-weaver.readthedocs.io/en/latest/processes.html#alternate-job-status) response\n"
         "\n\n"
+        "With ``response=collection``, the profile selects the collection representation "
+        f"(``{OGC_API_PROC_FORMAT_STAC_URI}``, its ``stac`` alias, or "
+        f"``{OGC_API_PROC_PROFILE_COLLECTION_URI}``).\n\n"
         f"Example: ``response[profile]=\"{OGC_API_PROC_PROFILE_JOB_DESC_URI}\"``"
     )
     missing = drop
@@ -4304,14 +4348,17 @@ class JobResultEndpoint(JobPath):
 
 class ProcessResultsEndpoint(LocalProcessPath, JobPath):
     header = RequestHeadersNoBody()
+    querystring = JobResponseQuery()
 
 
 class ProviderResultsEndpoint(ProviderProcessPath, JobPath):
     header = RequestHeadersNoBody()
+    querystring = JobResponseQuery()
 
 
 class JobResultsEndpoint(JobPath):
     header = RequestHeadersNoBody()
+    querystring = JobResponseQuery()
 
 
 class JobResultsIndexPath(JobPath):
@@ -7906,7 +7953,7 @@ class ExecuteHeadersXML(ExecuteHeadersBase):
 
 class PostJobsEndpointJSON(ExtendedMappingSchema):
     header = ExecuteHeadersJSON()
-    querystring = LocalProcessQuery()
+    querystring = LocalProcessExecuteQuery()
     body = Execute()
 
 
@@ -7916,7 +7963,7 @@ class PostProcessJobsEndpointJSON(PostJobsEndpointJSON, LocalProcessPath):
 
 class PostJobsEndpointXML(ExtendedMappingSchema):
     header = ExecuteHeadersXML()
-    querystring = LocalProcessQuery()
+    querystring = LocalProcessExecuteQuery()
     body = WPSExecutePost(
         # very important to override 'name' in this case
         # original schema uses it to specify the XML class name
@@ -7999,7 +8046,7 @@ class ExecuteBodyMultipart(ExtendedMappingSchema):
 
 class PostJobsEndpointMultipart(ExtendedMappingSchema):
     header = ExecuteHeadersMultipart()
-    querystring = LocalProcessQuery()
+    querystring = LocalProcessExecuteQuery()
     body = ExecuteBodyMultipart(
         examples={
             "ExecuteAdHoc": {

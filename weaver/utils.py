@@ -731,7 +731,7 @@ def get_response_profile(request=None, request_headers=None):
 
     Possible locations are, in order of precedence:
 
-        - ``profile`` query parameter.
+        - ``profile`` or ``response[profile]`` query parameter.
         - ``Accept-Profile`` header directly providing the profile :term:`URI`.
         - ``Accept`` :term:`Media-Type` with a ``profile`` parameter.
         - ``Prefer`` header including a ``profile`` parameter.
@@ -749,7 +749,7 @@ def get_response_profile(request=None, request_headers=None):
     :return: Matched profile value if found.
     """
     query_params = get_request_args(request) if request else {}
-    profile_query = query_params.get("profile")
+    profile_query = query_params.get("profile") or query_params.get("response[profile]")
     if profile_query:
         return profile_query or None
 
@@ -1417,6 +1417,61 @@ def create_content_id(resource_id, context_id):
     return f"<{resource_id}@{context_id}>"
 
 
+def compute_file_multihash(file_path, hash_algorithm="sha256"):
+    # type: (str, str) -> bytes
+    """
+    Computes the multihash digest of a file.
+
+    The result is the concatenation of ``<hash-code><digest-length><digest-bytes>``.
+
+    .. seealso::
+        - `Multihash <https://github.com/multiformats/multihash>`_
+        - `multicodec table <https://github.com/multiformats/multicodec/blob/master/table.csv>`_
+
+    :param file_path: Path to the file to compute the digest for.
+    :param hash_algorithm: Hash algorithm to use (default: ``sha256``).
+    :return: Multihash bytes.
+    :raises ValueError: If the file does not exist, cannot be read or the algorithm is not supported.
+    """
+    if not os.path.isfile(file_path):
+        raise ValueError(f"File not found or not accessible: [{file_path}]")
+
+    hash_func = getattr(hashlib, hash_algorithm, None)
+    if not hash_func:
+        raise ValueError(f"Unsupported hash algorithm: [{hash_algorithm}]")
+
+    hash_codes = {
+        "sha256": 0x12,  # sha2-256
+        "sha512": 0x13,  # sha2-512
+        "sha1": 0x11,    # sha1
+        "md5": 0xd5,     # md5
+    }
+    hash_code = hash_codes.get(hash_algorithm)
+    if not hash_code:
+        raise ValueError(f"Hash algorithm [{hash_algorithm}] not supported for multihash encoding")
+
+    hash_obj = hash_func()
+    with open(file_path, "rb") as f:
+        while chunk := f.read(8192):
+            hash_obj.update(chunk)
+    return multihash.wrap(hash_obj.digest(), hash_code)
+
+
+def compute_file_checksum(file_path, hash_algorithm="sha256"):
+    # type: (str, str) -> str
+    """
+    Computes the lowercase hexadecimal multihash of a file, as employed by the :term:`STAC` ``file:checksum`` field.
+
+    .. seealso::
+        :func:`compute_file_digest_multibase` for the equivalent ``digestMultibase`` representation.
+
+    :param file_path: Path to the file to compute the digest for.
+    :param hash_algorithm: Hash algorithm to use (default: ``sha256``).
+    :return: Hexadecimal multihash string.
+    """
+    return compute_file_multihash(file_path, hash_algorithm).hex()
+
+
 def compute_file_digest_multibase(file_path, hash_algorithm="sha256", multibase_encoding="base64"):
     # type: (str, str, str) -> str
     """
@@ -1439,41 +1494,8 @@ def compute_file_digest_multibase(file_path, hash_algorithm="sha256", multibase_
     :return: Multibase-encoded multihash string (e.g., ``mEiB7M...`` for ``base64``, ``zQmdf...`` for ``base58btc``).
     :raises ValueError: If the file does not exist or cannot be read.
     """
-
-    if not os.path.isfile(file_path):
-        raise ValueError(f"File not found or not accessible: [{file_path}]")
-
-    # Compute the file hash
-    hash_func = getattr(hashlib, hash_algorithm, None)
-    if not hash_func:
-        raise ValueError(f"Unsupported hash algorithm: [{hash_algorithm}]")
-
-    hash_obj = hash_func()
-    with open(file_path, "rb") as f:
-        while chunk := f.read(8192):
-            hash_obj.update(chunk)
-    digest = hash_obj.digest()
-
-    # Create multihash (includes hash algorithm identifier)
-    # Map common hash algorithms to multihash codes
-    # See: `multicodec table <https://github.com/multiformats/multicodec/blob/master/table.csv>`_
-    hash_codes = {
-        "sha256": 0x12,  # sha2-256
-        "sha512": 0x13,  # sha2-512
-        "sha1": 0x11,    # sha1
-        "md5": 0xd5,     # md5
-    }
-    hash_code = hash_codes.get(hash_algorithm)
-    if not hash_code:
-        raise ValueError(f"Hash algorithm [{hash_algorithm}] not supported for multihash encoding")
-
-    # Encode as multihash: <hash-code><digest-length><digest-bytes>
-    mhash = multihash.wrap(digest, hash_code)
-
-    # Encode with multibase
-    digest_multibase = multibase.encode(mhash, multibase_encoding)
-
-    return digest_multibase
+    mhash = compute_file_multihash(file_path, hash_algorithm)
+    return multibase.encode(mhash, multibase_encoding)
 
 
 def get_href_headers(
@@ -1639,6 +1661,23 @@ def get_href_headers(
     return headers
 
 
+def make_link_json(href, rel, title=None, media_type=None, **kwargs):
+    # type: (str, str, Optional[str], Optional[str], **Any) -> Link
+    """
+    Creates a :term:`JSON` link representation with optional metadata and extension fields.
+
+    .. seealso::
+        :func:`make_link_header` for the HTTP ``Link`` header representation.
+    """
+    link = {"href": href, "rel": rel}  # type: Link
+    if media_type:
+        link["type"] = media_type
+    if title:
+        link["title"] = title
+    link.update(kwargs)  # type: ignore
+    return link
+
+
 def make_link_header(
     href,           # type: Union[str, Link]
     hreflang=None,  # type: Optional[str]
@@ -1646,6 +1685,7 @@ def make_link_header(
     type=None,      # type: Optional[str]  # noqa
     title=None,     # type: Optional[str]
     charset=None,   # type: Optional[str]
+    profile=None,   # type: Optional[str]
     **kwargs,       # type: Optional[str]
 ):                  # type: (...) -> str
     """
@@ -1665,6 +1705,7 @@ def make_link_header(
         type = type or href.get("type")  # noqa
         title = title or href.get("title")
         charset = charset or href.get("charset")  # noqa
+        profile = profile or href.get("profile")
         hreflang = hreflang or href.get("hreflang")
         href = href["href"]
     if not rel:
@@ -1674,6 +1715,8 @@ def make_link_header(
         link += f"; type=\"{type}\""
     if charset:
         link += f"; charset=\"{charset}\""
+    if profile:
+        link += f"; profile=\"{profile}\""
     if title:
         link += f"; title=\"{title}\""
     if hreflang:

@@ -16,8 +16,10 @@ from prov.model import ProvDocument, ProvRelation
 
 from weaver.__meta__ import __version__ as weaver_version
 from weaver.base import Constants
+from weaver.collections.utils import collection_enabled
+from weaver.execute import ExecuteResponse
 from weaver.formats import ContentType, OutputFormat
-from weaver.utils import get_weaver_url
+from weaver.utils import get_path_kvp, get_weaver_url
 
 if TYPE_CHECKING:
     from typing import Any, List, Optional, Set, Tuple, Union
@@ -422,6 +424,30 @@ class WeaverResearchObject(ResearchObject):
         # Add a wasStartedBy relation (this is redundant for
         # single-process jobs, but will unify in RDF or JSONLD)
         document.wasStartedBy(activity=job_activity, starter=wf_agent)
+
+        if collection_enabled(self.settings):
+            results_entity = document.entity(
+                f"{self.job.uuid.urn}:results",
+                {
+                    prov_const.PROV_TYPE: prov_const.PROV["Collection"],
+                    prov_const.PROV_LOCATION: self.job.results_url(self.settings),
+                    prov_const.PROV_LABEL: "Job Results",
+                }
+            )
+            collection_entity = document.entity(
+                f"{self.job.uuid.urn}:collection",
+                {
+                    prov_const.PROV_TYPE: prov_const.PROV["Collection"],
+                    prov_const.PROV_LOCATION: get_path_kvp(
+                        self.job.results_url(self.settings),
+                        response=ExecuteResponse.COLLECTION,
+                    ),
+                    prov_const.PROV_LABEL: "Job Results STAC Collection",
+                }
+            )
+            document.wasGeneratedBy(results_entity, job_activity)
+            document.wasGeneratedBy(collection_entity, job_activity)
+            document.alternateOf(collection_entity, results_entity)
 
         # NOTE: This is a somewhat fragile workaround for cwlprov
         # unconditionally creating the user agent as a Person.  The
