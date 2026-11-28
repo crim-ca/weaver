@@ -820,13 +820,13 @@ class WpsRestApiJobsTest(JobUtils):
         path = sd.process_jobs_service.path.format(process_id="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_get_jobs_process_unknown_in_query(self):
         path = get_path_kvp(sd.jobs_service.path, process="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     @parameterized.expand([
         get_path_kvp(
@@ -877,7 +877,7 @@ class WpsRestApiJobsTest(JobUtils):
         """
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     @parameterized.expand([
         get_path_kvp(sd.jobs_service.path, process="process-1:invalid!!!"),
@@ -889,38 +889,38 @@ class WpsRestApiJobsTest(JobUtils):
         # type: (str) -> None
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_get_jobs_private_process_forbidden_access_in_path(self):
         path = sd.process_jobs_service.path.format(process_id=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_get_jobs_private_process_not_returned_in_query(self):
         path = get_path_kvp(sd.jobs_service.path, process=self.process_private.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_get_jobs_service_and_process_unknown_in_path(self):
         path = sd.provider_jobs_service.path.format(provider_id="unknown-service-id", process_id="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_get_jobs_service_and_process_unknown_in_query(self):
         path = get_path_kvp(sd.jobs_service.path, service="unknown-service-id", process="unknown-process-id")
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_get_jobs_private_service_public_process_forbidden_access_in_path(self):
         path = sd.provider_jobs_service.path.format(provider_id=self.service_private.name,
                                                     process_id=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_get_jobs_private_service_public_process_forbidden_access_in_query(self):
         path = get_path_kvp(sd.jobs_service.path,
@@ -928,7 +928,7 @@ class WpsRestApiJobsTest(JobUtils):
                             process=self.process_public.identifier)
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 403
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_get_jobs_public_service_private_process_forbidden_access_in_query(self):
         """
@@ -960,7 +960,7 @@ class WpsRestApiJobsTest(JobUtils):
                 stack.enter_context(patch)
             resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 404
-            assert resp.content_type == ContentType.APP_JSON
+            assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_get_jobs_public_with_access_and_request_user(self):
         """
@@ -1592,7 +1592,7 @@ class WpsRestApiJobsTest(JobUtils):
             path = f"/processes/{self.process_public.identifier}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", path, data=body, headers=headers, only_local=True)
             assert resp.status_code == 406, resp.text
-            assert resp.content_type == ContentType.APP_JSON
+            assert resp.content_type == ContentType.APP_PROBLEM_JSON
             assert sd.OGC_API_PROC_PROFILE_RESULTS_URI in resp.json["cause"]["schema"]["enum"]
             assert resp.json["cause"]["name"] == "Accept-Profile"
 
@@ -1614,7 +1614,7 @@ class WpsRestApiJobsTest(JobUtils):
             path = f"/processes/{self.process_public.identifier}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", path, data=body, headers=headers, only_local=True)
             assert resp.status_code == 406, resp.text
-            assert resp.content_type == ContentType.APP_JSON
+            assert resp.content_type == ContentType.APP_PROBLEM_JSON
             assert sd.OGC_API_PROC_PROFILE_JOB_DESC_URI in resp.json["cause"]["schema"]["enum"]
             assert resp.json["cause"]["name"] == "Accept-Profile"
 
@@ -1632,7 +1632,7 @@ class WpsRestApiJobsTest(JobUtils):
             path = f"/processes/{self.process_public.identifier}/jobs"
             resp = mocked_sub_requests(self.app, "post_json", path, data=body, headers=headers, only_local=True)
             assert resp.status_code == 422, resp.text
-            assert resp.content_type == ContentType.APP_JSON
+            assert resp.content_type == ContentType.APP_PROBLEM_JSON
             assert resp.json["cause"]["schema"] == {"const": sd.Execute._schema}
             assert resp.json["cause"]["name"] == "Content-Schema"
             assert resp.json["type"] == sd.OGC_API_PROC_PART4_EXC_UNSUPPORTED_SCHEMA_URI
@@ -1922,7 +1922,7 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{self.job_info[0].id}/logs"
         resp = self.app.get(path, headers={"Accept": ContentType.IMAGE_GEOTIFF}, expect_errors=True)
         assert resp.status_code == 406
-        assert ContentType.APP_JSON in resp.content_type
+        assert ContentType.APP_PROBLEM_JSON in resp.content_type
         assert "type" in resp.json
         assert resp.json["type"] == "NotAcceptable"
         assert "detail" in resp.json
@@ -2603,7 +2603,7 @@ class WpsRestApiJobsTest(JobUtils):
         path = f"/jobs/{new_job.id}"
         resp = self.app.patch(path, params="data", expect_errors=True)
         assert resp.status_code == 415
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
         assert resp.json["type"] == sd.OGC_API_PROC_PART4_EXC_UNSUPPORTED_MEDIA_TYPE_URI
 
     @pytest.mark.oap_part4

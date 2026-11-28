@@ -1048,7 +1048,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             path = "/processes"
             resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 400
-            assert resp.content_type == ContentType.APP_JSON
+            assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_deploy_process_conflict(self):
         process_name = self.process_private.identifier
@@ -1061,7 +1061,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             path = "/processes"
             resp = self.app.post_json(path, params=process_data, headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 409
-            assert resp.content_type == ContentType.APP_JSON
+            assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_deploy_process_content_id_header_mismatch(self):
         """
@@ -1641,7 +1641,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 resp = self.app.post_json(path, params=data, headers=self.json_headers, expect_errors=True)
                 msg = "Failed with test variation '{}' with value '{}' using data:\n{}"
                 assert resp.status_code in [400, 422], msg.format(i, resp.status_code, json.dumps(data, indent=2))
-                assert resp.content_type == ContentType.APP_JSON, msg.format(i, resp.content_type, "")
+                assert resp.content_type == ContentType.APP_PROBLEM_JSON, msg.format(i, resp.content_type, "")
 
     @parameterized.expand([
         ("not_a_list", "not-a-list"),
@@ -4646,14 +4646,14 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         path = f"/processes/{name}"
         resp = self.app.delete_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404, f"Error: {resp.text}"
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_delete_process_bad_name(self):
         name = f"{self.fully_qualified_test_name()}..."
         path = f"/processes/{name}"
         resp = self.app.delete_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400, f"Error: {resp.text}"
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_execute_process_success(self):
         path = f"/processes/{self.process_public.identifier}/jobs"
@@ -4700,7 +4700,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         path = f"/processes/{self.process_public.identifier}/jobs"
         resp = self.app.post_json(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_execute_process_valid_empty_string(self):
         """
@@ -4757,7 +4757,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         msg = "Failed with test variation '{}' with status '{}' using:\n{}"
                         code = [400, 422] if is_invalid else [201]
                         assert resp.status_code in code, msg.format(i, resp.status_code, data_json)
-                        assert resp.content_type == ContentType.APP_JSON, msg.format(i, resp.content_type)
+                        ctype = ContentType.APP_PROBLEM_JSON if is_invalid else ContentType.APP_JSON
+                        assert resp.content_type == ctype, msg.format(i, resp.content_type, data_json)
                 except stopit.TimeoutException:
                     # if required, not normal to have passed validation
                     # if optional, valid since omitting field does not raise missing field in schema
@@ -5474,7 +5475,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         path = f"/processes/{self.fully_qualified_test_name()}/visibility"
         resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 404
-        assert resp.content_type == ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
 
     def test_set_process_visibility_success(self):
         test_process = self.process_private.identifier
