@@ -268,9 +268,10 @@ OGC_API_PROC_PART5_EXC_UNSUPPORTED_METADATA_PROFILE_URI = (
 OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI = "https://www.opengis.net/def/profile"
 OGC_API_PROC_PART5_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"
 
-OGC_API_REL_QUERYABLES_URI = "http://www.opengis.net/def/rel/ogc/1.0/queryables"
-OGC_API_REL_SORTABLES_URI = "http://www.opengis.net/def/rel/ogc/1.0/sortables"
-OGC_API_REL_CATALOG_URI = "http://www.opengis.net/def/rel/ogc/1.0/ogc-catalog"
+OGC_API_REL_BASE_URI = "http://www.opengis.net/def/rel/ogc/1.0"
+OGC_API_REL_QUERYABLES_URI = f"{OGC_API_REL_BASE_URI}/queryables"
+OGC_API_REL_SORTABLES_URI = f"{OGC_API_REL_BASE_URI}/sortables"
+OGC_API_REL_CATALOG_URI = f"{OGC_API_REL_BASE_URI}/ogc-catalog"
 
 OGC_API_PROC_REL_BASE_URI = "https://www.opengis.net/def/rel/ogc/1.0"
 OGC_API_PROC_REL_CONFORMANCE_URI = f"{OGC_API_PROC_REL_BASE_URI}/conformance"
@@ -8609,19 +8610,19 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     body = ProviderProcessesSchema()
 
 
-class CollectionLinksResponseSchema(ExtendedMappingSchema):
-    description = "Links to the queryables or sortables of each collection."
+class CatalogLinksResponseSchema(ExtendedMappingSchema):
+    description = "Links to the queryables or sortables of each catalog."
     body = LandingPage()
 
 
 class QueryablesResponseSchema(ExtendedMappingSchema):
-    description = "Supported collection query parameters."
-    body = PermissiveMappingSchema(description="JSON Schema describing supported collection query parameters.")
+    description = "Supported catalog query parameters."
+    body = PermissiveMappingSchema(description="JSON Schema describing supported catalog query parameters.")
 
 
 class SortablesResponseSchema(ExtendedMappingSchema):
-    description = "Supported collection sorting fields."
-    body = PermissiveMappingSchema(description="JSON Schema describing supported collection sorting fields.")
+    description = "Supported catalog sorting fields."
+    body = PermissiveMappingSchema(description="JSON Schema describing supported catalog sorting fields.")
 
 
 class ProcessSearchExpression(ExtendedSchemaNode):

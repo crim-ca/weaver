@@ -62,7 +62,7 @@ from weaver.wps_restapi.jobs.utils import (
     validate_service_process
 )
 from weaver.wps_restapi.providers.utils import get_service
-from weaver.wps_restapi.queryables import get_queryables_schema, get_sortables_schema, resolve_queryables_params
+from weaver.wps_restapi.records import get_queryables_schema, get_sortables_schema, resolve_queryables_params
 
 if TYPE_CHECKING:
     from typing import Iterable, List

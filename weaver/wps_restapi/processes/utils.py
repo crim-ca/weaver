@@ -21,7 +21,7 @@ from weaver.typedefs import MetadataQueryScope, PreferHeaderHandling
 from weaver.utils import VersionFormat, get_header, get_path_kvp, get_request_args, get_settings, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.queryables import resolve_queryables_params
+from weaver.wps_restapi.records import resolve_queryables_params
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:

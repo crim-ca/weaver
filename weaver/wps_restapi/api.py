@@ -31,7 +31,7 @@ from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import CorniceOpenAPI
 from weaver.wps_restapi.constants import ConformanceCategory
-from weaver.wps_restapi.queryables import get_collection_links
+from weaver.wps_restapi.records import get_catalog_links
 from weaver.wps_restapi.utils import get_wps_restapi_base_path, get_wps_restapi_base_url
 
 if TYPE_CHECKING:
@@ -999,14 +999,14 @@ def api_conformance(request):  # noqa: F811
     tags=[sd.TAG_API],
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas={"200": sd.CollectionLinksResponseSchema()},
+    response_schemas={"200": sd.CatalogLinksResponseSchema()},
 )
 def api_queryables(request):
     # type: (PyramidRequest) -> JSON
     """
     Links to the queryables of each collection.
     """
-    return get_collection_links(request, sd.OGC_API_REL_QUERYABLES_URI, {
+    return get_catalog_links(request, sd.OGC_API_REL_QUERYABLES_URI, {
         "process": sd.processes_queryables_service,
         "job": sd.jobs_queryables_service,
     })
@@ -1016,14 +1016,14 @@ def api_queryables(request):
     tags=[sd.TAG_API],
     accept=ContentType.APP_JSON,
     renderer=OutputFormat.JSON,
-    response_schemas={"200": sd.CollectionLinksResponseSchema()},
+    response_schemas={"200": sd.CatalogLinksResponseSchema()},
 )
 def api_sortables(request):
     # type: (PyramidRequest) -> JSON
     """
     Links to the sortables of each collection.
     """
-    return get_collection_links(request, sd.OGC_API_REL_SORTABLES_URI, {
+    return get_catalog_links(request, sd.OGC_API_REL_SORTABLES_URI, {
         "process": sd.processes_sortables_service,
         "job": sd.jobs_sortables_service,
     })

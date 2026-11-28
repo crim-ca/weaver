@@ -358,7 +358,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ("sortables", sd.OGC_API_REL_SORTABLES_URI),
     ])
     @pytest.mark.ogc_records
-    def test_get_collections_discovery_links(self, endpoint, rel):
+    def test_get_catalogs_discovery_links(self, endpoint, rel):
         # type: (str, str) -> None
         """
         Tests that the generic endpoint provides only links to the corresponding endpoints of processes and jobs.

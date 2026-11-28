@@ -42,7 +42,7 @@ from weaver.wps_restapi.processes.utils import (
 )
 from weaver.wps_restapi.providers.providers import describe_provider_process
 from weaver.wps_restapi.providers.utils import get_provider_id, get_provider_services
-from weaver.wps_restapi.queryables import get_queryables_schema, get_sortables_schema
+from weaver.wps_restapi.records import get_queryables_schema, get_sortables_schema
 
 if TYPE_CHECKING:
     from pyramid.config import Configurator
