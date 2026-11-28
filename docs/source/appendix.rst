@@ -32,6 +32,11 @@ Glossary
         represented by a :term:`CWL` specification in the case of `Weaver` implementation, but could technically be
         defined by another similar approach. See the :ref:`Application Package` section for all relevant details.
 
+    Asset
+        A reference to a data file or supporting document associated with a :term:`STAC` :term:`Item` or
+        :term:`Collection`. Its metadata describes the resource location, media type, roles, and other properties.
+        See |stac-assets|_ for details.
+
     AWS
         | Amazon Web Services
         | In the context of `Weaver`, most often referring specifically to the use of :term:`S3` buckets.
@@ -193,6 +198,11 @@ Glossary
 
         .. seealso::
             See :ref:`OpenAPI Specification` for details.
+
+    Item
+        A :term:`STAC` object represented as a :term:`GeoJSON` Feature, with metadata, links, and :term:`Assets <Asset>`
+        describing the associated data. Items can be grouped into a :term:`Collection`.
+        See |stac-items|_ for details.
 
     JSON
         | JavaScript Object Notation

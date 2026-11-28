@@ -3265,14 +3265,16 @@ Job Collection Output Response
 
 .. versionadded:: 6.20
 
-Results of a successful :term:`Job` can be represented as a :term:`STAC` Collection, offered as an alternate
+Results of a successful :term:`Job` can be represented as a :term:`STAC` :term:`Collection`, offered as an alternate
 representation of the :ref:`Job Results <proc_op_job_results>`. This representation is generated only when
 requested, to avoid the cost of producing it for :term:`Job` executions that do not need it.
+
+.. _proc_op_job_collection_request:
 
 Requesting the Collection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The collection is requested using the ``response=collection`` query parameter, or equivalently with
+The :term:`Collection` is requested using the ``response=collection`` query parameter, or equivalently with
 ``{"response": "collection"}`` in the body of the :ref:`Execution Request <proc_op_execute>`.
 It can be used with the following operations, in |synchronous|_ or |asynchronous|_ modes:
 
@@ -3280,7 +3282,7 @@ It can be used with the following operations, in |synchronous|_ or |asynchronous
 - ``POST /processes/{processID}/jobs`` (alias of the above)
 - ``POST /jobs``
 
-For convenience, the collection can also be generated after the execution of a successful :term:`Job` using:
+For convenience, the :term:`Collection` can also be generated after the execution of a successful :term:`Job` using:
 
 .. code-block:: http
 
@@ -3292,28 +3294,28 @@ For convenience, the collection can also be generated after the execution of a s
     that is not necessarily shared by all :term:`OGC API - Processes` offering the *Collection Output* feature.
 
 Equivalent :term:`Process`-scoped and :term:`Provider`-scoped ``results`` endpoints are supported as well.
-When the collection is requested, :term:`Job` results are resolved as for other ``response`` values, and the
-response is an `HTTP 303 See Other` redirect with `Location` header to the collection described below.
-For |asynchronous|_ executions, the collection is generated once the :term:`Job` succeeds, and the same
+When the :term:`Collection` is requested, :term:`Job` results are resolved as for other ``response`` values, and the
+response is an `HTTP 303 See Other` redirect with `Location` header to the :term:`Collection` described below.
+For |asynchronous|_ executions, the :term:`Collection` is generated once the :term:`Job` succeeds, and the same
 redirect is returned when retrieving the results.
 
-An already generated collection is reused as is. The generation can be forced again from the :term:`Job` results
+An already generated :term:`Collection` is reused as is. The generation can be forced again from the :term:`Job` results
 by sending a ``Cache-Control: no-cache`` request header along the ``response=collection`` request.
 This header is ignored for any other ``response`` type on the API side (other proxy server rules could still use it).
 
 Generation can be disabled entirely with :confval:`weaver.job_collection`, in which case ``response=collection``
 returns ``HTTP 501 Not Implemented``.
 
-By default, collections are stored as :ref:`static documents <proc_op_job_collection_static>`.
+By default, :term:`Collections <Collection>` are stored as :ref:`static documents <proc_op_job_collection_static>`.
 Alternatively, a :term:`STAC` API can be configured to :ref:`publish <proc_op_job_collection_publish>`
-the *STAC Collection* and *STAC Items*, as presented below.
+the :term:`STAC` :term:`Collection` and :term:`Items <Item>`, as presented below.
 
 .. _proc_op_job_collection_static:
 
 Collection Static Storage
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The collection is written under the ``{JOB_UUID}-collection/`` directory, next to the ``{JOB_UUID}/`` results
+The :term:`Collection` is written under the ``{JOB_UUID}-collection/`` directory, next to the ``{JOB_UUID}/`` results
 and ``{JOB_UUID}-prov/`` directories (see :ref:`exec_output_location`). Contents are located relative to
 ``weaver.wps_output_dir`` (including any output context) and are hosted under ``weaver.wps_output_url``, with the
 same caveats regarding file hosting. The layout mimics the |stac-api|_ ``/collections/{collectionID}`` and
@@ -3336,21 +3338,22 @@ Collection STAC API Publishing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When :confval:`weaver.job_collection_stac_api_public_url` or :confval:`weaver.job_collection_stac_api_staging_url`
-are configured, the *Collection* and *Items* are published to that :term:`STAC` API
+are configured, the :term:`Collection` and :term:`Items <Item>` are published to that :term:`STAC` API
 instead of being written as static documents.
 If a staging URL is configured, it is used for publishing requests. A public URL (or the staging URL otherwise)
-is used for links, metadata, and the redirect `Location` of the collection response.
+is used for links, metadata, and the redirect `Location` of the :term:`Collection` response.
 
-After a successful publish, the *Collection* and *Items* documents are not retained locally.
+After a successful publish, the :term:`Collection` and :term:`Item` documents are not retained locally.
 A local ``.stac-api`` marker file in the ``{JOB_UUID}-collection/`` directory records that they were
 published and lets `Weaver` reuse that published representation without posting it again.
 
 Result files remain in their normal job results location and are referenced by their existing URLs in the
-Collection and Item asset metadata. `Weaver` does not upload those data assets to the :term:`STAC` API. Generated
-supporting asset documents (such as the results and parameter JSON documents, inline geospatial values, and
-unaligned literal arrays) remain in the local ``{JOB_UUID}-collection/assets/`` directory. The Collection and
-Items posted to the API reference these supporting documents through their public ``weaver.wps_output_url``
-URLs. The hosting server must therefore make those local assets accessible at the advertised URLs.
+:term:`Collection` and :term:`Item` :term:`Asset` metadata. `Weaver` does not upload those data :term:`Assets <Asset>`
+to the :term:`STAC` API. Generated supporting :term:`Asset` documents (such as the results and parameter JSON
+documents, inline geospatial values, and unaligned literal arrays) remain in the local
+``{JOB_UUID}-collection/assets/`` directory. The :term:`Collection` and :term:`Items <Item>` posted to the API
+reference these supporting documents through their public ``weaver.wps_output_url`` URLs. The hosting server must
+therefore make those local :term:`Assets <Asset>` accessible at the advertised URLs.
 
 When a :term:`STAC` API is configured, ``response=landingPage`` redirects to the API root, and the
 ``data-access-mechanisms`` and ``landing-page`` conformance classes are listed. Without a configured API,
@@ -3363,22 +3366,25 @@ previously stored in the database.
 Collection and Item Contents
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Documents use |stac-spec|_ version 1.1.0 and the ``other`` license. Each Item contains the result for each output ID
-at the corresponding array position. Scalar outputs are repeated in every Item. To determine the number of Items,
-`Weaver` examines top-level output values that are arrays of result
-elements. An array qualifies as a candidate when its elements are geo-like values, such as GeoJSON Features or
+Documents use |stac-spec|_ version 1.1.0 and the ``other`` license.
+Each :term:`Item` contains the result for each output ID at the corresponding array position.
+Scalar outputs are repeated in every :term:`Item`. To determine the number of :term:`Items <Item>`,
+`Weaver` examines top-level output values that are arrays of result elements.
+An array qualifies as a candidate when its elements are geo-like values, such as GeoJSON Features or
 references to geospatial files. The candidate cardinality is the number of elements in that output array. This
 refers to the result array, not coordinates, pixels, bands, or other internal arrays within an individual result.
 Among candidate cardinalities, `Weaver` selects the one matched by the greatest number of output arrays. A tie
 or an empty winning candidate returns ``HTTP 422`` because the results cannot be aligned unambiguously. If there is no
-candidate array, one Item is produced. Scalar outputs repeat in each Item. Output arrays matching the selected
-cardinality align by index. Arrays of other lengths become Collection-level assets.
+candidate array, one :term:`Item` is produced. Scalar outputs repeat in each :term:`Item`.
+Output arrays matching the selected cardinality align by index.
+Arrays of other lengths become :term:`Collection`-level :term:`Assets <Asset>`.
 
-The Collection provider contains a |stac-ext-processing|_ expression of the process description, using the
+The :term:`Collection` provider contains a |stac-ext-processing|_ expression of the process description, using the
 ``ogc-process-description`` profile. Its ``parameters`` contain the named execution ``inputs``. File inputs are
-linked using ``derived_from``. Item assets carry aligned output data with the ``data`` role. Collection assets
-include the complete results document, the :term:`Provenance` record of the :term:`Job` when available,
-and any unaligned literal arrays. Assets retain their media type and declared format profile when available.
+linked using ``derived_from``. :term:`Item` :term:`Assets <Asset>` carry aligned output data with the ``data`` role.
+:term:`Collection` :term:`Assets <Asset>` include the complete results document,
+the :term:`Provenance` record of the :term:`Job` when available, and any unaligned literal arrays.
+:term:`Assets <Asset>` retain their media type and declared format profile when available.
 Literal values are recorded by output ID in ``weaver:value`` and in ``processing:expression`` using
 ``format: results``.
 
@@ -3392,52 +3398,52 @@ Literal values are recorded by output ID in ``weaver:value`` and in ``processing
       - Value or format
       - Description
     * - |stac-spec|_: ``stac_version`` and ``license``
-      - Collection and Item
+      - :term:`Collection` and :term:`Item`
       - ``1.1.0`` and ``other``
       - STAC specification version and license used by generated documents.
     * - |stac-spec|_: ``id``
-      - Collection and Item
-      - Collection uses the Job UUID. Item uses the Job UUID and zero-based result index.
-      - Identifies the Collection and each aligned Item.
+      - :term:`Collection` and :term:`Item`
+      - :term:`Collection` uses the Job UUID. :term:`Item` uses the Job UUID and zero-based result index.
+      - Identifies the :term:`Collection` and each aligned :term:`Item`.
     * - |stac-ext-processing|_: ``processing:software``, ``processing:version``, ``processing:datetime``,
         ``processing:level``, ``processing:facility``, and ``processing:lineage``
-      - Collection and Item
+      - :term:`Collection` and :term:`Item`
       - Software and process metadata, job completion time, ``L4`` processing level, configured service name
         or URL, and job input/output lineage.
       - Describes the process and facility and provides associated lineage.
     * - |stac-ext-processing|_: ``processing:expression``
-      - Item
-      - Collection provider uses the ``ogc-process-description`` profile with the process description in
-        ``expression`` and the submitted ``inputs`` in ``parameters``. Item uses ``format: results`` with
+      - :term:`Item`
+      - :term:`Collection` provider uses the ``ogc-process-description`` profile with the process description in
+        ``expression`` and the submitted ``inputs`` in ``parameters``. :term:`Item` uses ``format: results`` with
         named literal values.
       - Records the process and submitted inputs, or the literal results.
     * - |stac-ext-application|_: ``application:languages`` and ``application:entrypoint``
-      - Collection and Item
+      - :term:`Collection` and :term:`Item`
       - ``["CWL"]`` and package entrypoint when defined.
       - Identifies the application language and entrypoint.
-    * - Asset: ``roles``
-      - Collection and Item assets
+    * - :term:`Asset`: ``roles``
+      - :term:`Collection` and :term:`Item` :term:`Assets <Asset>`
       - ``data`` for results and ``metadata`` for the :term:`Provenance` record.
-      - Identifies result assets and supporting documents.
-    * - Asset: ``type`` and ``profile``
-      - Collection and Item assets
+      - Identifies result :term:`Assets <Asset>` and supporting documents.
+    * - :term:`Asset`: ``type`` and ``profile``
+      - :term:`Collection` and :term:`Item` :term:`Assets <Asset>`
       - Resolved media type and declared format profile when available. Generated JSON uses
         ``application/json``.
-      - Indicates the asset format and any additional format semantics.
+      - Indicates the :term:`Asset` format and any additional format semantics.
     * - |stac-ext-file|_: ``file:size``, ``file:checksum``, ``file:byte_order``, and ``file:local_path``
-      - Assets
+      - :term:`Assets <Asset>`
       - File size, hexadecimal multihash, detected byte order, and job-relative path when available.
       - Provides file metadata when the result is accessible during generation.
     * - `Weaver`: ``weaver:value``
-      - Item
+      - :term:`Item`
       - Mapping of output IDs to literal values.
-      - Carries literal results aligned to the Item.
+      - Carries literal results aligned to the :term:`Item`.
     * - `Weaver`: ``weaver:job_id``, ``weaver:process_id``, ``weaver:output_id``, and ``weaver:provider_id``
-      - Item
+      - :term:`Item`
       - Job UUID, process ID, represented output IDs, and remote provider ID when applicable.
-      - Identifies the job, process, outputs, and provider associated with the Item.
+      - Identifies the job, process, outputs, and provider associated with the :term:`Item`.
     * - Links
-      - Collection and Item
+      - :term:`Collection` and :term:`Item`
       - Links to Job status using ``processing-execution``, the process description using
         ``processing-expression``, the :term:`CWL` package using ``application``, submitted inputs using
         ``application-input``, source code, URL inputs using ``derived_from``, provenance, results,
@@ -3449,11 +3455,12 @@ Literal values are recorded by output ID in ``weaver:value`` and in ``processing
 Spatial and Temporal Extents
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Item ``bbox`` and ``geometry`` are looked up from the results when they provide spatial details, such as
+:term:`Item` ``bbox`` and ``geometry`` are looked up from the results when they provide spatial details, such as
 :term:`GeoJSON` documents (``bbox``, ``geometry`` or coordinates), inline ``bbox`` values, vectors, rasters
 or any other supported format. Coordinates are reprojected to ``EPSG:4326`` when the :term:`CRS` is known.
-The Collection spatial extent is the largest extent over all items. When no spatial details can be found,
-the Item ``geometry`` is ``null`` and the Collection extent falls back to the whole globe.
+The :term:`Collection` spatial extent is the largest extent over all :term:`Items <Item>`.
+When no spatial details can be found, the :term:`Item` ``geometry`` is ``null``
+and the :term:`Collection` extent falls back to the whole globe.
 NetCDF files are not inspected for their extents at this time.
 
 For temporal values, ``datetime`` (or ``start_datetime`` and ``end_datetime``) properties of any input or output
@@ -3466,23 +3473,24 @@ Alternate Representations
 
 The :term:`Job` status response provides a ``rel="collection"`` link with the
 ``https://www.opengis.net/def/profile/OGC/0/ogc-collection`` profile. Its ``href`` is
-``/jobs/{jobID}/results?response=collection``, which generates the collection when requested.
+``/jobs/{jobID}/results?response=collection``, which generates the :term:`Collection` when requested.
 
 The :ref:`Job Results <proc_op_job_results>` response provides a ``rel="alternate"`` link with the same profile.
 Before generation, its ``href`` points to the ``response=collection`` results URL. After generation, it points
-directly to the collection document.
+directly to the :term:`Collection` document.
 
 The :ref:`Provenance <proc_op_job_prov>` links (``rel="provenance"`` and ``rel="https://www.w3.org/ns/prov"``,
 using ``application/provenance+json`` by default) are also provided in those responses.
 
-The :term:`Provenance` of the :term:`Job` also includes distinct entities for the results and their collection,
-both ``prov:wasGeneratedBy`` the :term:`Job` activity, where the collection is ``prov:alternateOf`` the results.
+The :term:`Provenance` of the :term:`Job` also includes distinct entities for the results and their :term:`Collection`,
+both ``prov:wasGeneratedBy`` the :term:`Job` activity, where the :term:`Collection` is ``prov:alternateOf`` the results.
 
 .. note::
-    The collection profile can be requested with ``response[profile]=stac`` or ``profile=stac`` (see
-    :ref:`proc_exec_results`), using the ``Accept-Profile`` header, or the profile
-    ``https://www.opengis.net/def/profile/OGC/0/ogc-collection``. Any other profile is refused with
-    ``HTTP 406`` and an ``application/problem+json`` response. Only the :term:`STAC` Collection profile is provided.
+    Request the :term:`STAC` :term:`Collection` using ``?response[profile]=stac`` or ``?profile=stac``
+    (see :ref:`proc_exec_results`). For header-based negotiation, send
+    ``Accept-Profile: <https://www.opengis.net/def/profile/OGC/0/ogc-collection>``.
+    This URI can also replace ``stac`` in either query parameter. An unsupported value returns
+    ``HTTP 406`` with an ``application/problem+json`` response.
 
 .. _proc_op_job_inputs:
 
