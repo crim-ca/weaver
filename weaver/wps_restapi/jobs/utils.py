@@ -820,7 +820,7 @@ def validate_collection_profile(profile, instance):
         return
     raise HTTPNotAcceptable(
         json={
-            "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/unsupported-collection-output",
+            "type": sd.OGC_API_PROC_PART1_EXC_UNSUPPORTED_COLLECTION_OUTPUT_URI,
             "title": "Unsupported collection profile",
             "detail": f"Collection profile [{profile}] is not supported. Only STAC collections are available.",
             "status": HTTPNotAcceptable.code,
@@ -846,7 +846,7 @@ def get_job_collection_response(
     if not collection_enabled(container):
         raise HTTPNotImplemented(
             json={
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/unsupported-collection-output",
+                "type": sd.OGC_API_PROC_PART1_EXC_UNSUPPORTED_COLLECTION_OUTPUT_URI,
                 "title": "Job results collection disabled",
                 "detail": "The generation of job results as collection is disabled by the server configuration.",
                 "status": HTTPNotImplemented.code,
@@ -859,7 +859,7 @@ def get_job_collection_response(
     if response == ExecuteResponse.LANDING_PAGE and not api_url:
         raise HTTPNotImplemented(
             json={
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/unsupported-collection-output",
+                "type": sd.OGC_API_PROC_PART1_EXC_UNSUPPORTED_COLLECTION_OUTPUT_URI,
                 "title": "Unsupported landing page response",
                 "detail": "Landing page response requires a STAC API configured for job results collections.",
                 "status": HTTPNotImplemented.code,
@@ -872,7 +872,7 @@ def get_job_collection_response(
     except AmbiguousCollectionItems as exc:
         raise HTTPUnprocessableEntity(
             json={
-                "type": "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/ambiguous-collection-output",
+                "type": sd.OGC_API_PROC_PART1_EXC_AMBIGUOUS_COLLECTION_OUTPUT_URI,
                 "title": "Ambiguous job results collection",
                 "detail": str(exc),
                 "status": HTTPUnprocessableEntity.code,

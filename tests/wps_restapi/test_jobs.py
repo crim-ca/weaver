@@ -3944,6 +3944,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert resp.status_code == 501
         assert resp.content_type == ContentType.APP_PROBLEM_JSON
         assert resp.json["status"] == 501 and resp.json["title"] and resp.json["detail"]
+        assert resp.json["type"] == sd.OGC_API_PROC_PART1_EXC_UNSUPPORTED_COLLECTION_OUTPUT_URI
         assert not os.path.exists(coll_dir)
 
     @pytest.mark.job
@@ -3962,6 +3963,7 @@ class WpsRestApiJobsTest(JobUtils):
             assert resp.status_code == status, query
             assert resp.content_type == ContentType.APP_PROBLEM_JSON
             assert resp.json["status"] == status
+            assert resp.json["type"] == sd.OGC_API_PROC_PART1_EXC_UNSUPPORTED_COLLECTION_OUTPUT_URI
 
     @pytest.mark.job
     @pytest.mark.collection
@@ -4000,6 +4002,7 @@ class WpsRestApiJobsTest(JobUtils):
         assert response.json["title"] == "Ambiguous job results collection"
         assert "ambiguous cardinalities" in response.json["detail"]
         assert response.json["status"] == 422
+        assert response.json["type"] == sd.OGC_API_PROC_PART1_EXC_AMBIGUOUS_COLLECTION_OUTPUT_URI
 
     @pytest.mark.job
     @pytest.mark.collection
