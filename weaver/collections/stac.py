@@ -87,9 +87,13 @@ STAC_ITEMS_DIR = "items"
 STAC_ITEMS_FILE = f"{STAC_ITEMS_DIR}/index.json"
 # STAC 1.1 uses 'other' because no SPDX license is known for the job results.
 STAC_LICENSE = "other"
+# Local publication record containing the remote Collection URL. Avoids reposting an existing STAC API Collection.
 STAC_API_MARKER = ".stac-api"
+# Treat process-derived job results as L4 products rather than raw observations.
 STAC_PROCESSING_LEVEL = "L4"
+# Limit JSON metadata inspection to 10 MiB to bound memory and parsing costs during Collection generation.
 STAC_MAX_PARSE_SIZE = 10 * 1024 * 1024
+# Required Collection spatial extent fallback when no result provides a usable geographic bounding box.
 STAC_WORLD_BBOX = [-180.0, -90.0, 180.0, 90.0]
 
 PROV_REL = "https://www.w3.org/ns/prov"
