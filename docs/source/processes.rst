@@ -565,50 +565,99 @@ the |getcap-req|_ request. See :ref:`proc_listing_search` for the process listin
 Filtering Processes
 ~~~~~~~~~~~~~~~~~~~
 
-The ``GET /processes`` listing supports the following search parameters for locally registered processes:
+The ``GET /processes`` listing supports the following search parameters to find locally registered :term:`Process`
+definitions. The same :term:`OGC API - Records` search capabilities are available on ``GET /jobs`` where applicable.
 
-- ``keywords`` matches whole keywords, case-insensitively. Comma-separated groups are combined with AND.
-  Alternatives within each group can be separated by ``|`` (OR).
-  For example, ``keywords=climate,netcdf|grib`` requires ``climate`` and either ``netcdf`` or ``grib``.
-  Prefix an individual keyword with ``!`` or ``~`` to negate it. ``keywords=climate,!grib`` excludes ``grib``.
-- ``title`` and ``description`` match literal substrings, case-insensitively.
-- ``q`` and ``query`` search partial terms against the title, description and keywords, case-insensitively.
-  Commas separate OR groups. Within a group, ``+`` combines terms with AND and ``-`` negates the following term.
-  Signs are operators only at the beginning or after whitespace or commas. Otherwise, they are literal characters.
-  For example, ``q=data-`` matches ``data-analysis`` and ``data-science``, and ``q=data+`` matches ``data+analysis``.
-  Use ``+-data`` to search a leading literal minus instead of negating ``data``.
-  Ordinary spaces join a contiguous, ordered phrase and match one or more whitespace characters.
-  For example, ``q=+climate weather +netcdf -grib`` requires the phrase ``climate weather`` and the term ``netcdf``,
-  while excluding ``grib``. It does not match ``climate data and weather``.
-  Double quotes preserve literal punctuation, such as the comma in ``query="regional,subset"``.
-- ``version`` matches an exact numeric semantic version or an inclusive ``lower/upper`` version interval.
-  For example, ``version=1.2.0/1.10.0`` compares numeric version components, not alphabetical strings.
-  Either bound can be open using ``..``, such as ``version=1.0.0/..``.
-  By default, only the latest revision of each process is searched.
-  Use ``revisions=true`` to include older revisions, optionally with ``process={processID}``.
-- ``datetime`` matches the process ``created`` time, as an instant or an interval such as ``2024-01-01T00:00:00Z/..``.
-- ``type`` matches comma-separated process types, case-insensitively, such as ``workflow``, ``application`` or ``wps``.
-  The :term:`OGC API - Records` resource type URIs of :term:`WPS` and :term:`OGC API - Processes` are also accepted.
-- ``license`` matches the ``href`` or ``title`` of a ``license`` link relation within ``metadata`` or ``links``.
-- ``filter`` applies a `CQL2` expression (``filter-lang`` defaults to ``cql2-text`` or ``cql2-json``) over the
-  queryable properties of the listing, including temporal functions applied on ``created``.
-  The same parameter is available on ``GET /jobs``.
-- ``sortby`` specifies comma-separated sorting fields, with ``+`` for ascending or ``-`` for descending.
-  Fields without prefix use their default direction. For example, ``sortby=+id,-version``.
+.. list-table:: Process Listing Search Parameters
+    :name: table-process-search
+    :header-rows: 1
+    :widths: 18 52 30
 
-A process must match every supplied search parameter. Search filters are applied before pagination, and ``total`` counts
-all matching public processes. Search parameters can be combined with metadata filters, sorting, pagination and
-``detail=false``.
-Terms are not regular expressions. Empty terms are invalid.
-These searches cannot be combined with ``providers=true``, since remote provider listings cannot apply the filters.
-URL-encode search values, in particular ``+`` as ``%2B``, to avoid interpreting it as a space in a query string.
-The ``/queryables/processes`` and ``/queryables/jobs`` endpoints describe the parameters supported by each listing
-as JSON Schema using the ``application/schema+json`` media-type. Similarly, the ``/sortables/processes`` and
-``/sortables/jobs`` endpoints describe the fields supported by the ``sortby`` parameter, which is an array provided
-as comma-separated values (``style=form``, ``explode=false``) where each field can be prefixed by ``+`` or ``-``.
-All are discoverable from the landing page and listings using the
+    * - Parameter
+      - Description
+      - Examples
+    * - ``keywords``
+      - Matches whole keywords, case-insensitively.
+        Comma-separated groups are combined with AND.
+        Alternatives within a group are separated by ``|`` (OR).
+        An individual keyword is negated using a ``!`` or ``~`` prefix.
+      - | ``keywords=climate,netcdf|grib``
+        | ``keywords=climate,!grib``
+    * - ``title``, ``description``
+      - Matches literal substrings, case-insensitively.
+      - | ``title=Subset``
+    * - ``q``, ``query``
+      - Searches partial terms against the title, description and keywords, case-insensitively.
+        Commas separate alternatives (OR). Within an alternative, ``+`` requires the following term (AND),
+        and ``-`` excludes it. Spaces join terms as an ordered phrase.
+        Double quotes preserve literal punctuation. A sign is an operator only at the start of a term.
+        Anywhere else, it is a literal character. Use ``+-`` to search for a term starting with a literal ``-``.
+      - | ``q=+climate weather +netcdf -grib``
+        | ``q=data-`` (literal ``-``)
+        | ``query="regional,subset"``
+    * - ``version``
+      - Matches an exact semantic version or an inclusive ``lower/upper`` interval.
+        Either bound can be left open using ``..``. Versions are compared numerically.
+      - | ``version=1.2.0``
+        | ``version=1.2.0/1.10.0``
+        | ``version=1.0.0/..``
+    * - ``revisions``, ``process``
+      - Only the latest revision of each :term:`Process` is searched by default.
+        Use ``revisions=true`` to include older revisions, optionally restricted using ``process={processID}``.
+      - | ``revisions=true&version=1.0.0/..``
+    * - ``datetime``
+      - Matches the :term:`Process` ``created`` time, as an instant or an interval.
+      - | ``datetime=2024-01-01T00:00:00Z/..``
+    * - ``type``
+      - Matches comma-separated :term:`Process` types, case-insensitively.
+        The :term:`OGC API - Records` resource type URIs of :term:`WPS` and :term:`OGC API - Processes`
+        are also accepted.
+      - | ``type=workflow,application``
+        | ``type=wps``
+    * - ``license``
+      - Matches the ``href`` or ``title`` of a ``license`` link relation provided in the :term:`Process`
+        ``metadata`` or ``links``.
+      - | ``license=apache``
+    * - ``filter``, ``filter-lang``, ``filter-crs``
+      - Applies a `CQL2` expression over the queryable properties. The language defaults to ``cql2-text``
+        or ``cql2-json`` according to the contents provided.
+      - | ``filter=version >= '1.2.0' AND type = 'workflow'``
+    * - ``sortby``
+      - Comma-separated sorting fields. Each field is prefixed by ``+`` for ascending or ``-`` for descending order.
+        Fields without prefix use their default direction.
+      - | ``sortby=+id,-version``
+
+A :term:`Process` must match every supplied parameter, and ``total`` in the response counts all matching public
+:term:`Process` definitions regardless of pagination. Search parameters can be combined with metadata filters,
+sorting, pagination and ``detail=false``. Terms are not regular expressions, and empty terms are invalid.
+
+.. note::
+    A ``+`` in a query string is interpreted as a space by most HTTP clients.
+    :term:`URL`-encode it as ``%2B`` to employ it as an operator.
+
+.. note::
+    These parameters cannot be combined with ``providers=true``, since remote :term:`Provider` listings
+    cannot apply the filters.
+
+To discover which parameters and sorting fields can be employed, the following endpoints are provided.
+They respond using the ``application/schema+json`` :term:`Media-Type` as a JSON Schema document.
+
+.. list-table:: Queryables and Sortables Endpoints
+    :header-rows: 1
+    :widths: 30 70
+
+    * - Endpoint
+      - Description
+    * - ``/queryables/processes``, ``/queryables/jobs``
+      - Parameters supported to search the corresponding listing.
+    * - ``/sortables/processes``, ``/sortables/jobs``
+      - Fields accepted by the ``sortby`` parameter of the corresponding listing.
+    * - ``/queryables``, ``/sortables``
+      - Only provide links toward the above endpoints.
+
+These endpoints are advertised in the landing page and in the listings using the
 ``http://www.opengis.net/def/rel/ogc/1.0/queryables`` and ``http://www.opengis.net/def/rel/ogc/1.0/sortables``
-link relations. The generic ``/queryables`` and ``/sortables`` endpoints only provide links to them.
+link relations. The ``sortby`` parameter is an array provided as comma-separated values.
 
 .. _proc_op_undeploy:
 .. _proc_op_replace:
