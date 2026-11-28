@@ -632,6 +632,7 @@ definitions. The same :term:`OGC API - Records` search capabilities are availabl
         The ``filter-lang`` query parameter defaults to ``cql2-text`` or ``cql2-json`` according to the
         ``filter`` contents provided.
       - | ``filter=version >= '1.2.0' AND type = 'workflow'``
+        | ``filter={"op":"=","args":[{"property":"id"},"my-process"]}&filter-lang=cql2-json``
     * - ``sortby``
       - Comma-separated :term:`Process` fields to sort by. Each field is prefixed by ``+`` for ascending or
         ``-`` for descending order. Fields without prefix use their default direction.
