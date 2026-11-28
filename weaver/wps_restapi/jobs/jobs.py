@@ -42,7 +42,7 @@ from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
 from weaver.transform.utils import extend_alternate_formats
-from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
+from weaver.utils import get_header, get_path_kvp, get_request_args, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     deploy_multipart_job_workflow,
@@ -62,7 +62,7 @@ from weaver.wps_restapi.jobs.utils import (
     validate_service_process
 )
 from weaver.wps_restapi.providers.utils import get_service
-from weaver.wps_restapi.queryables import get_queryables_params, get_queryables_schema, resolve_queryables_params
+from weaver.wps_restapi.queryables import get_queryables_schema, resolve_queryables_params
 
 if TYPE_CHECKING:
     from typing import Iterable, List
@@ -147,7 +147,7 @@ def get_queried_jobs(request):
     """
 
     settings = get_settings(request)
-    params = get_queryables_params(request)
+    params = dict(get_request_args(request))
 
     try:
         params = sd.GetJobsQueries().deserialize(params)

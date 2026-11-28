@@ -1101,7 +1101,7 @@ class WpsRestApiJobsTest(JobUtils):
         """
         for query, reverse in [
             ({}, True), ({"sortby": "-created"}, True), ({"sortby": "created"}, True),
-            ({"sortby": "%2Bcreated"}, False), ({"sort": "created"}, True),
+            ({"sortby": "%2Bcreated"}, False),
         ]:
             path = get_path_kvp(sd.jobs_service.path, detail=True, **query)
             resp = self.app.get(path, headers=self.json_headers)
@@ -1109,13 +1109,6 @@ class WpsRestApiJobsTest(JobUtils):
             created = [job["created"] for job in resp.json["jobs"]]
             assert len(created) > 1
             assert created == sorted(created, reverse=reverse), query
-
-    @pytest.mark.ogc_records
-    def test_get_jobs_sortby_conflict(self):
-        path = get_path_kvp(sd.jobs_service.path, sort="created", sortby="-created")
-        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 400
-        assert resp.json["error"] == "ListingInvalidParameter"
 
     @pytest.mark.ogc_records
     def test_get_jobs_filter_cql2(self):

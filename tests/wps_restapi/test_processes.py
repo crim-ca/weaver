@@ -5856,7 +5856,6 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ("ascending", {"sortby": "+id"}, ["a", "b", "c"]),
         ("descending", {"sortby": "-id"}, ["c", "b", "a"]),
         ("multi", {"sortby": "+version,-id"}, ["c", "b", "a"]),
-        ("deprecated_sort", {"sort": "id"}, ["a", "b", "c"]),
     ])
     @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_order(self, _, query, expected):
@@ -5876,20 +5875,6 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         resp = self.app.get("/processes", params=query, headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert resp.json["processes"] == [f"test-search-order-{suffix}" for suffix in expected]
-
-    @parameterized.expand([
-        ({"sort": "id"},),
-    ])
-    @pytest.mark.ogc_records
-    def test_get_processes_filter_by_search_order_conflict(self, query):
-        # type: (JSON) -> None
-        """
-        Tests that conflicting sorting conventions are rejected explicitly.
-        """
-        query.update({"sortby": "-id"})
-        resp = self.app.get("/processes", params=query, headers=self.json_headers, expect_errors=True)
-        assert resp.status_code == 400
-        assert resp.json["error"] == "ListingInvalidParameter"
 
     @parameterized.expand([
         ("after", {"datetime": "2024-01-01T00:00:00Z/.."}, ["new", "mid"]),
@@ -6104,7 +6089,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "limit": 1,
                 "page": 0,
                 "detail": detail,
-                "sort": "id",
+                "sortby": "id",
             },
             headers=self.json_headers,
         )

@@ -18,10 +18,10 @@ from weaver.formats import ContentType, OutputFormat, clean_media_type_format, g
 from weaver.ogc_definitions import normalize as normalize_ogc_uri
 from weaver.store.base import StoreProcesses
 from weaver.typedefs import MetadataQueryScope, PreferHeaderHandling
-from weaver.utils import VersionFormat, get_header, get_path_kvp, get_settings, make_link_header
+from weaver.utils import VersionFormat, get_header, get_path_kvp, get_request_args, get_settings, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.queryables import get_queryables_params, resolve_queryables_params
+from weaver.wps_restapi.queryables import resolve_queryables_params
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
@@ -92,7 +92,7 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
             "value": list(paging_names.intersection(request.params))
         })
 
-    search_param = sd.ProcessSearchQuery(unknown="ignore").deserialize(get_queryables_params(request))
+    search_param = sd.ProcessSearchQuery(unknown="ignore").deserialize(get_request_args(request))
     if with_providers and search_param:
         raise HTTPBadRequest(json={
             "description": "Cannot combine process search parameters with providers full listing query.",
@@ -101,7 +101,7 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
         })
     metadata_filters = parse_metadata_query_filters(request)
     store = get_db(request).get_store(StoreProcesses)
-    search_param = resolve_queryables_params({**search_param, **{"sort": paging_param.pop("sort", None)}})
+    search_param = resolve_queryables_params(search_param)
     processes, total_local_processes = store.list_processes(
         visibility=Visibility.PUBLIC,
         total=True,

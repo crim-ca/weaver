@@ -33,7 +33,6 @@ List jobs with filtering, pagination, and sorting capabilities.
 - `limit` (integer): Maximum number of results (default: 10)
 - `page` (integer): Page number for pagination (default: 0)
 - `datetime` (string): Filter by job creation datetime or interval
-- `sort` (string): Deprecated alias of `sortby`. Cannot be combined with it
 - `sortby` (string or list): Signed (`+/-`) sorting fields, such as `["-created", "status"]`
 - `filter` (string or JSON object/array): CQL2 expression, with optional `filter-lang`
 - `filter-crs` (string): Coordinate reference system for spatial filter properties

@@ -28,7 +28,8 @@ Changes:
   (resolves `#644 <https://github.com/crim-ca/weaver/issues/644>`_).
 - Add exact and inclusive ``lower/upper`` version range filtering on ``GET /processes``
   (resolves `#627 <https://github.com/crim-ca/weaver/issues/627>`_).
-- Add ``sortby`` signed multi-field sorting on ``GET /processes`` and ``GET /jobs``, and deprecate ``sort``
+- Add ``sortby`` signed multi-field sorting on ``GET /processes`` and ``GET /jobs``, replacing the removed ``sort``
+  query parameter and its `CLI` ``--sort`` option
   (resolves `#643 <https://github.com/crim-ca/weaver/issues/643>`_).
 - Add ``created`` datetime to `Process` and ``datetime`` query parameter on ``GET /processes`` matching it
   (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).

@@ -726,6 +726,16 @@ class DateTimeInterval(ExtendedSchemaNode):
         r"$"
     )
 
+    @staticmethod
+    def preparer(value):
+        # type: (Any) -> Any
+        """
+        Restores the ``+`` timezone offsets that an unencoded query string decodes as a space.
+        """
+        if isinstance(value, str):
+            return re.sub(r" (\d\d:\d\d)(?=/|$)", r"+\1", value)
+        return value
+
 
 class S3BucketReference(ExtendedSchemaNode):
     schema_type = String
@@ -2524,20 +2534,6 @@ class JobTitle(ExtendedSchemaNode):
     schema_type = String
     description = "Title assigned to the job for user-readable identification."
     validator = Length(min=1)
-
-
-class JobSortEnum(ExtendedSchemaNode):
-    schema_type = String
-    title = "JobSortingMethod"
-    example = Sort.CREATED
-    validator = OneOf(SortMethods.JOB)
-
-
-class ProcessSortEnum(ExtendedSchemaNode):
-    schema_type = String
-    title = "ProcessSortMethod"
-    example = Sort.CREATED
-    validator = OneOf(SortMethods.PROCESS)
 
 
 class ProcessSortByEnum(ExtendedSchemaNode):
@@ -4562,14 +4558,10 @@ class ProcessListing(OneOfKeywordSchema):
 
 
 class ProcessCollection(ExtendedMappingSchema):
-    recordsArrayName = RecordsArrayName(validator=OneOf(["processes"]), default="processes")
     processes = ProcessListing()
 
 
 class ProcessPagingQuery(ExtendedMappingSchema):
-    sort = ProcessSortEnum(
-        missing=drop, deprecated=True, description="Deprecated. Use 'sortby' instead. Cannot be combined with it.",
-    )
     # if page is omitted but limit provided, use reasonable zero by default
     page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(allow_string=True), missing=None, default=None, validator=Range(min=1),
@@ -8117,15 +8109,12 @@ class GetJobsQueries(PagingQueries, FilterSchema):
     provider = AnyIdentifier(missing=drop, default=None, description="Identifier of service provider to filter search.")
     type = JobTypeEnum(missing=drop, default=null,
                        description="Filter jobs only to matching type (note: 'service' and 'provider' are aliases).")
-    sort = JobSortEnum(
-        missing=drop, deprecated=True, description="Deprecated. Use 'sortby' instead. Cannot be combined with it.",
-    )
     sortby = JobSortByEnum(
         missing=drop, example="-created,status",
         description=(
             "Comma-separated sorting fields, with '+' for ascending or '-' for descending. "
             "Fields without prefix use their default direction. "
-            "Cannot be combined with the deprecated 'sort'. URL-encode '+' as '%2B'."
+            "URL-encode '+' as '%2B'."
         ),
     )
     access = JobAccess(missing=drop, default=None)
@@ -8630,7 +8619,7 @@ class ProcessSearchQuery(FilterSchema):
         description=(
             "Comma-separated sorting fields, with '+' for ascending or '-' for descending. "
             "Fields without prefix use their default direction. "
-            "Cannot be combined with the deprecated 'sort'. URL-encode '+' as '%2B'."
+            "URL-encode '+' as '%2B'."
         ),
     )
     datetime = DateTimeInterval(
@@ -8751,6 +8740,7 @@ class ProcessListingMetadata(PagingBodySchema):
 
 
 class ProcessesListing(ProcessCollection, ProcessListingLinks):
+    recordsArrayName = RecordsArrayName(validator=OneOf(["processes"]), default="processes")
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/processList.yaml"
     _sort_first = PROCESSES_LISTING_FIELD_FIRST
     _sort_after = PROCESSES_LISTING_FIELD_AFTER

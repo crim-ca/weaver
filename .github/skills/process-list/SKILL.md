@@ -29,7 +29,6 @@ List all available processes with optional filtering and pagination.
 - `visibility` (string): Filter by visibility ("public", "private")
 - `limit` (integer): Maximum number of results
 - `page` (integer): Pagination offset
-- `sort` (string): Sort order for results
 - `detail` (boolean): Include detailed descriptions
 
 ## CLI Usage
@@ -68,7 +67,6 @@ weaver capabilities -u $WEAVER_URL \
 - `version` (string): Exact version or inclusive `lower/upper` interval. Use `..` for an open bound.
   Add `revisions=true` to search older revisions.
 - `sortby` (string or list of strings): Signed sorting fields, such as `+id,-version`.
-- `sort` (string): Deprecated alias of `sortby`. Cannot be combined with it.
 - `datetime` (string): Instant or interval matched against the process `created` time.
 - `type` (string): Comma-separated process types (case-insensitive) or Records resource type URIs.
 - `license` (string): URL or title of a `license` link or metadata.

@@ -595,7 +595,6 @@ The ``GET /processes`` listing supports the following search parameters for loca
   The same parameter is available on ``GET /jobs``.
 - ``sortby`` specifies comma-separated sorting fields, with ``+`` for ascending or ``-`` for descending.
   Fields without prefix use their default direction. For example, ``sortby=+id,-version``.
-  The deprecated ``sort`` is interpreted as ``sortby``, and both cannot be provided together.
 
 A process must match every supplied search parameter. Search filters are applied before pagination, and ``total`` counts
 all matching public processes. Search parameters can be combined with metadata filters, sorting, pagination and

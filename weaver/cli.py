@@ -52,7 +52,6 @@ from weaver.processes.convert import (
 from weaver.processes.utils import create_multipart_deploy, get_process_information
 from weaver.processes.wps_package import get_process_definition
 from weaver.provenance import ProvenanceFormat, ProvenancePathType
-from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
     Lazify,
@@ -1490,7 +1489,6 @@ class WeaverClient(object):
         request_timeout=None,   # type: Optional[int]
         request_retries=None,   # type: Optional[int]
         output_format=None,     # type: Optional[AnyOutputFormat]
-        sort=None,              # type: Optional[Sort]
         page=None,              # type: Optional[int]
         limit=None,             # type: Optional[int]
         detail=False,           # type: bool
@@ -1529,7 +1527,6 @@ class WeaverClient(object):
         :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
-        :param sort: Sorting field to list processes. Name must be one of the fields supported by process objects.
         :param page: Paging index to list processes.
         :param limit: Amount of processes to list per page.
         :param detail: Obtain detailed process descriptions.
@@ -1555,7 +1552,7 @@ class WeaverClient(object):
         # queries not supported by non-Weaver, but default values save extra work if possible
         params = {"detail": detail, "providers": with_providers}
         params.update({
-            name: param for name, param in [("sort", sort), ("page", page), ("limit", limit)] if param is not None
+            name: param for name, param in [("page", page), ("limit", limit)] if param is not None
         })
         params.update({
             name: param for name, param in [
@@ -2457,7 +2454,6 @@ class WeaverClient(object):
         request_timeout=None,   # type: Optional[int]
         request_retries=None,   # type: Optional[int]
         output_format=None,     # type: Optional[AnyOutputFormat]
-        sort=None,              # type: Optional[Sort]
         sortby=None,            # type: Optional[Union[str, Sequence[str]]]
         page=None,              # type: Optional[int]
         limit=None,             # type: Optional[int]
@@ -2490,7 +2486,6 @@ class WeaverClient(object):
         :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
-        :param sort: Deprecated sorting field. Use ``sortby`` instead.
         :param sortby: Comma-separated sorting fields with optional ascending or descending prefixes.
         :param page: Paging index to list jobs.
         :param limit: Amount of jobs to list per page.
@@ -2514,8 +2509,6 @@ class WeaverClient(object):
             query["page"] = page
         if isinstance(limit, int) and limit > 0:
             query["limit"] = limit
-        if sort is not None:
-            query["sort"] = sort
         sortby = self._join_query_values(sortby)
         if sortby is not None:
             query["sortby"] = sortby
@@ -3301,12 +3294,6 @@ def add_listing_options(parser, item):
         "-D", "--detail", dest="detail", action="store_true", default=False,
         help=f"Obtain detailed {item} descriptions instead of only their ID (default: %(default)s)."
     )
-    sort_methods = cast("List[SortMethods]", SortMethods.get(item))
-    if sort_methods:
-        parser.add_argument(
-            "-O", "--order", "--sort", dest="sort", choices=sort_methods, type=str.lower,
-            help=f"Sorting field to list {item}. Name must be one of the fields supported by {item} objects."
-        )
 
 
 def add_process_search_options(parser):

@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 import colander
 from pyramid.httpexceptions import HTTPBadRequest, HTTPUnprocessableEntity
 
-from weaver.utils import get_request_args
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import OAS3TypeConversionDispatcher
 from weaver.wps_restapi.filter import FilterLanguage
@@ -14,18 +13,7 @@ from weaver.wps_restapi.filter import FilterLanguage
 if TYPE_CHECKING:
     from typing import Any, Dict
 
-    from weaver.typedefs import AnyRequestType, JSON
-
-
-def get_queryables_params(request):
-    # type: (AnyRequestType) -> Dict[str, str]
-    """
-    Obtains the request queryable parameters with the ``datetime`` ``+`` offset restored from its decoded space.
-    """
-    params = dict(get_request_args(request))
-    if params.get("datetime", False):
-        params["datetime"] = params["datetime"].replace(" ", "+")
-    return params
+    from weaver.typedefs import JSON
 
 
 def resolve_queryables_params(params):
@@ -33,21 +21,11 @@ def resolve_queryables_params(params):
     """
     Converts validated queryable query parameters into the arguments supported by the listing search of the stores.
 
-    The deprecated ``sort`` is interpreted as ``sortby``. The ``datetime`` and ``filter`` expressions are parsed.
+    The ``datetime`` and ``filter`` expressions are parsed.
 
-    :raises HTTPBadRequest: If both ``sort`` and ``sortby`` are provided.
     :raises HTTPUnprocessableEntity: If the ``datetime`` interval is inverted.
     """
     params = dict(params)
-    if params.get("sort") and params.get("sortby"):
-        raise HTTPBadRequest(json={
-            "error": "ListingInvalidParameter",
-            "description": "Cannot combine 'sortby' with the deprecated 'sort'.",
-            "value": {"sort": params["sort"], "sortby": params["sortby"]},
-        })
-    sort = params.pop("sort", None)
-    if sort:
-        params["sortby"] = sort
 
     filter_expr = params.pop("filter", None)
     filter_lang = params.pop("filter-lang", None)
