@@ -16,7 +16,7 @@ class ProcessType(Constants):
     def uris(cls):
         # type: () -> Dict[str, List[str]]
         """
-        Mapping of informative `OGC API - Records` resource type URIs to the corresponding process types.
+        Mapping of informative :term:`OGC API - Records` resource type URIs to the corresponding process types.
         """
         return {
             "http://www.opengis.net/def/serviceType/ogc/wps": [cls.WPS_LOCAL, cls.WPS_REMOTE],

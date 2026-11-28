@@ -15,6 +15,7 @@ on `Weaver`'s `ReadTheDocs` page.
 # pylint: disable=C0103,invalid-name
 # pylint: disable=E0241,duplicate-bases
 
+import abc
 import datetime
 import inspect
 import json
@@ -266,20 +267,21 @@ OGC_API_PROC_PART5_EXC_UNSUPPORTED_METADATA_PROFILE_URI = (
     f"{OGC_API_PROC_PART5_EXC_BASE_URI}/unsupported-metadata-profile"
 )
 OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI = "https://www.opengis.net/def/profile"
-OGC_API_COMMON_PART1_BASE_URI = "http://www.opengis.net/spec/ogcapi-common-1/1.0"
-OGC_API_COMMON_PART2_BASE_URI = "http://www.opengis.net/spec/ogcapi-common-2/1.0"
-OGC_API_CQL2_BASE_URI = "http://www.opengis.net/spec/cql2/1.0"
-OGC_API_RECORDS_PART1_BASE_URI = "http://www.opengis.net/spec/ogcapi-records-1/1.0"
-OGC_API_PROC_PART1_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-1/1.0"  # core (v1.0)
-OGC_API_PROC_PART1_V2_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-1/2.0"  # core (v2.0)
-OGC_API_PROC_PART2_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-2/1.0"  # deploy, replace, undeploy
-OGC_API_PROC_PART3_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-3/0.0"  # workflows and chaining
-OGC_API_PROC_PART4_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-4/1.0"  # job management
-OGC_API_PROC_PART5_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"  # provenance
-OGC_API_PROC_PART6_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-6/1.0"  # versioning (proposal)
-OGC_API_PROC_EOAP_BP_BASE_URI = "http://www.opengis.net/spec/eoap-bp/1.0"
+OGC_SPEC_BASE_URI = "http://www.opengis.net/spec"
+OGC_API_COMMON_PART1_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-common-1/1.0"
+OGC_API_COMMON_PART2_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-common-2/1.0"
+OGC_API_CQL2_BASE_URI = f"{OGC_SPEC_BASE_URI}/cql2/1.0"
+OGC_API_RECORDS_PART1_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-records-1/1.0"
+OGC_API_PROC_PART1_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-1/1.0"  # core (v1.0)
+OGC_API_PROC_PART1_V2_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-1/2.0"  # core (v2.0)
+OGC_API_PROC_PART2_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-2/1.0"  # deploy, replace, undeploy
+OGC_API_PROC_PART3_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-3/0.0"  # workflows and chaining
+OGC_API_PROC_PART4_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-4/1.0"  # job management
+OGC_API_PROC_PART5_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-5/1.0"  # provenance
+OGC_API_PROC_PART6_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-6/1.0"  # versioning (proposal)
+OGC_API_PROC_EOAP_BP_BASE_URI = f"{OGC_SPEC_BASE_URI}/eoap-bp/1.0"
 OGC_WPS1_BASE_URI = "http://schemas.opengis.net/wps/1.0.0"
-OGC_WPS2_BASE_URI = "http://www.opengis.net/spec/WPS/2.0"
+OGC_WPS2_BASE_URI = f"{OGC_SPEC_BASE_URI}/WPS/2.0"
 
 OGC_API_REL_BASE_URI = "http://www.opengis.net/def/rel/ogc/1.0"
 OGC_API_REL_QUERYABLES_URI = f"{OGC_API_REL_BASE_URI}/queryables"
@@ -8638,13 +8640,20 @@ class SortablesResponseSchema(ExtendedMappingSchema):
     body = PermissiveMappingSchema(description="JSON Schema describing supported catalog sorting fields.")
 
 
-class ProcessSearchExpression(ExtendedSchemaNode):
+class ProcessSearchExpressionMeta(type(ExtendedSchemaNode), abc.ABCMeta):
+    """
+    Combines the schema node metaclass with abstract base class support.
+    """
+
+
+class ProcessSearchExpression(ExtendedSchemaNode, metaclass=ProcessSearchExpressionMeta):
     """
     Base of search expressions validated by their :meth:`parse` implementation.
     """
     schema_type = String
 
     @staticmethod
+    @abc.abstractmethod
     def parse(value):
         # type: (str) -> Any
         raise NotImplementedError

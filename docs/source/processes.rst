@@ -588,7 +588,7 @@ The ``GET /processes`` listing supports the following search parameters for loca
   Use ``revisions=true`` to include older revisions, optionally with ``process={processID}``.
 - ``datetime`` matches the process ``created`` time, as an instant or an interval such as ``2024-01-01T00:00:00Z/..``.
 - ``type`` matches comma-separated process types, case-insensitively, such as ``workflow``, ``application`` or ``wps``.
-  The `OGC API - Records` resource type URIs of `WPS` and `OGC API - Processes` are also accepted.
+  The :term:`OGC API - Records` resource type URIs of :term:`WPS` and :term:`OGC API - Processes` are also accepted.
 - ``license`` matches the ``href`` or ``title`` of a ``license`` link relation within ``metadata`` or ``links``.
 - ``filter`` applies a `CQL2` expression (``filter-lang`` defaults to ``cql2-text`` or ``cql2-json``) over the
   queryable properties of the listing, including temporal functions applied on ``created``.

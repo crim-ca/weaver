@@ -1,5 +1,6 @@
 """
-Resolution of OGC API - Records catalog parameters shared by listing, queryables and sortables of processes and jobs.
+Resolution of :term:`OGC API - Records` :term:`Catalog` parameters shared by listing, queryables and sortables
+of processes and jobs.
 """
 from typing import TYPE_CHECKING
 
@@ -71,7 +72,7 @@ def schema_response(body):
 def get_queryables_schema(request, schema):
     # type: (PyramidRequest, colander.SchemaNode) -> AnyViewResponse
     """
-    Describes supported catalog parameters using the same schema that validates listing requests.
+    Describes supported :term:`Catalog` parameters using the same schema that validates listing requests.
     """
     queryables = OAS3TypeConversionDispatcher()(schema)
     queryables["$id"] = request.path_url
@@ -81,7 +82,7 @@ def get_queryables_schema(request, schema):
 def get_sortables_schema(request, schema):
     # type: (PyramidRequest, sd.SortByArray) -> AnyViewResponse
     """
-    Describes supported catalog sorting fields using the enum values that validate the ``sortby`` parameter.
+    Describes supported :term:`Catalog` sorting fields using the enum values that validate the ``sortby`` parameter.
     """
     fields = sorted({field.lstrip("+-") for field in schema.children[0].validator.choices})
     properties = {}
@@ -100,7 +101,7 @@ def get_sortables_schema(request, schema):
 def get_catalog_links(request, rel, services):
     # type: (PyramidRequest, str, Dict[str, Service]) -> JSON
     """
-    Provides links to the queryables or sortables endpoint of each catalog, named by their respective key.
+    Provides links to the queryables or sortables endpoint of each :term:`Catalog`, named by their respective key.
     """
     base_url = get_wps_restapi_base_url(request)
     links = [{"href": request.path_url, "rel": "self", "type": ContentType.APP_JSON, "title": "Current endpoint."}]
