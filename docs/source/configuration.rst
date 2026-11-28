@@ -809,7 +809,7 @@ It should preferably be left enabled (or by omitting ``verify`` entirely) to ens
 Additional options provided by `Weaver` include retry counts (``retries``, ``retry`` or ``max_retries``), retry delays
 (``backoff`` or ``backoff_factor`` and ``intervals``), ``ssl_verify`` (legacy alias to ``verify``), and
 cache controls (see also :ref:`conf_caching`). The ``intervals`` list specifies the delay between individual
-attempts and takes precedence over the ``retry`` count and ``backoff_factor``. 
+attempts and takes precedence over the ``retry`` count and ``backoff_factor``.
 For retry behavior, ``backoff`` applies an increasing delay between attempts. ``intervals`` supplies explicit delays
 instead. When :func:`weaver.utils.request_extra` is called directly, its ``retry_after`` parameter honors a server's
 ``Retry-After`` response header for ``HTTP 429`` responses.
