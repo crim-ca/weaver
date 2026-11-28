@@ -62,6 +62,7 @@ from requests.structures import CaseInsensitiveDict
 from requests_file import FileAdapter
 from urlmatch import urlmatch
 from webob.headers import EnvironHeaders, ResponseHeaders
+from webob.multidict import MultiDict
 from werkzeug.utils import secure_filename
 from werkzeug.wrappers import Request as WerkzeugRequest
 from yaml.scanner import ScannerError
@@ -795,27 +796,18 @@ def get_request_args(request):
     Extracts the parsed query string arguments from the appropriate request object strategy.
 
     Depending on the request implementation, attribute ``query_string`` are expected as :class:`bytes` (:mod:`werkzeug`)
-    or :class:`str` (:mod:`pyramid`, :mod:`webob`). The ``query_string`` attribute is then used by ``args`` and
-    ``params`` for respective implementations, but assuming their string-like formats are respected.
+    or :class:`str` (:mod:`pyramid`, :mod:`webob`). The ``query_string`` is parsed directly to behave the same way
+    regardless of the implementation.
+
+    The ``+`` character is preserved literally, as defined by :rfc:`3986`. Only ``%20`` is interpreted as a space.
+    The conversion of ``+`` into a space applies to ``application/x-www-form-urlencoded`` form submissions,
+    not to the query component of a :term:`URL`.
 
     .. seealso::
         https://github.com/pallets/werkzeug/issues/2710
     """
-    try:
-        # cannot assume/check only by object type, since they are sometimes extended with both (see 'extend_instance')
-        # instead, rely on the expected 'query_string' type by each implementation
-        if isinstance(request.query_string, bytes) and hasattr(request, "args"):
-            return request.args
-        if isinstance(request.query_string, str) and hasattr(request, "params"):
-            return request.params
-    except (AttributeError, TypeError):  # pragma: no cover
-        LOGGER.warning(
-            "Could not resolve expected query string parameter parser in request of type: [%s]. Using default parsing.",
-            type(request)
-        )
-    # perform essentially what both implementations do
-    params = parse_qsl(bytes2str(request.query_string), keep_blank_values=True)
-    return dict(params)
+    query = bytes2str(request.query_string)
+    return MultiDict(parse_qsl(query.replace("+", "%2B"), keep_blank_values=True))
 
 
 def split_unquoted(text, sep, maxsplit=-1):

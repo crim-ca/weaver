@@ -32,7 +32,14 @@ from weaver.processes.execution import submit_job, submit_job_dispatch_wps, subm
 from weaver.processes.utils import deploy_process_from_payload, get_process, update_process_metadata
 from weaver.status import Status
 from weaver.store.base import StoreJobs, StoreProcesses
-from weaver.utils import clean_json_text_body, fully_qualified_name, get_any_id, get_header, make_link_header
+from weaver.utils import (
+    clean_json_text_body,
+    fully_qualified_name,
+    get_any_id,
+    get_header,
+    get_request_args,
+    make_link_header
+)
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import (
@@ -125,14 +132,14 @@ def get_processes(request):
     Optionally list both local and provider processes.
     """
     try:
-        params = sd.GetProcessesQuery().deserialize(request.params)
+        params = sd.GetProcessesQuery().deserialize(get_request_args(request))
     except colander.Invalid as ex:
         raise HTTPBadRequest(json={
             "code": "ProcessInvalidParameter",
             "description": "Process query parameters failed validation.",
             "error": colander.Invalid.__name__,
             "cause": str(ex),
-            "value": repr_json(ex.value or dict(request.params), force_string=False),
+            "value": repr_json(ex.value or dict(get_request_args(request)), force_string=False),
         })
 
     links = asbool(params.get("links", True))

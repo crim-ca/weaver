@@ -643,8 +643,8 @@ A :term:`Process` must match every supplied parameter, and ``total`` in the resp
 sorting, pagination and ``detail=false``. Terms are not regular expressions, and empty terms are invalid.
 
 .. note::
-    A ``+`` in a query string is interpreted as a space by most HTTP clients.
-    :term:`URL`-encode it as ``%2B`` to employ it as an operator.
+    A ``+`` in the query string is interpreted literally, as defined by :rfc:`3986`, and can be used directly
+    as an operator. A space must be encoded as ``%20``.
 
 .. note::
     These parameters cannot be combined with ``providers=true``, since remote :term:`Provider` listings

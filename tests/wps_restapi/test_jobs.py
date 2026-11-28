@@ -8,6 +8,7 @@ import logging
 import os
 import shutil
 import tempfile
+import urllib.parse
 import warnings
 from datetime import date
 from typing import TYPE_CHECKING, cast
@@ -4561,6 +4562,6 @@ def test_get_job_status_profile_valid(accept_profile, query_profile, expected_pr
     queries = {"profile": query_profile} if query_profile else {}
     headers = {"Accept": ContentType.APP_JSON}
     headers.update({"Accept-Profile": accept_profile} if accept_profile else {})
-    request = MockedRequest(params=queries, headers=headers)
+    request = MockedRequest(params=queries, query_string=urllib.parse.urlencode(queries), headers=headers)
     profile, _ = get_job_status_schema(request)
     assert profile == expected_profile

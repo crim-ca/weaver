@@ -96,7 +96,7 @@ from weaver.wps_restapi.processes.utils import (
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Generator, List, Optional, Tuple, TypeAlias, Union
+    from typing import Any, Dict, Generator, List, Optional, Tuple, TypeAlias, Union
     from typing_extensions import Literal
 
     import _pytest  # noqa: W0212
@@ -185,6 +185,14 @@ def fixture_cwl_no_warn_unknown_hint(
 
 # pylint: disable=C0103,invalid-name
 @pytest.mark.functional
+def encode_query(params):
+    # type: (Dict[str, Any]) -> str
+    """
+    Encodes query parameters using percent-encoding only (space as ``%20``) since ``+`` is interpreted literally.
+    """
+    return urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
+
+
 class WpsRestApiProcessesTest(WpsConfigBase):
     remote_server = None    # type: str
     settings = {
@@ -5813,7 +5821,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             title="Regional Subset", abstract="Extracts a region", keywords=["climate", "netcdf"],
         ))
         query.update({"links": "false"})
-        resp = self.app.get("/processes", params=query, headers=self.json_headers)
+        resp = self.app.get("/processes", params=encode_query(query), headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert (p_id in [proc["id"] for proc in resp.json["processes"]]) is match
 
@@ -5858,11 +5866,11 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 id=f"test-search-terms-{suffix}", package={}, visibility=Visibility.PUBLIC,
                 title=title, keywords=["search-terms-fixture"] + keywords,
             ))
-        resp = self.app.get("/processes", params={
+        resp = self.app.get("/processes", params=encode_query({
             field: value,
             "keywords": "search-terms-fixture",
             "detail": "false",
-        }, headers=self.json_headers)
+        }), headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert set(resp.json["processes"]) == {f"test-search-terms-{suffix}" for suffix in expected}
         assert resp.json["total"] == len(expected)
@@ -5909,7 +5917,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         """
         Tests that malformed search expressions are rejected rather than broadening the search.
         """
-        resp = self.app.get("/processes", params={field: value}, headers=self.json_headers, expect_errors=True)
+        resp = self.app.get("/processes", params=encode_query({field: value}), headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400, resp.text
         assert resp.json["code"] == "ProcessInvalidParameter"
 
@@ -5933,7 +5941,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "keywords": "search-order",
             "detail": "false",
         })
-        resp = self.app.get("/processes", params=query, headers=self.json_headers)
+        resp = self.app.get("/processes", params=encode_query(query), headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert resp.json["processes"] == [f"test-search-order-{suffix}" for suffix in expected]
 
@@ -5961,9 +5969,25 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "detail": "false",
             "sortby": "-id",
         })
-        resp = self.app.get("/processes", params=query, headers=self.json_headers)
+        resp = self.app.get("/processes", params=encode_query(query), headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert resp.json["processes"] == [f"test-datetime-{suffix}" for suffix in sorted(expected, reverse=True)]
+
+    @pytest.mark.ogc_records
+    def test_get_processes_query_plus_literal(self):
+        """
+        Tests that a ``+`` in an unencoded query string is interpreted literally and not as a space.
+        """
+        for suffix, version in [("a", "2.0.0"), ("b", "1.0.0")]:
+            self.process_store.save_process(Process(
+                id=f"test-plus-{suffix}", package={}, visibility=Visibility.PUBLIC,
+                version=version, keywords=["plus-literal"],
+                created=datetime.datetime.fromisoformat("2024-06-01T00:00:00+00:00"),
+            ))
+        path = "/processes?keywords=plus-literal&detail=false&sortby=+version&datetime=2024-06-01T01:00:00+01:00"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json["processes"] == ["test-plus-b", "test-plus-a"]
 
     @pytest.mark.ogc_records
     def test_get_processes_created_default(self):
@@ -6071,7 +6095,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             "detail": "false",
             "sortby": "id",
         })
-        resp = self.app.get("/processes", params=query, headers=self.json_headers)
+        resp = self.app.get("/processes", params=encode_query(query), headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert resp.json["processes"] == [f"test-filter-{suffix}" for suffix in expected]
 
@@ -6083,7 +6107,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
     @pytest.mark.ogc_records
     def test_get_processes_filter_cql2_invalid(self, query):
         # type: (JSON) -> None
-        resp = self.app.get("/processes", params=query, headers=self.json_headers, expect_errors=True)
+        resp = self.app.get("/processes", params=encode_query(query), headers=self.json_headers, expect_errors=True)
         assert resp.status_code in [400, 422], resp.text
 
     @pytest.mark.ogc_records
@@ -6144,7 +6168,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             ))
         resp = self.app.get(
             "/processes",
-            params={
+            params=encode_query({
                 "q": "search + subset & netcdf|grib",
                 "query": "+climate -grass",
                 f"metadata[process][{role}]": profile,
@@ -6152,7 +6176,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "page": 0,
                 "detail": detail,
                 "sortby": "id",
-            },
+            }),
             headers=self.json_headers,
         )
         assert resp.status_code == 200, resp.text
@@ -6189,7 +6213,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         )
         if fields:
             self.process_store.collection.update_one({"identifier": p_id}, {"$set": fields})
-        resp = self.app.get("/processes", params=query, headers=self.json_headers)
+        resp = self.app.get("/processes", params=encode_query(query), headers=self.json_headers)
         assert resp.status_code == 200, resp.text
         assert (p_id in [proc["id"] for proc in resp.json["processes"]]) is match
 
