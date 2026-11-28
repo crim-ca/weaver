@@ -12,6 +12,19 @@ Changes
 
 Changes:
 --------
+- No change.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.19.0:
+
+`6.19.0 <https://github.com/crim-ca/weaver/tree/6.19.0>`_ (2026-11-28)
+====================================================================================================================
+
+Changes:
+--------
 - Use ``gunicorn[fast]`` to leverage the faster HTTP C parser instead of Python native implementation.
 - Add support for multiple `Process` description parts in multipart deployment, allowing the main `Workflow` and each
   sub-`CWL` to define their own description. Descriptions are linked to their `CWL` part by matching ``id`` fields
