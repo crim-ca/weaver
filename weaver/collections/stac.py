@@ -36,7 +36,7 @@ from pyramid.settings import asbool
 from rasterio.warp import transform_bounds
 
 from weaver import ogc_definitions as ogc_def
-from weaver.__meta__ import __source_repository__, __title__, __version__
+from weaver.__meta__ import __name__ as weaver_name, __source_repository__, __title__, __version__
 from weaver.collections.utils import collection_api_url, collection_enabled
 from weaver.execute import ExecuteCollectionFormat
 from weaver.formats import ContentType, clean_media_type_format, get_content_type
@@ -169,7 +169,7 @@ def get_software_versions(docker_image=None):
     """
     Obtains the name and version of software involved in the production of the :term:`Job` results.
     """
-    software = {__title__.lower(): __version__}
+    software = {weaver_name: __version__}
     try:
         software["cwltool"] = importlib_metadata.version("cwltool")
     except importlib_metadata.PackageNotFoundError:  # pragma: no cover
