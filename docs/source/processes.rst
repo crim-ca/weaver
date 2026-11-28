@@ -620,8 +620,10 @@ definitions. The same :term:`OGC API - Records` search capabilities are availabl
       - | ``type=workflow,application``
         | ``type=wps``
     * - ``license``
-      - Matches the ``href`` or ``title`` of a link with the ``license`` relation (``rel``) provided in the
-        :term:`Process` ``metadata`` or ``links`` fields.
+      - Matches a license reference of the :term:`Process`, provided as either of the following.
+        The ``links`` field can contain an entry with ``rel`` set to ``license``.
+        The ``metadata`` field can contain an entry with ``role`` set to ``license``.
+        In both cases, the ``href`` or ``title`` of that entry must match the ``license`` query parameter.
       - | ``license=apache``
     * - ``filter``, ``filter-lang``, ``filter-crs``
       - Applies a `CQL2` expression over the queryable fields (see the ``/queryables/processes`` endpoint below).
