@@ -137,7 +137,8 @@ def get_processes(request):
                 f"Manual cleanup of following processes is required: {invalid_processes}"
             )
 
-        body = {"processes": processes if detail else [get_any_id(p) for p in processes]}  # type: JSON
+        listing = processes if detail else [get_any_id(p) for p in processes]
+        body = {"recordsArrayName": "processes", "processes": listing}  # type: JSON
         if not with_providers:
             paging = {  # remove other params
                 "page": paging.get("page"),

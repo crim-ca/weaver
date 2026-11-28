@@ -377,6 +377,13 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
         assert sd.OGC_API_PROC_PROFILE_PROC_LIST_URI in profile[0]
 
+    @pytest.mark.ogc_records
+    def test_get_processes_records_array_name(self):
+        resp = self.app.get("/processes", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["recordsArrayName"] == "processes"
+        assert "processes" in resp.json
+
     def test_get_processes_with_paging(self):
         test_prefix = "test-proc-temp"
         for i in range(10):

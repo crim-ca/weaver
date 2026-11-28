@@ -121,6 +121,30 @@ class GenericApiRoutesTestCase(WpsConfigBase):
         for name in ["sorting", "filtering", "cql-filter"]:
             assert f"{records}/conf/{name}" in resp.json["conformsTo"]
 
+    @pytest.mark.ogc_records
+    def test_conformance_records_local_resources_catalog(self):
+        resp = self.app.get("/conformance", headers=self.json_headers)
+        records = "http://www.opengis.net/spec/ogcapi-records-1/1.0"
+        cql2 = "http://www.opengis.net/spec/cql2/1.0"
+        expected = [f"{records}/conf/{name}" for name in [
+            "autodiscovery",
+            "local-resources-catalog",
+            "local-resources-catalog-query-parameters",
+            "local-resources-catalog-sorting",
+            "local-resources-catalog-filtering",
+        ]]
+        expected += [f"{cql2}/conf/{name}" for name in ["basic-cql2", "cql2-json", "cql2-text"]]
+        expected.append("http://www.opengis.net/spec/ogcapi-common-2/1.0/conf/simple-query")
+        for conf in expected:
+            assert conf in resp.json["conformsTo"]
+
+    @pytest.mark.ogc_records
+    def test_landing_page_catalog_links(self):
+        resp = self.app.get("/", headers=self.json_headers)
+        catalogs = [link["href"] for link in resp.json["links"] if link["rel"] == sd.OGC_API_REL_CATALOG_URI]
+        assert any(href.endswith("/processes") for href in catalogs)
+        assert any(href.endswith("/jobs") for href in catalogs)
+
     def test_conformance_html(self):
         resp = self.app.get("/conformance", headers=self.json_headers)
         assert resp.status_code == 200

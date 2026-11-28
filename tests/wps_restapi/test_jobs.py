@@ -329,6 +329,13 @@ class WpsRestApiJobsTest(JobUtils):
             for link in landing.json["links"]
         )
 
+    @pytest.mark.ogc_records
+    def test_get_jobs_records_array_name(self):
+        resp = self.app.get(sd.jobs_service.path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["recordsArrayName"] == "jobs"
+        assert "jobs" in resp.json
+
     def test_get_jobs_normal_paged(self):
         resp = self.app.get(sd.jobs_service.path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)

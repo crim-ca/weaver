@@ -102,6 +102,8 @@ def get_conformance(category, settings):
     ogcapi_proc_part5 = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"  # provenance
     ogcapi_proc_part6 = "http://www.opengis.net/spec/ogcapi-processes-6/1.0"  # versioning (proposal, not yet defined)
     ogcapi_proc_apppkg = "http://www.opengis.net/spec/eoap-bp/1.0"
+    ogcapi_common2 = "http://www.opengis.net/spec/ogcapi-common-2/1.0"
+    ogcapi_cql2 = "http://www.opengis.net/spec/cql2/1.0"
     ogcapi_records = "http://www.opengis.net/spec/ogcapi-records-1/1.0"  # discovery of processes and jobs
     # FIXME: https://github.com/crim-ca/weaver/issues/412
     # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
@@ -179,7 +181,7 @@ def get_conformance(category, settings):
         f"{ogcapi_common}/req/json/definition",
         f"{ogcapi_common}/req/landing-page",
         f"{ogcapi_common}/req/oas30",  # OpenAPI 3.0
-        # ogcapi_common + "/req/simple-query",
+        f"{ogcapi_common2}/conf/simple-query",
         # ogcapi_common + "/req/umd-collection",
         f"{ogcapi_records}/conf/sorting",
         f"{ogcapi_records}/req/sorting",
@@ -187,6 +189,19 @@ def get_conformance(category, settings):
         f"{ogcapi_records}/req/filtering",
         f"{ogcapi_records}/conf/cql-filter",
         f"{ogcapi_records}/req/cql-filter",
+        f"{ogcapi_records}/conf/autodiscovery",
+        f"{ogcapi_records}/req/autodiscovery",
+        f"{ogcapi_records}/conf/local-resources-catalog",
+        f"{ogcapi_records}/req/local-resources-catalog",
+        f"{ogcapi_records}/conf/local-resources-catalog-query-parameters",
+        f"{ogcapi_records}/req/local-resources-catalog/query-parameters",
+        f"{ogcapi_records}/conf/local-resources-catalog-sorting",
+        f"{ogcapi_records}/req/local-resources-catalog/sorting",
+        f"{ogcapi_records}/conf/local-resources-catalog-filtering",
+        f"{ogcapi_records}/req/local-resources-catalog/filtering",
+        f"{ogcapi_cql2}/conf/basic-cql2",
+        f"{ogcapi_cql2}/conf/cql2-json",
+        f"{ogcapi_cql2}/conf/cql2-text",
         f"{ogcapi_proc_core2}/conf/core",
         f"{ogcapi_proc_core1}/conf/core",
         f"{ogcapi_proc_core1}/conf/core/api-definition-op",
@@ -841,6 +856,9 @@ def api_frontpage_body(settings):
             {"href": f"{weaver_url}{sd.processes_queryables_service.path}",
              "rel": sd.OGC_API_REL_QUERYABLES_URI, "type": ContentType.APP_JSON,
              "title": "Supported process queryables."},
+            {"href": weaver_process_url,
+             "rel": sd.OGC_API_REL_CATALOG_URI, "type": ContentType.APP_JSON,
+             "title": "Local resources catalog of processes offered by this service."},
             {"href": f"{weaver_url}{sd.jobs_queryables_service.path}",
              "rel": sd.OGC_API_REL_QUERYABLES_URI, "type": ContentType.APP_JSON,
              "title": "Supported job queryables."},
@@ -850,6 +868,9 @@ def api_frontpage_body(settings):
             {"href": weaver_jobs_url,
              "rel": sd.OGC_API_PROC_REL_JOB_LIST_URI, "type": ContentType.APP_JSON,
              "title": "Job search and listing endpoint of executions registered under this service."},
+            {"href": weaver_jobs_url,
+             "rel": sd.OGC_API_REL_CATALOG_URI, "type": ContentType.APP_JSON,
+             "title": "Local resources catalog of jobs registered under this service."},
             {"href": sd.CWL_BASE_URL,
              "rel": "cwl-home", "type": ContentType.TEXT_HTML,
              "title": "Common Workflow Language (CWL) homepage."},

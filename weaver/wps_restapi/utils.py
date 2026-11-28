@@ -8,12 +8,11 @@ from typing import TYPE_CHECKING
 import colander
 from box import Box
 from pyramid.events import BeforeRender, subscriber
-from pyramid.httpexceptions import HTTPBadRequest, HTTPSuccessful, HTTPUnprocessableEntity, status_map
+from pyramid.httpexceptions import HTTPBadRequest, HTTPSuccessful, status_map
 
 from weaver import __meta__
-from weaver.utils import get_header, get_request_args, get_settings, get_weaver_url
+from weaver.utils import get_header, get_settings, get_weaver_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.filter import FilterLanguage
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional

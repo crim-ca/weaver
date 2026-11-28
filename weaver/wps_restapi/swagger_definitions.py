@@ -32,6 +32,7 @@ import yaml
 from babel.numbers import list_currencies
 from colander import All, DateTime, Email as EmailRegex, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
+from lark.exceptions import LarkError
 from pygeofilter.backends.cql2_json import to_cql2
 from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, fes, jfe
 
@@ -272,6 +273,7 @@ OGC_API_PROC_REL_EXCEPTIONS_URI = f"{OGC_API_PROC_REL_BASE_URI}/exceptions"
 OGC_API_PROC_REL_EXECUTE_URI = f"{OGC_API_PROC_REL_BASE_URI}/execute"
 OGC_API_PROC_REL_PROCESSES_URI = f"{OGC_API_PROC_REL_BASE_URI}/processes"
 OGC_API_REL_QUERYABLES_URI = "http://www.opengis.net/def/rel/ogc/1.0/queryables"
+OGC_API_REL_CATALOG_URI = "http://www.opengis.net/def/rel/ogc/1.0/ogc-catalog"
 OGC_API_PROC_REL_PROCESS_DESC_URI = f"{OGC_API_PROC_REL_BASE_URI}/process-desc"
 OGC_API_PROC_REL_JOB_RESULTS_URI = f"{OGC_API_PROC_REL_BASE_URI}/results"
 OGC_API_PROC_REL_JOB_LIST_URI = f"{OGC_API_PROC_REL_BASE_URI}/job-list"
@@ -335,7 +337,7 @@ PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA = ["links"]
 PROCESS_IO_FIELD_FIRST = ["id", "title", "description", "minOccurs", "maxOccurs"]
 PROCESS_IO_FIELD_AFTER = ["literalDataDomains", "formats", "crs", "bbox"]
 
-PROCESSES_LISTING_FIELD_FIRST = ["description", "processes", "providers"]
+PROCESSES_LISTING_FIELD_FIRST = ["description", "recordsArrayName", "processes", "providers"]
 PROCESSES_LISTING_FIELD_AFTER = ["page", "limit", "count", "total", "links"]
 
 PROVIDER_DESCRIPTION_FIELD_FIRST = [
@@ -380,7 +382,7 @@ JOB_STATUS_FIELD_AFTER = [
     "links",
 ]
 
-JOBS_LISTING_FIELD_FIRST = ["description", "jobs", "groups"]
+JOBS_LISTING_FIELD_FIRST = ["description", "recordsArrayName", "jobs", "groups"]
 JOBS_LISTING_FIELD_AFTER = ["page", "limit", "count", "total", "links"]
 
 QUOTES_LISTING_FIELD_FIRST = ["description", "quotations"]
@@ -1872,7 +1874,7 @@ class FilterSchema(ExtendedMappingSchema):
         # type: (Union[JSON, str], str) -> FilterAstType
         try:
             return self.parse(filter_expr, filter_lang)
-        except (TypeError, ValueError) as exc:
+        except (LarkError, TypeError, ValueError) as exc:
             raise colander.Invalid(
                 node=self,
                 msg="Invalid filter expression could not be parsed against specified language.",
@@ -4535,6 +4537,12 @@ class ProcessSummary(
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
 
+class RecordsArrayName(ExtendedSchemaNode):
+    schema_type = String
+    missing = drop
+    description = "Name of the array property that contains the records of this local resources catalog."
+
+
 class ProcessSummaryList(ExtendedSequenceSchema):
     summary = ProcessSummary()
 
@@ -4554,6 +4562,7 @@ class ProcessListing(OneOfKeywordSchema):
 
 
 class ProcessCollection(ExtendedMappingSchema):
+    recordsArrayName = RecordsArrayName(validator=OneOf(["processes"]), default="processes")
     processes = ProcessListing()
 
 
@@ -4796,6 +4805,7 @@ class PagingBodySchema(ExtendedMappingSchema):
 
 class GetPagingJobsSchema(PagingBodySchema):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/jobList.yaml"  # technically, no 'links' yet, but added after by oneOf
+    recordsArrayName = RecordsArrayName(validator=OneOf(["jobs"]), default="jobs")
     jobs = JobCollection()
 
 
