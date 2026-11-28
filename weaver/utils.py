@@ -1661,6 +1661,23 @@ def get_href_headers(
     return headers
 
 
+def make_link_json(href, rel, title=None, media_type=None, **kwargs):
+    # type: (str, str, Optional[str], Optional[str], **Any) -> Link
+    """
+    Creates a :term:`JSON` link representation with optional metadata and extension fields.
+
+    .. seealso::
+        :func:`make_link_header` for the HTTP ``Link`` header representation.
+    """
+    link = {"href": href, "rel": rel}  # type: Link
+    if media_type:
+        link["type"] = media_type
+    if title:
+        link["title"] = title
+    link.update(kwargs)  # type: ignore
+    return link
+
+
 def make_link_header(
     href,           # type: Union[str, Link]
     hreflang=None,  # type: Optional[str]

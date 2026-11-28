@@ -53,6 +53,7 @@ from weaver.utils import (
     load_file,
     localize_datetime,
     make_dirs,
+    make_link_json,
     now,
     request_extra
 )
@@ -215,17 +216,6 @@ def get_package_source_urls(package):
             if isinstance(url, str) and url and url not in urls:
                 urls.append(url)
     return urls
-
-
-def make_link(href, rel, title=None, media_type=None, **kwargs):
-    # type: (URL, str, Optional[str], Optional[str], **Any) -> Link
-    link = {"href": href, "rel": rel}  # type: Link
-    if media_type:
-        link["type"] = media_type
-    if title:
-        link["title"] = title
-    link.update(kwargs)  # type: ignore
-    return link
 
 
 def is_wgs84(crs):
@@ -790,41 +780,42 @@ class JobCollection(object):
         """
         job_url = self.job_url
         links = [
-            make_link(job_url, "processing-execution", "Job status.", ContentType.APP_JSON),
-            make_link(f"{job_url}/results", sd.OGC_API_PROC_REL_JOB_RESULTS_URI,
-                      "Job results.", ContentType.APP_JSON, profile=sd.OGC_API_PROC_PROFILE_RESULTS_URI),
-            make_link(f"{job_url}/outputs", "outputs", "Job outputs with extended metadata.", ContentType.APP_JSON),
-            make_link(f"{job_url}/definition", "definition",
-                      "Job definition with the submitted inputs and outputs.", ContentType.APP_JSON),
-            make_link(f"{job_url}/logs", sd.OGC_API_PROC_REL_JOB_LOG_URI,
-                      "Job execution logs.", ContentType.APP_JSON),
-            make_link(self.process_url, "processing-expression", "Process description that produced the results.",
-                      ContentType.APP_JSON, profile=sd.OGC_API_PROC_PROFILE_PROC_DESC_URI),
-            make_link(f"{job_url}/inputs", "application-input", "Job inputs submitted to the process.",
-                      ContentType.APP_JSON),
-            make_link(self.weaver_url or self.out_url, "application-platform",
-                      "Server that executed the process.", ContentType.APP_JSON, **{"vcs:tag": __version__}),
-            make_link(__source_repository__, "processing-software", "Source code of the server application.",
-                      **{"vcs:type": "git", "vcs:tag": __version__}),
+            make_link_json(job_url, "processing-execution", "Job status.", ContentType.APP_JSON),
+            make_link_json(f"{job_url}/results", sd.OGC_API_PROC_REL_JOB_RESULTS_URI,
+                           "Job results.", ContentType.APP_JSON, profile=sd.OGC_API_PROC_PROFILE_RESULTS_URI),
+            make_link_json(f"{job_url}/outputs", "outputs",
+                           "Job outputs with extended metadata.", ContentType.APP_JSON),
+            make_link_json(f"{job_url}/definition", "definition",
+                           "Job definition with the submitted inputs and outputs.", ContentType.APP_JSON),
+            make_link_json(f"{job_url}/logs", sd.OGC_API_PROC_REL_JOB_LOG_URI,
+                           "Job execution logs.", ContentType.APP_JSON),
+            make_link_json(self.process_url, "processing-expression", "Process description that produced the results.",
+                           ContentType.APP_JSON, profile=sd.OGC_API_PROC_PROFILE_PROC_DESC_URI),
+            make_link_json(f"{job_url}/inputs", "application-input", "Job inputs submitted to the process.",
+                           ContentType.APP_JSON),
+            make_link_json(self.weaver_url or self.out_url, "application-platform",
+                           "Server that executed the process.", ContentType.APP_JSON, **{"vcs:tag": __version__}),
+            make_link_json(__source_repository__, "processing-software", "Source code of the server application.",
+                           **{"vcs:type": "git", "vcs:tag": __version__}),
         ]
         if isinstance(self.package, dict):
             package_url = f"{self.process_url}/package"
             links.extend([
-                make_link(package_url, "application", "Application Package (CWL) of the process.",
-                          ContentType.APP_JSON, **self.make_application_properties()),
+                make_link_json(package_url, "application", "Application Package (CWL) of the process.",
+                               ContentType.APP_JSON, **self.make_application_properties()),
             ])
         if self.prov_enabled:
             links.extend(
-                make_link(get_path_kvp(f"{job_url}/prov", f=fmt), PROV_REL, "Job provenance.",
-                          ProvenanceFormat.as_media_type(fmt))
+                make_link_json(get_path_kvp(f"{job_url}/prov", f=fmt), PROV_REL, "Job provenance.",
+                               ProvenanceFormat.as_media_type(fmt))
                 for fmt in ProvenanceFormat.formats()
             )
         for src_url in get_package_source_urls(self.package):
-            links.append(make_link(src_url, "vcs", "Source code repository of the application package."))
+            links.append(make_link_json(src_url, "vcs", "Source code repository of the application package."))
         for in_id, in_val in self.input_values:
             href = get_any_value(in_val, data=False, file=True) if isinstance(in_val, dict) else None
             if isinstance(href, str) and href:
-                link = make_link(href, "derived_from", f"Job input [{in_id}].", id=str(in_id))
+                link = make_link_json(href, "derived_from", f"Job input [{in_id}].", id=str(in_id))
                 if isinstance(in_val, dict):
                     media_type = self.get_media_type(in_val)
                     if media_type:
@@ -1070,13 +1061,13 @@ class JobCollection(object):
 
         item_url = self.item_url(item_id)
         links = [
-            make_link(item_url, "self", f"Result Item [{item_id}].", ContentType.APP_GEOJSON),
-            make_link(self.collection_url, "root", "Job results collection.", ContentType.APP_JSON),
-            make_link(self.collection_url, "parent", "Job results collection.", ContentType.APP_JSON),
-            make_link(self.collection_url, "collection", "Job results collection.", ContentType.APP_JSON),
+            make_link_json(item_url, "self", f"Result Item [{item_id}].", ContentType.APP_GEOJSON),
+            make_link_json(self.collection_url, "root", "Job results collection.", ContentType.APP_JSON),
+            make_link_json(self.collection_url, "parent", "Job results collection.", ContentType.APP_JSON),
+            make_link_json(self.collection_url, "collection", "Job results collection.", ContentType.APP_JSON),
         ]
         links.extend(
-            make_link(
+            make_link_json(
                 f"{self.job_url}/results/{quote(output_id, safe='')}", "alternate",
                 f"Job result of output [{output_id}].", ContentType.APP_JSON
             )
@@ -1130,10 +1121,10 @@ class JobCollection(object):
             "numberMatched": len(items),
             "numberReturned": len(items),
             "links": [
-                make_link(items_url, "self", "Job results items.", ContentType.APP_GEOJSON),
-                make_link(self.collection_url, "root", "Job results collection.", ContentType.APP_JSON),
-                make_link(self.collection_url, "parent", "Job results collection.", ContentType.APP_JSON),
-                make_link(self.collection_url, "collection", "Job results collection.", ContentType.APP_JSON),
+                make_link_json(items_url, "self", "Job results items.", ContentType.APP_GEOJSON),
+                make_link_json(self.collection_url, "root", "Job results collection.", ContentType.APP_JSON),
+                make_link_json(self.collection_url, "parent", "Job results collection.", ContentType.APP_JSON),
+                make_link_json(self.collection_url, "collection", "Job results collection.", ContentType.APP_JSON),
             ],
         }
 
@@ -1163,16 +1154,16 @@ class JobCollection(object):
             extensions.append(STAC_EXT_FILE)
 
         links = [
-            make_link(self.collection_url, "self", "Job results collection.", ContentType.APP_JSON),
-            make_link(self.collection_url, "root", "Job results collection.", ContentType.APP_JSON),
+            make_link_json(self.collection_url, "self", "Job results collection.", ContentType.APP_JSON),
+            make_link_json(self.collection_url, "root", "Job results collection.", ContentType.APP_JSON),
         ]
         links.append(
-            make_link(self.job.collection_url(self.settings, STAC_ITEMS_FILE), "items", "Job results items.",
-                      ContentType.APP_GEOJSON)
+            make_link_json(self.job.collection_url(self.settings, STAC_ITEMS_FILE), "items", "Job results items.",
+                           ContentType.APP_GEOJSON)
         )
         links.extend(
-            make_link(self.item_url(item_id), "item", f"Result Item [{item_id}].",
-                      ContentType.APP_GEOJSON, id=item_id)
+            make_link_json(self.item_url(item_id), "item", f"Result Item [{item_id}].",
+                           ContentType.APP_GEOJSON, id=item_id)
             for item_id in items
         )
         links.extend(self.make_reference_links())
