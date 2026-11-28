@@ -66,7 +66,7 @@ jsonschema>=4.26.0
 # - https://github.com/celery/celery/pull/7834
 kombu>=5.7.0,<6
 # FIXME: https://github.com/lark-parser/lark/issues/1565
-lark==1.2.2
+lark==1.3.1
 lxml
 mako
 # multiformats for digestMultibase (W3C VC Data Integrity)
