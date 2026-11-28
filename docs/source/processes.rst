@@ -605,10 +605,11 @@ definitions. The same :term:`OGC API - Records` search capabilities are availabl
         | ``version=1.2.0/1.10.0``
         | ``version=1.0.0/..``
     * - ``revisions``, ``process``
-      - Only the latest revision of each :term:`Process` is searched by default.
-        Use the ``revisions=true`` query parameter to include older revisions, optionally restricted to
-        a single :term:`Process` using the ``process={processID}`` query parameter.
-      - | ``revisions=true&version=1.0.0/..``
+      - Only the latest revision of each :term:`Process` is listed by default.
+        Use the ``revisions=true`` query parameter to list all revisions instead. It is typically combined with
+        the ``process={processID}`` query parameter to obtain every revision of a single :term:`Process`.
+      - | ``revisions=true&process=my-process``
+        | ``revisions=true`` (all processes)
     * - ``datetime``
       - Matches the :term:`Process` ``created`` field, using an instant or an interval.
       - | ``datetime=2024-01-01T00:00:00Z/..``
