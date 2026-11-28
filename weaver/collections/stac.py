@@ -72,7 +72,10 @@ STAC_VERSION = "1.1.0"
 STAC_SCHEMAS_URL = f"https://schemas.stacspec.org/v{STAC_VERSION}"
 STAC_COLLECTION_SCHEMA_URL = f"{STAC_SCHEMAS_URL}/collection-spec/json-schema/collection.json"
 STAC_ITEM_SCHEMA_URL = f"{STAC_SCHEMAS_URL}/item-spec/json-schema/item.json"
-STAC_COLLECTION_PROFILES = ["stac", ExecuteCollectionFormat.STAC, STAC_COLLECTION_SCHEMA_URL]
+STAC_COLLECTION_PROFILES = [
+    "stac", ExecuteCollectionFormat.STAC, STAC_COLLECTION_SCHEMA_URL,
+    ogc_def.normalize(sd.OGC_API_PROC_FORMAT_STAC_URI, version="0"),
+]
 STAC_API_DATA_ACCESS = [
     "https://api.stacspec.org/v1.0.0/collections",
     "https://api.stacspec.org/v1.0.0/ogcapi-features",

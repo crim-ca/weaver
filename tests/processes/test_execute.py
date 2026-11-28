@@ -27,7 +27,7 @@ from weaver.processes.execution import (
     submit_job_from_kvp,
     validate_job_accept_profile
 )
-from weaver.wps_restapi.swagger_definitions import OGC_API_PROC_BBOX_CRS
+from weaver.wps_restapi.swagger_definitions import OGC_API_PROC_BBOX_CRS, OGC_API_PROC_FORMAT_STAC_URI
 
 if TYPE_CHECKING:
     from weaver.processes.convert import OWS_Input_Type
@@ -1331,14 +1331,15 @@ def test_kvp_format_precedence(f_param, format_param, expected_accept):
 
 
 @pytest.mark.collection
-def test_kvp_response_collection_with_profile_in_submission():
+@pytest.mark.parametrize(["profile"], [["stac"], [OGC_API_PROC_FORMAT_STAC_URI]])
+def test_kvp_response_collection_with_profile_in_submission(profile):
     """
     Validate that ``response=collection`` and ``response[profile]`` from KVP are transferred to the execution body.
     """
     req = MockedRequest()
     req.params = {
         "response": "collection",
-        "response[profile]": "stac",
+        "response[profile]": profile,
         "response[prefer]": "respond-async",
         "input1": "test-value",
     }
@@ -1349,16 +1350,17 @@ def test_kvp_response_collection_with_profile_in_submission():
 
     body = json.loads(cast("bytes", req.body).decode("utf-8"))
     assert body["response"] == "collection"
-    assert body["profile"] == "stac"
+    assert body["profile"] == profile
 
 
 @pytest.mark.collection
-def test_validate_job_accept_profile_collection_response():
+@pytest.mark.parametrize(["profile"], [["stac"], [OGC_API_PROC_FORMAT_STAC_URI]])
+def test_validate_job_accept_profile_collection_response(profile):
     """
     Validate that sync execution with a collection response accepts only collection profiles in ``Accept-Profile``.
     """
-    headers = {"Accept-Profile": "stac"}
-    assert validate_job_accept_profile(headers, ExecuteMode.SYNC, ExecuteResponse.COLLECTION) == "stac"
+    headers = {"Accept-Profile": profile}
+    assert validate_job_accept_profile(headers, ExecuteMode.SYNC, ExecuteResponse.COLLECTION) == profile
     with pytest.raises(HTTPNotAcceptable):
         validate_job_accept_profile({"Accept-Profile": "https://example.com/other"}, ExecuteMode.SYNC,
                                     ExecuteResponse.COLLECTION)

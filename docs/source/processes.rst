@@ -1671,6 +1671,10 @@ These map directly to HTTP headers for consistent behavior across GET and POST e
     |    ?response[profile]=stac                            |    {"profile": "stac"}                                |
     +-------------------------------------------------------+-------------------------------------------------------+
 
+The ``stac`` entries above are short aliases for ``http://www.opengis.net/def/format/ogcapi-processes/0/stac``.
+The full URI is supported in query parameters, the body ``profile`` field and the ``Accept-Profile`` header,
+according to the execution-mode rules below.
+
 .. [#kvpProfile]
     The behavior of :term:`Profile` parameters vary depending on :ref:`Execution Mode <proc_exec_mode>`.
 
@@ -1690,7 +1694,7 @@ These map directly to HTTP headers for consistent behavior across GET and POST e
           (the immediate *HTTP 201 Created* response)
         - ``response[profile]`` applies to the **final** :ref:`proc_exec_results`
           (retrieved by subsequent :ref:`Job Result <proc_op_result>` request)
-          This can be relevant the profile of the results as a whole is relevant (e.g.: ``response[profile]=stac``),
+          This is relevant when the profile of the results as a whole must be specified,
           such as when combined with the ``response=collection`` parameter.
 
     **Input/Output Profile Qualifiers** (``{inputID}[profile]``, ``{outputID}[profile]``):
@@ -1710,7 +1714,7 @@ These map directly to HTTP headers for consistent behavior across GET and POST e
         &output[include]=true
         &output[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/geojson-feature-collection
         &response=collection
-        &response[profile]=stac
+        &response[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/stac
         &response[prefer]=respond-async
         &profile=ogc
         &f=json
@@ -3489,10 +3493,20 @@ The :term:`Provenance` of the :term:`Job` also includes distinct entities for th
 both ``prov:wasGeneratedBy`` the :term:`Job` activity, where the :term:`Collection` is ``prov:alternateOf`` the results.
 
 .. note::
-    Request the :term:`STAC` :term:`Collection` using ``?response[profile]=stac`` or ``?profile=stac``
-    (see :ref:`proc_exec_results`). For header-based negotiation, send
-    ``Accept-Profile: <https://www.opengis.net/def/profile/OGC/0/ogc-collection>``.
-    This URI can also replace ``stac`` in either query parameter. An unsupported value returns
+    Request the :term:`STAC` :term:`Collection` with the full format URI
+    ``http://www.opengis.net/def/format/ogcapi-processes/0/stac`` (see :ref:`proc_exec_results`):
+
+    .. code-block:: text
+
+        ?response=collection&response[profile]=http://www.opengis.net/def/format/ogcapi-processes/0/stac
+        ?response=collection&profile=http://www.opengis.net/def/format/ogcapi-processes/0/stac
+        Accept-Profile: <http://www.opengis.net/def/format/ogcapi-processes/0/stac>
+
+    The short alias ``stac`` and the HTTPS form of the full URI are also supported.
+    The ``https://www.opengis.net/def/profile/OGC/0/ogc-collection`` profile URI is another accepted
+    value in these query parameters or the ``Accept-Profile`` header.
+    Header negotiation during execution follows the synchronous and asynchronous rules above.
+    An unsupported value returns
     ``HTTP 406`` with an ``application/problem+json`` response.
 
 .. _proc_op_job_inputs:

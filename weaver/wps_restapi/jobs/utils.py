@@ -816,7 +816,10 @@ def validate_collection_profile(profile, instance):
     if not profile:
         return
     profile_uri = ogc_def.normalize(profile, version="0")
-    if profile_uri == sd.OGC_API_PROC_PROFILE_COLLECTION_URI or profile in STAC_COLLECTION_PROFILES:
+    if (
+        profile_uri == sd.OGC_API_PROC_PROFILE_COLLECTION_URI or
+        profile in STAC_COLLECTION_PROFILES or profile_uri in STAC_COLLECTION_PROFILES
+    ):
         return
     raise HTTPNotAcceptable(
         json={

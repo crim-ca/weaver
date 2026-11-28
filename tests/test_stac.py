@@ -75,7 +75,9 @@ class TestSTACCollection:
         if job.context:
             href = f"https://localhost/wpsoutputs/{job.context}/{job.id}/out/result.txt"
         return {
-            "out": {"href": href, "type": "text/plain", "digestMultibase": compute_file_digest_multibase(path)},
+            "out": {
+                "href": href, "type": ContentType.TEXT_PLAIN, "digestMultibase": compute_file_digest_multibase(path),
+            },
             "value": {"value": 3, "dataType": "integer"},
         }
 
@@ -183,7 +185,7 @@ class TestSTACCollection:
             assert asset["file:checksum"] == compute_file_checksum(
                 os.path.join(tmp, str(job.id), "out", "result.txt"), "sha256"
             )
-            assert asset["type"] == "text/plain"
+            assert asset["type"] == ContentType.TEXT_PLAIN
             rels = {lnk["rel"] for lnk in item_data["links"]}
             assert {"self", "root", "parent", "collection"} <= rels
 
@@ -688,7 +690,7 @@ class TestSTACCollection:
             outputs=[
                 {"id": "geo_two", "formats": [{"mediaType": "application/geo+json"}]},
                 {"id": "geo_three", "formats": [{"mediaType": "application/geo+json"}]},
-                {"id": "text", "formats": [{"mediaType": "text/plain"}]},
+                {"id": "text", "formats": [{"mediaType": ContentType.TEXT_PLAIN}]},
             ],
         )
         with tempfile.TemporaryDirectory() as tmp:

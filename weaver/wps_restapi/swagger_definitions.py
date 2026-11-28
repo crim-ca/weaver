@@ -291,6 +291,7 @@ OGC_API_PROC_PROFILE_OGC_VALUES_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-valu
 #   https://github.com/opengeospatial/ogcapi-processes/issues/616
 OGC_API_PROC_PROFILE_DEPLOY_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-deploy-process"
 OGC_API_PROC_PROFILE_COLLECTION_URI = f"{OGC_API_PROC_PROFILE_BASE_URI}/ogc-collection"
+OGC_API_PROC_FORMAT_STAC_URI = "http://www.opengis.net/def/format/ogcapi-processes/0/stac"
 
 # Following are legacy definitions from OGC Testebeds and EO Apps Best Practices.
 # Therefore, leave them in 'http' for any operation relying on them explicitly (no auto https/versionless handling).
@@ -3935,7 +3936,8 @@ class KVPResponseProfile(ExtendedSchemaNode, OAS3Parameter):
         "[*Job Status*](https://pavics-weaver.readthedocs.io/en/latest/processes.html#alternate-job-status) response\n"
         "\n\n"
         "With ``response=collection``, the profile selects the collection representation "
-        f"(``stac`` or ``{OGC_API_PROC_PROFILE_COLLECTION_URI}``).\n\n"
+        f"(``{OGC_API_PROC_FORMAT_STAC_URI}``, its ``stac`` alias, or "
+        f"``{OGC_API_PROC_PROFILE_COLLECTION_URI}``).\n\n"
         f"Example: ``response[profile]=\"{OGC_API_PROC_PROFILE_JOB_DESC_URI}\"``"
     )
     missing = drop

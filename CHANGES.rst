@@ -43,8 +43,9 @@ Changes:
 - Add ``weaver.job_collection_stac_api_public_url`` and ``weaver.job_collection_stac_api_staging_url`` settings to
   publish `Job` results collections to a `STAC API` instead of static files, with dynamic conformance classes.
 - Add ``response=landingPage`` (only with a configured `STAC API`) redirecting to the `STAC API` root.
-- Support ``response[profile]=stac`` (and ``profile`` alias) on process execution and `Job` results to select the
-  `STAC` collection representation, with validation of unsupported profiles at execution submission
+- Support ``response[profile]`` (and ``profile`` alias) on process execution and `Job` results to select the
+  `STAC` collection using ``http://www.opengis.net/def/format/ogcapi-processes/0/stac`` or the short alias ``stac``.
+  Validate unsupported profiles at execution submission
   (relates to `#984 <https://github.com/crim-ca/weaver/issues/984>`_).
 - Add dynamic ``dataAccessAPIs`` reporting of process outputs in the process description.
 - Return HTTP 406 ``application/problem+json`` when an unsupported collection profile is requested with

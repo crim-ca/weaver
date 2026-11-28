@@ -865,6 +865,10 @@ class BuiltinAppTest(WpsConfigBase):
             (ExecuteMode.ASYNC, "", ExecuteResponse.COLLECTION, True),
             (ExecuteMode.SYNC, "?response=collection&response[profile]=stac", None, True),
             (ExecuteMode.ASYNC, "?response=collection&response[profile]=stac", None, True),
+            (ExecuteMode.SYNC,
+             f"?response=collection&response[profile]={sd.OGC_API_PROC_FORMAT_STAC_URI}", None, True),
+            (ExecuteMode.ASYNC,
+             f"?response=collection&response[profile]={sd.OGC_API_PROC_FORMAT_STAC_URI}", None, True),
             (ExecuteMode.SYNC, "", ExecuteResponse.DOCUMENT, False),
             (ExecuteMode.ASYNC, "", ExecuteResponse.DOCUMENT, False),
         ]

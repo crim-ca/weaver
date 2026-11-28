@@ -3976,10 +3976,20 @@ class WpsRestApiJobsTest(JobUtils):
             "response=collection&response[profile]=stac",
             "response=collection&profile=stac",
             f"response=collection&response[profile]={sd.OGC_API_PROC_PROFILE_COLLECTION_URI}",
+            f"response=collection&response[profile]={sd.OGC_API_PROC_FORMAT_STAC_URI}",
+            f"response=collection&profile={sd.OGC_API_PROC_FORMAT_STAC_URI}",
+            f"response=collection&response[profile]={sd.OGC_API_PROC_FORMAT_STAC_URI.replace('http:', 'https:')}",
         ]:
             resp = self.app.get(f"/jobs/{job.id}/results?{query}", headers=self.json_headers, expect_errors=True)
             assert resp.status_code == 303, query
             assert resp.headers["Location"].endswith(f"{job.id}-collection/collection.json"), query
+        for profile in [sd.OGC_API_PROC_FORMAT_STAC_URI, sd.OGC_API_PROC_FORMAT_STAC_URI.replace("http:", "https:")]:
+            resp = self.app.get(
+                f"/jobs/{job.id}/results?response=collection",
+                headers={**self.json_headers, "Accept-Profile": f"<{profile}>"},
+            )
+            assert resp.status_code == 303
+            assert resp.headers["Location"].endswith(f"{job.id}-collection/collection.json")
 
     @pytest.mark.job
     @pytest.mark.collection
