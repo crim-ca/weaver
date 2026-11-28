@@ -31,6 +31,7 @@ from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.colander_extras import CorniceOpenAPI
 from weaver.wps_restapi.constants import ConformanceCategory
+from weaver.wps_restapi.queryables import get_collection_links
 from weaver.wps_restapi.utils import get_wps_restapi_base_path, get_wps_restapi_base_url
 
 if TYPE_CHECKING:
@@ -854,14 +855,20 @@ def api_frontpage_body(settings):
              "rel": sd.OGC_API_PROC_REL_PROCESSES_URI, "type": ContentType.APP_JSON,
              "title": "Processes offered by this service."},
             {"href": f"{weaver_url}{sd.processes_queryables_service.path}",
-             "rel": sd.OGC_API_REL_QUERYABLES_URI, "type": ContentType.APP_JSON,
+             "rel": sd.OGC_API_REL_QUERYABLES_URI, "type": ContentType.APP_SCHEMA_JSON,
              "title": "Supported process queryables."},
+            {"href": f"{weaver_url}{sd.processes_sortables_service.path}",
+             "rel": sd.OGC_API_REL_SORTABLES_URI, "type": ContentType.APP_SCHEMA_JSON,
+             "title": "Supported process sortables."},
             {"href": weaver_process_url,
              "rel": sd.OGC_API_REL_CATALOG_URI, "type": ContentType.APP_JSON,
              "title": "Local resources catalog of processes offered by this service."},
             {"href": f"{weaver_url}{sd.jobs_queryables_service.path}",
-             "rel": sd.OGC_API_REL_QUERYABLES_URI, "type": ContentType.APP_JSON,
+             "rel": sd.OGC_API_REL_QUERYABLES_URI, "type": ContentType.APP_SCHEMA_JSON,
              "title": "Supported job queryables."},
+            {"href": f"{weaver_url}{sd.jobs_sortables_service.path}",
+             "rel": sd.OGC_API_REL_SORTABLES_URI, "type": ContentType.APP_SCHEMA_JSON,
+             "title": "Supported job sortables."},
             {"href": sd.OGC_API_REPO_URL,
              "rel": "ogcapi-processes-repository", "type": ContentType.TEXT_HTML,
              "title": "OGC API - Processes schema definitions repository."},
@@ -986,6 +993,40 @@ def api_conformance(request):  # noqa: F811
     cat = ConformanceCategory.get(request.params.get("category"), ConformanceCategory.CONFORMANCE)
     data = get_conformance(cat, get_settings(request))
     return HTTPOk(json=data)
+
+
+@sd.queryables_service.get(
+    tags=[sd.TAG_API],
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas={"200": sd.CollectionLinksResponseSchema()},
+)
+def api_queryables(request):
+    # type: (PyramidRequest) -> JSON
+    """
+    Links to the queryables of each collection.
+    """
+    return get_collection_links(request, sd.OGC_API_REL_QUERYABLES_URI, {
+        "process": sd.processes_queryables_service,
+        "job": sd.jobs_queryables_service,
+    })
+
+
+@sd.sortables_service.get(
+    tags=[sd.TAG_API],
+    accept=ContentType.APP_JSON,
+    renderer=OutputFormat.JSON,
+    response_schemas={"200": sd.CollectionLinksResponseSchema()},
+)
+def api_sortables(request):
+    # type: (PyramidRequest) -> JSON
+    """
+    Links to the sortables of each collection.
+    """
+    return get_collection_links(request, sd.OGC_API_REL_SORTABLES_URI, {
+        "process": sd.processes_sortables_service,
+        "job": sd.jobs_sortables_service,
+    })
 
 
 def get_openapi_json(
@@ -1343,6 +1384,8 @@ def includeme(config):
         sd.api_redoc_ui_service,
         sd.api_versions_service,
         sd.api_conformance_service,
+        sd.queryables_service,
+        sd.sortables_service,
     ]
     for api_svc in api_base_services:
         config.add_cornice_service(api_svc)

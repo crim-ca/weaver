@@ -48,8 +48,9 @@ Changes:
   `#640 <https://github.com/crim-ca/weaver/issues/640>`_, `#643 <https://github.com/crim-ca/weaver/issues/643>`_,
   `#644 <https://github.com/crim-ca/weaver/issues/644>`_ and
   `#642 <https://github.com/crim-ca/weaver/issues/642>`_).
-- Add ``/queryables/processes`` and ``/queryables/jobs`` descriptions generated from supported listing parameters,
-  with discovery links (resolves `#646 <https://github.com/crim-ca/weaver/issues/646>`_).
+- Add ``/queryables/processes``, ``/queryables/jobs``, ``/sortables/processes`` and ``/sortables/jobs`` descriptions
+  generated from supported listing parameters, with ``/queryables`` and ``/sortables`` discovery links
+  (resolves `#646 <https://github.com/crim-ca/weaver/issues/646>`_).
 - Add `OGC API - Records` sorting, filtering and ``cql-filter`` conformance classes
   (resolves `#641 <https://github.com/crim-ca/weaver/issues/641>`_).
 - Use ``gunicorn[fast]`` to leverage the faster HTTP C parser instead of Python native implementation.

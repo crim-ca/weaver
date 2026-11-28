@@ -47,8 +47,17 @@ class SortMethods(Constants):
     ])
 
 
+def sort_with_directions(methods):
+    # type: (Iterable[str]) -> List[str]
+    """
+    Augments sorting fields with their ascending (``+``) and descending (``-``) prefixed variants.
+    """
+    fields = sorted(methods)
+    return fields + [f"{direction}{field}" for field in fields for direction in ("+", "-")]
+
+
 if TYPE_CHECKING:
-    from typing import Union
+    from typing import Iterable, List, Union
     from typing_extensions import Literal
 
     AnySortType = Literal[

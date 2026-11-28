@@ -121,7 +121,7 @@ from weaver.processes.constants import (
 from weaver.processes.types import ProcessType
 from weaver.provenance import ProvenanceFormat
 from weaver.quotation.status import QuoteStatus
-from weaver.sort import Sort, SortMethods
+from weaver.sort import Sort, SortMethods, sort_with_directions
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
 from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, json_hashable, load_file, repr_json
 from weaver.visibility import Visibility
@@ -268,13 +268,15 @@ OGC_API_PROC_PART5_EXC_UNSUPPORTED_METADATA_PROFILE_URI = (
 OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI = "https://www.opengis.net/def/profile"
 OGC_API_PROC_PART5_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"
 
+OGC_API_REL_QUERYABLES_URI = "http://www.opengis.net/def/rel/ogc/1.0/queryables"
+OGC_API_REL_SORTABLES_URI = "http://www.opengis.net/def/rel/ogc/1.0/sortables"
+OGC_API_REL_CATALOG_URI = "http://www.opengis.net/def/rel/ogc/1.0/ogc-catalog"
+
 OGC_API_PROC_REL_BASE_URI = "https://www.opengis.net/def/rel/ogc/1.0"
 OGC_API_PROC_REL_CONFORMANCE_URI = f"{OGC_API_PROC_REL_BASE_URI}/conformance"
 OGC_API_PROC_REL_EXCEPTIONS_URI = f"{OGC_API_PROC_REL_BASE_URI}/exceptions"
 OGC_API_PROC_REL_EXECUTE_URI = f"{OGC_API_PROC_REL_BASE_URI}/execute"
 OGC_API_PROC_REL_PROCESSES_URI = f"{OGC_API_PROC_REL_BASE_URI}/processes"
-OGC_API_REL_QUERYABLES_URI = "http://www.opengis.net/def/rel/ogc/1.0/queryables"
-OGC_API_REL_CATALOG_URI = "http://www.opengis.net/def/rel/ogc/1.0/ogc-catalog"
 OGC_API_PROC_REL_PROCESS_DESC_URI = f"{OGC_API_PROC_REL_BASE_URI}/process-desc"
 OGC_API_PROC_REL_JOB_RESULTS_URI = f"{OGC_API_PROC_REL_BASE_URI}/results"
 OGC_API_PROC_REL_JOB_LIST_URI = f"{OGC_API_PROC_REL_BASE_URI}/job-list"
@@ -441,6 +443,8 @@ api_swagger_ui_service = Service(name="api_swagger_ui", path="/swagger")
 api_redoc_ui_service = Service(name="api_redoc_ui", path="/redoc")
 api_versions_service = Service(name="api_versions", path="/versions")
 api_conformance_service = Service(name="api_conformance", path="/conformance")
+queryables_service = Service(name="queryables", path="/queryables")
+sortables_service = Service(name="sortables", path="/sortables")
 openapi_json_service = Service(name="openapi_json", path="/json")
 
 quotes_service = Service(name="quotes", path="/quotations")
@@ -450,6 +454,7 @@ bill_service = Service(name="bill", path=f"{bills_service.path}/{{bill_id}}")
 
 jobs_service = Service(name="jobs", path="/jobs")
 jobs_queryables_service = Service(name="jobs_queryables", path="/queryables/jobs")
+jobs_sortables_service = Service(name="jobs_sortables", path="/sortables/jobs")
 job_service = Service(name="job", path=f"{jobs_service.path}/{{job_id}}")
 job_results_service = Service(name="job_results", path=f"{job_service.path}/results")
 job_result_value_service = Service(name="job_result_value", path=f"{job_results_service.path}/{{output_id}}")
@@ -476,6 +481,7 @@ job_prov_runs_service = Service(name="job_prov_runs", path=f"{job_prov_service.p
 
 processes_service = Service(name="processes", path="/processes")
 processes_queryables_service = Service(name="processes_queryables", path="/queryables/processes")
+processes_sortables_service = Service(name="processes_sortables", path="/sortables/processes")
 process_service = Service(name="process", path=f"{processes_service.path}/{{process_id}}")
 process_quotes_service = Service(name="process_quotes", path=process_service.path + quotes_service.path)
 process_quote_service = Service(name="process_quote", path=process_service.path + quote_service.path)
@@ -2537,21 +2543,48 @@ class JobTitle(ExtendedSchemaNode):
     validator = Length(min=1)
 
 
-class ProcessSortByEnum(ExtendedSchemaNode):
+class SortByArray(ExtendedSequenceSchema, OAS3Parameter):
+    """
+    Sorting fields provided as a comma-separated list, which is the ``style=form`` and ``explode=false`` array encoding.
+
+    A leading space is a decoded ``+`` in query strings and is interpreted as the ascending prefix.
+    """
+    style = "form"
+    explode = False
+    missing = drop
+
+    def deserialize(self, cstruct=null):
+        # type: (Any) -> Any
+        if isinstance(cstruct, str):
+            cstruct = cstruct.split(",")
+        return super().deserialize(cstruct)
+
+
+class SortByField(ExtendedSchemaNode):
     schema_type = String
+
+    @staticmethod
+    def preparer(value):
+        # type: (Any) -> Any
+        return f"+{value[1:]}" if isinstance(value, str) and value.startswith(" ") else value
+
+
+class ProcessSortByField(SortByField):
+    validator = OneOf(sort_with_directions(SortMethods.PROCESS))
+
+
+class JobSortByField(SortByField):
+    validator = OneOf(sort_with_directions(SortMethods.JOB))
+
+
+class ProcessSortByEnum(SortByArray):
     title = "ProcessSortingMethod"
-    default = Sort.ID
-    fields_pattern = "|".join(sorted(SortMethods.PROCESS))
-    # leading space is a decoded '+' in query strings
-    validator = Regex(rf"^[+\- ]?(?:{fields_pattern})(?:,[+\- ]?(?:{fields_pattern}))*$")
+    field = ProcessSortByField()
 
 
-class JobSortByEnum(ExtendedSchemaNode):
-    schema_type = String
+class JobSortByEnum(SortByArray):
     title = "JobSortingMethod"
-    default = Sort.CREATED
-    fields_pattern = "|".join(sorted(SortMethods.JOB))
-    validator = Regex(rf"^[+\- ]?(?:{fields_pattern})(?:,[+\- ]?(?:{fields_pattern}))*$")
+    field = JobSortByField()
 
 
 class QuoteSortEnum(ExtendedSchemaNode):
@@ -8115,11 +8148,11 @@ class GetJobsQueries(PagingQueries, FilterSchema):
     type = JobTypeEnum(missing=drop, default=null,
                        description="Filter jobs only to matching type (note: 'service' and 'provider' are aliases).")
     sortby = JobSortByEnum(
-        missing=drop, example="-created,status",
+        missing=drop, example=["-created", "status"],
         description=(
             "Comma-separated sorting fields, with '+' for ascending or '-' for descending. "
             "Fields without prefix use their default direction. "
-            "URL-encode '+' as '%2B'."
+            f"URL-encode '+' as '%2B'. Defaults to '{Sort.CREATED}'."
         ),
     )
     access = JobAccess(missing=drop, default=None)
@@ -8576,9 +8609,19 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     body = ProviderProcessesSchema()
 
 
+class CollectionLinksResponseSchema(ExtendedMappingSchema):
+    description = "Links to the queryables or sortables of each collection."
+    body = LandingPage()
+
+
 class QueryablesResponseSchema(ExtendedMappingSchema):
     description = "Supported collection query parameters."
     body = PermissiveMappingSchema(description="JSON Schema describing supported collection query parameters.")
+
+
+class SortablesResponseSchema(ExtendedMappingSchema):
+    description = "Supported collection sorting fields."
+    body = PermissiveMappingSchema(description="JSON Schema describing supported collection sorting fields.")
 
 
 class ProcessSearchExpression(ExtendedSchemaNode):
@@ -8704,11 +8747,11 @@ class ProcessTypeExpression(ExtendedSchemaNode):
 
 class ProcessSearchQuery(FilterSchema):
     sortby = ProcessSortByEnum(
-        missing=drop, example="+id,-version",
+        missing=drop, example=["+id", "-version"],
         description=(
             "Comma-separated sorting fields, with '+' for ascending or '-' for descending. "
             "Fields without prefix use their default direction. "
-            "URL-encode '+' as '%2B'."
+            f"URL-encode '+' as '%2B'. Defaults to '{Sort.ID}'."
         ),
     )
     datetime = DateTimeInterval(

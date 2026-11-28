@@ -342,7 +342,11 @@ def get_job_list_links(job_total, filters, grouped, request):
 
     links.append({
         "href": base_url + sd.jobs_queryables_service.path, "rel": sd.OGC_API_REL_QUERYABLES_URI,
-        "type": ContentType.APP_JSON, "title": "Supported job queryables."
+        "type": ContentType.APP_SCHEMA_JSON, "title": "Supported job queryables."
+    })
+    links.append({
+        "href": base_url + sd.jobs_sortables_service.path, "rel": sd.OGC_API_REL_SORTABLES_URI,
+        "type": ContentType.APP_SCHEMA_JSON, "title": "Supported job sortables."
     })
 
     if not grouped:

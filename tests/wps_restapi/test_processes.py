@@ -74,6 +74,7 @@ from weaver.processes.constants import (
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import deploy_process_from_payload
 from weaver.processes.wps_testing import WpsTestProcess
+from weaver.sort import Sort, SortMethods, sort_with_directions
 from weaver.status import Status
 from weaver.utils import (
     explode_headers,
@@ -336,6 +337,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         """
         resp = self.app.get("/queryables/processes", headers=self.json_headers)
         assert resp.status_code == 200, resp.text
+        assert resp.content_type == ContentType.APP_SCHEMA_JSON
         jsonschema.Draft7Validator.check_schema(resp.json)
         assert set(resp.json["properties"]) == {child.name for child in sd.GetProcessesQuery().children}
         assert {"keywords", "q", "query", "version", "sortby", "datetime",
@@ -350,6 +352,62 @@ class WpsRestApiProcessesTest(WpsConfigBase):
             and link["href"].endswith("/queryables/processes")
             for link in landing.json["links"]
         )
+
+    @parameterized.expand([
+        ("queryables", sd.OGC_API_REL_QUERYABLES_URI),
+        ("sortables", sd.OGC_API_REL_SORTABLES_URI),
+    ])
+    @pytest.mark.ogc_records
+    def test_get_collections_discovery_links(self, endpoint, rel):
+        # type: (str, str) -> None
+        """
+        Tests that the generic endpoint provides only links to the corresponding endpoints of processes and jobs.
+        """
+        resp = self.app.get(f"/{endpoint}", headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert list(resp.json) == ["links"]
+        targets = {urllib.parse.urlparse(link["href"]).path for link in resp.json["links"] if link["rel"] == rel}
+        assert targets == {f"/{endpoint}/processes", f"/{endpoint}/jobs"}
+        for link in resp.json["links"]:
+            if link["rel"] == rel:
+                assert link["type"] == ContentType.APP_SCHEMA_JSON
+                target = self.app.get(link["href"], headers=self.json_headers)
+                assert target.status_code == 200, target.text
+                assert target.content_type == ContentType.APP_SCHEMA_JSON
+
+    @pytest.mark.ogc_records
+    def test_get_processes_sortables(self):
+        # type: () -> None
+        """
+        Tests that process sortables describe the sorting fields enumerated by the ``sortby`` queryable.
+        """
+        queryables = self.app.get("/queryables/processes", headers=self.json_headers).json
+        sortby = queryables["properties"]["sortby"]
+        assert sortby["type"] == "array"
+        assert sortby["items"]["enum"] == sort_with_directions(SortMethods.PROCESS)
+
+        resp = self.app.get("/sortables/processes", headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.content_type == ContentType.APP_SCHEMA_JSON
+        jsonschema.Draft7Validator.check_schema(resp.json)
+        assert set(resp.json["properties"]) == set(SortMethods.PROCESS)
+        assert resp.json["properties"][Sort.CREATED]["format"] == "date-time"
+
+        spec = self.app.get("/json", headers=self.json_headers).json
+        assert "/sortables/processes" in spec["paths"]
+        sortby_params = [param for name, param in spec["components"]["parameters"].items() if name.endswith(".sortby")]
+        assert sortby_params
+        sortby_param = sortby_params[0]
+        assert sortby_param["style"] == "form"
+        assert sortby_param["explode"] is False
+        assert sortby_param["schema"]["type"] == "array"
+
+        for path in ["/", "/processes"]:
+            links = self.app.get(path, headers=self.json_headers).json["links"]
+            assert any(
+                link["rel"] == sd.OGC_API_REL_SORTABLES_URI and link["href"].endswith("/sortables/processes")
+                for link in links
+            ), path
 
     def test_get_processes_no_links(self):
         path = "/processes"
@@ -5843,6 +5901,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ("version", "1.0.0//2.0.0"),
         ("sortby", "unknown"),
         ("sortby", "id,"),
+        ("sortby", "+"),
     ])
     @pytest.mark.ogc_records
     def test_get_processes_filter_by_search_invalid(self, field, value):

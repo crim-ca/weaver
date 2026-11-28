@@ -42,7 +42,7 @@ from weaver.wps_restapi.processes.utils import (
 )
 from weaver.wps_restapi.providers.providers import describe_provider_process
 from weaver.wps_restapi.providers.utils import get_provider_id, get_provider_services
-from weaver.wps_restapi.queryables import get_queryables_schema
+from weaver.wps_restapi.queryables import get_queryables_schema, get_sortables_schema
 
 if TYPE_CHECKING:
     from pyramid.config import Configurator
@@ -54,16 +54,30 @@ LOGGER = logging.getLogger(__name__)
 
 @sd.processes_queryables_service.get(
     tags=[sd.TAG_PROCESSES],
-    accept=ContentType.APP_JSON,
+    accept=[ContentType.APP_SCHEMA_JSON, ContentType.APP_JSON],
     renderer=OutputFormat.JSON,
     response_schemas={"200": sd.QueryablesResponseSchema()},
 )
 def get_process_queryables(request):
-    # type: (PyramidRequest) -> JSON
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Describes supported process queryables.
     """
-    return get_queryables_schema(sd.GetProcessesQuery(), request.path_url)
+    return get_queryables_schema(request, sd.GetProcessesQuery())
+
+
+@sd.processes_sortables_service.get(
+    tags=[sd.TAG_PROCESSES],
+    accept=[ContentType.APP_SCHEMA_JSON, ContentType.APP_JSON],
+    renderer=OutputFormat.JSON,
+    response_schemas={"200": sd.SortablesResponseSchema()},
+)
+def get_process_sortables(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Describes supported process sortables.
+    """
+    return get_sortables_schema(request, sd.ProcessSortByEnum())
 
 
 @sd.processes_service.options(tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES, sd.TAG_DEPLOY])
@@ -607,6 +621,7 @@ def includeme(config):
     LOGGER.info("Adding WPS REST API processes views...")
     config.add_cornice_service(sd.processes_service)
     config.add_cornice_service(sd.processes_queryables_service)
+    config.add_cornice_service(sd.processes_sortables_service)
     config.add_cornice_service(sd.process_service)
     config.add_cornice_service(sd.process_package_service)
     config.add_cornice_service(sd.process_payload_service)

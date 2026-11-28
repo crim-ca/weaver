@@ -603,8 +603,12 @@ Terms are not regular expressions. Empty terms are invalid.
 These searches cannot be combined with ``providers=true``, since remote provider listings cannot apply the filters.
 URL-encode search values, in particular ``+`` as ``%2B``, to avoid interpreting it as a space in a query string.
 The ``/queryables/processes`` and ``/queryables/jobs`` endpoints describe the parameters supported by each listing
-as JSON Schema. Both are discoverable from the landing page using the
-``http://www.opengis.net/def/rel/ogc/1.0/queryables`` link relation.
+as JSON Schema using the ``application/schema+json`` media-type. Similarly, the ``/sortables/processes`` and
+``/sortables/jobs`` endpoints describe the fields supported by the ``sortby`` parameter, which is an array provided
+as comma-separated values (``style=form``, ``explode=false``) where each field can be prefixed by ``+`` or ``-``.
+All are discoverable from the landing page and listings using the
+``http://www.opengis.net/def/rel/ogc/1.0/queryables`` and ``http://www.opengis.net/def/rel/ogc/1.0/sortables``
+link relations. The generic ``/queryables`` and ``/sortables`` endpoints only provide links to them.
 
 .. _proc_op_undeploy:
 .. _proc_op_replace:

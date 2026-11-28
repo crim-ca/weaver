@@ -50,6 +50,7 @@ from weaver.formats import ContentType, OutputFormat
 from weaver.notify import decrypt_email
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema, JobStatusType
 from weaver.processes.wps_testing import WpsTestProcess
+from weaver.sort import Sort, SortMethods, sort_with_directions
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import Version, compute_file_digest_multibase, explode_headers, get_path_kvp, now
 from weaver.visibility import Visibility
@@ -320,6 +321,7 @@ class WpsRestApiJobsTest(JobUtils):
         """
         resp = self.app.get("/queryables/jobs", headers=self.json_headers)
         assert resp.status_code == 200, resp.text
+        assert resp.content_type == ContentType.APP_SCHEMA_JSON
         jsonschema.Draft7Validator.check_schema(resp.json)
         assert set(resp.json["properties"]) == {child.name for child in sd.GetJobsQueries().children}
         landing = self.app.get("/", headers=self.json_headers)
@@ -328,6 +330,40 @@ class WpsRestApiJobsTest(JobUtils):
             and link["href"].endswith("/queryables/jobs")
             for link in landing.json["links"]
         )
+
+    @pytest.mark.ogc_records
+    def test_get_jobs_sortables(self):
+        # type: () -> None
+        """
+        Tests that job sortables describe the sorting fields enumerated by the ``sortby`` queryable.
+        """
+        queryables = self.app.get("/queryables/jobs", headers=self.json_headers).json
+        sortby = queryables["properties"]["sortby"]
+        assert sortby["type"] == "array"
+        assert sortby["items"]["enum"] == sort_with_directions(SortMethods.JOB)
+
+        resp = self.app.get("/sortables/jobs", headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.content_type == ContentType.APP_SCHEMA_JSON
+        jsonschema.Draft7Validator.check_schema(resp.json)
+        assert set(resp.json["properties"]) == set(SortMethods.JOB)
+        assert resp.json["properties"][Sort.FINISHED]["format"] == "date-time"
+
+        spec = self.app.get("/json", headers=self.json_headers).json
+        assert "/sortables/jobs" in spec["paths"]
+        sortby_params = [param for name, param in spec["components"]["parameters"].items() if name.endswith(".sortby")]
+        assert sortby_params
+        sortby_param = sortby_params[0]
+        assert sortby_param["style"] == "form"
+        assert sortby_param["explode"] is False
+        assert sortby_param["schema"]["type"] == "array"
+
+        for path in ["/", "/jobs"]:
+            links = self.app.get(path, headers=self.json_headers).json["links"]
+            assert any(
+                link["rel"] == sd.OGC_API_REL_SORTABLES_URI and link["href"].endswith("/sortables/jobs")
+                for link in links
+            ), path
 
     @pytest.mark.ogc_records
     def test_get_jobs_records_array_name(self):

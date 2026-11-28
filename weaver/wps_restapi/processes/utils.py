@@ -340,7 +340,9 @@ def get_process_list_links(request, paging, total, provider=None):
     else:
         links.extend([
             {"href": base_url + sd.processes_queryables_service.path, "rel": sd.OGC_API_REL_QUERYABLES_URI,
-             "type": ContentType.APP_JSON, "title": "Supported process queryables."},
+             "type": ContentType.APP_SCHEMA_JSON, "title": "Supported process queryables."},
+            {"href": base_url + sd.processes_sortables_service.path, "rel": sd.OGC_API_REL_SORTABLES_URI,
+             "type": ContentType.APP_SCHEMA_JSON, "title": "Supported process sortables."},
             {"href": sd.OGC_API_PROC_PROFILE_PROC_LIST_URI, "rel": "profile", "title": "Process listing profile."},
             {"href": f"{base_url}/", "rel": "up", "type": ContentType.APP_JSON, "title": "API entrypoint."}
         ])

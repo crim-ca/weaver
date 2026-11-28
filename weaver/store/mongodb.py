@@ -503,17 +503,22 @@ class ListingMixin(object):
         return {sort: sort_order}
 
     @classmethod
-    def _apply_sortby(cls, sortby, sort_default, sort_allowed, aliases=None):
-        # type: (Optional[str], AnySortType, Iterable[AnySortType], Optional[Dict[str, List[str]]]) -> Dict[str, int]
+    def _apply_sortby(
+        cls,
+        sortby,         # type: Optional[List[str]]
+        sort_default,   # type: AnySortType
+        sort_allowed,   # type: Iterable[AnySortType]
+        aliases=None,   # type: Optional[Dict[str, List[str]]]
+    ):                  # type: (...) -> Dict[str, int]
         """
-        Resolves comma-separated sorting fields that can be prefixed by ``+`` (ascending) or ``-`` (descending).
+        Resolves sorting fields that can be prefixed by ``+`` (ascending) or ``-`` (descending).
 
         Fields without prefix employ their default direction. A leading space is interpreted as ``+``,
         since an unescaped ``+`` in a query string is decoded as a space.
         Aliases map a field to one or many equivalent fields of the database representation.
         """
         sort_fields = {}  # type: MongodbAggregateSortOrder
-        for term in sortby.split(",") if sortby else [sort_default]:
+        for term in sortby or [sort_default]:
             term = f"+{term[1:]}" if term.startswith(" ") else term
             name = term.lstrip("+-")
             direction = {"+": pymongo.ASCENDING, "-": pymongo.DESCENDING}.get(term[:1])
@@ -821,7 +826,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                        q=None,              # type: Optional[str]
                        query=None,          # type: Optional[str]
                        version=None,        # type: Optional[str]
-                       sortby=None,         # type: Optional[str]
+                       sortby=None,         # type: Optional[List[str]]
                        datetime_interval=None,  # type: Optional[DatetimeIntervalType]
                        license=None,        # type: Optional[str]
                        type=None,           # type: Optional[str]
@@ -858,7 +863,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             Boundary-prefixed ``+`` and ``-`` introduce AND and NOT terms. Other signs are literal.
         :param version: Exact process version or inclusive ``lower/upper`` range with ``..`` for open bounds.
         :param sortby:
-            Comma-separated fields optionally prefixed with ``+`` (ascending) or ``-`` (descending).
+            Fields optionally prefixed with ``+`` (ascending) or ``-`` (descending).
             Fields without prefix use their default direction. Takes precedence over :paramref:`sort`.
         :param datetime_interval: Interval that the process ``created`` datetime must match.
         :param license: License reference (``href`` or ``title``) of a ``license`` link or metadata of the process.
@@ -956,7 +961,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         insert_fields.append({"$set": {"created": {"$ifNull": ["$created", {"$toDate": "$_id"}]}}})
         sort_id = [Sort.ID_LONG, Sort.VERSION] if revisions else [Sort.ID_LONG]
         sort_fields = self._apply_sortby(
-            sortby or sort, Sort.ID, SortMethods.PROCESS,
+            sortby or ([sort] if sort else None), Sort.ID, SortMethods.PROCESS,
             {Sort.ID: sort_id, Sort.PROCESS: sort_id, Sort.ID_LONG: sort_id},
         )
         if revisions and Sort.VERSION in sort_fields and Sort.ID_LONG in sort_fields:
@@ -1447,7 +1452,7 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                   access=None,              # type: Optional[str]
                   status=None,              # type: Optional[AnyStatusSearch, List[AnyStatusSearch]]
                   sort=None,                # type: Optional[AnySortType]
-                  sortby=None,              # type: Optional[str]
+                  sortby=None,              # type: Optional[List[str]]
                   filter_ast=None,          # type: Optional[AstType]
                   page=0,                   # type: Optional[int]
                   limit=10,                 # type: Optional[int]
@@ -1521,7 +1526,8 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         pipeline = [{"$match": search_filters}]  # expected for all filters except 'duration'
         self._apply_duration_filter(pipeline, min_duration, max_duration)
 
-        sort_method = {"$sort": self._apply_sortby(sortby or sort, Sort.CREATED, SortMethods.JOB)}
+        sort_by = sortby or ([sort] if sort else None)
+        sort_method = {"$sort": self._apply_sortby(sort_by, Sort.CREATED, SortMethods.JOB)}
         pipeline.append(sort_method)
 
         # results by group categories or with job list paging

@@ -62,7 +62,7 @@ from weaver.wps_restapi.jobs.utils import (
     validate_service_process
 )
 from weaver.wps_restapi.providers.utils import get_service
-from weaver.wps_restapi.queryables import get_queryables_schema, resolve_queryables_params
+from weaver.wps_restapi.queryables import get_queryables_schema, get_sortables_schema, resolve_queryables_params
 
 if TYPE_CHECKING:
     from typing import Iterable, List
@@ -76,16 +76,30 @@ LOGGER = get_task_logger(__name__)
 
 @sd.jobs_queryables_service.get(
     tags=[sd.TAG_JOBS],
-    accept=ContentType.APP_JSON,
+    accept=[ContentType.APP_SCHEMA_JSON, ContentType.APP_JSON],
     renderer=OutputFormat.JSON,
     response_schemas={"200": sd.QueryablesResponseSchema()},
 )
 def get_job_queryables(request):
-    # type: (PyramidRequest) -> JSON
+    # type: (PyramidRequest) -> AnyViewResponse
     """
     Describes supported job queryables.
     """
-    return get_queryables_schema(sd.GetJobsQueries(), request.path_url)
+    return get_queryables_schema(request, sd.GetJobsQueries())
+
+
+@sd.jobs_sortables_service.get(
+    tags=[sd.TAG_JOBS],
+    accept=[ContentType.APP_SCHEMA_JSON, ContentType.APP_JSON],
+    renderer=OutputFormat.JSON,
+    response_schemas={"200": sd.SortablesResponseSchema()},
+)
+def get_job_sortables(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Describes supported job sortables.
+    """
+    return get_sortables_schema(request, sd.JobSortByEnum())
 
 
 @sd.provider_jobs_service.get(
@@ -1095,6 +1109,7 @@ def includeme(config):
     LOGGER.info("Adding WPS REST API jobs views...")
     config.add_cornice_service(sd.jobs_service)
     config.add_cornice_service(sd.jobs_queryables_service)
+    config.add_cornice_service(sd.jobs_sortables_service)
     config.add_cornice_service(sd.job_service)
     config.add_cornice_service(sd.job_results_service)
     config.add_cornice_service(sd.job_result_value_service)
