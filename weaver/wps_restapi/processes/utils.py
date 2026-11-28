@@ -18,9 +18,10 @@ from weaver.formats import ContentType, OutputFormat, clean_media_type_format, g
 from weaver.ogc_definitions import normalize as normalize_ogc_uri
 from weaver.store.base import StoreProcesses
 from weaver.typedefs import MetadataQueryScope, PreferHeaderHandling
-from weaver.utils import VersionFormat, get_header, get_path_kvp, get_settings, make_link_header
+from weaver.utils import VersionFormat, get_header, get_path_kvp, get_request_args, get_settings, make_link_header
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
+from weaver.wps_restapi.records import resolve_queryables_params
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
@@ -91,12 +92,21 @@ def get_processes_filtered_by_valid_schemas(request, detail=True, links=True):
             "value": list(paging_names.intersection(request.params))
         })
 
+    search_param = sd.ProcessSearchQuery(unknown="ignore").deserialize(get_request_args(request))
+    if with_providers and search_param:
+        raise HTTPBadRequest(json={
+            "description": "Cannot combine process search parameters with providers full listing query.",
+            "error": "ListingInvalidParameter",
+            "value": list(search_param),
+        })
     metadata_filters = parse_metadata_query_filters(request)
     store = get_db(request).get_store(StoreProcesses)
+    search_param = resolve_queryables_params(search_param)
     processes, total_local_processes = store.list_processes(
         visibility=Visibility.PUBLIC,
         total=True,
         metadata=metadata_filters,
+        **search_param,
         **revisions_param,
         **paging_param
     )
@@ -319,7 +329,7 @@ def get_process_list_links(request, paging, total, provider=None):
          "type": ContentType.APP_JSON, "title": "Generic query endpoint to list processes."},
         {"href": f"{proc_url}?detail=false", "rel": "preview",
          "type": ContentType.APP_JSON, "title": "Process listing summary (identifiers and count only)."},
-        {"href": f"{proc_url}?f=json", "rel": "http://www.opengis.net/def/rel/ogc/1.0/processes",
+        {"href": f"{proc_url}?f=json", "rel": sd.OGC_API_PROC_REL_PROCESSES_URI,
          "type": ContentType.APP_JSON, "title": "List of registered local processes."},
         {"href": f"{proc_url}?{urllib.parse.urlencode(req_params)}", "rel": "self",
          "type": req_fmt, "title": "Current process listing."},
@@ -329,6 +339,10 @@ def get_process_list_links(request, paging, total, provider=None):
         links.append({"href": prov_url, "rel": "up", "type": ContentType.APP_JSON, "title": "Provider description."})
     else:
         links.extend([
+            {"href": base_url + sd.processes_queryables_service.path, "rel": sd.OGC_API_REL_QUERYABLES_URI,
+             "type": ContentType.APP_SCHEMA_JSON, "title": "Supported process queryables."},
+            {"href": base_url + sd.processes_sortables_service.path, "rel": sd.OGC_API_REL_SORTABLES_URI,
+             "type": ContentType.APP_SCHEMA_JSON, "title": "Supported process sortables."},
             {"href": sd.OGC_API_PROC_PROFILE_PROC_LIST_URI, "rel": "profile", "title": "Process listing profile."},
             {"href": f"{base_url}/", "rel": "up", "type": ContentType.APP_JSON, "title": "API entrypoint."}
         ])
@@ -339,22 +353,26 @@ def get_process_list_links(request, paging, total, provider=None):
         max_page = max(math.ceil(total / per_page) - 1, 0)
         if cur_page < 0 or cur_page > max_page:
             raise IndexError(f"Page index {cur_page} is out of range from [0,{max_page}].")
+        paging_params = {
+            urllib.parse.quote(key, safe=""): urllib.parse.quote(value, safe="")
+            for key, value in kvp_params.items()
+        }
         links.extend([
-            {"href": get_path_kvp(proc_url, page=cur_page, **kvp_params), "rel": "current",
+            {"href": get_path_kvp(proc_url, page=cur_page, **paging_params), "rel": "current",
              "type": ContentType.APP_JSON, "title": "Current page of processes query listing."},
-            {"href": get_path_kvp(proc_url, page=0, **kvp_params), "rel": "first",
+            {"href": get_path_kvp(proc_url, page=0, **paging_params), "rel": "first",
              "type": ContentType.APP_JSON, "title": "First page of processes query listing."},
-            {"href": get_path_kvp(proc_url, page=max_page, **kvp_params), "rel": "last",
+            {"href": get_path_kvp(proc_url, page=max_page, **paging_params), "rel": "last",
              "type": ContentType.APP_JSON, "title": "Last page of processes query listing."},
         ])
         if cur_page > 0:
             links.append({
-                "href": get_path_kvp(proc_url, page=cur_page - 1, **kvp_params), "rel": "prev",
+                "href": get_path_kvp(proc_url, page=cur_page - 1, **paging_params), "rel": "prev",
                 "type": ContentType.APP_JSON, "title": "Previous page of processes query listing."
             })
         if cur_page < max_page:
             links.append({
-                "href": get_path_kvp(proc_url, page=cur_page + 1, **kvp_params), "rel": "next",
+                "href": get_path_kvp(proc_url, page=cur_page + 1, **paging_params), "rel": "next",
                 "type": ContentType.APP_JSON, "title": "Next page of processes query listing."
             })
     process = kvp_params.get("process")

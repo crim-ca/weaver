@@ -15,11 +15,13 @@ on `Weaver`'s `ReadTheDocs` page.
 # pylint: disable=C0103,invalid-name
 # pylint: disable=E0241,duplicate-bases
 
+import abc
 import datetime
 import inspect
 import json
 import os
 import re
+import shlex
 from copy import copy
 from decimal import Decimal
 from functools import cache
@@ -32,6 +34,7 @@ import yaml
 from babel.numbers import list_currencies
 from colander import All, DateTime, Email as EmailRegex, Length, Money, OneOf, Range, Regex, drop, null, required
 from dateutil import parser as date_parser
+from lark.exceptions import LarkError
 from pygeofilter.backends.cql2_json import to_cql2
 from pygeofilter.parsers import cql2_json, cql2_text, cql_json, ecql, fes, jfe
 
@@ -116,9 +119,10 @@ from weaver.processes.constants import (
     JobStatusType,
     ProcessSchema
 )
+from weaver.processes.types import ProcessType
 from weaver.provenance import ProvenanceFormat
 from weaver.quotation.status import QuoteStatus
-from weaver.sort import Sort, SortMethods
+from weaver.sort import Sort, SortMethods, sort_with_directions
 from weaver.status import JOB_STATUS_CODE_API, JOB_STATUS_SEARCH_API, Status
 from weaver.utils import AWS_S3_BUCKET_REFERENCE_PATTERN, json_hashable, load_file, repr_json
 from weaver.visibility import Visibility
@@ -153,6 +157,7 @@ from weaver.wps_restapi.colander_extras import (
     XMLObject
 )
 from weaver.wps_restapi.constants import ConformanceCategory
+from weaver.wps_restapi.filter import FilterLanguage
 from weaver.wps_restapi.patches import WeaverService as Service  # warning: don't use 'cornice.Service'
 
 if TYPE_CHECKING:
@@ -262,9 +267,29 @@ OGC_API_PROC_PART5_EXC_UNSUPPORTED_METADATA_PROFILE_URI = (
     f"{OGC_API_PROC_PART5_EXC_BASE_URI}/unsupported-metadata-profile"
 )
 OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI = "https://www.opengis.net/def/profile"
-OGC_API_PROC_PART5_BASE_URI = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"
+OGC_SPEC_BASE_URI = "http://www.opengis.net/spec"
+OGC_API_COMMON_PART1_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-common-1/1.0"
+OGC_API_COMMON_PART2_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-common-2/1.0"
+OGC_API_CQL2_BASE_URI = f"{OGC_SPEC_BASE_URI}/cql2/1.0"
+OGC_API_RECORDS_PART1_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-records-1/1.0"
+OGC_API_PROC_PART1_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-1/1.0"  # core (v1.0)
+OGC_API_PROC_PART1_V2_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-1/2.0"  # core (v2.0)
+OGC_API_PROC_PART2_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-2/1.0"  # deploy, replace, undeploy
+OGC_API_PROC_PART3_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-3/0.0"  # workflows and chaining
+OGC_API_PROC_PART4_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-4/1.0"  # job management
+OGC_API_PROC_PART5_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-5/1.0"  # provenance
+OGC_API_PROC_PART6_BASE_URI = f"{OGC_SPEC_BASE_URI}/ogcapi-processes-6/1.0"  # versioning (proposal)
+OGC_API_PROC_EOAP_BP_BASE_URI = f"{OGC_SPEC_BASE_URI}/eoap-bp/1.0"
+OGC_WPS1_BASE_URI = "http://schemas.opengis.net/wps/1.0.0"
+OGC_WPS2_BASE_URI = f"{OGC_SPEC_BASE_URI}/WPS/2.0"
+
+OGC_API_REL_BASE_URI = "http://www.opengis.net/def/rel/ogc/1.0"
+OGC_API_REL_QUERYABLES_URI = f"{OGC_API_REL_BASE_URI}/queryables"
+OGC_API_REL_SORTABLES_URI = f"{OGC_API_REL_BASE_URI}/sortables"
+OGC_API_REL_CATALOG_URI = f"{OGC_API_REL_BASE_URI}/ogc-catalog"
 
 OGC_API_PROC_REL_BASE_URI = "https://www.opengis.net/def/rel/ogc/1.0"
+OGC_API_PROC_REL_CONFORMANCE_URI = f"{OGC_API_PROC_REL_BASE_URI}/conformance"
 OGC_API_PROC_REL_EXCEPTIONS_URI = f"{OGC_API_PROC_REL_BASE_URI}/exceptions"
 OGC_API_PROC_REL_EXECUTE_URI = f"{OGC_API_PROC_REL_BASE_URI}/execute"
 OGC_API_PROC_REL_PROCESSES_URI = f"{OGC_API_PROC_REL_BASE_URI}/processes"
@@ -331,7 +356,7 @@ PROCESS_DESCRIPTION_FIELD_AFTER_OLD_SCHEMA = ["links"]
 PROCESS_IO_FIELD_FIRST = ["id", "title", "description", "minOccurs", "maxOccurs"]
 PROCESS_IO_FIELD_AFTER = ["literalDataDomains", "formats", "crs", "bbox"]
 
-PROCESSES_LISTING_FIELD_FIRST = ["description", "processes", "providers"]
+PROCESSES_LISTING_FIELD_FIRST = ["description", "recordsArrayName", "processes", "providers"]
 PROCESSES_LISTING_FIELD_AFTER = ["page", "limit", "count", "total", "links"]
 
 PROVIDER_DESCRIPTION_FIELD_FIRST = [
@@ -376,7 +401,7 @@ JOB_STATUS_FIELD_AFTER = [
     "links",
 ]
 
-JOBS_LISTING_FIELD_FIRST = ["description", "jobs", "groups"]
+JOBS_LISTING_FIELD_FIRST = ["description", "recordsArrayName", "jobs", "groups"]
 JOBS_LISTING_FIELD_AFTER = ["page", "limit", "count", "total", "links"]
 
 QUOTES_LISTING_FIELD_FIRST = ["description", "quotations"]
@@ -434,6 +459,8 @@ api_swagger_ui_service = Service(name="api_swagger_ui", path="/swagger")
 api_redoc_ui_service = Service(name="api_redoc_ui", path="/redoc")
 api_versions_service = Service(name="api_versions", path="/versions")
 api_conformance_service = Service(name="api_conformance", path="/conformance")
+queryables_service = Service(name="queryables", path="/queryables")
+sortables_service = Service(name="sortables", path="/sortables")
 openapi_json_service = Service(name="openapi_json", path="/json")
 
 quotes_service = Service(name="quotes", path="/quotations")
@@ -442,6 +469,8 @@ bills_service = Service(name="bills", path="/bills")
 bill_service = Service(name="bill", path=f"{bills_service.path}/{{bill_id}}")
 
 jobs_service = Service(name="jobs", path="/jobs")
+jobs_queryables_service = Service(name="jobs_queryables", path="/queryables/jobs")
+jobs_sortables_service = Service(name="jobs_sortables", path="/sortables/jobs")
 job_service = Service(name="job", path=f"{jobs_service.path}/{{job_id}}")
 job_results_service = Service(name="job_results", path=f"{job_service.path}/results")
 job_result_value_service = Service(name="job_result_value", path=f"{job_results_service.path}/{{output_id}}")
@@ -467,6 +496,8 @@ job_prov_run_id_service = Service(name="job_prov_run_id", path=f"{job_prov_servi
 job_prov_runs_service = Service(name="job_prov_runs", path=f"{job_prov_service.path}/runs")
 
 processes_service = Service(name="processes", path="/processes")
+processes_queryables_service = Service(name="processes_queryables", path="/queryables/processes")
+processes_sortables_service = Service(name="processes_sortables", path="/sortables/processes")
 process_service = Service(name="process", path=f"{processes_service.path}/{{process_id}}")
 process_quotes_service = Service(name="process_quotes", path=process_service.path + quotes_service.path)
 process_quote_service = Service(name="process_quote", path=process_service.path + quote_service.path)
@@ -1791,18 +1822,8 @@ class AnyFilterExpression(AnyOfKeywordSchema):
 class AnyFilterLanguage(ExtendedSchemaNode):
     schema_type = String
     name = "filter-lang"
-    default = "cql2-json"
-    validator = OneOfCaseInsensitive([
-        "cql2-json",
-        "cql2-text",
-        "cql",
-        "cql-text",
-        "cql-json",
-        "ecql",
-        "simple-cql",
-        "fes",
-        "jfe"
-    ])
+    default = FilterLanguage.CQL2_JSON
+    validator = OneOfCaseInsensitive(FilterLanguage.values())
     summary = "Filter expression language to use for parsing."
     description = (
         "Filter expression language to use for parsing. "
@@ -1850,17 +1871,19 @@ class FilterSchema(ExtendedMappingSchema):
     def parse(filter_expr, filter_lang):
         # type: (Union[JSON, str], str) -> FilterAstType
         parsed_expr = None
-        if filter_lang == "cql2-json":
+        if filter_lang == FilterLanguage.CQL2_JSON:
             parsed_expr = cql2_json.parse(filter_expr)
-        elif filter_lang == "cql2-text":
+        elif filter_lang == FilterLanguage.CQL2_TEXT:
             parsed_expr = cql2_text.parse(filter_expr)
-        elif filter_lang == "cql-json":
+        elif filter_lang == FilterLanguage.CQL_JSON:
             parsed_expr = cql_json.parse(filter_expr)
-        elif filter_lang in ["cql", "cql-text", "ecql", "simple-cql"]:
+        elif filter_lang in [
+            FilterLanguage.CQL, FilterLanguage.CQL_TEXT, FilterLanguage.ECQL, FilterLanguage.SIMPLE_CQL
+        ]:
             parsed_expr = ecql.parse(filter_expr)
-        elif filter_lang == "fes":
+        elif filter_lang == FilterLanguage.FES:
             parsed_expr = fes.parse(filter_expr)
-        elif filter_lang == "jfe":
+        elif filter_lang == FilterLanguage.JFE:
             parsed_expr = jfe.parse(filter_expr)
         if not parsed_expr:
             raise colander.Invalid(
@@ -1874,7 +1897,7 @@ class FilterSchema(ExtendedMappingSchema):
         # type: (Union[JSON, str], str) -> FilterAstType
         try:
             return self.parse(filter_expr, filter_lang)
-        except (TypeError, ValueError) as exc:
+        except (LarkError, TypeError, ValueError) as exc:
             raise colander.Invalid(
                 node=self,
                 msg="Invalid filter expression could not be parsed against specified language.",
@@ -1917,7 +1940,7 @@ class FilterSchema(ExtendedMappingSchema):
                 )
             return result
         if not filter_lang:
-            filter_lang = "cql2-text" if isinstance(filter, str) else "cql2-json"
+            filter_lang = FilterLanguage.CQL2_TEXT if isinstance(filter_expr, str) else FilterLanguage.CQL2_JSON
         # perform conversion to validate
         # but don't return the converted CQL2-JSON to preserve the original definition where called (storage/dispatch)
         # conversion can be done as needed to obtain a uniform representation locally
@@ -2526,20 +2549,43 @@ class JobTitle(ExtendedSchemaNode):
     validator = Length(min=1)
 
 
-class JobSortEnum(ExtendedSchemaNode):
+class SortByArray(ExtendedSequenceSchema, OAS3Parameter):
+    """
+    Sorting fields provided as a comma-separated list, which is the ``style=form`` and ``explode=false`` array encoding.
+
+    A leading space is a decoded ``+`` in query strings and is interpreted as the ascending prefix.
+    """
+    style = "form"
+    explode = False
+    missing = drop
+
+    def deserialize(self, cstruct=null):
+        # type: (Any) -> Any
+        if isinstance(cstruct, str):
+            cstruct = cstruct.split(",")
+        return super().deserialize(cstruct)
+
+
+class SortByField(ExtendedSchemaNode):
     schema_type = String
+
+
+class ProcessSortByField(SortByField):
+    validator = OneOf(sort_with_directions(SortMethods.PROCESS))
+
+
+class JobSortByField(SortByField):
+    validator = OneOf(sort_with_directions(SortMethods.JOB))
+
+
+class ProcessSortByEnum(SortByArray):
+    title = "ProcessSortingMethod"
+    field = ProcessSortByField()
+
+
+class JobSortByEnum(SortByArray):
     title = "JobSortingMethod"
-    default = Sort.CREATED
-    example = Sort.CREATED
-    validator = OneOf(SortMethods.JOB)
-
-
-class ProcessSortEnum(ExtendedSchemaNode):
-    schema_type = String
-    title = "ProcessSortMethod"
-    default = Sort.ID
-    example = Sort.CREATED
-    validator = OneOf(SortMethods.PROCESS)
+    field = JobSortByField()
 
 
 class QuoteSortEnum(ExtendedSchemaNode):
@@ -4526,6 +4572,12 @@ class ProcessSummary(
     _sort_after = PROCESS_DESCRIPTION_FIELD_AFTER
 
 
+class RecordsArrayName(ExtendedSchemaNode):
+    schema_type = String
+    missing = drop
+    description = "Name of the array property that contains the records of this local resources catalog."
+
+
 class ProcessSummaryList(ExtendedSequenceSchema):
     summary = ProcessSummary()
 
@@ -4549,7 +4601,6 @@ class ProcessCollection(ExtendedMappingSchema):
 
 
 class ProcessPagingQuery(ExtendedMappingSchema):
-    sort = ProcessSortEnum(missing=drop)
     # if page is omitted but limit provided, use reasonable zero by default
     page = ExtendedSchemaNode(Integer(allow_string=True), missing=0, default=0, validator=Range(min=0))
     limit = ExtendedSchemaNode(Integer(allow_string=True), missing=None, default=None, validator=Range(min=1),
@@ -4785,6 +4836,7 @@ class PagingBodySchema(ExtendedMappingSchema):
 
 class GetPagingJobsSchema(PagingBodySchema):
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/jobList.yaml"  # technically, no 'links' yet, but added after by oneOf
+    recordsArrayName = RecordsArrayName(validator=OneOf(["jobs"]), default="jobs")
     jobs = JobCollection()
 
 
@@ -7438,7 +7490,7 @@ class VersionsSchema(ExtendedMappingSchema):
 
 class ConformanceList(ExtendedSequenceSchema):
     conformance = URL(description="Conformance specification link.",
-                      example="http://www.opengis.net/spec/ogcapi-common-1/1.0/conf/core")
+                      example=f"{OGC_API_COMMON_PART1_BASE_URI}/conf/core")
 
 
 class ConformanceSchema(ExtendedMappingSchema):
@@ -8063,7 +8115,7 @@ class PagingQueries(ExtendedMappingSchema):
                                schema=f"{OGC_API_PROC_PART1_PARAMETERS}/limit.yaml")
 
 
-class GetJobsQueries(PagingQueries):
+class GetJobsQueries(PagingQueries, FilterSchema):
     # note:
     #   This schema is also used to generate any missing defaults during filter parameter handling.
     #   Items with default value are added if omitted, except 'default=null' which are removed after handling by alias.
@@ -8096,7 +8148,14 @@ class GetJobsQueries(PagingQueries):
     provider = AnyIdentifier(missing=drop, default=None, description="Identifier of service provider to filter search.")
     type = JobTypeEnum(missing=drop, default=null,
                        description="Filter jobs only to matching type (note: 'service' and 'provider' are aliases).")
-    sort = JobSortEnum(missing=drop)
+    sortby = JobSortByEnum(
+        missing=drop, example=["-created", "status"],
+        description=(
+            "Comma-separated sorting fields, with '+' for ascending or '-' for descending. "
+            "Fields without prefix use their default direction. "
+            f"URL-encode '+' as '%2B'. Defaults to '{Sort.CREATED}'."
+        ),
+    )
     access = JobAccess(missing=drop, default=None)
     tags = JobTagsCommaSeparated()
 
@@ -8551,7 +8610,214 @@ class OkGetProviderProcessesSchema(ExtendedMappingSchema):
     body = ProviderProcessesSchema()
 
 
-class GetProcessesQuery(ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuery, ProcessRevisionsQuery):
+class CatalogLinksResponseSchema(ExtendedMappingSchema):
+    description = "Links to the queryables or sortables of each catalog."
+    body = LandingPage()
+
+
+class QueryablesResponseSchema(ExtendedMappingSchema):
+    description = "Supported catalog query parameters."
+    body = PermissiveMappingSchema(description="JSON Schema describing supported catalog query parameters.")
+
+
+class SortablesResponseSchema(ExtendedMappingSchema):
+    description = "Supported catalog sorting fields."
+    body = PermissiveMappingSchema(description="JSON Schema describing supported catalog sorting fields.")
+
+
+class ProcessSearchExpressionMeta(type(ExtendedSchemaNode), abc.ABCMeta):
+    """
+    Combines the schema node metaclass with abstract base class support.
+    """
+
+
+class ProcessSearchExpression(ExtendedSchemaNode, metaclass=ProcessSearchExpressionMeta):
+    """
+    Base of search expressions validated by their :meth:`parse` implementation.
+    """
+    schema_type = String
+
+    @staticmethod
+    @abc.abstractmethod
+    def parse(value):
+        # type: (str) -> Any
+        raise NotImplementedError
+
+    def deserialize(self, cstruct=null):
+        # type: (Any) -> Any
+        if cstruct == "":
+            raise colander.Invalid(self, "An empty search expression is not allowed.", value=cstruct)
+        value = super().deserialize(cstruct)
+        if value is not drop and value is not null:
+            try:
+                self.parse(value)
+            except ValueError as exc:
+                raise colander.Invalid(self, str(exc), value=value) from exc
+        return value
+
+
+class ProcessQueryExpression(ProcessSearchExpression):
+    @staticmethod
+    def parse(value):
+        # type: (str) -> List[List[Tuple[str, bool]]]
+        """
+        Parses a process search expression into phrase groups.
+
+        Commas separate alternatives. At a term boundary, ``+`` requires a term and ``-`` excludes it.
+        Signs elsewhere are literal. Whitespace joins ordered phrases, and quoted punctuation is preserved.
+        """
+        pattern = r'"(?:\\.|[^"\\])*"|(?P<operator>,|(?<![^\s,])[+-])|[^\s,"]+|\s+|"'
+        groups = [[]]  # type: List[List[Tuple[str, bool]]]
+        parts = []
+        negative = pending = False
+        for match in re.finditer(pattern, f"{value},"):
+            lexeme = match.group()
+            if match.group("operator"):
+                text = "".join(parts).strip()
+                if text:
+                    groups[-1].append((text, negative))
+                elif pending or lexeme == ",":
+                    raise ValueError("Missing search query term.")
+                if lexeme == ",":
+                    groups.append([])
+                parts = []
+                negative, pending = lexeme == "-", lexeme != ","
+            elif lexeme.startswith('"'):
+                parts.extend(shlex.split(lexeme))
+            else:
+                parts.append(lexeme)
+        return groups[:-1]
+
+
+class ProcessKeywordExpression(ProcessSearchExpression):
+    @staticmethod
+    def parse(value):
+        # type: (str) -> List[List[Tuple[str, bool]]]
+        """
+        Parses keyword alternatives grouped by comma-separated AND terms.
+
+        Terms separated by ``|`` are alternatives. Prefix a term with ``!`` or ``~`` to exclude it.
+        """
+        groups = []
+        for group in value.split(","):
+            terms = []
+            for term in group.split("|"):
+                term = term.strip()
+                negative = term.startswith(("!", "~"))
+                term = term[1:].strip() if negative else term
+                if not term or term.startswith(("!", "~")):
+                    raise ValueError("A keyword or negated keyword is required for every alternative.")
+                terms.append((term, negative))
+            groups.append(terms)
+        return groups
+
+
+class ProcessVersionExpression(ProcessSearchExpression):
+    @staticmethod
+    def parse(value):
+        # type: (str) -> Tuple[Optional[Tuple[int, int, int]], Optional[Tuple[int, int, int]]]
+        """
+        Parses an exact version or an inclusive ``lower/upper`` range with optional ``..`` open bounds.
+        """
+        bounds = value.split("/")
+        if len(bounds) not in [1, 2]:
+            raise ValueError("Expected an exact version or a lower/upper version interval.")
+        versions = []  # type: List[Optional[Tuple[int, int, int]]]
+        for bound in bounds:
+            if bound == ".." and len(bounds) == 2:
+                versions.append(None)
+            elif re.fullmatch(r"\d+(?:\.\d+){0,2}", bound):
+                version_parts = tuple(int(component) for component in bound.split("."))
+                versions.append(version_parts + (0,) * (3 - len(version_parts)))
+            else:
+                raise ValueError("Version interval bounds must be numeric semantic versions or '..'.")
+        if not any(version is not None for version in versions):
+            raise ValueError("At least one version bound is required.")
+        if len(versions) == 1:
+            return versions[0], versions[0]
+        lower, upper = versions[0], versions[1]
+        if lower is not None and upper is not None and lower > upper:
+            raise ValueError("The lower version bound exceeds the upper bound.")
+        return lower, upper
+
+
+class ProcessTypeExpression(ExtendedSchemaNode):
+    schema_type = String
+    example = "workflow,wps"
+    validator = Regex(r"^\s*[^,\s]+(?:\s*,\s*[^,\s]+)*\s*$")
+    description = (
+        "Comma-separated process types, where any must match (case-insensitive). "
+        f"Supported types are {', '.join(ProcessType.values())}. "
+        "Resource type URIs are also supported, namely "
+        f"{', '.join(ProcessType.uris())}."
+    )
+
+
+class ProcessSearchQuery(FilterSchema):
+    sortby = ProcessSortByEnum(
+        missing=drop, example=["+id", "-version"],
+        description=(
+            "Comma-separated sorting fields, with '+' for ascending or '-' for descending. "
+            "Fields without prefix use their default direction. "
+            f"URL-encode '+' as '%2B'. Defaults to '{Sort.ID}'."
+        ),
+    )
+    datetime = DateTimeInterval(
+        missing=drop, default=None,
+        description="Filter locally registered processes by creation datetime or interval.",
+    )
+    license = ExtendedSchemaNode(
+        String(), missing=drop, example="https://spdx.org/licenses/Apache-2.0",
+        validator=Length(min=1),
+        description="Filter locally registered processes with a 'license' link or metadata matching its href or title.",
+    )
+    type = ProcessTypeExpression(missing=drop)
+    keywords = ProcessKeywordExpression(
+        missing=drop, example="climate,netcdf|grib",
+        description=(
+            "Filter processes by 'keywords'. Comma-separated terms must all be matched (AND). "
+            "Alternatives within a term can be provided using the pipe character (OR). "
+            "Prefix a keyword with '!' or '~' to exclude it. "
+            "Matches whole keywords (case-insensitive). Applicable only to locally registered processes."
+        )
+    )
+    title_search = ExtendedSchemaNode(
+        String(allow_empty=True), name="title", missing=drop, example="Subset",
+        validator=Regex(r"^[\s\S]*\S[\s\S]*$"),
+        description="Filter locally registered processes with a 'title' containing literal text (case-insensitive)."
+    )
+    description_search = ExtendedSchemaNode(
+        String(allow_empty=True), name="description", missing=drop, example="Extracts a region",
+        validator=Regex(r"^[\s\S]*\S[\s\S]*$"),
+        description=(
+            "Filter locally registered processes with a 'description' containing literal text (case-insensitive)."
+        )
+    )
+    q = ProcessQueryExpression(
+        missing=drop, example="subset,netcdf",
+        description=(
+            "Alias of 'query'. Searches partial terms and phrases across title, description and keywords. "
+            "Applicable only to locally registered processes. See 'query' for expression syntax."
+        )
+    )
+    query = ProcessQueryExpression(missing=drop, example="+climate +netcdf -grib,subset", description=(
+        "Case-insensitive substring search across title, description and keywords. Commas separate OR groups. "
+        "At the beginning or after whitespace or a comma, '+' requires a term and '-' excludes a term. "
+        "Other signs are literal, so 'data-' matches 'data-analysis'. Use '+-data' for a leading literal minus. "
+        "Ordinary spaces join an ordered phrase and match one or more whitespace characters. "
+        "Double quotes preserve literal punctuation. URL-encode '+' as '%2B'. "
+        "Applicable only to locally registered processes."
+    ))
+    version = ProcessVersionExpression(missing=drop, example="1.2.3", description=(
+        "Filter locally registered processes by version or inclusive 'lower/upper' version range. "
+        "Use '..' for an open bound, such as '1.0.0/..'. "
+        "Use 'revisions=true' to include older revisions."
+    ))
+
+
+class GetProcessesQuery(
+    ProcessPagingQuery, ProcessDetailQuery, ProcessLinksQuery, ProcessRevisionsQuery, ProcessSearchQuery
+):
     metadata = ExtendedSchemaNode(
         colander.String(), missing=drop, default=None, name="metadata[process|inputs|outputs][<role>]",
         example="metadata[inputs][https://www.opengis.net/def/profile]=urn:ogc:def:profile:OGC::text-plain",
@@ -8614,6 +8880,7 @@ class ProcessListingMetadata(PagingBodySchema):
 
 
 class ProcessesListing(ProcessCollection, ProcessListingLinks):
+    recordsArrayName = RecordsArrayName(validator=OneOf(["processes"]), default="processes")
     _schema = f"{OGC_API_PROC_PART1_SCHEMAS}/processList.yaml"
     _sort_first = PROCESSES_LISTING_FIELD_FIRST
     _sort_after = PROCESSES_LISTING_FIELD_AFTER

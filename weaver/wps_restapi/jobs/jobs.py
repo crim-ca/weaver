@@ -42,7 +42,7 @@ from weaver.processes.wps_package import mask_process_inputs
 from weaver.status import StatusCompliant, map_status
 from weaver.store.base import StoreJobs
 from weaver.transform.utils import extend_alternate_formats
-from weaver.utils import get_header, get_path_kvp, get_settings, make_link_header
+from weaver.utils import get_header, get_path_kvp, get_request_args, get_settings, make_link_header
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.jobs.utils import (
     deploy_multipart_job_workflow,
@@ -62,7 +62,7 @@ from weaver.wps_restapi.jobs.utils import (
     validate_service_process
 )
 from weaver.wps_restapi.providers.utils import get_service
-from weaver.wps_restapi.swagger_definitions import datetime_interval_parser
+from weaver.wps_restapi.records import get_queryables_schema, get_sortables_schema, resolve_queryables_params
 
 if TYPE_CHECKING:
     from typing import Iterable, List
@@ -72,6 +72,34 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnyResponseType, AnyViewResponse, JSON, PyramidRequest
 
 LOGGER = get_task_logger(__name__)
+
+
+@sd.jobs_queryables_service.get(
+    tags=[sd.TAG_JOBS],
+    accept=[ContentType.APP_SCHEMA_JSON, ContentType.APP_JSON],
+    renderer=OutputFormat.JSON,
+    response_schemas={"200": sd.QueryablesResponseSchema()},
+)
+def get_job_queryables(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Describes supported job queryables.
+    """
+    return get_queryables_schema(request, sd.GetJobsQueries())
+
+
+@sd.jobs_sortables_service.get(
+    tags=[sd.TAG_JOBS],
+    accept=[ContentType.APP_SCHEMA_JSON, ContentType.APP_JSON],
+    renderer=OutputFormat.JSON,
+    response_schemas={"200": sd.SortablesResponseSchema()},
+)
+def get_job_sortables(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Describes supported job sortables.
+    """
+    return get_sortables_schema(request, sd.JobSortByEnum())
 
 
 @sd.provider_jobs_service.get(
@@ -133,10 +161,7 @@ def get_queried_jobs(request):
     """
 
     settings = get_settings(request)
-    params = dict(request.params)
-    if params.get("datetime", False):
-        # replace white space with '+' since request.params replaces '+' with whitespaces when parsing
-        params["datetime"] = params["datetime"].replace(" ", "+")
+    params = dict(get_request_args(request))
 
     try:
         params = sd.GetJobsQueries().deserialize(params)
@@ -149,6 +174,7 @@ def get_queried_jobs(request):
             "value": repr_json(ex.value or params, force_string=False),
         })
 
+    params = resolve_queryables_params(params)
     service, process = validate_service_process(request)
     LOGGER.debug("Job search queries (raw):\n%s", repr_json(params, indent=2))
     for param_name in ["process", "processID", "provider", "service"]:
@@ -171,14 +197,6 @@ def get_queried_jobs(request):
     filters["max_duration"] = filters.pop("maxDuration", None)
     filters["job_type"] = filters.pop("type", None)
 
-    dti = datetime_interval_parser(params["datetime"]) if params.get("datetime", False) else None
-    if dti and dti.get("before", False) and dti.get("after", False) and dti["after"] > dti["before"]:
-        raise HTTPUnprocessableEntity(json={
-            "code": "InvalidDateFormat",
-            "description": "Datetime at the start of the interval must be less than the datetime at the end."
-        })
-    filters["datetime_interval"] = dti
-    filters.pop("datetime", None)
     LOGGER.debug("Job search queries (processed):\n%s", repr_json(filters, indent=2))
 
     store = get_db(request).get_store(StoreJobs)
@@ -1090,6 +1108,8 @@ def includeme(config):
     # type: (Configurator) -> None
     LOGGER.info("Adding WPS REST API jobs views...")
     config.add_cornice_service(sd.jobs_service)
+    config.add_cornice_service(sd.jobs_queryables_service)
+    config.add_cornice_service(sd.jobs_sortables_service)
     config.add_cornice_service(sd.job_service)
     config.add_cornice_service(sd.job_results_service)
     config.add_cornice_service(sd.job_result_value_service)

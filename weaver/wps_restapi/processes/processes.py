@@ -32,7 +32,14 @@ from weaver.processes.execution import submit_job, submit_job_dispatch_wps, subm
 from weaver.processes.utils import deploy_process_from_payload, get_process, update_process_metadata
 from weaver.status import Status
 from weaver.store.base import StoreJobs, StoreProcesses
-from weaver.utils import clean_json_text_body, fully_qualified_name, get_any_id, get_header, make_link_header
+from weaver.utils import (
+    clean_json_text_body,
+    fully_qualified_name,
+    get_any_id,
+    get_header,
+    get_request_args,
+    make_link_header
+)
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.processes.utils import (
@@ -42,6 +49,7 @@ from weaver.wps_restapi.processes.utils import (
 )
 from weaver.wps_restapi.providers.providers import describe_provider_process
 from weaver.wps_restapi.providers.utils import get_provider_id, get_provider_services
+from weaver.wps_restapi.records import get_queryables_schema, get_sortables_schema
 
 if TYPE_CHECKING:
     from pyramid.config import Configurator
@@ -49,6 +57,34 @@ if TYPE_CHECKING:
     from weaver.typedefs import AnyViewResponse, JSON, PyramidRequest
 
 LOGGER = logging.getLogger(__name__)
+
+
+@sd.processes_queryables_service.get(
+    tags=[sd.TAG_PROCESSES],
+    accept=[ContentType.APP_SCHEMA_JSON, ContentType.APP_JSON],
+    renderer=OutputFormat.JSON,
+    response_schemas={"200": sd.QueryablesResponseSchema()},
+)
+def get_process_queryables(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Describes supported process queryables.
+    """
+    return get_queryables_schema(request, sd.GetProcessesQuery())
+
+
+@sd.processes_sortables_service.get(
+    tags=[sd.TAG_PROCESSES],
+    accept=[ContentType.APP_SCHEMA_JSON, ContentType.APP_JSON],
+    renderer=OutputFormat.JSON,
+    response_schemas={"200": sd.SortablesResponseSchema()},
+)
+def get_process_sortables(request):
+    # type: (PyramidRequest) -> AnyViewResponse
+    """
+    Describes supported process sortables.
+    """
+    return get_sortables_schema(request, sd.ProcessSortByEnum())
 
 
 @sd.processes_service.options(tags=[sd.TAG_PROCESSES, sd.TAG_GETCAPABILITIES, sd.TAG_DEPLOY])
@@ -96,14 +132,14 @@ def get_processes(request):
     Optionally list both local and provider processes.
     """
     try:
-        params = sd.GetProcessesQuery().deserialize(request.params)
+        params = sd.GetProcessesQuery().deserialize(get_request_args(request))
     except colander.Invalid as ex:
         raise HTTPBadRequest(json={
             "code": "ProcessInvalidParameter",
             "description": "Process query parameters failed validation.",
             "error": colander.Invalid.__name__,
             "cause": str(ex),
-            "value": repr_json(ex.value or dict(request.params), force_string=False),
+            "value": repr_json(ex.value or dict(get_request_args(request)), force_string=False),
         })
 
     links = asbool(params.get("links", True))
@@ -122,7 +158,8 @@ def get_processes(request):
                 f"Manual cleanup of following processes is required: {invalid_processes}"
             )
 
-        body = {"processes": processes if detail else [get_any_id(p) for p in processes]}  # type: JSON
+        listing = processes if detail else [get_any_id(p) for p in processes]
+        body = {"processes": listing}  # type: JSON
         if not with_providers:
             paging = {  # remove other params
                 "page": paging.get("page"),
@@ -590,6 +627,8 @@ def includeme(config):
     # type: (Configurator) -> None
     LOGGER.info("Adding WPS REST API processes views...")
     config.add_cornice_service(sd.processes_service)
+    config.add_cornice_service(sd.processes_queryables_service)
+    config.add_cornice_service(sd.processes_sortables_service)
     config.add_cornice_service(sd.process_service)
     config.add_cornice_service(sd.process_package_service)
     config.add_cornice_service(sd.process_payload_service)

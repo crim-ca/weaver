@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     import datetime
     from typing import Any, Dict, List, Optional, Tuple, Union
 
+    from pygeofilter.ast import AstType
     from pyramid.request import Request
     from pywps import Process as ProcessWPS
 
@@ -121,6 +122,17 @@ class StoreProcesses(StoreInterface):
                        process=None,        # type: Optional[str]
                        identifiers=None,    # type: Optional[List[str]]
                        metadata=None,       # type: Optional[List[Tuple[MetadataQueryScope, str, str]]]
+                       keywords=None,       # type: Optional[str]
+                       title=None,          # type: Optional[str]
+                       description=None,    # type: Optional[str]
+                       q=None,              # type: Optional[str]
+                       query=None,          # type: Optional[str]
+                       version=None,        # type: Optional[str]
+                       sortby=None,         # type: Optional[List[str]]
+                       datetime_interval=None,  # type: Optional[DatetimeIntervalType]
+                       license=None,        # type: Optional[str]
+                       type=None,           # type: Optional[str]
+                       filter_ast=None,     # type: Optional[AstType]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         raise NotImplementedError
 
@@ -228,6 +240,8 @@ class StoreJobs(StoreInterface):
                   access=None,              # type: Optional[str]
                   status=None,              # type: Optional[AnyStatusSearch, List[AnyStatusSearch]]
                   sort=None,                # type: Optional[AnySortType]
+                  sortby=None,              # type: Optional[List[str]]
+                  filter_ast=None,          # type: Optional[AstType]
                   page=0,                   # type: Optional[int]
                   limit=10,                 # type: Optional[int]
                   min_duration=None,        # type: Optional[int]

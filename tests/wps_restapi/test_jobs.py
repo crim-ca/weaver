@@ -8,12 +8,14 @@ import logging
 import os
 import shutil
 import tempfile
+import urllib.parse
 import warnings
 from datetime import date
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urlsplit
 
 import colander
+import jsonschema
 import mock
 import pytest
 from dateutil import parser as date_parser
@@ -49,6 +51,7 @@ from weaver.formats import ContentType, OutputFormat
 from weaver.notify import decrypt_email
 from weaver.processes.constants import JobInputsOutputsSchema, JobStatusProfileSchema, JobStatusType
 from weaver.processes.wps_testing import WpsTestProcess
+from weaver.sort import Sort, SortMethods, sort_with_directions
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory
 from weaver.utils import Version, compute_file_digest_multibase, explode_headers, get_path_kvp, now
 from weaver.visibility import Visibility
@@ -311,7 +314,65 @@ class WpsRestApiJobsTest(JobUtils):
             total += grouped_jobs["count"]
         assert total == response.json["total"]
 
-    @pytest.mark.oap_part1
+    @pytest.mark.ogc_records
+    def test_get_jobs_queryables(self):
+        # type: () -> None
+        """
+        Tests that job queryables advertise supported filters.
+        """
+        resp = self.app.get("/queryables/jobs", headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.content_type == ContentType.APP_SCHEMA_JSON
+        jsonschema.Draft7Validator.check_schema(resp.json)
+        assert set(resp.json["properties"]) == {child.name for child in sd.GetJobsQueries().children}
+        landing = self.app.get("/", headers=self.json_headers)
+        assert any(
+            link["rel"] == sd.OGC_API_REL_QUERYABLES_URI
+            and link["href"].endswith("/queryables/jobs")
+            for link in landing.json["links"]
+        )
+
+    @pytest.mark.ogc_records
+    def test_get_jobs_sortables(self):
+        # type: () -> None
+        """
+        Tests that job sortables describe the sorting fields enumerated by the ``sortby`` queryable.
+        """
+        queryables = self.app.get("/queryables/jobs", headers=self.json_headers).json
+        sortby = queryables["properties"]["sortby"]
+        assert sortby["type"] == "array"
+        assert sortby["items"]["enum"] == sort_with_directions(SortMethods.JOB)
+
+        resp = self.app.get("/sortables/jobs", headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.content_type == ContentType.APP_SCHEMA_JSON
+        jsonschema.Draft7Validator.check_schema(resp.json)
+        assert set(resp.json["properties"]) == set(SortMethods.JOB)
+        assert resp.json["properties"][Sort.FINISHED]["format"] == "date-time"
+
+        spec = self.app.get("/json", headers=self.json_headers).json
+        assert "/sortables/jobs" in spec["paths"]
+        sortby_params = [param for name, param in spec["components"]["parameters"].items() if name.endswith(".sortby")]
+        assert sortby_params
+        sortby_param = sortby_params[0]
+        assert sortby_param["style"] == "form"
+        assert sortby_param["explode"] is False
+        assert sortby_param["schema"]["type"] == "array"
+
+        for path in ["/", "/jobs"]:
+            links = self.app.get(path, headers=self.json_headers).json["links"]
+            assert any(
+                link["rel"] == sd.OGC_API_REL_SORTABLES_URI and link["href"].endswith("/sortables/jobs")
+                for link in links
+            ), path
+
+    @pytest.mark.ogc_records
+    def test_get_jobs_records_array_name(self):
+        resp = self.app.get(sd.jobs_service.path, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["recordsArrayName"] == "jobs"
+        assert "jobs" in resp.json
+
     def test_get_jobs_normal_paged(self):
         resp = self.app.get(sd.jobs_service.path, headers=self.json_headers)
         self.check_basic_jobs_info(resp)
@@ -1069,6 +1130,49 @@ class WpsRestApiJobsTest(JobUtils):
         schema_prefix = sd.GetProcessJobsQuery.__name__
         assert not resp.json["components"]["parameters"][f"{schema_prefix}.page"]["required"]
         assert not resp.json["components"]["parameters"][f"{schema_prefix}.limit"]["required"]
+
+    @pytest.mark.ogc_records
+    def test_get_jobs_sortby(self):
+        """
+        Tests that ``sortby`` applies signed fields, with ``-created`` as the default direction of ``created``.
+        """
+        for query, reverse in [
+            ({}, True), ({"sortby": "-created"}, True), ({"sortby": "created"}, True),
+            ({"sortby": "%2Bcreated"}, False),
+        ]:
+            path = get_path_kvp(sd.jobs_service.path, detail=True, **query)
+            resp = self.app.get(path, headers=self.json_headers)
+            assert resp.status_code == 200, resp.text
+            created = [job["created"] for job in resp.json["jobs"]]
+            assert len(created) > 1
+            assert created == sorted(created, reverse=reverse), query
+
+    @pytest.mark.ogc_records
+    def test_get_jobs_filter_cql2(self):
+        """
+        Tests that a CQL2 ``filter`` is applied by the same job listing aggregation as the other query parameters.
+        """
+        path = get_path_kvp(sd.jobs_service.path, detail=False, status=Status.SUCCESSFUL)
+        expected = self.app.get(path, headers=self.json_headers).json["jobs"]
+        assert expected
+        path = get_path_kvp(sd.jobs_service.path, detail=False, filter=f"status = '{Status.SUCCESSFUL}'")
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert sorted(resp.json["jobs"]) == sorted(expected)
+
+        path = get_path_kvp(
+            sd.jobs_service.path, detail=False, filter="created AFTER 2000-01-01T00:00:00Z", **{"filter-lang": "ecql"}
+        )
+        total = self.app.get(get_path_kvp(sd.jobs_service.path, detail=False), headers=self.json_headers).json["total"]
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json["total"] == total
+
+    @pytest.mark.ogc_records
+    def test_get_jobs_filter_cql2_invalid(self):
+        path = get_path_kvp(sd.jobs_service.path, filter="unknown = 'x'")
+        resp = self.app.get(path, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400
 
     def test_get_jobs_filter_by_tags_single(self):
         path = get_path_kvp(sd.jobs_service.path, tags="unique", detail=False)
@@ -4458,6 +4562,6 @@ def test_get_job_status_profile_valid(accept_profile, query_profile, expected_pr
     queries = {"profile": query_profile} if query_profile else {}
     headers = {"Accept": ContentType.APP_JSON}
     headers.update({"Accept-Profile": accept_profile} if accept_profile else {})
-    request = MockedRequest(params=queries, headers=headers)
+    request = MockedRequest(params=queries, query_string=urllib.parse.urlencode(queries), headers=headers)
     profile, _ = get_job_status_schema(request)
     assert profile == expected_profile

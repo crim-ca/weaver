@@ -2,6 +2,7 @@ import io
 import math
 import os
 import shutil
+import urllib.parse
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast, overload
 from urllib.parse import unquote_plus
@@ -291,10 +292,11 @@ def get_job_list_links(job_total, filters, grouped, request):
     base_url = get_wps_restapi_base_url(request)
 
     # reapply queries that must be given to obtain the same result in case of subsequent requests (sort, limits, etc.)
-    kvp_params = {param: value for param, value in request.params.items() if param != "page"}
-    # patch datetime that have some extra character manipulation (reapply '+' auto-converted to ' ' by params parser)
-    if "datetime" in kvp_params:
-        kvp_params["datetime"] = kvp_params["datetime"].replace(" ", "+")
+    kvp_params = {param: value for param, value in get_request_args(request).items() if param != "page"}
+    kvp_params = {
+        urllib.parse.quote(key, safe=""): urllib.parse.quote(value, safe="")
+        for key, value in kvp_params.items()
+    }
     alt_kvp = deepcopy(kvp_params)
 
     # request job uses general endpoint, obtain the full path if any service/process was given as alternate location
@@ -338,6 +340,15 @@ def get_job_list_links(job_total, filters, grouped, request):
             "type": ContentType.APP_JSON, "title": "Alternate endpoint with equivalent set of filtered jobs."
         })
 
+    links.append({
+        "href": base_url + sd.jobs_queryables_service.path, "rel": sd.OGC_API_REL_QUERYABLES_URI,
+        "type": ContentType.APP_SCHEMA_JSON, "title": "Supported job queryables."
+    })
+    links.append({
+        "href": base_url + sd.jobs_sortables_service.path, "rel": sd.OGC_API_REL_SORTABLES_URI,
+        "type": ContentType.APP_SCHEMA_JSON, "title": "Supported job sortables."
+    })
+
     if not grouped:
         links.append({
             "href": sd.OGC_API_PROC_PROFILE_JOB_LIST_URI, "rel": "profile",
@@ -351,7 +362,7 @@ def get_job_list_links(job_total, filters, grouped, request):
          "type": ContentType.APP_JSON, "title": "Generic query endpoint to search for jobs."},
         {"href": f"{job_path}?detail=false", "rel": "preview",
          "type": ContentType.APP_JSON, "title": "Job listing summary (UUID and count only)."},
-        {"href": job_path, "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
+        {"href": job_path, "rel": sd.OGC_API_PROC_REL_JOB_LIST_URI,
          "type": ContentType.APP_JSON, "title": "List of registered jobs."},
         {"href": get_path_kvp(job_path, page=cur_page, **kvp_params), "rel": "current",
          "type": ContentType.APP_JSON, "title": "Current page of job query listing."},

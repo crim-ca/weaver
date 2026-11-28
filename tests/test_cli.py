@@ -69,6 +69,129 @@ def test_cli_url_required_in_client_or_param():
 
 
 @pytest.mark.cli
+@pytest.mark.ogc_records
+def test_cli_jobs_queryables_options():
+    """
+    Tests that CLI queryables options are forwarded as job listing query parameters.
+    """
+    with mock.patch.object(WeaverClient, "_request", return_value=mock.sentinel.response) as request:
+        with mock.patch.object(WeaverClient, "_parse_result", return_value=OperationResult(True, message="ok")):
+            run_command(
+                [
+                    "jobs",
+                    "-u",
+                    "https://fake.domain.com",
+                    "--sortby=-created",
+                    "--sortby=status",
+                    "--datetime=2025-01-01T00:00:00Z/2025-12-31T23:59:59Z",
+                    "--filter",
+                    "status = 'successful'",
+                    "--filter-lang",
+                    "CQL2-TEXT",
+                ],
+                entrypoint=weaver_cli,
+            )
+        params = request.call_args.kwargs["params"]
+
+    assert params == {
+        "sortby": "-created,status",
+        "datetime": "2025-01-01T00:00:00Z/2025-12-31T23:59:59Z",
+        "filter": "status = 'successful'",
+        "filter-lang": "cql2-text",
+    }
+
+
+@pytest.mark.cli
+@pytest.mark.ogc_records
+def test_cli_capabilities_queryables_options():
+    filter_expr = {"op": "=", "args": [{"property": "id"}, "example"]}
+    response = mock.Mock()
+    response.json.return_value = {"processes": []}
+    with mock.patch.object(WeaverClient, "_request", return_value=response) as request:
+        with mock.patch.object(WeaverClient, "_parse_result", return_value=OperationResult(True, message="ok")):
+            run_command(
+                [
+                    "capabilities",
+                    "-u",
+                    "https://fake.domain.com",
+                    "--process",
+                    "example",
+                    "--revisions",
+                    "--sortby=+id",
+                    "--sortby=-version",
+                    "--keywords",
+                    "climate",
+                    "--keywords",
+                    "netcdf",
+                    "--title",
+                    "Subset",
+                    "--description",
+                    "Extracts a region",
+                    "--q",
+                    "+climate",
+                    "--query",
+                    "+climate -grib",
+                    "--version",
+                    "1.0.0/..",
+                    "--datetime",
+                    "2025-01-01T00:00:00Z/..",
+                    "--license",
+                    "https://spdx.org/licenses/Apache-2.0",
+                    "--type",
+                    "application",
+                    "--type",
+                    "workflow",
+                    "--filter",
+                    json.dumps(filter_expr),
+                    "--filter-lang",
+                    "CQL2-JSON",
+                    "--filter-crs",
+                    "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+                ],
+                entrypoint=weaver_cli,
+            )
+        params = request.call_args.kwargs["params"]
+
+    assert params["process"] == "example"
+    assert params["revisions"] is True
+    assert params["sortby"] == "+id,-version"
+    assert params["keywords"] == "climate,netcdf"
+    assert params["title"] == "Subset"
+    assert params["description"] == "Extracts a region"
+    assert params["q"] == "+climate"
+    assert params["query"] == "+climate -grib"
+    assert params["version"] == "1.0.0/.."
+    assert params["datetime"] == "2025-01-01T00:00:00Z/.."
+    assert params["license"] == "https://spdx.org/licenses/Apache-2.0"
+    assert params["type"] == "application,workflow"
+    assert json.loads(params["filter"]) == filter_expr
+    assert params["filter-lang"] == "cql2-json"
+    assert params["filter-crs"] == "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+
+
+@pytest.mark.cli
+@pytest.mark.ogc_records
+def test_weaver_client_capabilities_accepts_python_filter_and_sortby():
+    filter_expr = {"op": "=", "args": [{"property": "id"}, "example"]}
+    response = mock.Mock()
+    response.json.return_value = {"processes": []}
+    with mock.patch.object(WeaverClient, "_request", return_value=response) as request:
+        with mock.patch.object(WeaverClient, "_parse_result", return_value=OperationResult(True, message="ok")):
+            WeaverClient(url="https://fake.domain.com").capabilities(
+                sortby=["+id", "-version"],
+                filter=filter_expr,
+                filter_lang="cql2-json",
+                filter_crs="http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+            )
+        params = request.call_args.kwargs["params"]
+
+    assert params["sortby"] == "+id,-version"
+    assert json.loads(params["filter"]) == filter_expr
+    assert params["filter-lang"] == "cql2-json"
+    assert params["filter-crs"] == "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+
+
+@pytest.mark.cli
 def test_cli_url_override_by_operation():
     with mock.patch("weaver.cli.WeaverClient._parse_inputs", return_value=OperationResult()):
         client = WeaverClient(url="https://fake.domain.com")
@@ -362,6 +485,16 @@ def test_cli_url_handle_quotes(url):
 def test_cli_request_options_setup(parameters, expect_settings):
     client = WeaverClient("http://localhost:4001", **parameters)
     assert client._settings == expect_settings
+
+
+def test_cli_request_query_spaces_encoded():
+    """
+    Ensure spaces are sent as ``%20`` since ``+`` is interpreted literally by the API.
+    """
+    client = WeaverClient("http://localhost:4001")
+    with mock.patch("weaver.cli.request_extra") as mock_request:
+        client._request("GET", "http://localhost:4001/processes", params={"q": "a b +c", "skip": None, "k": ["x y"]})
+    assert mock_request.call_args.kwargs["params"] == "q=a%20b%20%2Bc&k=x%20y"
 
 
 def test_cli_request_options_parsing():

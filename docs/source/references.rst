@@ -137,6 +137,8 @@
 .. _ogc-api-maps: https://ogcapi.ogc.org/maps/
 .. |ogc-api-tiles| replace:: *OGC API - Tiles*
 .. _ogc-api-tiles: https://ogcapi.ogc.org/tiles/
+.. |ogc-api-records| replace:: *OGC API - Records*
+.. _ogc-api-records: https://github.com/opengeospatial/ogcapi-records
 .. |ogc-api-proc| replace:: *OGC API - Processes*
 .. _ogc-api-proc: https://github.com/opengeospatial/ogcapi-processes
 .. |ogc-proc-long| replace:: |ogc-api-proc|_ (WPS-REST bindings)

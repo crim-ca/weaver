@@ -32,9 +32,11 @@ List jobs with filtering, pagination, and sorting capabilities.
 - `status` (string): Filter by job status (running, succeeded, failed, etc.)
 - `limit` (integer): Maximum number of results (default: 10)
 - `page` (integer): Page number for pagination (default: 0)
-- `sort` (string): Sort order (e.g., "created:desc")
+- `datetime` (string): Filter by job creation datetime or interval
+- `sortby` (string or list): Signed (`+/-`) sorting fields, such as `["-created", "status"]`
+- `filter` (string or JSON object/array): CQL2 expression, with optional `filter-lang`
+- `filter-crs` (string): Coordinate reference system for spatial filter properties
 - `tags` (list): Filter by job tags
-- `date` (string): Filter by date range
 - `detail` (boolean): Include detailed information
 
 ## CLI Usage
@@ -56,7 +58,13 @@ weaver jobs -u $WEAVER_URL -p my-process -s failed
 weaver jobs -u $WEAVER_URL --limit 50 --page 2
 
 # Sort by creation date
-weaver jobs -u $WEAVER_URL --sort created:desc
+weaver jobs -u $WEAVER_URL --sortby=-created
+
+# Filter by creation time and status
+weaver jobs -u $WEAVER_URL \
+  --datetime "2026-02-01/2026-02-19" \
+  --filter "status = 'succeeded'" \
+  --filter-lang cql2-text
 ```
 
 ## Python Usage
@@ -80,13 +88,21 @@ failed_jobs = client.jobs(
 
 # Get detailed information
 detailed = client.jobs(detail=True, limit=100)
+
+# Filter, sort, and restrict by creation time
+filtered = client.jobs(
+    sortby=["-created", "status"],
+    filter={"op": "=", "args": [{"property": "status"}, "succeeded"]},
+    filter_lang="cql2-json",
+    datetime="2026-02-01/2026-02-19",
+)
 ```
 
 ## API Request
 
 ```bash
 curl -X GET \
-  "${WEAVER_URL}/jobs?process=my-process&status=succeeded&limit=20&page=0"
+  "${WEAVER_URL}/jobs?process=my-process&status=succeeded&limit=20&page=0&sortby=-created"
 ```
 
 ## Returns
@@ -125,10 +141,10 @@ curl -X GET \
 
 ## Filtering Examples
 
-### By Date Range
+### By Creation Date Range
 
 ```bash
-weaver jobs -u $WEAVER_URL --date "2026-02-01/2026-02-19"
+weaver jobs -u $WEAVER_URL --datetime "2026-02-01/2026-02-19"
 ```
 
 ### By Multiple Statuses

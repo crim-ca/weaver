@@ -12,7 +12,52 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add `OGC API - Records` ``autodiscovery`` and ``local-resources-catalog`` (``query-parameters``, ``sorting``,
+  ``filtering``) conformance classes, ``ogc-catalog`` landing page links for ``/processes`` and ``/jobs``,
+  and ``recordsArrayName`` in their listings
+  (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
+- Add ``cql2/1.0`` ``basic-cql2``, ``cql2-json`` and ``cql2-text`` and `OGC API - Common` Part 2
+  ``simple-query`` conformance classes
+  (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
+- Add ``keywords`` query parameter on ``GET /processes`` with ``,`` for AND, ``|`` for OR and ``!``/``~`` for NOT
+  (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
+- Add ``title`` and ``description`` query parameters on ``GET /processes`` for case-insensitive text search
+  (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
+- Add ``q`` and ``query`` phrase search with boundary-prefixed ``+`` (AND), ``-`` (NOT) and ``,`` (OR) over process
+  titles, descriptions and keywords. Preserve literal embedded/trailing signs and match flexible phrase whitespace
+  (resolves `#644 <https://github.com/crim-ca/weaver/issues/644>`_).
+- Add exact and inclusive ``lower/upper`` version range filtering on ``GET /processes``
+  (resolves `#627 <https://github.com/crim-ca/weaver/issues/627>`_).
+- Add ``sortby`` signed multi-field sorting on ``GET /processes`` and ``GET /jobs``, replacing the removed ``sort``
+  query parameter and its `CLI` ``--sort`` option
+  (resolves `#643 <https://github.com/crim-ca/weaver/issues/643>`_).
+- Add ``created`` datetime to `Process` and ``datetime`` query parameter on ``GET /processes`` matching it
+  (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
+- Add ``type`` query parameter on ``GET /processes`` matching `Process` types or `OGC API - Records` resource type URIs
+  (resolves `#642 <https://github.com/crim-ca/weaver/issues/642>`_ and
+  `#645 <https://github.com/crim-ca/weaver/issues/645>`_).
+- Add ``license`` query parameter on ``GET /processes`` matching ``license`` links or metadata
+  (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
+- Add `CQL2` ``filter`` query parameter on ``GET /processes`` and ``GET /jobs``
+  (resolves `#640 <https://github.com/crim-ca/weaver/issues/640>`_).
+- Add `CLI` support for job listing ``datetime``, ``sortby``, ``filter`` and ``filter-lang`` parameters
+  (resolves `#640 <https://github.com/crim-ca/weaver/issues/640>`_ and
+  `#643 <https://github.com/crim-ca/weaver/issues/643>`_).
+- Add process search and filtering parameters to `CLI` and ``WeaverClient.capabilities()``, including CQL2-JSON and
+  list-based sorting (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_,
+  `#640 <https://github.com/crim-ca/weaver/issues/640>`_, `#643 <https://github.com/crim-ca/weaver/issues/643>`_,
+  `#644 <https://github.com/crim-ca/weaver/issues/644>`_ and
+  `#642 <https://github.com/crim-ca/weaver/issues/642>`_).
+- Add ``/queryables/processes``, ``/queryables/jobs``, ``/sortables/processes`` and ``/sortables/jobs`` descriptions
+  generated from supported listing parameters, with ``/queryables`` and ``/sortables`` discovery links
+  (resolves `#646 <https://github.com/crim-ca/weaver/issues/646>`_).
+- Add `OGC API - Records` sorting, filtering and ``cql-filter`` conformance classes
+  (resolves `#641 <https://github.com/crim-ca/weaver/issues/641>`_).
+- Interpret ``+`` literally in request query strings, as defined by
+  `RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986>`_, instead of applying the form-style conversion
+  into a space. This allows ``+`` operators and ``+`` signs of ``q``, ``query``, ``sortby`` and ``datetime`` parameters
+  to be provided directly. A space must now be encoded as ``%20`` by direct `HTTP` clients.
+  The `CLI` and ``WeaverClient`` encode query parameters accordingly.
 
 Fixes:
 ------
@@ -65,6 +110,7 @@ Changes:
 
 Fixes:
 ------
+- Fix paging links of ``GET /jobs`` not URL-encoding the provided query parameters.
 - Fix process version links and version-history listings for semantic versions with suffixes such as ``0.1.3.dev10``.
   Correct ``latest-version``, ``version-history``, ``predecessor-version``, ``successor-version`` and ``working-copy``
   links. Add ``current`` and ``working-copy-of`` links and make ``self`` and ``alternate`` links representation-aware

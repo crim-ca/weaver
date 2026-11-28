@@ -44,8 +44,8 @@ class GenericApiRoutesTestCase(WpsConfigBase):
         except colander.Invalid as ex:
             body = json.dumps(body, indent=2, ensure_ascii=False)
             self.fail(f"expected valid response format as defined in schema [{ex!s}] in\n{body}")
-        refs = [link["rel"] for link in body["links"]]
-        assert len(body["links"]) == len(set(refs)), "Link relationships must all be unique"
+        refs = [(link["rel"], link["href"]) for link in body["links"]]
+        assert len(body["links"]) == len(set(refs)), "Links for the same relationship and target must be unique"
 
         # override media-type with alternative representations for specific rel links
         expect_ctype = {
@@ -113,6 +113,54 @@ class GenericApiRoutesTestCase(WpsConfigBase):
             sd.ConformanceSchema().deserialize(resp.json)
         except colander.Invalid as ex:
             self.fail(f"expected valid response format as defined in schema [{ex!s}]")
+
+    @pytest.mark.ogc_records
+    def test_conformance_records_queryables(self):
+        resp = self.app.get("/conformance", headers=self.json_headers)
+        records = sd.OGC_API_RECORDS_PART1_BASE_URI
+        for name in ["sorting", "filtering", "cql-filter"]:
+            assert f"{records}/conf/{name}" in resp.json["conformsTo"]
+
+    @pytest.mark.ogc_records
+    def test_conformance_records_local_resources_catalog(self):
+        resp = self.app.get("/conformance", headers=self.json_headers)
+        records = sd.OGC_API_RECORDS_PART1_BASE_URI
+        cql2 = sd.OGC_API_CQL2_BASE_URI
+        expected = [f"{records}/conf/{name}" for name in [
+            "autodiscovery",
+            "local-resources-catalog",
+            "local-resources-catalog-query-parameters",
+            "local-resources-catalog-sorting",
+            "local-resources-catalog-filtering",
+        ]]
+        expected += [f"{cql2}/conf/{name}" for name in ["basic-cql2", "cql2-json", "cql2-text"]]
+        expected.append(f"{sd.OGC_API_COMMON_PART2_BASE_URI}/conf/simple-query")
+        for conf in expected:
+            assert conf in resp.json["conformsTo"]
+
+    @pytest.mark.ogc_records
+    def test_landing_page_catalog_links(self):
+        resp = self.app.get("/", headers=self.json_headers)
+        catalogs = [link["href"] for link in resp.json["links"] if link["rel"] == sd.OGC_API_REL_CATALOG_URI]
+        assert any(href.endswith("/processes") for href in catalogs)
+        assert any(href.endswith("/jobs") for href in catalogs)
+
+    @pytest.mark.ogc_records
+    def test_landing_page_catalog_links_resolve_to_records(self):
+        """
+        Tests that each ``ogc-catalog`` link resolves to a listing whose ``recordsArrayName`` names its records.
+        """
+        resp = self.app.get("/", headers=self.json_headers)
+        catalogs = [link for link in resp.json["links"] if link["rel"] == sd.OGC_API_REL_CATALOG_URI]
+        assert all(link["type"] == ContentType.APP_JSON for link in catalogs)
+        found = set()
+        for link in catalogs:
+            listing = self.app.get(link["href"], headers=self.json_headers)
+            assert listing.status_code == 200, listing.text
+            name = listing.json["recordsArrayName"]
+            assert isinstance(listing.json[name], list)
+            found.add(name)
+        assert found == {"processes", "jobs"}
 
     def test_conformance_html(self):
         resp = self.app.get("/conformance", headers=self.json_headers)

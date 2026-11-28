@@ -237,6 +237,20 @@ Glossary
         Regroups all the :term:`API` standards defined by :term:`OGC`, including :term:`OGC API - Processes`.
         These are often distinguished from the older :term:`OWS` standards such as :term:`WPS`.
 
+    Catalog
+        Collection of records described by :term:`OGC API - Records` that can be browsed or searched.
+        Searches employ logically connected predicates such as keywords, temporal extent or other scalar properties.
+
+    Records
+    OGC API - Records
+        The :term:`OGC API` standard that provides a way to browse or search a curated collection of records
+        known as a :term:`Catalog`. A record is the atomic unit of information in a :term:`Catalog`,
+        and contains descriptive metadata that makes a resource discoverable.
+        In `Weaver`, :term:`Process` and :term:`Job` listings are exposed as :term:`Catalog` resources.
+
+        .. seealso::
+            |ogc-api-records|_
+
     OAP
     OGC API - Processes
         The new :term:`API` that defines :term:`JSON` REST-binding representation

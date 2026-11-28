@@ -2,6 +2,7 @@
 import base64
 import contextlib
 import copy
+import datetime
 import gzip
 import json
 import os
@@ -13,6 +14,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, cast
 
 import colander
+import jsonschema
 import mock
 import pyramid.testing
 import pytest
@@ -72,8 +74,17 @@ from weaver.processes.constants import (
 from weaver.processes.types import ProcessType
 from weaver.processes.utils import deploy_process_from_payload
 from weaver.processes.wps_testing import WpsTestProcess
+from weaver.sort import Sort, SortMethods, sort_with_directions
 from weaver.status import Status
-from weaver.utils import explode_headers, fully_qualified_name, get_path_kvp, load_file, ows_context_href, repr_json
+from weaver.utils import (
+    explode_headers,
+    fully_qualified_name,
+    get_path_kvp,
+    load_file,
+    now,
+    ows_context_href,
+    repr_json
+)
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
@@ -85,7 +96,7 @@ from weaver.wps_restapi.processes.utils import (
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    from typing import Any, Generator, List, Optional, Tuple, TypeAlias, Union
+    from typing import Any, Dict, Generator, List, Optional, Tuple, TypeAlias, Union
     from typing_extensions import Literal
 
     import _pytest  # noqa: W0212
@@ -174,6 +185,14 @@ def fixture_cwl_no_warn_unknown_hint(
 
 # pylint: disable=C0103,invalid-name
 @pytest.mark.functional
+def encode_query(params):
+    # type: (Dict[str, Any]) -> str
+    """
+    Encodes query parameters using percent-encoding only (space as ``%20``) since ``+`` is interpreted literally.
+    """
+    return urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
+
+
 class WpsRestApiProcessesTest(WpsConfigBase):
     remote_server = None    # type: str
     settings = {
@@ -316,7 +335,87 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         path = "/conformance"
         resp = self.app.get(path, headers=self.json_headers)
         conf = resp.json["conformsTo"]
-        assert "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/core/process-summary-links" in conf
+        assert f"{sd.OGC_API_PROC_PART1_BASE_URI}/conf/core/process-summary-links" in conf
+
+    @pytest.mark.ogc_records
+    def test_get_processes_queryables(self):
+        # type: () -> None
+        """
+        Tests discoverable process search parameters generated from the actual listing schema.
+        """
+        resp = self.app.get("/queryables/processes", headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.content_type == ContentType.APP_SCHEMA_JSON
+        jsonschema.Draft7Validator.check_schema(resp.json)
+        assert set(resp.json["properties"]) == {child.name for child in sd.GetProcessesQuery().children}
+        assert {"keywords", "q", "query", "version", "sortby", "datetime",
+                "license", "type", "filter"}.issubset(resp.json["properties"])
+        specification = self.app.get("/json", headers=self.json_headers)
+        assert specification.status_code == 200, specification.text
+        assert "/queryables/processes" in specification.json["paths"]
+        assert "/queryables/jobs" in specification.json["paths"]
+        landing = self.app.get("/", headers=self.json_headers)
+        assert any(
+            link["rel"] == sd.OGC_API_REL_QUERYABLES_URI
+            and link["href"].endswith("/queryables/processes")
+            for link in landing.json["links"]
+        )
+
+    @parameterized.expand([
+        ("queryables", sd.OGC_API_REL_QUERYABLES_URI),
+        ("sortables", sd.OGC_API_REL_SORTABLES_URI),
+    ])
+    @pytest.mark.ogc_records
+    def test_get_catalogs_discovery_links(self, endpoint, rel):
+        # type: (str, str) -> None
+        """
+        Tests that the generic endpoint provides only links to the corresponding endpoints of processes and jobs.
+        """
+        resp = self.app.get(f"/{endpoint}", headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert list(resp.json) == ["links"]
+        targets = {urllib.parse.urlparse(link["href"]).path for link in resp.json["links"] if link["rel"] == rel}
+        assert targets == {f"/{endpoint}/processes", f"/{endpoint}/jobs"}
+        for link in resp.json["links"]:
+            if link["rel"] == rel:
+                assert link["type"] == ContentType.APP_SCHEMA_JSON
+                target = self.app.get(link["href"], headers=self.json_headers)
+                assert target.status_code == 200, target.text
+                assert target.content_type == ContentType.APP_SCHEMA_JSON
+
+    @pytest.mark.ogc_records
+    def test_get_processes_sortables(self):
+        # type: () -> None
+        """
+        Tests that process sortables describe the sorting fields enumerated by the ``sortby`` queryable.
+        """
+        queryables = self.app.get("/queryables/processes", headers=self.json_headers).json
+        sortby = queryables["properties"]["sortby"]
+        assert sortby["type"] == "array"
+        assert sortby["items"]["enum"] == sort_with_directions(SortMethods.PROCESS)
+
+        resp = self.app.get("/sortables/processes", headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.content_type == ContentType.APP_SCHEMA_JSON
+        jsonschema.Draft7Validator.check_schema(resp.json)
+        assert set(resp.json["properties"]) == set(SortMethods.PROCESS)
+        assert resp.json["properties"][Sort.CREATED]["format"] == "date-time"
+
+        spec = self.app.get("/json", headers=self.json_headers).json
+        assert "/sortables/processes" in spec["paths"]
+        sortby_params = [param for name, param in spec["components"]["parameters"].items() if name.endswith(".sortby")]
+        assert sortby_params
+        sortby_param = sortby_params[0]
+        assert sortby_param["style"] == "form"
+        assert sortby_param["explode"] is False
+        assert sortby_param["schema"]["type"] == "array"
+
+        for path in ["/", "/processes"]:
+            links = self.app.get(path, headers=self.json_headers).json["links"]
+            assert any(
+                link["rel"] == sd.OGC_API_REL_SORTABLES_URI and link["href"].endswith("/sortables/processes")
+                for link in links
+            ), path
 
     def test_get_processes_no_links(self):
         path = "/processes"
@@ -343,6 +442,13 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         profile = [link for link in headers.getall("Link") if "rel=\"profile\"" in link]
         assert len(profile) == 1, "Expected exactly one profile link in the response headers."
         assert sd.OGC_API_PROC_PROFILE_PROC_LIST_URI in profile[0]
+
+    @pytest.mark.ogc_records
+    def test_get_processes_records_array_name(self):
+        resp = self.app.get("/processes", headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["recordsArrayName"] == "processes"
+        assert "processes" in resp.json
 
     def test_get_processes_with_paging(self):
         test_prefix = "test-proc-temp"
@@ -716,6 +822,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         assert len(resp.json["processes"]) == total
         assert len(resp.json["providers"]) == 1
         prov = resp.json["providers"][0]
+        assert resp.json["recordsArrayName"] == "processes"
+        assert "recordsArrayName" not in prov, "Records array name applies to the top-level listing only."
         assert "id" in prov and prov["id"] == test_svc_id
         assert "processes" in prov and isinstance(prov["processes"], list)
         assert all(isinstance(proc, str) for proc in prov["processes"])
@@ -5452,7 +5560,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "features[profile]": "http://www.opengis.net/spec/ogcapi-features-1/1.0",
                 "result[include]": "true",
                 "result[mediaType]": ContentType.APP_JSON,
-                "result[profile]": "http://www.opengis.net/spec/ogcapi-processes-1/1.0",
+                "result[profile]": sd.OGC_API_PROC_PART1_BASE_URI,
                 "response[prefer]": ExecuteControlOption.ASYNC,
             }
             resp = self.app.get(path, params=params, headers=self.json_headers)
@@ -5650,6 +5758,493 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         logs = resp.text
         assert "Dispatching execution of nested process" in logs
         assert "Abort execution." in logs
+
+    @parameterized.expand([
+        ("keywords_and", {"keywords": "climate,netcdf"}, True),
+        ("keywords_or", {"keywords": " CLIMATE , grib|netcdf "}, True),
+        ("keywords_no_match", {"keywords": "climate,grib"}, False),
+        ("keywords_whole_word", {"keywords": "clim"}, False),
+        ("keywords_literal", {"keywords": ".*"}, False),
+        ("keywords_not", {"keywords": "climate,!grib"}, True),
+        ("keywords_not_match", {"keywords": "climate,!netcdf"}, False),
+        ("keywords_tilde", {"keywords": "climate,~grib"}, True),
+        ("keywords_not_or", {"keywords": "!climate|grib"}, False),
+        ("keywords_not_or_match", {"keywords": "!climate|netcdf"}, True),
+        ("title", {"title": "regional"}, True),
+        ("title_no_match", {"title": "other"}, False),
+        ("title_literal", {"title": "Regional.*"}, False),
+        ("description", {"description": "a REGION"}, True),
+        ("description_no_match", {"description": "other"}, False),
+        ("description_literal", {"description": ".*"}, False),
+        ("q_title", {"q": "other,subset"}, True),
+        ("q_keywords", {"q": "netcdf"}, True),
+        ("q_description", {"q": "extracts"}, True),
+        ("q_no_match", {"q": "other,unknown"}, False),
+        ("q_literal", {"q": ".*"}, False),
+        ("query_and", {"query": "+regional +climate"}, True),
+        ("query_and_no_match", {"query": "+regional +grib"}, False),
+        ("query_not", {"query": "+climate -grib"}, True),
+        ("query_not_match", {"query": "+climate -netcdf"}, False),
+        ("query_only_not", {"query": "-grib"}, True),
+        ("query_only_not_match", {"query": "-climate"}, False),
+        ("query_or", {"query": "missing,climate +subset"}, True),
+        ("query_or_no_match", {"query": "missing,climate +unknown"}, False),
+        ("query_or_positive", {"query": "missing,+climate"}, True),
+        ("query_or_not", {"query": "missing,-grib"}, True),
+        ("query_or_not_match", {"query": "missing,-climate"}, False),
+        ("query_phrases", {"query": '"regional subset" -"other phrase"'}, True),
+        ("query_whitespace", {"query": "+regional +climate -grib"}, True),
+        ("query_literal", {"query": '".*"'}, False),
+        ("q_and_query", {"q": "climate", "query": "-netcdf"}, False),
+        ("version", {"version": "1.2.3"}, True),
+        ("version_no_match", {"version": "9.9.9"}, False),
+        ("version_range", {"version": "1.2.0/2.0.0"}, True),
+        ("version_range_lower", {"version": "1.2.3/2.0.0"}, True),
+        ("version_range_upper", {"version": "1.0.0/1.2.3"}, True),
+        ("version_range_above", {"version": "1.2.4/2.0.0"}, False),
+        ("version_range_below", {"version": "1.0.0/1.2.2"}, False),
+        ("version_open_lower", {"version": "../1.2.3"}, True),
+        ("version_open_upper", {"version": "1.2.3/.."}, True),
+        ("version_numeric", {"version": "1.2.0/1.10.0"}, True),
+        ("combined_match", {"q": "subset", "title": "regional", "version": "1.2.3"}, True),
+        ("combined_no_match", {"q": "subset", "title": "other"}, False),
+    ])
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_by_search_queries(self, _, query, match):
+        # type: (str, JSON, bool) -> None
+        """
+        Tests process queryables with literal text, keyword expressions and exact versions.
+        """
+        p_id = "test-process-search-queries"
+        self.process_store.save_process(Process(
+            id=p_id, package={}, visibility=Visibility.PUBLIC, version="1.2.3",
+            title="Regional Subset", abstract="Extracts a region", keywords=["climate", "netcdf"],
+        ))
+        query.update({"links": "false"})
+        resp = self.app.get("/processes", params=encode_query(query), headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert (p_id in [proc["id"] for proc in resp.json["processes"]]) is match
+
+    @parameterized.expand([
+        (f"{field}_{name}", field, value, expected)
+        for field in ["q", "query"]
+        for name, value, expected in [
+            ("trailing_minus", "data-", ["analysis", "science"]),
+            ("trailing_plus", "data+", ["plus"]),
+            ("trailing_minus_or", "data-,missing", ["analysis", "science"]),
+            ("trailing_plus_or", "data+,missing", ["plus"]),
+            ("embedded_minus", "+data-analysis", ["analysis"]),
+            ("embedded_plus", "+data+analysis", ["plus"]),
+            ("negative_prefix", "+-data", ["leading"]),
+            ("and", "+data- +analysis", ["analysis"]),
+            ("not", "+data- -analysis", ["science"]),
+            ("initial_not", "-data-", ["plus", "phrase", "separated", "leading"]),
+            ("phrase", "+data analysis", ["phrase"]),
+            ("phrase_whitespace", "data \t analysis", ["phrase"]),
+            ("phrase_and", "+data analysis +regional", ["phrase"]),
+            ("phrase_not", "+data analysis -regional", []),
+            ("phrase_order", "analysis data", []),
+            ("phrase_across_fields", "analysis regional", []),
+            ("substring", "clim", ["analysis", "science", "plus"]),
+        ]
+    ])
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_by_search_term_boundaries(self, _, field, value, expected):
+        # type: (str, str, str, List[str]) -> None
+        """
+        Tests literal signs, boundary-prefixed operators and contiguous phrases in both text search parameters.
+        """
+        for suffix, title, keywords in [
+            ("analysis", "Data-analysis", ["climate"]),
+            ("science", "Data-science", ["climatology"]),
+            ("plus", "Data+analysis", ["xclim"]),
+            ("phrase", "Data \t analysis", ["regional"]),
+            ("separated", "Data and analysis", []),
+            ("leading", "-data", []),
+        ]:
+            self.process_store.save_process(Process(
+                id=f"test-search-terms-{suffix}", package={}, visibility=Visibility.PUBLIC,
+                title=title, keywords=["search-terms-fixture"] + keywords,
+            ))
+        resp = self.app.get("/processes", params=encode_query({
+            field: value,
+            "keywords": "search-terms-fixture",
+            "detail": "false",
+        }), headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert set(resp.json["processes"]) == {f"test-search-terms-{suffix}" for suffix in expected}
+        assert resp.json["total"] == len(expected)
+
+    @parameterized.expand([
+        ("keywords", " "),
+        ("keywords", ",climate"),
+        ("keywords", "climate,"),
+        ("keywords", ""),
+        ("title", ""),
+        ("description", ""),
+        ("q", ""),
+        ("query", ""),
+        ("version", ""),
+        ("keywords", "climate||netcdf"),
+        ("keywords", "climate| "),
+        ("keywords", "!"),
+        ("keywords", "climate,~"),
+        ("keywords", "!!climate"),
+        ("q", ","),
+        ("q", "other,,subset"),
+        ("q", "subset, "),
+        ("q", " "),
+        ("title", " "),
+        ("description", " "),
+        ("version", "invalid"),
+        ("query", "+"),
+        ("query", "-"),
+        ("query", "climate +"),
+        ("query", "climate,"),
+        ("query", ",climate"),
+        ("query", '"climate'),
+        ("query", " "),
+        ("version", "../.."),
+        ("version", "2.0.0/1.0.0"),
+        ("version", "1.0.0//2.0.0"),
+        ("sortby", "unknown"),
+        ("sortby", "id,"),
+        ("sortby", "+"),
+    ])
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_by_search_invalid(self, field, value):
+        # type: (str, str) -> None
+        """
+        Tests that malformed search expressions are rejected rather than broadening the search.
+        """
+        query = encode_query({field: value})
+        resp = self.app.get("/processes", params=query, headers=self.json_headers, expect_errors=True)
+        assert resp.status_code == 400, resp.text
+        assert resp.json["code"] == "ProcessInvalidParameter"
+
+    @parameterized.expand([
+        ("ascending", {"sortby": "+id"}, ["a", "b", "c"]),
+        ("descending", {"sortby": "-id"}, ["c", "b", "a"]),
+        ("multi", {"sortby": "+version,-id"}, ["c", "b", "a"]),
+    ])
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_by_search_order(self, _, query, expected):
+        # type: (str, JSON, List[str]) -> None
+        """
+        Tests signed multi-field sorting and explicit order with the existing listing aggregation.
+        """
+        for suffix, version in [("a", "2.0.0"), ("b", "1.0.0"), ("c", "1.0.0")]:
+            self.process_store.save_process(Process(
+                id=f"test-search-order-{suffix}", package={}, visibility=Visibility.PUBLIC,
+                version=version, keywords=["search-order"],
+            ))
+        query.update({
+            "keywords": "search-order",
+            "detail": "false",
+        })
+        resp = self.app.get("/processes", params=encode_query(query), headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json["processes"] == [f"test-search-order-{suffix}" for suffix in expected]
+
+    @parameterized.expand([
+        ("after", {"datetime": "2024-01-01T00:00:00Z/.."}, ["new", "mid"]),
+        ("before", {"datetime": "../2023-01-01T00:00:00Z"}, ["old"]),
+        ("interval", {"datetime": "2022-01-01T00:00:00Z/2024-12-31T00:00:00Z"}, ["mid"]),
+        ("exact", {"datetime": "2020-01-01T00:00:00Z"}, ["old"]),
+    ])
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_by_datetime(self, _, query, expected):
+        # type: (str, JSON, List[str]) -> None
+        """
+        Tests that ``datetime`` is compared against the process ``created`` time.
+        """
+        for suffix, created in [("old", "2020-01-01T00:00:00Z"), ("mid", "2024-06-01T00:00:00Z"),
+                                ("new", "2026-01-01T00:00:00Z")]:
+            self.process_store.save_process(Process(
+                id=f"test-datetime-{suffix}", package={}, visibility=Visibility.PUBLIC,
+                created=datetime.datetime.fromisoformat(created),
+                keywords=["datetime-search"],
+            ))
+        query.update({
+            "keywords": "datetime-search",
+            "detail": "false",
+            "sortby": "-id",
+        })
+        resp = self.app.get("/processes", params=encode_query(query), headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json["processes"] == [f"test-datetime-{suffix}" for suffix in sorted(expected, reverse=True)]
+
+    @pytest.mark.ogc_records
+    def test_get_processes_query_plus_literal(self):
+        """
+        Tests that a ``+`` in an unencoded query string is interpreted literally and not as a space.
+        """
+        for suffix, version in [("a", "2.0.0"), ("b", "1.0.0")]:
+            self.process_store.save_process(Process(
+                id=f"test-plus-{suffix}", package={}, visibility=Visibility.PUBLIC,
+                version=version, keywords=["plus-literal"],
+                created=datetime.datetime.fromisoformat("2024-06-01T00:00:00+00:00"),
+            ))
+        path = "/processes?keywords=plus-literal&detail=false&sortby=+version&datetime=2024-06-01T01:00:00+01:00"
+        resp = self.app.get(path, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json["processes"] == ["test-plus-b", "test-plus-a"]
+
+    @pytest.mark.ogc_records
+    def test_get_processes_created_default(self):
+        """
+        Tests that processes without explicit ``created`` receive the current time.
+        """
+        process = self.process_store.save_process(Process(id="test-created-default", package={}))
+        assert abs((now() - process.created).total_seconds()) < 60
+
+    @parameterized.expand([
+        ("name", "workflow", ["wf"]),
+        ("case", "WPS,Builtin", ["wps1", "builtin"]),
+        ("wps-uri", "http://www.opengis.net/def/serviceType/ogc/wps", ["wps1", "wps2"]),
+        ("ogcapi-uri", sd.OGC_API_PROC_PART1_BASE_URI, ["app"]),
+    ])
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_by_type(self, _, value, expected):
+        # type: (str, str, List[str]) -> None
+        """
+        Tests that ``type`` matches the process type case-insensitively, or any equivalent resource type URI.
+        """
+        for suffix, proc_type in [
+            ("wf", ProcessType.WORKFLOW), ("wps1", ProcessType.WPS_LOCAL), ("wps2", ProcessType.WPS_REMOTE),
+            ("builtin", ProcessType.BUILTIN), ("app", ProcessType.OGC_API),
+        ]:
+            self.process_store.save_process(Process(
+                id=f"test-type-{suffix}", package={}, visibility=Visibility.PUBLIC, type=proc_type,
+                keywords=["type-search"],
+            ))
+        params = {
+            "type": value,
+            "keywords": "type-search",
+            "detail": "false",
+            "sortby": "id",
+        }
+        resp = self.app.get("/processes", params=params, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert sorted(resp.json["processes"]) == sorted(f"test-type-{suffix}" for suffix in expected)
+
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_by_type_unknown(self):
+        resp = self.app.get("/processes", params={"type": "unknown"}, headers=self.json_headers)
+        assert resp.status_code == 200
+        assert resp.json["processes"] == []
+
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_by_license(self):
+        """
+        Tests that ``license`` matches metadata or links using the ``license`` role or relation.
+        """
+        apache = "https://spdx.org/licenses/Apache-2.0"
+        for suffix, kwargs in [
+            ("link", {"additional_links": [{"rel": "license", "href": apache}]}),
+            ("meta", {"metadata": [{"rel": "license", "href": apache}]}),
+            ("role", {"metadata": [{"role": "https://schema.org/license", "value": apache}]}),
+            ("title", {"metadata": [{"rel": "license", "href": "https://example.com/l", "title": "Apache-2.0"}]}),
+            ("other", {"metadata": [{"rel": "describedby", "href": apache}]}),
+            ("none", {}),
+        ]:
+            self.process_store.save_process(Process(
+                id=f"test-license-{suffix}", package={}, visibility=Visibility.PUBLIC, keywords=["license-search"],
+                **kwargs
+            ))
+        base = {
+            "keywords": "license-search",
+            "detail": "false",
+        }
+        resp = self.app.get("/processes", params={**base, "license": apache}, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert sorted(resp.json["processes"]) == ["test-license-link", "test-license-meta", "test-license-role"]
+        resp = self.app.get("/processes", params={**base, "license": "apache-2.0"}, headers=self.json_headers)
+        assert resp.json["processes"] == ["test-license-title"]
+
+    @parameterized.expand([
+        ("text", {"filter": "title LIKE 'Filter%' AND version = '1.0.0'"}, ["a"]),
+        ("text-or", {"filter": "id = 'test-filter-a' OR id = 'test-filter-c'"}, ["a", "c"]),
+        ("text-not", {"filter": "NOT (id = 'test-filter-a') AND title LIKE 'Filter%'"}, ["b", "c"]),
+        ("text-in", {"filter": "id IN ('test-filter-b', 'test-filter-c')"}, ["b", "c"]),
+        ("text-type", {"filter": "type = 'workflow'"}, ["c"]),
+        ("temporal", {"filter": "created BEFORE 2021-01-01T00:00:00Z", "filter-lang": "ecql"}, ["a"]),
+        ("json", {"filter": json.dumps({"op": "=", "args": [{"property": "id"}, "test-filter-b"]}),
+                  "filter-lang": "cql2-json"}, ["b"]),
+        ("json-temporal", {"filter": json.dumps({
+            "op": "t_after", "args": [{"property": "created"}, {"timestamp": "2021-01-01T00:00:00Z"}]}),
+            "filter-lang": "cql2-json"}, ["b", "c"]),
+    ])
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_cql2(self, _, query, expected):
+        # type: (str, JSON, List[str]) -> None
+        """
+        Tests that CQL2 ``filter`` expressions are applied by the same listing aggregation as the other search fields.
+        """
+        for suffix, title, version, proc_type, created in [
+            ("a", "Filter one", "1.0.0", ProcessType.APPLICATION, "2020-01-01T00:00:00Z"),
+            ("b", "Filter two", "2.0.0", ProcessType.APPLICATION, "2024-01-01T00:00:00Z"),
+            ("c", "Filter three", "3.0.0", ProcessType.WORKFLOW, "2025-01-01T00:00:00Z"),
+        ]:
+            self.process_store.save_process(Process(
+                id=f"test-filter-{suffix}", package={}, visibility=Visibility.PUBLIC, title=title, version=version,
+                type=proc_type, created=datetime.datetime.fromisoformat(created),
+                keywords=["cql-search"],
+            ))
+        query.update({
+            "keywords": "cql-search",
+            "detail": "false",
+            "sortby": "id",
+        })
+        resp = self.app.get("/processes", params=encode_query(query), headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json["processes"] == [f"test-filter-{suffix}" for suffix in expected]
+
+    @parameterized.expand([
+        ({"filter": "unknown = 'x'"},),
+        ({"filter": "title = "},),
+        ({"filter": "S_INTERSECTS(title, POINT(1 1))"},),
+    ])
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_cql2_invalid(self, query):
+        # type: (JSON) -> None
+        resp = self.app.get("/processes", params=encode_query(query), headers=self.json_headers, expect_errors=True)
+        assert resp.status_code in [400, 422], resp.text
+
+    @pytest.mark.ogc_records
+    def test_get_processes_queryables_link(self):
+        resp = self.app.get("/processes", headers=self.json_headers)
+        assert resp.status_code == 200
+        links = [link for link in resp.json["links"] if link["rel"] == sd.OGC_API_REL_QUERYABLES_URI]
+        assert links and links[0]["href"].endswith("/queryables/processes")
+
+    @parameterized.expand([
+        "keywords",
+        "title",
+        "description",
+        "q",
+        "query",
+        "version",
+    ])
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_by_search_providers(self, field):
+        # type: (str) -> None
+        """
+        Tests that local search filters cannot silently return unfiltered remote provider processes.
+        """
+        value = "1.2.3" if field == "version" else "subset"
+        resp = self.app.get(
+            "/processes",
+            params={
+                field: value,
+                "providers": "true",
+            },
+            headers=self.json_headers,
+            expect_errors=True,
+        )
+        assert resp.status_code == 400, resp.text
+        assert resp.json["error"] == "ListingInvalidParameter"
+
+    @parameterized.expand([
+        True,
+        False,
+    ])
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_by_search_paging(self, detail):
+        # type: (bool) -> None
+        """
+        Tests that searches combine with metadata and visibility filters before pagination and total calculation.
+        """
+        role = "https://schema.org/encodingFormat"
+        profile = "https://www.iana.org/assignments/media-types/text/plain"
+        for suffix, visibility, metadata in [
+            ("a", Visibility.PUBLIC, True), ("b", Visibility.PUBLIC, True),
+            ("private", Visibility.PRIVATE, True), ("no-metadata", Visibility.PUBLIC, False),
+        ]:
+            self.process_store.save_process(Process(
+                id=f"test-search-{suffix}", package={}, visibility=visibility, title="Search + subset & netcdf|grib",
+                keywords=["climate"],
+                metadata=[{"role": role, "href": profile, "rel": sd.OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI}]
+                if metadata else [],
+            ))
+        resp = self.app.get(
+            "/processes",
+            params=encode_query({
+                "q": "search + subset & netcdf|grib",
+                "query": "+climate -grass",
+                f"metadata[process][{role}]": profile,
+                "limit": 1,
+                "page": 0,
+                "detail": detail,
+                "sortby": "id",
+            }),
+            headers=self.json_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json["total"] == 2
+        assert resp.json["count"] == 1
+        processes = resp.json["processes"]
+        assert (processes[0]["id"] if detail else processes[0]) == "test-search-a"
+        links = get_links(resp.json["links"])
+        next_response = self.app.get(links["next"], headers=self.json_headers)
+        assert next_response.status_code == 200, next_response.text
+        assert next_response.json["total"] == 2
+        processes = next_response.json["processes"]
+        assert (processes[0]["id"] if detail else processes[0]) == "test-search-b"
+
+    @parameterized.expand([
+        ("title", {"title": "test-search-fallback"}, {}, True),
+        ("description", {"description": "modern"}, {"description": "Modern description"}, True),
+        ("legacy_description", {"description": "legacy"}, {"abstract": "Legacy description"}, True),
+        ("description_precedence", {"description": "modern"},
+         {"abstract": "Legacy description", "description": "Modern description"}, False),
+        ("q_description_precedence", {"q": "modern"},
+         {"abstract": "Legacy description", "description": "Modern description"}, False),
+    ])
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_by_search_fallback(self, _, query, fields, match):
+        # type: (str, JSON, JSON, bool) -> None
+        """
+        Tests that searches use the effective title and description of existing process documents.
+        """
+        p_id = "test-search-fallback"
+        self.process_store.save_process(Process(id=p_id, package={}, visibility=Visibility.PUBLIC))
+        self.process_store.collection.update_one(
+            {"identifier": p_id}, {"$unset": {"title": "", "abstract": "", "description": ""}},
+        )
+        if fields:
+            self.process_store.collection.update_one({"identifier": p_id}, {"$set": fields})
+        resp = self.app.get("/processes", params=encode_query(query), headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert (p_id in [proc["id"] for proc in resp.json["processes"]]) is match
+
+    @parameterized.expand([
+        False,
+        True,
+    ])
+    @pytest.mark.ogc_records
+    def test_get_processes_filter_by_search_version_revisions(self, revisions):
+        # type: (bool) -> None
+        """
+        Tests that exact version searches respect latest-only and revision listing semantics.
+        """
+        p_id = "test-search-versions"
+        self.process_store.save_process(Process(
+            id=p_id, package={}, visibility=Visibility.PUBLIC, version="1.0.0",
+        ))
+        self.process_store.update_version(p_id, "1.0.0")
+        self.process_store.save_process(Process(
+            id=p_id, package={}, visibility=Visibility.PUBLIC, version="2.0.0",
+        ))
+        resp = self.app.get("/processes", params={
+            "process": p_id,
+            "revisions": revisions,
+            "version": "1.0.0",
+            "detail": "false",
+        }, headers=self.json_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json["processes"] == ([f"{p_id}:1.0.0"] if revisions else [])
+        assert resp.json["total"] == int(revisions)
 
     @pytest.mark.oap_part5
     def test_get_processes_filter_by_metadata_profile(self):

@@ -291,6 +291,8 @@ GetCapabilities Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Accomplishes the :ref:`GetCapabilities <proc_op_getcap>` request to obtain a list of available :term:`Process`.
+Process filtering and revision listing options are documented in :ref:`proc_listing_search` and
+:ref:`proc_revisions`. These options are available to both the CLI and :class:`weaver.cli.WeaverClient`.
 
 .. code-block:: shell
     :caption: Command Line

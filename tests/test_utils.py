@@ -621,6 +621,8 @@ class BadQueryStringTypeRequest(PseudoRequest):
             ("param=value", {"param": "value"}),
             ("param=val1,val2", {"param": "val1,val2"}),
             ("param1=val1,val2&param2=val3", {"param1": "val1,val2", "param2": "val3"}),
+            ("param=a+b%20c", {"param": "a+b c"}),
+            ("param=%2Ba", {"param": "+a"}),
         ]
     )
 )

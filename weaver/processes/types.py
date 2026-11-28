@@ -12,6 +12,32 @@ class ProcessType(Constants):
     WPS_LOCAL = "wps"               # Local PyWPS process definitions
     WPS_REMOTE = "wps-remote"       # Remote WPS provider references (once instantiated from Service definition)
 
+    @classmethod
+    def uris(cls):
+        # type: () -> Dict[str, List[str]]
+        """
+        Mapping of informative :term:`OGC API - Records` resource type URIs to the corresponding process types.
+        """
+        return {
+            "http://www.opengis.net/def/serviceType/ogc/wps": [cls.WPS_LOCAL, cls.WPS_REMOTE],
+            "http://www.opengis.net/spec/ogcapi-processes-1/1.0": [cls.OGC_API],
+        }
+
+    @classmethod
+    def resolve(cls, process_type):
+        # type: (str) -> List[str]
+        """
+        Translates a process type name (case-insensitive) or a resource type URI into corresponding process types.
+
+        :returns: Matched process types, or an empty list if the value is not supported.
+        """
+        value = process_type.strip()
+        for uri, types in cls.uris().items():
+            if value.lower() == uri.lower():
+                return list(types)
+        name = cls.get(value.lower())
+        return [name] if name else []
+
     @staticmethod
     def is_wps(process_type):
         # type: (AnyProcessType) -> bool
@@ -19,6 +45,8 @@ class ProcessType(Constants):
 
 
 if TYPE_CHECKING:
+    from typing import Dict, List
+
     from weaver.typedefs import Literal
 
     AnyProcessType = Literal[

@@ -3,6 +3,7 @@ import argparse
 import base64
 import copy
 import inspect
+import json
 import logging
 import os
 import re
@@ -10,7 +11,7 @@ import sys
 import textwrap
 import time
 from typing import TYPE_CHECKING, cast
-from urllib.parse import urlparse
+from urllib.parse import quote, urlencode, urlparse
 
 import yaml
 from colander import EMAIL_RE, URL_REGEX
@@ -51,7 +52,6 @@ from weaver.processes.convert import (
 from weaver.processes.utils import create_multipart_deploy, get_process_information
 from weaver.processes.wps_package import get_process_definition
 from weaver.provenance import ProvenanceFormat, ProvenancePathType
-from weaver.sort import Sort, SortMethods
 from weaver.status import JOB_STATUS_CATEGORIES, Status, StatusCategory, map_status
 from weaver.utils import (
     Lazify,
@@ -76,6 +76,7 @@ from weaver.utils import (
 from weaver.visibility import Visibility
 from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.constants import ConformanceCategory
+from weaver.wps_restapi.filter import FilterLanguage
 
 if TYPE_CHECKING:
     from typing import (
@@ -569,6 +570,12 @@ class WeaverClient(object):
                 textwrap.indent(repr_json(kwargs.get("json") or kwargs.get("body") or {}, indent=len(tab)), tab * 2),
                 textwrap.indent(repr_json(options, indent=len(tab)), tab * 2),
             )
+        params = kwargs.get("params")
+        if isinstance(params, (dict, list, tuple)):
+            # '+' is interpreted literally by the API, so spaces must be '%20' rather than the form-style '+'
+            items = params.items() if isinstance(params, dict) else params
+            kwargs["params"] = urlencode([(key, val) for key, val in items if val is not None],
+                                         doseq=True, quote_via=quote)
         return request_extra(method, url, headers=headers, **kwargs)
 
     def _get_url(self, url):
@@ -1448,6 +1455,35 @@ class WeaverClient(object):
                 return OperationResult(False, f"Failed to parse {param_name}: {exc}", None)
         return param
 
+    @staticmethod
+    def _join_query_values(values):
+        # type: (Optional[Union[str, Sequence[str]]]) -> Optional[str]
+        if isinstance(values, str):
+            return values
+        if isinstance(values, (list, tuple)):
+            if not all(isinstance(value, str) for value in values):
+                raise TypeError("Comma-separated query values must all be strings.")
+            return ",".join(values)
+        return None
+
+    def _serialize_filter_parameter(self, filter_expr):
+        # type: (Optional[Union[str, JSON]]) -> Union[Optional[str], OperationResult]
+        if isinstance(filter_expr, str):
+            filter_text = filter_expr.lstrip()
+            if filter_text.startswith(("{", "[")):
+                filter_expr = self._parse_file_or_json(filter_text, "filter")
+                if isinstance(filter_expr, OperationResult):
+                    return filter_expr
+        if isinstance(filter_expr, (dict, list)):
+            return json.dumps(filter_expr)
+        if filter_expr is None or isinstance(filter_expr, str):
+            return filter_expr
+        return OperationResult(
+            False,
+            "Filter must be a CQL expression string or a JSON object or array.",
+            None,
+        )
+
     def capabilities(
         self,
         url=None,               # type: Optional[URL]
@@ -1459,10 +1495,24 @@ class WeaverClient(object):
         request_timeout=None,   # type: Optional[int]
         request_retries=None,   # type: Optional[int]
         output_format=None,     # type: Optional[AnyOutputFormat]
-        sort=None,              # type: Optional[Sort]
         page=None,              # type: Optional[int]
         limit=None,             # type: Optional[int]
         detail=False,           # type: bool
+        process=None,           # type: Optional[str]
+        revisions=None,         # type: Optional[bool]
+        sortby=None,            # type: Optional[Union[str, Sequence[str]]]
+        keywords=None,          # type: Optional[Union[str, Sequence[str]]]
+        title=None,             # type: Optional[str]
+        description=None,       # type: Optional[str]
+        q=None,                 # type: Optional[str]
+        query=None,             # type: Optional[str]
+        version=None,           # type: Optional[str]
+        datetime=None,          # type: Optional[str]
+        license=None,           # type: Optional[str]
+        process_type=None,      # type: Optional[Union[str, Sequence[str]]]
+        filter=None,            # type: Optional[Union[str, JSON]]
+        filter_lang=None,       # type: Optional[str]
+        filter_crs=None,        # type: Optional[str]
     ):                          # type: (...) -> OperationResult
         """
         List all available :term:`Process` on the instance.
@@ -1483,20 +1533,57 @@ class WeaverClient(object):
         :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
-        :param sort: Sorting field to list processes. Name must be one of the fields supported by process objects.
         :param page: Paging index to list processes.
         :param limit: Amount of processes to list per page.
         :param detail: Obtain detailed process descriptions.
+        :param process: Filter process revisions by process identifier.
+        :param revisions: Include older process revisions in the listing.
+        :param sortby: Comma-separated sorting fields, or a sequence of fields.
+        :param keywords: Filter by keywords using the process keyword expression syntax.
+        :param title: Filter by title text.
+        :param description: Filter by description text.
+        :param q: Filter by the simple process search expression.
+        :param query: Filter by the process search expression.
+        :param version: Filter by process version or version range.
+        :param datetime: Filter by process creation datetime or interval.
+        :param license: Filter by process license.
+        :param process_type: Filter by process type or resource type URI.
+        :param filter: CQL expression string or CQL2-JSON object/array.
+        :param filter_lang: Language used to parse the CQL filter expression.
+        :param filter_crs: Coordinate reference system for spatial filter properties.
         :returns: Results of the operation.
         """
         base = self._get_url(url)
         path = f"{base}/processes"
         # queries not supported by non-Weaver, but default values save extra work if possible
-        query = {"detail": detail, "providers": with_providers}
-        query.update({
-            name: param for name, param in [("sort", sort), ("page", page), ("limit", limit)] if param is not None
+        params = {"detail": detail, "providers": with_providers}
+        params.update({
+            name: param for name, param in [("page", page), ("limit", limit)] if param is not None
         })
-        resp = self._request("GET", path, params=query,
+        params.update({
+            name: param for name, param in [
+                ("process", process),
+                ("revisions", revisions),
+                ("sortby", self._join_query_values(sortby)),
+                ("keywords", self._join_query_values(keywords)),
+                ("title", title),
+                ("description", description),
+                ("q", q),
+                ("query", query),
+                ("version", version),
+                ("datetime", datetime),
+                ("license", license),
+                ("type", self._join_query_values(process_type)),
+                ("filter-lang", filter_lang),
+                ("filter-crs", filter_crs),
+            ] if param is not None
+        })
+        filter_param = self._serialize_filter_parameter(filter)
+        if isinstance(filter_param, OperationResult):
+            return filter_param
+        if filter_param is not None:
+            params["filter"] = filter_param
+        resp = self._request("GET", path, params=params,
                              headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
         result = self._parse_result(resp)
@@ -2373,7 +2460,7 @@ class WeaverClient(object):
         request_timeout=None,   # type: Optional[int]
         request_retries=None,   # type: Optional[int]
         output_format=None,     # type: Optional[AnyOutputFormat]
-        sort=None,              # type: Optional[Sort]
+        sortby=None,            # type: Optional[Union[str, Sequence[str]]]
         page=None,              # type: Optional[int]
         limit=None,             # type: Optional[int]
         status=None,            # type: Optional[Union[AnyStatusSearch, List[AnyStatusSearch]]]
@@ -2382,6 +2469,10 @@ class WeaverClient(object):
         process=None,           # type: Optional[str]
         provider=None,          # type: Optional[str]
         tags=None,              # type: Optional[Union[str, List[str]]]
+        datetime=None,          # type: Optional[str]
+        filter=None,            # type: Optional[Union[str, JSON]]
+        filter_lang=None,       # type: Optional[str]
+        filter_crs=None,        # type: Optional[str]
     ):                          # type: (...) -> OperationResult
         """
         Obtain a listing of :term:`Job`.
@@ -2401,7 +2492,7 @@ class WeaverClient(object):
         :param request_timeout: Maximum timeout duration (seconds) to wait for a response when performing HTTP requests.
         :param request_retries: Amount of attempt to retry HTTP requests in case of failure.
         :param output_format: Select an alternate output representation of the result body contents.
-        :param sort: Sorting field to list jobs. Name must be one of the fields supported by job objects.
+        :param sortby: Comma-separated sorting fields with optional ascending or descending prefixes.
         :param page: Paging index to list jobs.
         :param limit: Amount of jobs to list per page.
         :param status: Filter job listing only to matching status. If multiple are provided, must match one of them.
@@ -2410,6 +2501,10 @@ class WeaverClient(object):
         :param process: Obtain jobs executed only by matching :term:`Process`.
         :param provider: Obtain jobs only matching remote :term:`Provider`.
         :param tags: Obtain jobs filtered by matching tags. Jobs must match all tags simultaneously, not one of them.
+        :param datetime: Filter jobs by their creation datetime or interval.
+        :param filter: CQL2 filter expression to match jobs.
+        :param filter_lang: Language used to parse the CQL2 filter expression.
+        :param filter_crs: Coordinate reference system for spatial filter properties.
         :returns: Retrieved status of the job.
         """
         base_url = self._get_url(url)
@@ -2420,8 +2515,9 @@ class WeaverClient(object):
             query["page"] = page
         if isinstance(limit, int) and limit > 0:
             query["limit"] = limit
-        if sort is not None:
-            query["sort"] = sort
+        sortby = self._join_query_values(sortby)
+        if sortby is not None:
+            query["sortby"] = sortby
         if isinstance(status, (str, Status, StatusCategory)) and status:
             status = str(getattr(status, "value", status)).split(",")  # consider enum or plain single/multi string
         if isinstance(status, list) and status:
@@ -2439,6 +2535,17 @@ class WeaverClient(object):
             tags = ",".join(tags)
         if isinstance(tags, str) and tags:
             query["tags"] = tags
+        if isinstance(datetime, str) and datetime:
+            query["datetime"] = datetime
+        filter_param = self._serialize_filter_parameter(filter)
+        if isinstance(filter_param, OperationResult):
+            return filter_param
+        if filter_param is not None:
+            query["filter"] = filter_param
+        if isinstance(filter_lang, str) and filter_lang:
+            query["filter-lang"] = filter_lang
+        if isinstance(filter_crs, str) and filter_crs:
+            query["filter-crs"] = filter_crs
         resp = self._request("GET", jobs_url, params=query,
                              headers=self._headers, x_headers=headers, settings=self._settings, auth=auth,
                              request_timeout=request_timeout, request_retries=request_retries)
@@ -3193,12 +3300,71 @@ def add_listing_options(parser, item):
         "-D", "--detail", dest="detail", action="store_true", default=False,
         help=f"Obtain detailed {item} descriptions instead of only their ID (default: %(default)s)."
     )
-    sort_methods = cast("List[SortMethods]", SortMethods.get(item))
-    if sort_methods:
-        parser.add_argument(
-            "-O", "--order", "--sort", dest="sort", choices=sort_methods, type=str.lower,
-            help=f"Sorting field to list {item}. Name must be one of the fields supported by {item} objects."
-        )
+
+
+def add_process_search_options(parser):
+    # type: (argparse.ArgumentParser) -> None
+    parser.add_argument(
+        "--process", dest="process",
+        help="Filter process revisions by process identifier."
+    )
+    parser.add_argument(
+        "--revisions", dest="revisions", action="store_true", default=None,
+        help="Include older process revisions in the listing."
+    )
+    parser.add_argument(
+        "--sortby", dest="sortby", action="append", metavar="FIELD",
+        help="Sort by a field. Repeat to specify multiple fields, prefixing with '+' or '-' for direction."
+    )
+    parser.add_argument(
+        "--keywords", dest="keywords", action="append", metavar="EXPRESSION",
+        help="Filter by process keywords. Repeat to provide comma-separated AND terms."
+    )
+    parser.add_argument(
+        "--title", dest="title",
+        help="Filter by process title text."
+    )
+    parser.add_argument(
+        "--description", dest="description",
+        help="Filter by process description text."
+    )
+    parser.add_argument(
+        "--q", dest="q",
+        help="Filter by the simple process search expression."
+    )
+    parser.add_argument(
+        "--query", dest="query",
+        help="Filter by the process search expression."
+    )
+    parser.add_argument(
+        "--version", dest="version",
+        help="Filter by process version or version range."
+    )
+    parser.add_argument(
+        "--datetime", dest="datetime",
+        help="Filter by process creation datetime or interval."
+    )
+    parser.add_argument(
+        "--license", dest="license",
+        help="Filter by process license."
+    )
+    parser.add_argument(
+        "--type", dest="process_type", action="append", metavar="TYPE",
+        help="Filter by process type or Records resource type URI. Repeat to specify multiple types."
+    )
+    parser.add_argument(
+        "--filter", dest="filter",
+        help="Filter processes with a CQL expression or a CQL2-JSON object/array."
+    )
+    parser.add_argument(
+        "--filter-lang", dest="filter_lang",
+        choices=FilterLanguage.values(), type=str.lower,
+        help="Language used to parse the CQL filter expression."
+    )
+    parser.add_argument(
+        "--filter-crs", dest="filter_crs",
+        help="Coordinate reference system for spatial filter properties."
+    )
 
 
 def parse_auth(kwargs):
@@ -4236,6 +4402,7 @@ def make_parser():
     add_url_param(op_capabilities)
     add_shared_options(op_capabilities)
     add_listing_options(op_capabilities, item="process")
+    add_process_search_options(op_capabilities)
     prov_args_grp = op_capabilities.add_argument_group(
         title="Remote Provider Arguments",
         description="Parameters related to remote providers reporting."
@@ -4337,6 +4504,26 @@ def make_parser():
     op_jobs.add_argument(
         "-fT", "--tags", dest="tags", type=str.lower, nargs="+",
         help="Filter job listing only to matching tags. Jobs must match all tags simultaneously, not one of them."
+    )
+    op_jobs.add_argument(
+        "--sortby", dest="sortby", action="append", metavar="FIELD",
+        help="Sort jobs by a field. Repeat to specify multiple fields, prefixing with '+' or '-' for direction."
+    )
+    op_jobs.add_argument(
+        "--datetime", dest="datetime",
+        help="Filter jobs by creation datetime or interval."
+    )
+    op_jobs.add_argument(
+        "--filter", dest="filter",
+        help="Filter jobs with a CQL2 expression."
+    )
+    op_jobs.add_argument(
+        "--filter-lang", dest="filter_lang", choices=FilterLanguage.values(), type=str.lower,
+        help="Language used to parse the CQL2 filter expression."
+    )
+    op_jobs.add_argument(
+        "--filter-crs", dest="filter_crs",
+        help="Coordinate reference system for spatial filter properties."
     )
 
     op_dismiss = WeaverArgumentParser(

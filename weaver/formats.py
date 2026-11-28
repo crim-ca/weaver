@@ -105,6 +105,7 @@ class ContentType(Constants):
     APP_JSON = "application/json"
     APP_JSONLD = "application/ld+json"
     APP_RAW_JSON = "application/raw+json"
+    APP_SCHEMA_JSON = "application/schema+json"
     APP_OAS_JSON = "application/vnd.oai.openapi+json; version=3.0"
     APP_OGC_PKG_JSON = "application/ogcapppkg+json"
     APP_OGC_PKG_YAML = "application/ogcapppkg+yaml"

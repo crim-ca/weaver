@@ -2,11 +2,15 @@
 Stores to read/write data to from/to `MongoDB` using pymongo.
 """
 import copy
+import datetime
 import logging
+import re
 import uuid
 from typing import TYPE_CHECKING, cast
 
 import pymongo
+from pygeofilter import ast
+from pygeofilter.values import Interval
 from pymongo.collation import Collation
 from pymongo.collection import ReturnDocument
 from pymongo.errors import DuplicateKeyError
@@ -59,10 +63,10 @@ from weaver.wps_restapi import swagger_definitions as sd
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
-    import datetime
-    from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+    from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
     from typing_extensions import TypedDict
 
+    from pygeofilter.ast import AstType
     from pymongo.collection import Collection
 
     from weaver.execute import AnyExecuteMode, AnyExecuteResponse, AnyExecuteReturnPreference
@@ -85,6 +89,8 @@ if TYPE_CHECKING:
         MetadataQueryScope
     )
     from weaver.visibility import AnyVisibility
+
+    MongoFilterFields = Dict[str, Tuple[Any, str]]
 
     MongodbValue = Union[AnyValueType, datetime.datetime]
     MongodbAggregateValue = Union[
@@ -125,6 +131,226 @@ if TYPE_CHECKING:
     MongodbAggregatePipeline = List[Dict[str, Union[str, Dict[str, MongodbAggregateStep]]]]
 
 LOGGER = logging.getLogger(__name__)
+
+
+class MongoFilterTranslator(object):
+    """
+    Translates parsed `CQL2` expressions into `MongoDB` aggregation expressions.
+    """
+
+    _FIELD_SCALAR = "scalar"
+    _FIELD_ARRAY = "array"
+    _FIELD_DATETIME = "datetime"
+
+    _LICENSE_LINKS = {"$concatArrays": [{"$ifNull": ["$metadata", []]}, {"$ifNull": ["$additional_links", []]}]}
+    _LICENSE_HREFS = {"$map": {
+        "input": {"$filter": {
+            "input": _LICENSE_LINKS,
+            "cond": {"$or": [{"$eq": ["$$this.rel", "license"]}, {"$eq": ["$$this.role", "license"]}]},
+        }},
+        "in": {"$ifNull": ["$$this.href", "$$this.value"]},
+    }}
+    _PROCESS_MONGO_FIELDS = {
+        "id": ("$identifier", _FIELD_SCALAR),
+        "title": ({"$ifNull": ["$title", "$identifier"]}, _FIELD_SCALAR),
+        "description": ({"$cond": ["$abstract", "$abstract", {"$ifNull": ["$description", ""]}]}, _FIELD_SCALAR),
+        "keywords": ("$keywords", _FIELD_ARRAY),
+        "version": ("$version", _FIELD_SCALAR),
+        "type": ("$type", _FIELD_SCALAR),
+        "license": ({"$arrayElemAt": [_LICENSE_HREFS, 0]}, _FIELD_SCALAR),
+        "created": ("$created", _FIELD_DATETIME),
+    }
+    _JOB_MONGO_FIELDS = {
+        "id": ("$id", _FIELD_SCALAR),
+        "status": ("$status", _FIELD_SCALAR),
+        "processID": ("$process", _FIELD_SCALAR),
+        "provider": ("$service", _FIELD_SCALAR),
+        "created": ("$created", _FIELD_DATETIME),
+        "started": ("$started", _FIELD_DATETIME),
+        "finished": ("$finished", _FIELD_DATETIME),
+    }
+    _PROCESS_VALUE_RESOLVERS = {"type": ProcessType.resolve}
+
+    _COMPARISONS = {
+        ast.Equal: "$eq",
+        ast.NotEqual: "$ne",
+        ast.LessThan: "$lt",
+        ast.LessEqual: "$lte",
+        ast.GreaterThan: "$gt",
+        ast.GreaterEqual: "$gte",
+    }
+
+    @classmethod
+    def for_processes(cls):
+        # type: (Type[MongoFilterTranslator]) -> MongoFilterTranslator
+        return cls(cls._PROCESS_MONGO_FIELDS, cls._PROCESS_VALUE_RESOLVERS)
+
+    @classmethod
+    def for_jobs(cls):
+        # type: (Type[MongoFilterTranslator]) -> MongoFilterTranslator
+        return cls(cls._JOB_MONGO_FIELDS)
+
+    def __init__(self, mongo_fields, resolvers=None):
+        # type: (MongoFilterFields, Optional[Dict[str, Callable[[Any], List[Any]]]]) -> None
+        """
+        Initializes the MongoDB filter translator.
+
+        :param mongo_fields: Mapping of API queryable names to MongoDB expressions and value kinds.
+        :param resolvers: Mapping of queryable names to functions expanding equivalent values.
+        """
+        self.mongo_fields = mongo_fields
+        self.resolvers = resolvers or {}
+
+    @staticmethod
+    def _invalid_filter(description, value=None):
+        # type: (str, Optional[Any]) -> ListingInvalidParameter
+        return ListingInvalidParameter(json={
+            "description": description,
+            "cause": "filter",
+            "value": str(value),
+        })
+
+    @staticmethod
+    def _filter_datetime(value):
+        # type: (Any) -> datetime.datetime
+        if isinstance(value, datetime.datetime):
+            return value if value.tzinfo else value.replace(tzinfo=datetime.timezone.utc)
+        if isinstance(value, datetime.date):
+            return datetime.datetime(value.year, value.month, value.day, tzinfo=datetime.timezone.utc)
+        raise MongoFilterTranslator._invalid_filter("Filter value is not a valid datetime.", value)
+
+    @staticmethod
+    def _filter_like_regex(node):
+        # type: (ast.Like) -> str
+        regex = ""
+        chars = iter(node.pattern)
+        for char in chars:
+            if char == node.escapechar:
+                regex += re.escape(next(chars, ""))
+            elif char == node.wildcard:
+                regex += ".*"
+            elif char == node.singlechar:
+                regex += "."
+            else:
+                regex += re.escape(char)
+        return f"^{regex}$"
+
+    def translate(self, node):
+        # type: (AstType) -> JSON
+        """
+        Translates a `pygeofilter` AST node into a `MongoDB` aggregation expression.
+
+        :raises ListingInvalidParameter: If the expression refers to unsupported properties or operators.
+        """
+        if isinstance(node, ast.And):
+            return {"$and": [self.translate(node.lhs), self.translate(node.rhs)]}
+        if isinstance(node, ast.Or):
+            return {"$or": [self.translate(node.lhs), self.translate(node.rhs)]}
+        if isinstance(node, ast.Not):
+            return {"$not": [self.translate(node.sub_node)]}
+        if isinstance(node, ast.Include):
+            return {"$literal": True}
+        if isinstance(node, tuple(self._COMPARISONS)):
+            return self._compare(node)
+        if isinstance(node, ast.Between):
+            expr, kind = self._field(node.lhs)
+            result = {"$and": [
+                {"$gte": [expr, self._value(node.low, kind)]},
+                {"$lte": [expr, self._value(node.high, kind)]},
+            ]}
+            return {"$not": [result]} if node.not_ else result
+        if isinstance(node, ast.Like):
+            expr, _ = self._field(node.lhs)
+            result = {"$regexMatch": {
+                "input": {"$ifNull": [expr, ""]},
+                "regex": self._filter_like_regex(node),
+                "options": "i" if node.nocase else "",
+            }}
+            return {"$not": [result]} if node.not_ else result
+        if isinstance(node, ast.In):
+            return self._contain(node)
+        if isinstance(node, ast.IsNull):
+            expr, _ = self._field(node.lhs)
+            result = {"$eq": [{"$ifNull": [expr, None]}, None]}
+            return {"$not": [result]} if node.not_ else result
+        if isinstance(node, ast.TemporalPredicate):
+            return self._temporal(node)
+        raise self._invalid_filter("Unsupported filter operation.", type(node).__name__)
+
+    def _field(self, node):
+        # type: (AstType) -> Tuple[Any, str]
+        if not isinstance(node, ast.Attribute):
+            raise self._invalid_filter("Unsupported filter property.", getattr(node, "name", node))
+        if node.name not in self.mongo_fields:
+            raise self._invalid_filter("Unsupported filter property.", node.name)
+        return self.mongo_fields[node.name]
+
+    def _values(self, name, value):
+        # type: (str, Any) -> List[Any]
+        resolver = self.resolvers.get(name)
+        return resolver(value) if resolver else [value]
+
+    def _value(self, value, kind):
+        # type: (Any, str) -> Any
+        if isinstance(value, ast.Node):
+            raise self._invalid_filter("Filter comparison between properties is not supported.", value)
+        if kind == self._FIELD_DATETIME:
+            return self._filter_datetime(value)
+        return value
+
+    def _compare(self, node):
+        # type: (ast.Comparison) -> JSON
+        name = getattr(node.lhs, "name", None)
+        expr, kind = self._field(node.lhs)
+        operator = self._COMPARISONS[type(node)]
+        if kind == self._FIELD_ARRAY:
+            if operator not in ["$eq", "$ne"]:
+                raise self._invalid_filter("Unsupported filter operation for array property.", name)
+            result = {"$in": [self._value(node.rhs, kind), {"$ifNull": [expr, []]}]}
+            return result if operator == "$eq" else {"$not": [result]}
+        values = self._values(name, node.rhs)
+        if len(values) > 1 and operator in ["$eq", "$ne"]:
+            result = {"$in": [expr, values]}
+            return result if operator == "$eq" else {"$not": [result]}
+        return {operator: [expr, self._value(values[0], kind)]}
+
+    def _contain(self, node):
+        # type: (ast.In) -> JSON
+        name = getattr(node.lhs, "name", None)
+        expr, kind = self._field(node.lhs)
+        values = [value for item in node.sub_nodes for value in self._values(name, item)]
+        values = [self._value(value, kind) for value in values]
+        if kind == self._FIELD_ARRAY:
+            result = {"$gt": [{"$size": {"$setIntersection": [{"$ifNull": [expr, []]}, values]}}, 0]}
+        else:
+            result = {"$in": [expr, values]}
+        return {"$not": [result]} if node.not_ else result
+
+    def _temporal(self, node):
+        # type: (ast.TemporalPredicate) -> JSON
+        expr, kind = self._field(node.lhs)
+        if kind != self._FIELD_DATETIME:
+            raise self._invalid_filter(
+                "Temporal filter operation requires a datetime property.",
+                getattr(node.lhs, "name", None),
+            )
+        rhs = node.rhs
+        start, end = (rhs.start, rhs.end) if isinstance(rhs, Interval) else (rhs, rhs)
+        start = self._filter_datetime(start) if start is not None else None
+        end = self._filter_datetime(end) if end is not None else None
+        within = [{"$gte": [expr, start]}] if start else []
+        within += [{"$lte": [expr, end]}] if end else []
+        if isinstance(node, ast.TimeAfter):
+            return {"$gt": [expr, end or start]}
+        if isinstance(node, ast.TimeBefore):
+            return {"$lt": [expr, start or end]}
+        if isinstance(node, ast.TimeEquals):
+            return {"$eq": [expr, start]}
+        if isinstance(node, ast.TimeDisjoint):
+            return {"$not": [{"$and": within}]} if within else {"$literal": False}
+        if isinstance(node, (ast.TimeDuring, ast.TimeOverlaps, ast.TimeOverlappedBy)):
+            return {"$and": within} if within else {"$literal": True}
+        raise self._invalid_filter("Unsupported temporal filter operation.", type(node).__name__)
 
 
 class MongodbStore(object):
@@ -275,6 +501,48 @@ class ListingMixin(object):
             })
         sort_order = pymongo.DESCENDING if sort in (Sort.FINISHED, Sort.CREATED) else pymongo.ASCENDING
         return {sort: sort_order}
+
+    @classmethod
+    def _apply_sortby(
+        cls,
+        sortby,         # type: Optional[List[str]]
+        sort_default,   # type: AnySortType
+        sort_allowed,   # type: Iterable[AnySortType]
+        aliases=None,   # type: Optional[Dict[str, List[str]]]
+    ):                  # type: (...) -> Dict[str, int]
+        """
+        Resolves sorting fields that can be prefixed by ``+`` (ascending) or ``-`` (descending).
+
+        Fields without prefix employ their default direction. A leading space is interpreted as ``+``,
+        since an unescaped ``+`` in a query string is decoded as a space.
+        Aliases map a field to one or many equivalent fields of the database representation.
+        """
+        sort_fields = {}  # type: MongodbAggregateSortOrder
+        for term in sortby or [sort_default]:
+            term = f"+{term[1:]}" if term.startswith(" ") else term
+            name = term.lstrip("+-")
+            direction = {"+": pymongo.ASCENDING, "-": pymongo.DESCENDING}.get(term[:1])
+            for field in (aliases or {}).get(name, [name]):
+                for key, default_direction in cls._apply_sort_method(field, sort_default, sort_allowed).items():
+                    sort_fields[key] = direction or default_direction
+        return sort_fields
+
+    @staticmethod
+    def _apply_datetime_filter(datetime_interval):
+        # type: (Optional[DatetimeIntervalType]) -> MongodbAggregateExpression
+        search_filters = {}
+        if datetime_interval is not None:
+            if datetime_interval.get("after", False):
+                search_filters["$gte"] = datetime_interval["after"]
+
+            if datetime_interval.get("before", False):
+                search_filters["$lte"] = datetime_interval["before"]
+
+            if datetime_interval.get("match", False):
+                search_filters = datetime_interval["match"]
+
+            return {"created": search_filters}
+        return {}
 
     @staticmethod
     def _apply_total_result(search_pipeline, extra_pipeline):
@@ -552,6 +820,17 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                        process=None,        # type: Optional[str]
                        identifiers=None,    # type: Optional[List[str]]
                        metadata=None,       # type: Optional[List[Tuple[MetadataQueryScope, str, str]]]
+                       keywords=None,       # type: Optional[str]
+                       title=None,          # type: Optional[str]
+                       description=None,    # type: Optional[str]
+                       q=None,              # type: Optional[str]
+                       query=None,          # type: Optional[str]
+                       version=None,        # type: Optional[str]
+                       sortby=None,         # type: Optional[List[str]]
+                       datetime_interval=None,  # type: Optional[DatetimeIntervalType]
+                       license=None,        # type: Optional[str]
+                       type=None,           # type: Optional[str]
+                       filter_ast=None,     # type: Optional[AstType]
                        ):                   # type: (...) -> Union[List[Process], Tuple[List[Process], int]]
         """
         Lists all processes in database, optionally filtered by `visibility`.
@@ -573,6 +852,25 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             :data:`weaver.wps_restapi.swagger_definitions.OGC_API_PROC_PART5_METADATA_PROFILE_REL_URI`) are
             considered for the ``role``/``href`` matching
             (`OGC API - Processes - Part 5` ``metadata-profiles`` query filtering).
+        :param keywords:
+            Comma-separated keywords that must all be matched (AND).
+            Alternatives for a given keyword can be provided with ``|`` (OR).
+        :param title: Case-insensitive text that must be contained in the process title.
+        :param description: Case-insensitive text that must be contained in the process description.
+        :param q: Alias for :paramref:`query`.
+        :param query:
+            Phrase search across title, description and keywords with comma-separated OR groups.
+            Boundary-prefixed ``+`` and ``-`` introduce AND and NOT terms. Other signs are literal.
+        :param version: Exact process version or inclusive ``lower/upper`` range with ``..`` for open bounds.
+        :param sortby:
+            Fields optionally prefixed with ``+`` (ascending) or ``-`` (descending).
+            Fields without prefix use their default direction. Takes precedence over :paramref:`sort`.
+        :param datetime_interval: Interval that the process ``created`` datetime must match.
+        :param license: License reference (``href`` or ``title``) of a ``license`` link or metadata of the process.
+        :param type:
+            Comma-separated :class:`ProcessType` (case-insensitive) or equivalent resource type URIs.
+            Any of the specified types must match.
+        :param filter_ast: Parsed `CQL2` filter expression matched against the supported queryable properties.
         :returns:
             List of sorted, and possibly page-filtered, processes matching queries.
             If ``total`` was requested, return a tuple of this list and the number of processes.
@@ -652,20 +950,26 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                     metadata_conditions.append({scope: {"$elemMatch": {"metadata": {"$elemMatch": elem_match}}}})
             search_filters["$and"] = metadata_conditions
 
-        # processes do not have 'created', but ObjectID in '_id' has the particularity of embedding creation time
-        if sort == Sort.CREATED:
-            sort = "_id"
-        # replace equivalent aliases to corresponding fields in db
-        if sort in [Sort.ID, Sort.PROCESS]:
-            sort = Sort.ID_LONG
-        sort_allowed = list(SortMethods.PROCESS) + ["_id"]
-        sort_fields = self._apply_sort_method(sort, Sort.ID_LONG, sort_allowed)
-        if revisions and sort in [Sort.ID, Sort.ID_LONG, Sort.PROCESS]:
+        search_conditions = self._apply_search_filter(
+            keywords, title, description, q, query, version, license, type, filter_ast,
+        )
+        if search_conditions:
+            search_filters.setdefault("$and", []).extend(search_conditions)
+        search_filters.update(self._apply_datetime_filter(datetime_interval))
+
+        # processes saved before 'created' existed can still be matched with the creation time embedded in '_id'
+        insert_fields.append({"$set": {"created": {"$ifNull": ["$created", {"$toDate": "$_id"}]}}})
+        sort_id = [Sort.ID_LONG, Sort.VERSION] if revisions else [Sort.ID_LONG]
+        sort_fields = self._apply_sortby(
+            sortby or ([sort] if sort else None), Sort.ID, SortMethods.PROCESS,
+            {Sort.ID: sort_id, Sort.PROCESS: sort_id, Sort.ID_LONG: sort_id},
+        )
+        if revisions and Sort.VERSION in sort_fields and Sort.ID_LONG in sort_fields:
             # If listing many revisions, sort by version on top of ID to make listing more natural.
             # Because the "latest version" is saved with 'id' only while "older revisions" are saved with 'id:version',
             # that more recent version would always appear first since alphabetical sort: 'id' (latest) < 'id:version'.
             # Work around this by dynamically reassigning 'id' by itself.
-            insert_fields = [
+            insert_fields += [
                 {"$set": {"id_version": {"$split": ["$identifier", ":"]}}},
                 {"$set": {"identifier": {"$arrayElemAt": ["$id_version", 0]}}},
                 # Don't set the 'version' field with index=1 here since an explicit 'null' from parsing 'id_version'
@@ -673,7 +977,6 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
                 # where 'id' does not contain ':' (therefore 'null' result from '$split') although that latest process
                 # is a revision that *should* have the 'version' value provided for the previous version to be created.
             ]
-            sort_fields = {"identifier": pymongo.ASCENDING, "version": pymongo.ASCENDING}
         sort_method = [{"$sort": sort_fields}]
 
         search_pipeline = insert_fields + [{"$match": search_filters}] + resolve_filter + sort_method
@@ -690,6 +993,114 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
             total = found[0]["total"]
             return items, total
         return [Process(item) for item in found]
+
+    @staticmethod
+    def _apply_search_filter(keywords,      # type: Optional[str]
+                             title,         # type: Optional[str]
+                             description,   # type: Optional[str]
+                             q,             # type: Optional[str]
+                             query,         # type: Optional[str]
+                             version,       # type: Optional[str]
+                             license,       # type: Optional[str]
+                             type,          # type: Optional[str]
+                             filter_ast,    # type: Optional[AstType]
+                             ):             # type: (...) -> List[MongodbAggregateExpression]
+        """
+        Builds process queryables conditions for the existing listing aggregation.
+        """
+        conditions = []  # type: List[MongodbAggregateExpression]
+        if keywords:
+            for group in sd.ProcessKeywordExpression.parse(keywords):
+                alternatives = []
+                for term, negative in group:
+                    condition = {"keywords": {"$regex": f"^{re.escape(term)}$", "$options": "i"}}
+                    alternatives.append({"$nor": [condition]} if negative else condition)
+                conditions.append({"$or": alternatives})
+        for field, text in [("title", title), ("description", description)]:
+            if text:
+                conditions.append(MongodbProcessStore._apply_text_filter(field, text))
+        for expression in [q, query]:
+            if expression:
+                conditions.append(MongodbProcessStore._apply_query_filter(expression))
+        if version:
+            conditions.append(MongodbProcessStore._apply_version_filter(version))
+        if license:
+            conditions.append(MongodbProcessStore._apply_license_filter(license))
+        if type:
+            types = [value for item in type.split(",") for value in ProcessType.resolve(item)]
+            conditions.append({"type": {"$in": types}})
+        if filter_ast:
+            translator = MongoFilterTranslator.for_processes()
+            conditions.append({"$expr": translator.translate(filter_ast)})
+        return conditions
+
+    @staticmethod
+    def _apply_license_filter(license):
+        # type: (str) -> MongodbAggregateExpression
+        """
+        Matches the reference of any entry of the process ``metadata`` or ``links`` with a ``license`` role or relation.
+
+        Link entries are matched by their ``href`` or ``title``, and metadata value entries by their ``value``.
+        """
+        license_rel = {"$regex": r"(^|/)license$"}
+        reference = {"$or": [{"href": license}, {"value": license}, {
+            "title": {"$regex": f"^{re.escape(license)}$", "$options": "i"}}]}
+        return {"$or": [
+            {field: {"$elemMatch": {"$and": [{"$or": [{"rel": license_rel}, {"role": license_rel}]}, reference]}}}
+            for field in ["metadata", "additional_links"]
+        ]}
+
+    @staticmethod
+    def _apply_query_filter(query):
+        # type: (str) -> MongodbAggregateExpression
+        """
+        Applies OR groups of AND and NOT text terms within the existing listing filter.
+        """
+        alternatives = []
+        for group in sd.ProcessQueryExpression.parse(query):
+            terms = []
+            for text, negative in group:
+                condition = {"$or": [
+                    MongodbProcessStore._apply_text_filter(field, text, match_whitespace=True)
+                    for field in ["title", "description", "keywords"]
+                ]}
+                terms.append({"$nor": [condition]} if negative else condition)
+            alternatives.append({"$and": terms})
+        return {"$or": alternatives}
+
+    @staticmethod
+    def _apply_version_filter(version):
+        # type: (str) -> MongodbAggregateExpression
+        """
+        Matches semantic version intervals numerically rather than comparing version strings alphabetically.
+        """
+        lower, upper = sd.ProcessVersionExpression.parse(version)
+        if lower is not None and lower == upper:
+            return {"version": ".".join(str(part) for part in lower)}
+        version_parts = {"$map": {"input": {"$split": ["$version", "."]}, "in": {"$toInt": "$$this"}}}
+        conditions = []
+        for bound, operator in [(lower, "$gte"), (upper, "$lte")]:
+            if bound is not None:
+                conditions.append({operator: [version_parts, list(bound)]})
+        numeric_version = {"$regexMatch": {"input": {"$ifNull": ["$version", ""]}, "regex": r"^\d+\.\d+\.\d+$"}}
+        return {"$expr": {"$cond": [numeric_version, {"$and": conditions}, False]}}
+
+    @staticmethod
+    def _apply_text_filter(field, text, match_whitespace=False):
+        # type: (str, str, bool) -> MongodbAggregateExpression
+        """
+        Matches literal text against the effective process description fields, with optional flexible phrase whitespace.
+        """
+        parts = re.split(r"\s+", text.strip()) if match_whitespace else [text.strip()]
+        regex = r"\s+".join(re.escape(part) for part in parts)
+        if field == "keywords":
+            return {field: {"$regex": regex, "$options": "i"}}
+        # Match the same fallback fields exposed by Process.title and Process.description.
+        if field == "title":
+            value = {"$ifNull": ["$title", "$identifier"]}
+        else:
+            value = {"$cond": ["$abstract", "$abstract", {"$ifNull": ["$description", ""]}]}
+        return {"$expr": {"$regexMatch": {"input": value, "regex": regex, "options": "i"}}}
 
     def _get_revision_search(self, process_id):
         # type: (str) -> Tuple[MongodbAggregateExpression, Optional[str]]
@@ -1043,6 +1454,8 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
                   access=None,              # type: Optional[str]
                   status=None,              # type: Optional[AnyStatusSearch, List[AnyStatusSearch]]
                   sort=None,                # type: Optional[AnySortType]
+                  sortby=None,              # type: Optional[List[str]]
+                  filter_ast=None,          # type: Optional[AstType]
                   page=0,                   # type: Optional[int]
                   limit=10,                 # type: Optional[int]
                   min_duration=None,        # type: Optional[int]
@@ -1107,12 +1520,16 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         search_filters.update(self._apply_tags_filter(tags))
         search_filters.update(self._apply_access_filter(access, request))
         search_filters.update(self._apply_datetime_filter(datetime_interval))
+        if filter_ast:
+            translator = MongoFilterTranslator.for_jobs()
+            search_filters.setdefault("$and", []).append({"$expr": translator.translate(filter_ast)})
 
         # minimal operation, only search for matches and sort them
         pipeline = [{"$match": search_filters}]  # expected for all filters except 'duration'
         self._apply_duration_filter(pipeline, min_duration, max_duration)
 
-        sort_method = {"$sort": self._apply_sort_method(sort, Sort.CREATED, SortMethods.JOB)}
+        sort_by = sortby or ([sort] if sort else None)
+        sort_method = {"$sort": self._apply_sortby(sort_by, Sort.CREATED, SortMethods.JOB)}
         pipeline.append(sort_method)
 
         # results by group categories or with job list paging
@@ -1263,23 +1680,6 @@ class MongodbJobStore(StoreJobs, MongodbStore, ListingMixin):
         elif status:
             search_filters["status"] = str(status[0])
         return search_filters
-
-    @staticmethod
-    def _apply_datetime_filter(datetime_interval):
-        # type: (Optional[DatetimeIntervalType]) -> MongodbAggregateExpression
-        search_filters = {}
-        if datetime_interval is not None:
-            if datetime_interval.get("after", False):
-                search_filters["$gte"] = datetime_interval["after"]
-
-            if datetime_interval.get("before", False):
-                search_filters["$lte"] = datetime_interval["before"]
-
-            if datetime_interval.get("match", False):
-                search_filters = datetime_interval["match"]
-
-            return {"created": search_filters}
-        return {}
 
     @staticmethod
     def _apply_duration_filter(pipeline, min_duration, max_duration):
