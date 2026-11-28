@@ -11,11 +11,13 @@ import pystac
 import pytest
 
 from weaver import ogc_definitions as ogc_def
+from weaver.__meta__ import __source_repository__, __version__
 from weaver.collections.stac import (
     STAC_COLLECTION_FILE,
     STAC_EXT_APPLICATION,
     STAC_EXT_FILE,
     STAC_EXT_PROCESSING,
+    STAC_EXT_VCS,
     AmbiguousCollectionItems,
     JobCollection,
     generate_job_collection,
@@ -159,15 +161,18 @@ def test_job_collection_generation():
             index = json.load(f)
         assert index["type"] == "FeatureCollection"
         assert index["numberMatched"] == index["numberReturned"] == 1
-        assert STAC_EXT_PROCESSING in coll_data["stac_extensions"]
+        assert set(coll_data["stac_extensions"]) == {
+            STAC_EXT_PROCESSING, STAC_EXT_APPLICATION, STAC_EXT_VCS,
+        }
         coll = pystac.Collection.from_dict(coll_data)
         assert coll.id == str(job.id)
 
         with open(os.path.join(coll_dir, "items", f"{job.id}-0.json"), mode="r", encoding="utf-8") as f:
             item_data = json.load(f)
         pystac.Item.from_dict(item_data)
-        assert STAC_EXT_FILE in item_data["stac_extensions"]
-        assert STAC_EXT_PROCESSING in item_data["stac_extensions"]
+        assert set(item_data["stac_extensions"]) == {
+            STAC_EXT_PROCESSING, STAC_EXT_APPLICATION, STAC_EXT_VCS, STAC_EXT_FILE,
+        }
         assert item_data["collection"] == str(job.id)
         assert item_data["properties"]["weaver:output_id"] == ["out", "value"]
         asset = item_data["assets"]["out"]
@@ -180,7 +185,38 @@ def test_job_collection_generation():
         rels = {lnk["rel"] for lnk in item_data["links"]}
         assert {"self", "root", "parent", "collection"} <= rels
 
+        job_url = f"{settings['weaver.url']}/processes/{job.process}/jobs/{job.id}"
+        expected_links = {
+            "processing-execution": (job_url, ContentType.APP_JSON),
+            sd.OGC_API_PROC_REL_JOB_RESULTS_URI: (f"{job_url}/results", ContentType.APP_JSON),
+            "outputs": (f"{job_url}/outputs", ContentType.APP_JSON),
+            "definition": (f"{job_url}/definition", ContentType.APP_JSON),
+            sd.OGC_API_PROC_REL_JOB_LOG_URI: (f"{job_url}/logs", ContentType.APP_JSON),
+            "processing-expression": (
+                f"{settings['weaver.url']}/processes/{job.process}", ContentType.APP_JSON,
+            ),
+            "application-input": (f"{job_url}/inputs", ContentType.APP_JSON),
+            "application-platform": (settings["weaver.url"], ContentType.APP_JSON),
+        }
+        for document in [coll_data, item_data]:
+            links = {link["rel"]: link for link in document["links"]}
+            for rel, (href, media_type) in expected_links.items():
+                assert links[rel]["href"] == href
+                assert links[rel]["type"] == media_type
+            assert links[sd.OGC_API_PROC_REL_JOB_RESULTS_URI]["profile"] == sd.OGC_API_PROC_PROFILE_RESULTS_URI
+            assert links["processing-expression"]["profile"] == sd.OGC_API_PROC_PROFILE_PROC_DESC_URI
+            assert links["application-platform"]["vcs:tag"] == __version__
+            assert links["processing-software"]["href"] == __source_repository__
+            assert links["processing-software"]["vcs:type"] == "git"
+            assert links["processing-software"]["vcs:tag"] == __version__
+            assert links["derived_from"]["href"] == "https://example.com/input.txt"
+            assert "application" not in links
+            assert "vcs" not in links
+
         assert item_data["properties"]["weaver:value"] == {"value": 3}
+        assert item_data["properties"]["processing:expression"] == {
+            "format": "results", "expression": {"value": 3},
+        }
         assert coll_data["assets"]["results"]["roles"] == ["data"]
         assert coll_data["assets"]["results"]["profile"] == sd.OGC_API_PROC_PROFILE_RESULTS_URI
         assert os.path.isfile(os.path.join(coll_dir, "assets", "results.json"))
@@ -244,7 +280,15 @@ def test_compute_file_checksum():
 
 @pytest.mark.collection
 @pytest.mark.stac
-def test_job_collection_process_application_extension():
+@pytest.mark.parametrize(
+    ["repository"],
+    [
+        [None],
+        ["https://example.com/package-source"],
+        [{"@id": "https://example.com/package-source"}],
+    ],
+)
+def test_job_collection_process_application_extension(repository):
     """
     Tests that process and CWL package references are mapped to the STAC Application extension.
     """
@@ -256,6 +300,8 @@ def test_job_collection_process_application_extension():
         "inputs": {},
         "outputs": {},
     }
+    if repository is not None:
+        package["s:codeRepository"] = repository
     with tempfile.TemporaryDirectory() as tmp:
         settings = make_settings(tmp)
         job = make_job()
@@ -281,9 +327,42 @@ def test_job_collection_process_application_extension():
         assert expression["parameters"] == {"inputs": {"data": {"href": "https://example.com/input.txt"}}}
         links = {link["rel"]: link for link in coll["links"]}
         assert links["application"]["href"].endswith("/processes/test-process/package")
+        assert links["application"]["type"] == ContentType.APP_JSON
+        assert links["application"]["application:languages"] == ["CWL"]
+        assert links["application"]["application:entrypoint"] == "echo"
         assert links["processing-expression"]["href"].endswith("/processes/test-process")
         assert links["processing-expression"]["profile"] == sd.OGC_API_PROC_PROFILE_PROC_DESC_URI
         assert links["application-input"]["href"].endswith(f"/jobs/{job.id}/inputs")
+        assert links[sd.OGC_API_PROC_REL_JOB_RESULTS_URI]["profile"] == sd.OGC_API_PROC_PROFILE_RESULTS_URI
+        assert links[sd.OGC_API_PROC_REL_JOB_LOG_URI]["href"].endswith(f"/jobs/{job.id}/logs")
+        assert links["application-platform"]["href"] == settings["weaver.url"]
+        assert links["application-platform"]["vcs:tag"] == __version__
+        assert links["processing-software"]["href"] == __source_repository__
+        assert links["processing-software"]["vcs:tag"] == __version__
+        assert links["processing-software"]["vcs:type"] == "git"
+        assert coll["providers"][0]["url"] == settings["weaver.url"]
+        assert STAC_EXT_VCS in coll["stac_extensions"]
+        vcs_links = [link for link in coll["links"] if link["rel"] == "vcs"]
+        assert [link["href"] for link in vcs_links] == (
+            ["https://example.com/package-source"] if repository is not None else []
+        )
+        with open(os.path.join(job.collection_path(settings), "items", f"{job.id}-0.json"),
+                  mode="r", encoding="utf-8") as f:
+            item = json.load(f)
+        assert STAC_EXT_VCS in item["stac_extensions"]
+        assert STAC_EXT_APPLICATION in item["stac_extensions"]
+        assert item["properties"]["application:languages"] == ["CWL"]
+        assert item["properties"]["application:entrypoint"] == "echo"
+        assert coll["providers"][0]["application:languages"] == ["CWL"]
+        assert coll["providers"][0]["application:entrypoint"] == "echo"
+        item_links = {link["rel"]: link for link in item["links"]}
+        for rel in [
+            "application", "application-input", "application-platform",
+            "processing-expression", "processing-software",
+            sd.OGC_API_PROC_REL_JOB_RESULTS_URI, sd.OGC_API_PROC_REL_JOB_LOG_URI,
+        ]:
+            assert item_links[rel] == links[rel]
+        assert [link for link in item["links"] if link["rel"] == "vcs"] == vcs_links
         assert [link["href"] for link in coll["links"] if link["rel"] == "processing-expression"] == [
             links["processing-expression"]["href"]
         ]

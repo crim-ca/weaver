@@ -40,7 +40,7 @@ from weaver.__meta__ import __source_repository__, __title__, __version__
 from weaver.collections.utils import collection_api_url, collection_enabled
 from weaver.execute import ExecuteCollectionFormat
 from weaver.formats import ContentType, clean_media_type_format, get_content_type
-from weaver.processes.constants import JobInputsOutputsSchema
+from weaver.processes.constants import CWL_REQUIREMENT_APP_DOCKER, JobInputsOutputsSchema
 from weaver.processes.convert import convert_input_values_schema, get_field
 from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.utils import (
@@ -50,7 +50,9 @@ from weaver.utils import (
     get_path_kvp,
     get_settings,
     get_weaver_url,
+    load_file,
     localize_datetime,
+    make_dirs,
     now,
     request_extra
 )
@@ -77,6 +79,7 @@ STAC_API_DATA_ACCESS = [
 STAC_EXT_PROCESSING = "https://stac-extensions.github.io/processing/v1.2.0/schema.json"
 STAC_EXT_APPLICATION = "https://stac-extensions.github.io/application/v0.1.0/schema.json"
 STAC_EXT_FILE = "https://stac-extensions.github.io/file/v2.1.0/schema.json"
+STAC_EXT_VCS = "https://stac-extensions.github.io/vcs/v0.1.0/schema.json"
 
 STAC_COLLECTION_SUFFIX = "-collection"
 STAC_COLLECTION_FILE = "collection.json"
@@ -160,8 +163,8 @@ def get_tiff_byte_order(file_path):
     return None
 
 
-def get_software_versions(package=None):
-    # type: (Optional[CWL]) -> Dict[str, str]
+def get_software_versions(docker_image=None):
+    # type: (Optional[str]) -> Dict[str, str]
     """
     Obtains the name and version of software involved in the production of the :term:`Job` results.
     """
@@ -170,30 +173,12 @@ def get_software_versions(package=None):
         software["cwltool"] = importlib_metadata.version("cwltool")
     except importlib_metadata.PackageNotFoundError:  # pragma: no cover
         pass
-    docker_image = get_package_docker_image(package)
     if docker_image:
         image, _, tag = docker_image.rpartition(":")
         if not image or "/" in tag:  # no tag, ':' belongs to a registry port
             image, tag = docker_image, "latest"
         software[image] = tag
     return software
-
-
-def get_package_docker_image(package):
-    # type: (Optional[CWL]) -> Optional[str]
-    """
-    Obtains the first Docker image reference of the :term:`CWL` package if any.
-    """
-    if not isinstance(package, dict):
-        return None
-    for field in ["requirements", "hints"]:
-        reqs = package.get(field) or {}
-        if isinstance(reqs, dict):
-            reqs = [dict(req, **{"class": cls}) for cls, req in reqs.items() if isinstance(req, dict)]
-        for req in reqs:
-            if isinstance(req, dict) and req.get("class") == "DockerRequirement":
-                return req.get("dockerPull")
-    return None
 
 
 def get_package_entrypoint(package):
@@ -354,8 +339,7 @@ def load_json_file(file_path, media_type):
     if not is_json or os.path.getsize(file_path) > STAC_MAX_PARSE_SIZE:
         return None
     try:
-        with open(file_path, mode="r", encoding="utf-8") as json_file:
-            return json.load(json_file)
+        return json.loads(load_file(file_path, text=True))
     except (OSError, ValueError):
         return None
 
@@ -469,9 +453,13 @@ class JobCollection(object):
         self.process = process
         self.package = process.package if process is not None else None
         # Delay this dependency to avoid the datatype -> collections -> wps_package import cycle.
-        from weaver.processes.wps_package import mask_process_inputs
+        from weaver.processes.wps_package import get_application_requirement, mask_process_inputs
 
         inputs = mask_process_inputs(self.package, deepcopy(job.inputs or []))
+        requirement = get_application_requirement(
+            self.package, search=CWL_REQUIREMENT_APP_DOCKER, validate=False, required=False
+        ) if isinstance(self.package, dict) else {}
+        self.software = get_software_versions(requirement.get("dockerPull"))
         self.inputs = convert_input_values_schema(inputs, JobInputsOutputsSchema.OGC)
         self.input_values = [
             (in_id, in_item)
@@ -730,7 +718,7 @@ class JobCollection(object):
             self.weaver_url or __title__,
             "processing:datetime": self.finished,
             "processing:level": STAC_PROCESSING_LEVEL,
-            "processing:software": get_software_versions(self.package),
+            "processing:software": self.software,
         }  # type: JSON
         version = self.process.version if self.process is not None else None
         if version:
@@ -798,20 +786,21 @@ class JobCollection(object):
         job_url = self.job_url
         links = [
             make_link(job_url, "processing-execution", "Job status.", ContentType.APP_JSON),
-            make_link(f"{job_url}/results", "https://www.opengis.net/def/rel/ogc/1.0/results",
-                      "Job results.", ContentType.APP_JSON),
+            make_link(f"{job_url}/results", sd.OGC_API_PROC_REL_JOB_RESULTS_URI,
+                      "Job results.", ContentType.APP_JSON, profile=sd.OGC_API_PROC_PROFILE_RESULTS_URI),
             make_link(f"{job_url}/outputs", "outputs", "Job outputs with extended metadata.", ContentType.APP_JSON),
             make_link(f"{job_url}/definition", "definition",
                       "Job definition with the submitted inputs and outputs.", ContentType.APP_JSON),
-            make_link(f"{job_url}/logs", "https://www.opengis.net/def/rel/ogc/1.0/log",
+            make_link(f"{job_url}/logs", sd.OGC_API_PROC_REL_JOB_LOG_URI,
                       "Job execution logs.", ContentType.APP_JSON),
             make_link(self.process_url, "processing-expression", "Process description that produced the results.",
                       ContentType.APP_JSON, profile=sd.OGC_API_PROC_PROFILE_PROC_DESC_URI),
             make_link(f"{job_url}/inputs", "application-input", "Job inputs submitted to the process.",
                       ContentType.APP_JSON),
             make_link(self.weaver_url or self.out_url, "application-platform",
-                      "Server that executed the process.", ContentType.APP_JSON),
-            make_link(__source_repository__, "vcs", "Source code repository of the server application."),
+                      "Server that executed the process.", ContentType.APP_JSON, **{"vcs:tag": __version__}),
+            make_link(__source_repository__, "processing-software", "Source code of the server application.",
+                      **{"vcs:type": "git", "vcs:tag": __version__}),
         ]
         if isinstance(self.package, dict):
             package_url = f"{self.process_url}/package"
@@ -826,7 +815,7 @@ class JobCollection(object):
                 for fmt in ProvenanceFormat.formats()
             )
         for src_url in get_package_source_urls(self.package):
-            links.append(make_link(src_url, "processing-software", "Source code of the application package."))
+            links.append(make_link(src_url, "vcs", "Source code repository of the application package."))
         for in_id, in_val in self.input_values:
             href = get_any_value(in_val, data=False, file=True) if isinstance(in_val, dict) else None
             if isinstance(href, str) and href:
@@ -1069,9 +1058,7 @@ class JobCollection(object):
         props.update(self.make_processing_properties(output_ids))
         props.update(self.make_application_properties())
 
-        extensions = [STAC_EXT_PROCESSING]
-        if "application:languages" in props:
-            extensions.append(STAC_EXT_APPLICATION)
+        extensions = [STAC_EXT_PROCESSING, STAC_EXT_APPLICATION, STAC_EXT_VCS]
         if any(key.startswith("file:") for asset in assets.values() for key in asset):
             extensions.append(STAC_EXT_FILE)
 
@@ -1157,7 +1144,7 @@ class JobCollection(object):
             "name": self.settings.get("weaver.wps_metadata_provider_name") or __title__,
             "description": "Server that executed the process and generated the job results.",
             "roles": ["processor", "host"],
-            "url": self.weaver_url or __source_repository__,
+            "url": self.weaver_url or self.out_url,
         }  # type: JSON
         provider.update(self.make_processing_properties())
         expression = self.make_processing_expression()
@@ -1165,9 +1152,7 @@ class JobCollection(object):
             provider["processing:expression"] = expression
         provider.update(self.make_application_properties())
 
-        extensions = [STAC_EXT_PROCESSING]
-        if "application:languages" in provider:
-            extensions.append(STAC_EXT_APPLICATION)
+        extensions = [STAC_EXT_PROCESSING, STAC_EXT_APPLICATION, STAC_EXT_VCS]
         if any(key.startswith("file:") for asset in self.collection_assets.values() for key in asset):
             extensions.append(STAC_EXT_FILE)
 
@@ -1208,7 +1193,7 @@ class JobCollection(object):
     @staticmethod
     def write_json(path, content):
         # type: (Path, JSON) -> None
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        make_dirs(os.path.dirname(path), exist_ok=True)
         fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
         try:
             with os.fdopen(fd, mode="w", encoding="utf-8") as tmp_file:

@@ -3388,6 +3388,11 @@ the :term:`Provenance` record of the :term:`Job` when available, and any unalign
 Literal values are recorded by output ID in ``weaver:value`` and in ``processing:expression`` using
 ``format: results``.
 
+The ``application-platform`` link identifies the `Weaver` service URL and carries its release in ``vcs:tag``.
+A separate ``processing-software`` link identifies the server source repository with ``vcs:type`` and ``vcs:tag``.
+The ``vcs`` links identify application source repositories when ``codeRepository`` metadata is provided in the
+:term:`CWL` package. These fields use the `STAC VCS Extension <https://github.com/stac-extensions/vcs>`_.
+
 .. list-table:: Job Results Collection and Item Contents
     :name: table-job-collection-contents
     :align: center

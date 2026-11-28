@@ -16,6 +16,7 @@ from prov.model import ProvDocument, ProvRelation
 
 from weaver.__meta__ import __version__ as weaver_version
 from weaver.base import Constants
+from weaver.collections.utils import collection_enabled
 from weaver.execute import ExecuteResponse
 from weaver.formats import ContentType, OutputFormat
 from weaver.utils import get_path_kvp, get_weaver_url
@@ -423,8 +424,6 @@ class WeaverResearchObject(ResearchObject):
         # Add a wasStartedBy relation (this is redundant for
         # single-process jobs, but will unify in RDF or JSONLD)
         document.wasStartedBy(activity=job_activity, starter=wf_agent)
-
-        from weaver.collections.utils import collection_enabled
 
         if collection_enabled(self.settings):
             results_entity = document.entity(
