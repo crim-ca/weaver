@@ -862,9 +862,10 @@ no user-facing endpoint or setting to manually clear a cache region.
     cache.quotation.enabled = true
     cache.quotation.expire = 3600
 
-For outbound requests, any of these ``Cache-Control`` header values bypasses cached responses:
-``no-cache``, ``max-age=0`` or ``max-age=0, must-revalidate``. Setting ``cache`` or ``cache_enabled`` to ``false`` in
-:ref:`Request Options <conf_request_options>` also bypasses the request cache.
+For outbound requests, the ``Cache-Control`` header value can be set
+to ``no-cache``, ``max-age=0`` or ``max-age=0, must-revalidate`` to bypass cached responses.
+Setting ``cache`` or ``cache_enabled`` to ``false`` in :ref:`Request Options <conf_request_options>`
+also bypasses the cached requests since they will not be employed.
 
 .. _cache-type:
 
