@@ -792,19 +792,21 @@ checked in order, and only the first matching URL and method entry is used:
     requests:
       - url: "https://data.example.org/catalog/*"
         method: GET
-        timeout: 30
-        retries: 2
-        backoff: 0.5
-        verify: true
+        timeout: 30   # multiple requests use 5s or other sensible request-specific defaults if omitted
+        retries: 2    # default 0 if omitted
+        backoff: 0.5  # default not applied without retries, or resolve from HTTP 429 response if Retry-After header is provided
+        verify: true  # default enabled if omitted
 
 The ``url`` value may be one pattern or a list of patterns. ``method`` is optional and may be a method, a list, or
 comma-separated methods. The first matching entry is used. Standard :mod:`requests` options such as ``timeout``,
-``auth``, ``headers``, ``cookies``, ``params``, ``stream`` and ``verify`` are passed to the request. `Weaver`-specific
-options supported in the file include retry counts (``retries``, ``retry`` or ``max_retries``), retry delays
-(``backoff`` or ``backoff_factor`` and ``intervals``), ``ssl_verify``, and cache controls. The ``intervals`` list
-specifies the delay between individual attempts and takes precedence over the retry count and backoff factor.
-``ssl_verify`` is an alias for ``verify``. Use restrictive URL patterns, especially for authentication and TLS
-settings.
+``auth``, ``headers``, ``cookies``, ``params``, ``stream`` and ``verify`` are passed to the request. Additional
+options provided by `Weaver` include retry counts (``retries``, ``retry`` or ``max_retries``), retry delays
+(``backoff`` or ``backoff_factor`` and ``intervals``), ``ssl_verify`` (legacy alias to ``verify``), and
+cache controls (see also :ref:`conf_caching`). The ``intervals`` list specifies the delay between individual
+attempts and takes precedence over the ``retry`` count and ``backoff_factor``. 
+Use restrictive :term:`URL` patterns, especially for authentication and TLS settings.
+Failing SSL/TLS checks can be disabled with ``verify`` for debugging or controlled situations.
+It should be left enabled (or omitted entirely to ) , but it is recommended to limit this to known
 
 For retry behavior, ``backoff`` applies an increasing delay between attempts. ``intervals`` supplies explicit delays
 instead. When :func:`weaver.utils.request_extra` is called directly, its ``retry_after`` parameter honors a server's
