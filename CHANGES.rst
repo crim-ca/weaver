@@ -38,7 +38,7 @@ Changes:
   `#645 <https://github.com/crim-ca/weaver/issues/645>`_).
 - Add ``license`` query parameter on ``GET /processes`` matching ``license`` links or metadata
   (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
-- Add ``CQL2`` ``filter`` query parameter on ``GET /processes`` and ``GET /jobs``
+- Add `CQL2` ``filter`` query parameter on ``GET /processes`` and ``GET /jobs``
   (resolves `#640 <https://github.com/crim-ca/weaver/issues/640>`_).
 - Add `CLI` support for job listing ``datetime``, ``sortby``, ``filter`` and ``filter-lang`` parameters
   (resolves `#640 <https://github.com/crim-ca/weaver/issues/640>`_ and
