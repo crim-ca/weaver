@@ -2539,6 +2539,8 @@ class JobTitle(ExtendedSchemaNode):
 
 class ProcessSortByEnum(ExtendedSchemaNode):
     schema_type = String
+    title = "ProcessSortingMethod"
+    default = Sort.ID
     fields_pattern = "|".join(sorted(SortMethods.PROCESS))
     # leading space is a decoded '+' in query strings
     validator = Regex(rf"^[+\- ]?(?:{fields_pattern})(?:,[+\- ]?(?:{fields_pattern}))*$")
@@ -2546,6 +2548,8 @@ class ProcessSortByEnum(ExtendedSchemaNode):
 
 class JobSortByEnum(ExtendedSchemaNode):
     schema_type = String
+    title = "JobSortingMethod"
+    default = Sort.CREATED
     fields_pattern = "|".join(sorted(SortMethods.JOB))
     validator = Regex(rf"^[+\- ]?(?:{fields_pattern})(?:,[+\- ]?(?:{fields_pattern}))*$")
 
