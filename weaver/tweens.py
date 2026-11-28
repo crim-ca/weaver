@@ -1,3 +1,4 @@
+import json as json_pkg
 import logging
 import sys
 from typing import TYPE_CHECKING
@@ -128,11 +129,48 @@ def error_repr(http_err):
     return f"({err_type}) <{err_code}> {err_repr!s}"
 
 
+def is_problem_json(response):
+    # type: (AnyViewResponse) -> bool
+    """
+    Verifies if the response is an error with a JSON body matching the problem details structure.
+
+    Both the :term:`OWS`-based error body (``description`` and ``code``) and the RFC-7807 body
+    (``type``, ``title``, ``status`` or ``detail``) are considered.
+    """
+    try:
+        if not isinstance(response.status_code, int) or response.status_code < 400:
+            return False
+        if (response.content_type or "").lower() != ContentType.APP_JSON:
+            return False
+        body = json_pkg.loads(response.body or b"")
+    except Exception:  # noqa: W0703
+        return False
+    if not isinstance(body, dict):
+        return False
+    return ({"description", "code"}.issubset(body) or
+            ("title" in body and bool({"status", "detail", "type"}.intersection(body))))
+
+
+def apply_problem_json(response):
+    # type: (AnyViewResponse) -> AnyViewResponse
+    """
+    Applies the ``application/problem+json`` ``Content-Type`` to error responses with matching JSON body.
+    """
+    if is_problem_json(response):
+        response.content_type = ContentType.APP_PROBLEM_JSON
+    return response
+
+
 def ows_response_tween(request, handler):
     # type: (PyramidRequest, ViewHandler) -> AnyViewResponse
     """
     Tween that wraps any API request with appropriate dispatch of error conversion to handle formatting.
     """
+    return apply_problem_json(_ows_response_tween(request, handler))
+
+
+def _ows_response_tween(request, handler):
+    # type: (PyramidRequest, ViewHandler) -> AnyViewResponse
     exc_log_lvl = logging.WARNING
     try:
         result = handler(request)

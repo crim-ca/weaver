@@ -155,7 +155,7 @@ class WpsAppTest(WpsConfigBase):
         params = f"service=wps&request=describeprocess&version=1.0.0&identifier={bad_id}"
         resp = self.app.get(self.make_url(params), expect_errors=True, headers={"Accept": ContentType.APP_JSON})
         assert resp.status_code == 400
-        assert resp.content_type in ContentType.APP_JSON
+        assert resp.content_type == ContentType.APP_PROBLEM_JSON
         assert resp.json["code"] == OWSInvalidParameterValue.code
         assert resp.json["value"] == [bad_id]
 

@@ -12,7 +12,8 @@ Changes
 
 Changes:
 --------
-- No change.
+- Add ``ContentType.APP_PROBLEM_JSON`` (``application/problem+json``) and apply it as ``Content-Type`` of all
+  error responses with a JSON body matching the problem details structure.
 
 Fixes:
 ------
