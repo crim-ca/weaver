@@ -3387,8 +3387,8 @@ the :term:`Provenance` record of the :term:`Job` when available, and any unalign
 The :term:`Provenance` :term:`Asset` references the existing record in the ``{jobID}-prov/`` directory.
 The record is not copied into the :term:`Collection` directory.
 :term:`Assets <Asset>` retain their media type and declared format profile when available.
-Literal values are recorded by output ID in ``weaver:value`` and in ``processing:expression`` using
-``format: results``.
+Literal values are available in the complete results :term:`Asset` and recorded by output ID in
+``processing:expression`` using ``format: results``.
 
 The ``application-platform`` link identifies the `Weaver` service URL and carries its release in ``vcs:tag``.
 A separate ``processing-software`` link identifies the server source repository with ``vcs:type`` and ``vcs:tag``.
@@ -3441,10 +3441,6 @@ The ``vcs`` links identify application source repositories when ``codeRepository
       - :term:`Assets <Asset>`
       - File size, hexadecimal multihash, detected byte order, and job-relative path when available.
       - Provides file metadata when the result is accessible during generation.
-    * - `Weaver`: ``weaver:value``
-      - :term:`Item`
-      - Mapping of output IDs to literal values.
-      - Carries literal results aligned to the :term:`Item`.
     * - `Weaver`: ``weaver:job``, ``weaver:process``, ``weaver:outputs``, and ``weaver:provider``
       - :term:`Item`
       - Job UUID, process ID, represented output IDs, and remote provider ID when applicable.

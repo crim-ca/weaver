@@ -1060,7 +1060,6 @@ class JobCollection(object):
         if self.job.service:
             props["weaver:provider"] = self.job.service
         if values:
-            props["weaver:value"] = values
             props["processing:expression"] = {"format": "results", "expression": values}
         props.update(self.make_processing_properties(output_ids))
         props.update(self.make_application_properties())

@@ -215,13 +215,16 @@ class TestSTACCollection:
                 assert "application" not in links
                 assert "vcs" not in links
 
-            assert item_data["properties"]["weaver:value"] == {"value": 3}
+            assert "weaver:value" not in item_data["properties"]
             assert item_data["properties"]["processing:expression"] == {
                 "format": "results", "expression": {"value": 3},
             }
             assert coll_data["assets"]["results"]["roles"] == ["data"]
             assert coll_data["assets"]["results"]["profile"] == sd.OGC_API_PROC_PROFILE_RESULTS_URI
-            assert os.path.isfile(os.path.join(coll_dir, "assets", "results.json"))
+            with open(os.path.join(coll_dir, "assets", "results.json"), encoding="utf-8") as f:
+                result_document = json.load(f)
+            assert result_document == results
+            assert result_document["value"] == {"value": 3, "dataType": "integer"}
             assert not any(
                 role.startswith("processing-")
                 for asset in [*coll_data["assets"].values(), *item_data["assets"].values()]
@@ -622,8 +625,11 @@ class TestSTACCollection:
             first = self.load_item(job, settings)
             second = self.load_item(job, settings, f"{job.id}-1")
             assert first["properties"]["weaver:outputs"] == ["geo_a", "geo_b", "literal"]
-            assert second["properties"]["weaver:value"] == {"literal": "shared"}
-            assert first["properties"]["weaver:value"] == {"literal": "shared"}
+            for item in [first, second]:
+                assert "weaver:value" not in item["properties"]
+                assert item["properties"]["processing:expression"] == {
+                    "format": "results", "expression": {"literal": "shared"},
+                }
             assert first["bbox"] == [1, 20, 3, 20]
             assert second["bbox"] == [2, 20, 4, 20]
             assert set(first["assets"]) == {"geo_a", "geo_b"}
@@ -802,6 +808,7 @@ class TestSTACCollection:
                 "format": "results",
                 "expression": {"value": 3},
             }
+            assert "weaver:value" not in props
             assert props["weaver:job"] == str(job.id)
             assert props["weaver:process"] == job.process
             assert props["weaver:outputs"] == ["value"]
