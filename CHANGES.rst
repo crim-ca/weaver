@@ -28,8 +28,8 @@ Changes:
   collection items with the `Job`, `Process`, `CWL` package, `Provenance` and result files
   (relates to `#103 <https://github.com/crim-ca/weaver/issues/103>`_
   and `#910 <https://github.com/crim-ca/weaver/issues/910>`_).
-  Distinguish application source repositories from server software and include
-  `STAC VCS Extension <https://github.com/stac-extensions/vcs>`_ release metadata on server links.
+  Identify processing software using the `CWL` application and Docker image when available.
+  Include `STAC VCS Extension <https://github.com/stac-extensions/vcs>`_ release metadata on platform links.
 - Generate the collection on request with ``response=collection`` (query parameter or body alias) during process
   execution or through ``/jobs`` and ``GET /jobs/{jobID}/results``. Redirect to the generated collection, reuse it if
   it already exists, and regenerate it when ``Cache-Control: no-cache`` is provided

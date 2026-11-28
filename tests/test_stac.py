@@ -11,7 +11,7 @@ import pystac
 import pytest
 
 from weaver import ogc_definitions as ogc_def
-from weaver.__meta__ import __source_repository__, __version__
+from weaver.__meta__ import __version__
 from weaver.collections.stac import (
     STAC_COLLECTION_FILE,
     STAC_EXT_APPLICATION,
@@ -210,12 +210,12 @@ class TestSTACCollection:
                 assert links[sd.OGC_API_PROC_REL_JOB_RESULTS_URI]["profile"] == sd.OGC_API_PROC_PROFILE_RESULTS_URI
                 assert links["processing-expression"]["profile"] == sd.OGC_API_PROC_PROFILE_PROC_DESC_URI
                 assert links["application-platform"]["vcs:tag"] == __version__
-                assert links["processing-software"]["href"] == __source_repository__
-                assert links["processing-software"]["vcs:type"] == "git"
-                assert links["processing-software"]["vcs:tag"] == __version__
+                assert "processing-software" not in links
                 assert links["derived_from"]["href"] == "https://example.com/input.txt"
                 assert "application" not in links
                 assert "vcs" not in links
+            assert "processing:software" not in coll_data["providers"][0]
+            assert "processing:software" not in item_data["properties"]
 
             assert "weaver:value" not in item_data["properties"]
             assert item_data["properties"]["processing:expression"] == {
@@ -291,7 +291,8 @@ class TestSTACCollection:
             [{"@id": "https://example.com/package-source"}],
         ],
     )
-    def test_job_collection_process_application_extension(self, repository):
+    @pytest.mark.parametrize(["docker_image"], [[None], ["debian:latest"], ["ghcr.io/example/app:2.4.0"]])
+    def test_job_collection_process_application_extension(self, repository, docker_image):
         """
         Tests that process and CWL package references are mapped to the STAC Application extension.
         """
@@ -299,7 +300,7 @@ class TestSTACCollection:
             "cwlVersion": "v1.2",
             "class": "CommandLineTool",
             "baseCommand": ["echo"],
-            "requirements": {"DockerRequirement": {"dockerPull": "debian:latest"}},
+            "requirements": {"DockerRequirement": {"dockerPull": docker_image}} if docker_image else {},
             "inputs": {},
             "outputs": {},
         }
@@ -340,9 +341,15 @@ class TestSTACCollection:
             assert links[sd.OGC_API_PROC_REL_JOB_LOG_URI]["href"].endswith(f"/jobs/{job.id}/logs")
             assert links["application-platform"]["href"] == settings["weaver.url"]
             assert links["application-platform"]["vcs:tag"] == __version__
-            assert links["processing-software"]["href"] == __source_repository__
-            assert links["processing-software"]["vcs:tag"] == __version__
-            assert links["processing-software"]["vcs:type"] == "git"
+            assert links["processing-software"]["href"] == links["application"]["href"]
+            assert links["processing-software"]["application:languages"] == ["CWL"]
+            assert "vcs:tag" not in links["processing-software"]
+            expected_software = {"test-process": "1.2.3"}
+            if docker_image:
+                image, _, version = docker_image.rpartition(":")
+                expected_software[image] = version
+            assert coll["providers"][0]["processing:software"] == expected_software
+            assert coll["providers"][0]["processing:version"] == "1.2.3"
             assert coll["providers"][0]["url"] == settings["weaver.url"]
             assert STAC_EXT_VCS in coll["stac_extensions"]
             vcs_links = [link for link in coll["links"] if link["rel"] == "vcs"]
@@ -356,6 +363,8 @@ class TestSTACCollection:
             assert STAC_EXT_APPLICATION in item["stac_extensions"]
             assert item["properties"]["application:languages"] == ["CWL"]
             assert item["properties"]["application:entrypoint"] == "echo"
+            assert item["properties"]["processing:software"] == expected_software
+            assert item["properties"]["processing:version"] == "1.2.3"
             assert coll["providers"][0]["application:languages"] == ["CWL"]
             assert coll["providers"][0]["application:entrypoint"] == "echo"
             item_links = {link["rel"]: link for link in item["links"]}

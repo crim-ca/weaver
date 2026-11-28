@@ -26,7 +26,6 @@ import shutil
 import tempfile
 from copy import deepcopy
 from datetime import datetime, timezone
-from importlib import metadata as importlib_metadata
 from typing import TYPE_CHECKING
 from urllib.parse import quote, urlparse
 
@@ -36,7 +35,7 @@ from pyramid.settings import asbool
 from rasterio.warp import transform_bounds
 
 from weaver import ogc_definitions as ogc_def
-from weaver.__meta__ import __name__ as weaver_name, __source_repository__, __title__, __version__
+from weaver.__meta__ import __title__, __version__
 from weaver.collections.utils import collection_api_url, collection_enabled
 from weaver.execute import ExecuteCollectionFormat
 from weaver.formats import ContentType, clean_media_type_format, get_content_type
@@ -175,13 +174,9 @@ def get_tiff_byte_order(file_path):
 def get_software_versions(docker_image=None):
     # type: (Optional[str]) -> Dict[str, str]
     """
-    Obtains the name and version of software involved in the production of the :term:`Job` results.
+    Obtains the image name and version of the :term:`CWL` application's Docker software, if provided.
     """
-    software = {weaver_name: __version__}
-    try:
-        software["cwltool"] = importlib_metadata.version("cwltool")
-    except importlib_metadata.PackageNotFoundError:  # pragma: no cover
-        pass
+    software = {}  # type: Dict[str, str]
     if docker_image:
         image, _, tag = docker_image.rpartition(":")
         if not image or "/" in tag:  # no tag, ':' belongs to a registry port
@@ -458,6 +453,8 @@ class JobCollection(object):
             self.package, search=CWL_REQUIREMENT_APP_DOCKER, validate=False, required=False
         ) if isinstance(self.package, dict) else {}
         self.software = get_software_versions(requirement.get("dockerPull"))
+        if process is not None and isinstance(self.package, dict) and process.version:
+            self.software[process.id] = str(process.version)
         self.inputs = convert_input_values_schema(inputs, JobInputsOutputsSchema.OGC)
         self.input_values = [
             (in_id, in_item)
@@ -716,8 +713,9 @@ class JobCollection(object):
             self.weaver_url or __title__,
             "processing:datetime": self.finished,
             "processing:level": STAC_PROCESSING_LEVEL,
-            "processing:software": self.software,
         }  # type: JSON
+        if self.software:
+            props["processing:software"] = self.software
         version = self.process.version if self.process is not None else None
         if version:
             props["processing:version"] = str(version)
@@ -798,13 +796,13 @@ class JobCollection(object):
                            ContentType.APP_JSON),
             make_link_json(self.weaver_url or self.out_url, "application-platform",
                            "Server that executed the process.", ContentType.APP_JSON, **{"vcs:tag": __version__}),
-            make_link_json(__source_repository__, "processing-software", "Source code of the server application.",
-                           **{"vcs:type": "git", "vcs:tag": __version__}),
         ]
         if isinstance(self.package, dict):
             package_url = f"{self.process_url}/package"
             links.extend([
                 make_link_json(package_url, "application", "Application Package (CWL) of the process.",
+                               ContentType.APP_JSON, **self.make_application_properties()),
+                make_link_json(package_url, "processing-software", "CWL application that produced the results.",
                                ContentType.APP_JSON, **self.make_application_properties()),
             ])
         if self.prov_enabled:
