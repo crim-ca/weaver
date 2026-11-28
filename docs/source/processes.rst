@@ -628,7 +628,7 @@ definitions. The same :term:`OGC API - Records` search capabilities are availabl
         must match the ``license`` query parameter.
       - | ``license=apache``
     * - ``filter``, ``filter-lang``, ``filter-crs``
-      - Applies a `CQL2` expression over the queryable fields (see the ``/queryables/processes`` endpoint below).
+      - Applies a `CQL2` expression over the queryable fields (see :ref:`table-process-queryables`).
         The ``filter-lang`` query parameter defaults to ``cql2-text`` or ``cql2-json`` according to the
         ``filter`` contents provided.
       - | ``filter=version >= '1.2.0' AND type = 'workflow'``
@@ -653,6 +653,7 @@ To discover which parameters and sorting fields can be employed, the following e
 They respond using the ``application/schema+json`` :term:`Media-Type` as a JSON Schema document.
 
 .. list-table:: Queryables and Sortables Endpoints
+    :name: table-process-queryables
     :header-rows: 1
     :widths: 30 70
 
