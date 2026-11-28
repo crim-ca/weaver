@@ -60,7 +60,6 @@ from weaver.utils import (
 from weaver.visibility import Visibility
 from weaver.wps.utils import get_wps_url
 from weaver.wps_restapi import swagger_definitions as sd
-from weaver.wps_restapi.filter import parse_keyword_query, parse_search_query, parse_version_range
 from weaver.wps_restapi.utils import get_wps_restapi_base_url
 
 if TYPE_CHECKING:
@@ -1006,7 +1005,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         """
         conditions = []  # type: List[MongodbAggregateExpression]
         if keywords:
-            for group in parse_keyword_query(keywords):
+            for group in sd.ProcessKeywordExpression.parse(keywords):
                 alternatives = []
                 for term, negative in group:
                     condition = {"keywords": {"$regex": f"^{re.escape(term)}$", "$options": "i"}}
@@ -1051,7 +1050,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         Applies OR groups of AND and NOT text terms within the existing listing filter.
         """
         alternatives = []
-        for group in parse_search_query(query):
+        for group in sd.ProcessQueryExpression.parse(query):
             terms = []
             for text, negative in group:
                 condition = {"$or": [
@@ -1068,7 +1067,7 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         """
         Matches semantic version intervals numerically rather than comparing version strings alphabetically.
         """
-        lower, upper = parse_version_range(version)
+        lower, upper = sd.ProcessVersionExpression.parse(version)
         if lower is not None and lower == upper:
             return {"version": ".".join(str(part) for part in lower)}
         version_parts = {"$map": {"input": {"$split": ["$version", "."]}, "in": {"$toInt": "$$this"}}}

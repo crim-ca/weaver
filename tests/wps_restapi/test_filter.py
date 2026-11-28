@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 
 import pytest
 
-from weaver.wps_restapi.filter import parse_keyword_query, parse_search_query, parse_version_range
+from weaver.wps_restapi import swagger_definitions as sd
 
 
 @pytest.mark.ogc_records
@@ -31,7 +31,7 @@ def test_parse_search_query(value, expected):
     """
     Tests text query grouping, negation and quoted literal operators.
     """
-    assert parse_search_query(value) == expected
+    assert sd.ProcessQueryExpression.parse(value) == expected
 
 
 @pytest.mark.ogc_records
@@ -42,7 +42,7 @@ def test_parse_search_query_invalid(value):
     Tests that incomplete expressions cannot silently alter search semantics.
     """
     with pytest.raises(ValueError):
-        parse_search_query(value)
+        sd.ProcessQueryExpression.parse(value)
 
 
 @pytest.mark.ogc_records
@@ -51,7 +51,7 @@ def test_parse_keyword_query():
     """
     Tests keyword AND groups with OR alternatives and either negation prefix.
     """
-    assert parse_keyword_query(" climate , !grib|~netcdf ") == [
+    assert sd.ProcessKeywordExpression.parse(" climate , !grib|~netcdf ") == [
         [("climate", False)], [("grib", True), ("netcdf", True)],
     ]
 
@@ -68,4 +68,4 @@ def test_parse_version_range(value, expected):
     """
     Tests numeric interval bounds and normalization of abbreviated versions.
     """
-    assert parse_version_range(value) == expected
+    assert sd.ProcessVersionExpression.parse(value) == expected
