@@ -16,7 +16,8 @@ Changes:
   ``filtering``) conformance classes, ``ogc-catalog`` landing page links for ``/processes`` and ``/jobs``,
   and ``recordsArrayName`` in their listings
   (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
-- Add ``cql2/1.0`` ``basic-cql2``, ``cql2-json`` and ``cql2-text`` and Common Part 2 ``simple-query`` conformance classes
+- Add ``cql2/1.0`` ``basic-cql2``, ``cql2-json`` and ``cql2-text`` and `OGC API - Common` Part 2
+  ``simple-query`` conformance classes
   (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
 - Add ``keywords`` query parameter on ``GET /processes`` with ``,`` for AND, ``|`` for OR and ``!``/``~`` for NOT
   (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
