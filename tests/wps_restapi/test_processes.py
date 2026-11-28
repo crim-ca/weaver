@@ -6018,6 +6018,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         for suffix, kwargs in [
             ("link", {"additional_links": [{"rel": "license", "href": apache}]}),
             ("meta", {"metadata": [{"rel": "license", "href": apache}]}),
+            ("role", {"metadata": [{"role": "https://schema.org/license", "value": apache}]}),
             ("title", {"metadata": [{"rel": "license", "href": "https://example.com/l", "title": "Apache-2.0"}]}),
             ("other", {"metadata": [{"rel": "describedby", "href": apache}]}),
             ("none", {}),
@@ -6032,7 +6033,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         }
         resp = self.app.get("/processes", params={**base, "license": apache}, headers=self.json_headers)
         assert resp.status_code == 200, resp.text
-        assert sorted(resp.json["processes"]) == ["test-license-link", "test-license-meta"]
+        assert sorted(resp.json["processes"]) == ["test-license-link", "test-license-meta", "test-license-role"]
         resp = self.app.get("/processes", params={**base, "license": "apache-2.0"}, headers=self.json_headers)
         assert resp.json["processes"] == ["test-license-title"]
 

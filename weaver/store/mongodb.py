@@ -148,7 +148,7 @@ class MongoFilterTranslator(object):
             "input": _LICENSE_LINKS,
             "cond": {"$or": [{"$eq": ["$$this.rel", "license"]}, {"$eq": ["$$this.role", "license"]}]},
         }},
-        "in": "$$this.href",
+        "in": {"$ifNull": ["$$this.href", "$$this.value"]},
     }}
     _PROCESS_MONGO_FIELDS = {
         "id": ("$identifier", _FIELD_SCALAR),
@@ -1039,9 +1039,11 @@ class MongodbProcessStore(StoreProcesses, MongodbStore, ListingMixin):
         # type: (str) -> MongodbAggregateExpression
         """
         Matches the reference of any entry of the process ``metadata`` or ``links`` with a ``license`` role or relation.
+
+        Link entries are matched by their ``href`` or ``title``, and metadata value entries by their ``value``.
         """
         license_rel = {"$regex": r"(^|/)license$"}
-        reference = {"$or": [{"href": license}, {
+        reference = {"$or": [{"href": license}, {"value": license}, {
             "title": {"$regex": f"^{re.escape(license)}$", "$options": "i"}}]}
         return {"$or": [
             {field: {"$elemMatch": {"$and": [{"$or": [{"rel": license_rel}, {"role": license_rel}]}, reference]}}}

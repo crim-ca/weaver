@@ -622,8 +622,10 @@ definitions. The same :term:`OGC API - Records` search capabilities are availabl
     * - ``license``
       - Matches a license reference of the :term:`Process`, provided as either of the following.
         The ``links`` field can contain an entry with ``rel`` set to ``license``.
-        The ``metadata`` field can contain an entry with ``role`` set to ``license``.
-        In both cases, the ``href`` or ``title`` of that entry must match the ``license`` query parameter.
+        The ``metadata`` field can contain an entry with ``role`` set to ``license`` (or its URI, such as
+        ``https://schema.org/license``) or a link entry with ``rel`` set to ``license``.
+        The ``href`` or ``title`` of a link entry, or the ``value`` of a metadata value entry,
+        must match the ``license`` query parameter.
       - | ``license=apache``
     * - ``filter``, ``filter-lang``, ``filter-crs``
       - Applies a `CQL2` expression over the queryable fields (see the ``/queryables/processes`` endpoint below).
