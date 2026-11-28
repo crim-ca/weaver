@@ -134,8 +134,8 @@ def is_problem_json(response):
     """
     Verifies if the response is an error with a JSON body matching the problem details structure.
 
-    Both the :term:`OWS`-based error body (``description`` and ``code``) and the RFC-7807 body
-    (``type``, ``title``, ``status`` or ``detail``) are considered.
+    Both the :term:`OWS`-based error body (``description`` and ``code``) and the :rfc:`7807` body
+    (``title`` with any of ``type``, ``status`` or ``detail``) are considered.
     """
     try:
         if not isinstance(response.status_code, int) or response.status_code < 400:
@@ -147,26 +147,23 @@ def is_problem_json(response):
         return False
     if not isinstance(body, dict):
         return False
-    return ({"description", "code"}.issubset(body) or
-            ("title" in body and bool({"status", "detail", "type"}.intersection(body))))
-
-
-def apply_problem_json(response):
-    # type: (AnyViewResponse) -> AnyViewResponse
-    """
-    Applies the ``application/problem+json`` ``Content-Type`` to error responses with matching JSON body.
-    """
-    if is_problem_json(response):
-        response.content_type = ContentType.APP_PROBLEM_JSON
-    return response
+    is_ows_error = {"description", "code"}.issubset(body)
+    is_rfc_error = "title" in body and any(field in body for field in ["type", "status", "detail"])
+    return is_ows_error or is_rfc_error
 
 
 def ows_response_tween(request, handler):
     # type: (PyramidRequest, ViewHandler) -> AnyViewResponse
     """
     Tween that wraps any API request with appropriate dispatch of error conversion to handle formatting.
+
+    Error responses with a JSON body matching the :rfc:`7807` structure are returned
+    with the ``application/problem+json`` ``Content-Type``.
     """
-    return apply_problem_json(_ows_response_tween(request, handler))
+    response = _ows_response_tween(request, handler)
+    if is_problem_json(response):
+        response.content_type = ContentType.APP_PROBLEM_JSON
+    return response
 
 
 def _ows_response_tween(request, handler):
