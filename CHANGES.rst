@@ -12,7 +12,7 @@ Changes
 
 Changes:
 --------
-- Add OGC API - Records ``autodiscovery`` and ``local-resources-catalog`` (``query-parameters``, ``sorting``,
+- Add `OGC API - Records` ``autodiscovery`` and ``local-resources-catalog`` (``query-parameters``, ``sorting``,
   ``filtering``) conformance classes, ``ogc-catalog`` landing page links for ``/processes`` and ``/jobs``,
   and ``recordsArrayName`` in their listings
   (resolves `#102 <https://github.com/crim-ca/weaver/issues/102>`_).
