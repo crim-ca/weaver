@@ -565,6 +565,8 @@ the |getcap-req|_ request. See :ref:`proc_listing_search` for the process listin
 Filtering Processes
 ~~~~~~~~~~~~~~~~~~~
 
+.. versionadded:: 6.20
+
 The ``GET /processes`` listing supports the following search parameters to find locally registered :term:`Process`
 definitions. The same :term:`OGC API - Records` search capabilities are available on ``GET /jobs`` where applicable.
 
@@ -645,6 +647,9 @@ sorting, pagination and ``detail=false``. Terms are not regular expressions, and
 .. note::
     A ``+`` in the query string is interpreted literally, as defined by :rfc:`3986`, and can be used directly
     as an operator. A space must be encoded as ``%20``.
+
+    .. versionchanged:: 6.20
+        Query strings no longer convert ``+`` into a space.
 
 .. note::
     These parameters cannot be combined with ``providers=true``, since remote :term:`Provider` listings

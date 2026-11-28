@@ -82,6 +82,12 @@ Run a WPS-1/WPS-2 ``DescribeProcess`` request (built-in process ``jsonarray2netc
 
 This will provide you with an XML response listing the specific process details such and inputs/outputs and description.
 
+:term:`WPS` requests return :term:`XML` by default. For ``GetCapabilities`` and ``DescribeProcess``, request
+``Accept: application/json`` to redirect to the corresponding :term:`OGC API - Processes` process listing or
+description. :term:`WPS` ``Execute`` requests are converted to a :term:`Job` submission and run through the normal
+worker execution path. The default response is the :term:`WPS` :term:`XML` status document. An
+``Accept: application/json`` header instead returns the :term:`JSON` job submission response.
+
 We can now use the process to execute a WPS request. To do so, we will need some input data files to call it.
 First, let's create a JSON file with some *dummy* NetCDF file reference for demonstration purpose.
 

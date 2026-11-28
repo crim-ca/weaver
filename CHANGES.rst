@@ -12,7 +12,6 @@ Changes
 
 Changes:
 --------
-
 - Add OGC API - Records ``autodiscovery`` and ``local-resources-catalog`` (``query-parameters``, ``sorting``,
   ``filtering``) conformance classes, ``ogc-catalog`` landing page links for ``/processes`` and ``/jobs``,
   and ``recordsArrayName`` in their listings
@@ -53,6 +52,20 @@ Changes:
   (resolves `#646 <https://github.com/crim-ca/weaver/issues/646>`_).
 - Add `OGC API - Records` sorting, filtering and ``cql-filter`` conformance classes
   (resolves `#641 <https://github.com/crim-ca/weaver/issues/641>`_).
+- Interpret ``+`` literally in request query strings as defined by :rfc:`3986` instead of converting it into a space.
+  A space must be encoded as ``%20``.
+
+Fixes:
+------
+- No change.
+
+.. _changes_6.19.0:
+
+`6.19.0 <https://github.com/crim-ca/weaver/tree/6.19.0>`_ (2026-11-28)
+====================================================================================================================
+
+Changes:
+--------
 - Use ``gunicorn[fast]`` to leverage the faster HTTP C parser instead of Python native implementation.
 - Add support for multiple `Process` description parts in multipart deployment, allowing the main `Workflow` and each
   sub-`CWL` to define their own description. Descriptions are linked to their `CWL` part by matching ``id`` fields
@@ -67,6 +80,8 @@ Changes:
 - Expand usage documentation with service discovery, configuration and caching, bounding-box and multiple-input
   examples, workflow chaining, and quotation and billing operations 
   (resolves `#61 <https://github.com/crim-ca/weaver/issues/61>`_).
+- Clarify data-source and WPS registration fields, request-cache invalidation and bypass behavior, and supported
+  `Request Options` parameters (relates to `#61 <https://github.com/crim-ca/weaver/issues/61>`_).
 - Implement the `CLI` ``replace`` operation to update an existing `Process` definition
   (resolves `#906 <https://github.com/crim-ca/weaver/issues/906>`_).
 - Add ``--output-id`` option (multiple allowed) to `CLI` ``execute`` and ``update_job`` operations to

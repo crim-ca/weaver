@@ -581,10 +581,23 @@ A typical :term:`Data Source` file is presented below. This sample is also provi
 
 Both :term:`JSON` and :term:`YAML` are supported.
 
-Each top-level key identifies a :term:`Data Source`. The associated ``netloc`` identifies the location to match against
-input references, and ``ades`` specifies the :term:`ADES` where matching :term:`Process` executions are dispatched.
-The ``default`` flag selects the fallback :term:`Data Source` for unmatched references. Refer to the example above for
-the supported fields.
+Each top-level key identifies a :term:`Data Source`. Common location-matching and dispatch fields are:
+
+.. list-table::
+    :header-rows: 1
+    :widths: 20,80
+
+    * - Field
+      - Description
+    * - ``netloc``
+      - Host name matched against the ``netloc`` component of an input :term:`URL`.
+    * - ``ades``
+      - Endpoint of the :term:`ADES` where matching :term:`Process` executions are dispatched.
+    * - ``default``
+      - Optional boolean that selects the fallback :term:`Data Source` for unmatched references. If no entry has this
+        flag set, the first entry in the file is used as the fallback.
+    * - ``rootdir``
+      - Optional local path prefix matched against file references to select this :term:`Data Source`.
 
 .. _weaver-data-sources:
 
@@ -621,13 +634,39 @@ of processes under a common WPS server to iteratively register, using a :ref:`Ge
 endpoint.
 Please refer to `wps_processes.yml.example`_ for explicit format, keywords supported, and their resulting behaviour.
 
-The file has optional top-level ``processes`` and ``providers`` lists. Entries can be :term:`URL` strings or mappings
-with fields such as ``url``, ``name``, ``id`` and ``visible``. Entries under ``processes`` register :term:`WPS`
-process snapshots. Entries under ``providers`` register remote :term:`WPS` providers whose :term:`Process` listings
-are resolved from the remote service. The example file shows the supported combinations. The loader accepts
-:term:`JSON` as well as :term:`YAML`. The :confval:`weaver.wps_processes_file` setting selects one file, not a
-directory.
-See the setting below for its default location and path resolution.
+The optional top-level ``processes`` and ``providers`` keys each contain a list of :term:`URL` strings or mappings.
+Entries under ``processes`` register local snapshots of remote :term:`WPS` processes. Entries under ``providers``
+register remote :term:`WPS` providers whose :term:`Process` listings are resolved from the service when requested.
+The file accepts :term:`JSON` or :term:`YAML`. The :confval:`weaver.wps_processes_file` setting selects one file, not
+a directory. See the setting below for its default location and path resolution.
+
+Mapping entries support the following fields:
+
+.. list-table::
+    :header-rows: 1
+    :widths: 20,80
+
+    * - Field
+      - Description
+    * - ``url``
+      - Remote :term:`WPS` endpoint. A :term:`URL` may target a ``GetCapabilities`` listing request
+        or a specific ``DescribeProcess`` request. If using a ``DescribeProcess`` reference,
+        the ``id`` configuration may be omitted as it can be inferred from the ``identifier``
+        parameter required by that request. An alternate ``name`` may be provided to allow a registration
+        of a :term:`Remote Process` identifier that does not conform to :term:`Process` identifier registration
+        rules imposed by `Weaver`.
+    * - ``id``
+      - Optional :term:`Process` identifier or list of identifiers to register from the remote :term:`Provider`.
+        This field applies to ``processes`` entries.
+        If omitted, all processes discovered from the endpoint are registered.
+    * - ``name``
+      - Optional :term:`Provider` name to employ as identifier for `Weaver` endpoints.
+        It must respect the SLUG pattern allowed by the :term:`API`.
+        If omitted, `Weaver` derives a valid :term:`Provider` name from the host name of the `url`.
+    * - ``visible``
+      - Optional boolean that controls whether the registered :term:`Process` or :term:`Provider`
+        processes are visible. The default is ``false``. Set this to ``true`` if access to the processes
+        is managed by another external method.
 
 .. note::
     Processes defined under ``processes`` section registered into `Weaver` will correspond to a local snapshot of
@@ -753,16 +792,27 @@ checked in order, and only the first matching URL and method entry is used:
     requests:
       - url: "https://data.example.org/catalog/*"
         method: GET
-        timeout: 30
-        retries: 2
-        backoff: 0.5
-        verify: true
+        timeout: 30   # multiple requests use 5s or other sensible request-specific defaults if omitted
+        retries: 2    # default 0 if omitted
+        backoff: 0.5  # default not applied, or resolve from HTTP 429 response if Retry-After header is returned
+        verify: true  # default enabled if omitted
 
 The ``url`` value may be one pattern or a list of patterns. ``method`` is optional and may be a method, a list, or
-comma-separated methods. Other keys are passed as options to the request handler, including options supported by
-:mod:`requests` and :func:`weaver.utils.request_extra` such as ``timeout``, ``verify``, ``retries``, ``backoff`` and
-``cache_enabled`` (see :ref:`Configuration of Request Caching <conf_caching>`). Use restrictive URL patterns,
-especially for authentication and TLS settings.
+comma-separated methods. The first matching entry is used. Standard :mod:`requests` options such as ``timeout``,
+``auth``, ``headers``, ``cookies``, ``params``, ``stream`` and ``verify`` are passed to the request.
+
+Failing SSL/TLS checks can be disabled with ``verify`` for debugging or controlled situations where the impact of
+disabling this option is acceptable. In such situations, it is recommend to use more restrictive and specific
+:term:`URL` patterns or even a literal :term:`URL` without any pattern, to limit the scope of impact of the option.
+It should preferably be left enabled (or by omitting ``verify`` entirely) to ensure security features are applied.
+
+Additional options provided by `Weaver` include retry counts (``retries``, ``retry`` or ``max_retries``), retry delays
+(``backoff`` or ``backoff_factor`` and ``intervals``), ``ssl_verify`` (legacy alias to ``verify``), and
+cache controls (see also :ref:`conf_caching`). The ``intervals`` list specifies the delay between individual
+attempts and takes precedence over the ``retry`` count and ``backoff_factor``.
+For retry behavior, ``backoff`` applies an increasing delay between attempts. ``intervals`` supplies explicit delays
+instead. When :func:`weaver.utils.request_extra` is called directly, its ``retry_after`` parameter honors a server's
+``Retry-After`` response header for ``HTTP 429`` responses.
 
 .. note::
     To define a match of *any URL*, the ``http://*`` and/or ``https://*`` patterns can be used as the ``url`` field.
@@ -795,8 +845,12 @@ especially for authentication and TLS settings.
 Configuration of Request Caching
 =======================================
 
-Request caching uses named cache regions. Use the settings below to select the cache backend, enable each supported
-region and set its expiration time.
+Request caching uses named cache regions. The active regions are ``doc`` for :term:`API` documentation responses,
+``request`` for outbound requests and ``quotation`` for currency-conversion requests used in quotation calculations.
+The ``result`` region is registered internally but has no active use. Use the settings below to select the cache
+backend, enable each active region and set its expiration time. Entries expire after the configured interval. Cache
+initialization clears existing entries. Failed outbound requests are invalidated internally before a retry. There is
+no user-facing endpoint or setting to manually clear a cache region.
 
 .. code-block:: ini
 
@@ -808,8 +862,10 @@ region and set its expiration time.
     cache.quotation.enabled = true
     cache.quotation.expire = 3600
 
-An outbound request with a ``Cache-Control: no-cache`` header bypasses cached responses. The ``cache_enabled`` request
-option in :ref:`Request Options <conf_request_options>` can also bypass the request cache.
+For outbound requests, the ``Cache-Control`` header value can be set
+to ``no-cache``, ``max-age=0`` or ``max-age=0, must-revalidate`` to bypass cached responses.
+Setting ``cache`` or ``cache_enabled`` to ``false`` in :ref:`Request Options <conf_request_options>`
+also bypasses the cached requests since they will not be employed.
 
 .. _cache-type:
 

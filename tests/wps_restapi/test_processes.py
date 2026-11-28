@@ -5917,7 +5917,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         """
         Tests that malformed search expressions are rejected rather than broadening the search.
         """
-        resp = self.app.get("/processes", params=encode_query({field: value}), headers=self.json_headers, expect_errors=True)
+        query = encode_query({field: value})
+        resp = self.app.get("/processes", params=query, headers=self.json_headers, expect_errors=True)
         assert resp.status_code == 400, resp.text
         assert resp.json["code"] == "ProcessInvalidParameter"
 
