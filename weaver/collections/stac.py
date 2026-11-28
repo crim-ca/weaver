@@ -998,13 +998,14 @@ class JobCollection(object):
         if not self.prov_enabled:
             return None
         prov_format = ProvenanceFormat.PROV_JSON
-        data, _ = self.job.prov_data(self.settings, ProvenancePathType.PROV, prov_format)
-        if not data:
+        path = self.job.prov_path(self.settings, ProvenancePathType.PROV, prov_format)
+        if not path or not os.path.isfile(path):
             return None
-        path = "assets/provenance.json"
-        self.asset_documents[path] = json.loads(data)
+        href = map_wps_output_location(path, self.settings, url=True)
+        if not href:
+            return None
         return {
-            "href": self.collection_asset_url(path),
+            "href": href,
             "type": ProvenanceFormat.as_media_type(prov_format),
             "title": "Job provenance record.",
             "roles": ["metadata"],
@@ -1048,16 +1049,16 @@ class JobCollection(object):
             **self.make_datetime_properties(item_index),
             "created": self.finished,
             "title": f"Result {item_index + 1} of Job {self.job.id}",
-            "weaver:job_id": str(self.job.id),
-            "weaver:process_id": self.job.process,
-            "weaver:output_id": output_ids,
+            "weaver:job": str(self.job.id),
+            "weaver:process": self.job.process,
+            "weaver:outputs": output_ids,
         }  # type: JSON
         if descriptions:
             props["description"] = " ".join(descriptions)
         if keywords:
             props["keywords"] = keywords
         if self.job.service:
-            props["weaver:provider_id"] = self.job.service
+            props["weaver:provider"] = self.job.service
         if values:
             props["weaver:value"] = values
             props["processing:expression"] = {"format": "results", "expression": values}
@@ -1191,7 +1192,7 @@ class JobCollection(object):
             "license": STAC_LICENSE,
             "providers": [provider],
             "extent": self.make_extent(items),
-            "summaries": {"weaver:output_id": output_ids},
+            "summaries": {"weaver:outputs": output_ids},
             "assets": self.collection_assets,
             "links": links,
         }

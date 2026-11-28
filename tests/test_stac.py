@@ -30,6 +30,7 @@ from weaver.collections.utils import collection_api_url, collection_enabled
 from weaver.datatype import Job, Process
 from weaver.formats import ContentType
 from weaver.processes.constants import CWL_REQUIREMENT_SECRETS
+from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.status import Status
 from weaver.utils import compute_file_checksum, compute_file_digest_multibase
 from weaver.wps_restapi import swagger_definitions as sd
@@ -174,7 +175,8 @@ class TestSTACCollection:
                 STAC_EXT_PROCESSING, STAC_EXT_APPLICATION, STAC_EXT_VCS, STAC_EXT_FILE,
             }
             assert item_data["collection"] == str(job.id)
-            assert item_data["properties"]["weaver:output_id"] == ["out", "value"]
+            assert item_data["properties"]["weaver:outputs"] == ["out", "value"]
+            assert coll_data["summaries"] == {"weaver:outputs": ["out", "value"]}
             asset = item_data["assets"]["out"]
             assert asset["roles"] == ["data"]
             assert asset["file:size"] == 5
@@ -619,7 +621,7 @@ class TestSTACCollection:
             assert index["numberReturned"] == 2
             first = self.load_item(job, settings)
             second = self.load_item(job, settings, f"{job.id}-1")
-            assert first["properties"]["weaver:output_id"] == ["geo_a", "geo_b", "literal"]
+            assert first["properties"]["weaver:outputs"] == ["geo_a", "geo_b", "literal"]
             assert second["properties"]["weaver:value"] == {"literal": "shared"}
             assert first["properties"]["weaver:value"] == {"literal": "shared"}
             assert first["bbox"] == [1, 20, 3, 20]
@@ -691,7 +693,7 @@ class TestSTACCollection:
             with open(os.path.join(job.collection_path(settings), "items", "index.json"), encoding="utf-8") as f:
                 index = json.load(f)
             assert index["numberReturned"] == 3
-            assert self.load_item(job, settings)["properties"]["weaver:output_id"] == ["geo_three", "text"]
+            assert self.load_item(job, settings)["properties"]["weaver:outputs"] == ["geo_three", "text"]
             with open(path, encoding="utf-8") as f:
                 collection = json.load(f)
             assert "output-geo_two-0" in collection["assets"]
@@ -783,13 +785,16 @@ class TestSTACCollection:
 
     @pytest.mark.collection
     @pytest.mark.stac
-    def test_job_collection_literal_expression(self):
+    @pytest.mark.parametrize(["provider"], [[None], ["remote-provider"]])
+    def test_job_collection_literal_expression(self, provider):
         """
         Tests that literal results are also provided as processing expression of format results.
         """
         with tempfile.TemporaryDirectory() as tmp:
             settings = self.make_settings(tmp)
             job = self.make_job()
+            if provider:
+                job.service = provider
             results = {"value": {"value": 3, "dataType": "integer"}}
             generate_job_collection(job, settings, results)
             props = self.load_item(job, settings)["properties"]
@@ -797,23 +802,55 @@ class TestSTACCollection:
                 "format": "results",
                 "expression": {"value": 3},
             }
+            assert props["weaver:job"] == str(job.id)
+            assert props["weaver:process"] == job.process
+            assert props["weaver:outputs"] == ["value"]
+            if provider:
+                assert props["weaver:provider"] == provider
+            else:
+                assert "weaver:provider" not in props
+            assert not any(key.startswith("weaver:") and key.endswith("_id") for key in props)
 
     @pytest.mark.collection
     @pytest.mark.stac
-    def test_job_collection_provenance_asset(self):
+    @pytest.mark.parametrize(
+        ["context", "enabled", "available"],
+        [
+            [None, True, True],
+            ["nested/context", True, True],
+            [None, False, True],
+            [None, True, False],
+        ],
+    )
+    def test_job_collection_provenance_asset(self, context, enabled, available):
         """
-        Tests that the provenance record of the job is copied as a collection asset when available.
+        Tests that the provenance asset references the existing job record without duplicating it.
         """
-        prov = {"prefix": {}, "entity": {"urn:uuid:test": {}}}
+        prov = json.dumps({"prefix": {}, "entity": {"urn:uuid:test": {}}})
         with tempfile.TemporaryDirectory() as tmp:
-            settings = self.make_settings(tmp)
-            job = self.make_job()
+            settings = self.make_settings(tmp, **{"weaver.cwl_prov": enabled})
+            job = self.make_job(context=context)
             results = self.make_results(settings, job)
-            with mock.patch.object(Job, "prov_data", return_value=(json.dumps(prov), ContentType.APP_JSON)):
-                path = generate_job_collection(job, settings, results)
+            prov_path = job.prov_path(settings, ProvenancePathType.PROV, ProvenanceFormat.PROV_JSON)
+            if available:
+                os.makedirs(os.path.dirname(prov_path))
+                with open(prov_path, mode="w", encoding="utf-8") as f:
+                    f.write(prov)
+            path = generate_job_collection(job, settings, results)
             with open(path, encoding="utf-8") as f:
-                asset = json.load(f)["assets"]["provenance"]
-            assert asset["roles"] == ["metadata"]
-            assert asset["type"] == ContentType.APP_PROV_JSON
-            with open(os.path.join(job.collection_path(settings), "assets", "provenance.json"), encoding="utf-8") as f:
-                assert json.load(f) == prov
+                assets = json.load(f)["assets"]
+            if enabled and available:
+                asset = assets["provenance"]
+                prefix = f"{context}/" if context else ""
+                assert asset["href"] == (
+                    f"{settings['weaver.wps_output_url']}/{prefix}{job.id}-prov/"
+                    "metadata/provenance/primary.cwlprov.json"
+                )
+                assert asset["roles"] == ["metadata"]
+                assert asset["type"] == ContentType.APP_PROV_JSON
+            else:
+                assert "provenance" not in assets
+            if available:
+                with open(prov_path, encoding="utf-8") as f:
+                    assert f.read() == prov
+            assert not os.path.exists(os.path.join(job.collection_path(settings), "assets", "provenance.json"))

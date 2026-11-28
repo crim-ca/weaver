@@ -3349,8 +3349,8 @@ published and lets `Weaver` reuse that published representation without posting 
 
 Result files remain in their normal job results location and are referenced by their existing URLs in the
 :term:`Collection` and :term:`Item` :term:`Asset` metadata. `Weaver` does not upload those data :term:`Assets <Asset>`
-to the :term:`STAC` API. Generated supporting :term:`Asset` documents (such as the results and parameter JSON
-documents, inline geospatial values, and unaligned literal arrays) remain in the local
+to the :term:`STAC` API. Generated supporting :term:`Asset` documents (such as the complete results JSON
+document, inline geospatial values, and unaligned literal arrays) remain in the local
 ``{JOB_UUID}-collection/assets/`` directory. The :term:`Collection` and :term:`Items <Item>` posted to the API
 reference these supporting documents through their public ``weaver.wps_output_url`` URLs. The hosting server must
 therefore make those local :term:`Assets <Asset>` accessible at the advertised URLs.
@@ -3384,6 +3384,8 @@ The :term:`Collection` provider contains a |stac-ext-processing|_ expression of 
 linked using ``derived_from``. :term:`Item` :term:`Assets <Asset>` carry aligned output data with the ``data`` role.
 :term:`Collection` :term:`Assets <Asset>` include the complete results document,
 the :term:`Provenance` record of the :term:`Job` when available, and any unaligned literal arrays.
+The :term:`Provenance` :term:`Asset` references the existing record in the ``{jobID}-prov/`` directory.
+The record is not copied into the :term:`Collection` directory.
 :term:`Assets <Asset>` retain their media type and declared format profile when available.
 Literal values are recorded by output ID in ``weaver:value`` and in ``processing:expression`` using
 ``format: results``.
@@ -3443,7 +3445,7 @@ The ``vcs`` links identify application source repositories when ``codeRepository
       - :term:`Item`
       - Mapping of output IDs to literal values.
       - Carries literal results aligned to the :term:`Item`.
-    * - `Weaver`: ``weaver:job_id``, ``weaver:process_id``, ``weaver:output_id``, and ``weaver:provider_id``
+    * - `Weaver`: ``weaver:job``, ``weaver:process``, ``weaver:outputs``, and ``weaver:provider``
       - :term:`Item`
       - Job UUID, process ID, represented output IDs, and remote provider ID when applicable.
       - Identifies the job, process, outputs, and provider associated with the :term:`Item`.

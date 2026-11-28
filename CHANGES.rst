@@ -21,7 +21,7 @@ Changes:
   cardinality as Collection assets. Reject ambiguous geo-like array cardinalities with HTTP 422 Problem Details
   and represent the process description and submitted inputs using the ``processing:expression`` ``parameters``
   (`processing extension PR #46 <https://github.com/stac-extensions/processing/pull/46>`_).
-  The complete results document and the `Provenance` record are provided as Collection assets.
+  The complete results document and the existing `Provenance` record are referenced as Collection assets.
 - Add `STAC Processing Extension <https://github.com/stac-extensions/processing>`_,
   `STAC Application Extension <https://github.com/stac-extensions/application>`_ and
   `STAC File Extension <https://github.com/stac-extensions/file>`_ metadata to associate
