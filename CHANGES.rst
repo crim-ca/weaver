@@ -56,7 +56,8 @@ Changes:
 - Interpret ``+`` literally in request query strings, as defined by
   `RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986>`_, instead of applying the form-style conversion
   into a space. This allows ``+`` operators and ``+`` signs of ``q``, ``query``, ``sortby`` and ``datetime`` parameters
-  to be provided directly. A space must now be encoded as ``%20``.
+  to be provided directly. A space must now be encoded as ``%20`` by direct `HTTP` clients.
+  The `CLI` and ``WeaverClient`` encode query parameters accordingly.
 
 Fixes:
 ------

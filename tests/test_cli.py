@@ -487,6 +487,16 @@ def test_cli_request_options_setup(parameters, expect_settings):
     assert client._settings == expect_settings
 
 
+def test_cli_request_query_spaces_encoded():
+    """
+    Ensure spaces are sent as ``%20`` since ``+`` is interpreted literally by the API.
+    """
+    client = WeaverClient("http://localhost:4001")
+    with mock.patch("weaver.cli.request_extra") as mock_request:
+        client._request("GET", "http://localhost:4001/processes", params={"q": "a b +c", "skip": None, "k": ["x y"]})
+    assert mock_request.call_args.kwargs["params"] == "q=a%20b%20%2Bc&k=x%20y"
+
+
 def test_cli_request_options_parsing():
     with mock.patch(
         "weaver.cli.WeaverClient._request",

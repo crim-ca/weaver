@@ -11,7 +11,7 @@ import sys
 import textwrap
 import time
 from typing import TYPE_CHECKING, cast
-from urllib.parse import urlparse
+from urllib.parse import quote, urlencode, urlparse
 
 import yaml
 from colander import EMAIL_RE, URL_REGEX
@@ -570,6 +570,12 @@ class WeaverClient(object):
                 textwrap.indent(repr_json(kwargs.get("json") or kwargs.get("body") or {}, indent=len(tab)), tab * 2),
                 textwrap.indent(repr_json(options, indent=len(tab)), tab * 2),
             )
+        params = kwargs.get("params")
+        if isinstance(params, (dict, list, tuple)):
+            # '+' is interpreted literally by the API, so spaces must be '%20' rather than the form-style '+'
+            items = params.items() if isinstance(params, dict) else params
+            kwargs["params"] = urlencode([(key, val) for key, val in items if val is not None],
+                                         doseq=True, quote_via=quote)
         return request_extra(method, url, headers=headers, **kwargs)
 
     def _get_url(self, url):
