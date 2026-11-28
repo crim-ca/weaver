@@ -183,7 +183,7 @@ Type names refer to the Python built-in :class:`bool`, :class:`int`, and :class:
    Configure whether the :term:`STAC` Collection of successful :term:`Job` results can be generated on request
    and advertised using alternate links. See :ref:`proc_op_job_collection` for details.
 
-   .. versionadded:: 6.19
+   .. versionadded:: 6.20
 
 .. confval:: weaver.job_collection_stac_api_public_url
    :type: URL
@@ -198,7 +198,7 @@ Type names refer to the Python built-in :class:`bool`, :class:`int`, and :class:
    .. seealso::
       :ref:`proc_op_job_collection_publish`
 
-   .. versionadded:: 6.19
+   .. versionadded:: 6.20
 
 .. confval:: weaver.job_collection_stac_api_staging_url
    :type: URL
@@ -211,7 +211,7 @@ Type names refer to the Python built-in :class:`bool`, :class:`int`, and :class:
    .. seealso::
       :ref:`proc_op_job_collection_publish`
 
-   .. versionadded:: 6.19
+   .. versionadded:: 6.20
 
 .. confval:: weaver.wps
    :type: bool-like

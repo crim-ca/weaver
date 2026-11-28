@@ -40,7 +40,7 @@ from weaver.execute import ExecuteCollectionFormat
 from weaver.formats import ContentType, clean_media_type_format, get_content_type
 from weaver.processes.constants import JobInputsOutputsSchema
 from weaver.processes.convert import convert_input_values_schema, get_field
-from weaver.provenance import ProvenanceFormat
+from weaver.provenance import ProvenanceFormat, ProvenancePathType
 from weaver.utils import (
     compute_file_checksum,
     get_any_id,
@@ -53,6 +53,7 @@ from weaver.utils import (
     request_extra
 )
 from weaver.wps.utils import get_wps_output_dir, get_wps_output_url, map_wps_output_location
+from weaver.wps_restapi import swagger_definitions as sd
 
 try:
     import rasterio
@@ -772,6 +773,25 @@ class JobCollection(object):
             parameters[in_id] = value
         return parameters
 
+    def make_processing_expression(self):
+        # type: () -> Optional[JSON]
+        """
+        Generates the Processing Extension expression using the process description and the submitted inputs.
+        """
+        if self.process is None:
+            return None
+        try:
+            description = self.process.offering(request=self.settings)
+        except Exception as exc:  # noqa: W0703
+            LOGGER.warning("Failed to resolve process description of [%s] for STAC expression: [%s]",
+                           self.process.id, exc, exc_info=exc)
+            return None
+        return {
+            "format": sd.OGC_API_PROC_PROFILE_PROC_DESC_URI,
+            "expression": description,
+            "parameters": {"inputs": self.make_processing_parameters()},
+        }
+
     def make_application_properties(self):
         # type: () -> JSON
         """
@@ -800,7 +820,10 @@ class JobCollection(object):
                       "Job definition with the submitted inputs and outputs.", ContentType.APP_JSON),
             make_link(f"{job_url}/logs", "https://www.opengis.net/def/rel/ogc/1.0/log",
                       "Job execution logs.", ContentType.APP_JSON),
-            make_link(self.process_url, "describedby", "Process description.", ContentType.APP_JSON),
+            make_link(self.process_url, "processing-expression", "Process description that produced the results.",
+                      ContentType.APP_JSON, profile=sd.OGC_API_PROC_PROFILE_PROC_DESC_URI),
+            make_link(f"{job_url}/inputs", "application-input", "Job inputs submitted to the process.",
+                      ContentType.APP_JSON),
             make_link(self.weaver_url or self.out_url, "application-platform",
                       "Server that executed the process.", ContentType.APP_JSON),
             make_link(__source_repository__, "vcs", "Source code repository of the server application."),
@@ -810,13 +833,8 @@ class JobCollection(object):
             links.extend([
                 make_link(package_url, "application", "Application Package (CWL) of the process.",
                           ContentType.APP_JSON, **self.make_application_properties()),
-                make_link(package_url, "processing-expression", "Processing chain that produced the results.",
-                          ContentType.APP_JSON),
             ])
         if self.prov_enabled:
-            links.append(
-                make_link(f"{job_url}/prov", "processing-expression", "Job provenance.", ContentType.APP_JSON)
-            )
             links.extend(
                 make_link(get_path_kvp(f"{job_url}/prov", f=fmt), PROV_REL, "Job provenance.",
                           ProvenanceFormat.as_media_type(fmt))
@@ -844,8 +862,8 @@ class JobCollection(object):
         rel_path = f"{rel_path}/{path}".replace(os.sep, "/")
         return f"{self.out_url}/{quote(rel_path, safe='/')}"
 
-    def make_reference_asset(self, item, title, role, output_id=None):
-        # type: (JSON, str, str, Optional[str]) -> JSON
+    def make_reference_asset(self, item, title, output_id=None):
+        # type: (JSON, str, Optional[str]) -> JSON
         """
         Generates a referenced asset with the corresponding Processing and File extension metadata.
         """
@@ -861,7 +879,7 @@ class JobCollection(object):
             "href": href,
             "type": media_type or ContentType.APP_JSON,
             "title": title,
-            "roles": ["data", role],
+            "roles": ["data"],
         }  # type: JSON
         fmt = self.output_format(output_id, item) if output_id else item.get("format") or {}
         profile = (fmt.get("profile") if isinstance(fmt, dict) else None) or item.get("profile")
@@ -919,7 +937,7 @@ class JobCollection(object):
                     "href": self.collection_asset_url(path),
                     "type": self.output_media_type(output_id, item) or ContentType.APP_GEOJSON,
                     "title": out_def.get("title") or output_id,
-                    "roles": ["data", "processing-output"],
+                    "roles": ["data"],
                 }  # type: JSON
                 fmt = self.output_format(output_id, item)
                 profile = fmt.get("profile") if isinstance(fmt, dict) else None
@@ -936,9 +954,7 @@ class JobCollection(object):
                 continue
             out_def = self.output_definition(output_id)
             key = quote(str(output_id), safe="")
-            assets[key] = self.make_reference_asset(
-                item, out_def.get("title") or output_id, "processing-output", output_id
-            )
+            assets[key] = self.make_reference_asset(item, out_def.get("title") or output_id, output_id)
         return assets, values
 
     def make_collection_assets(self):
@@ -948,30 +964,19 @@ class JobCollection(object):
         """
         self.asset_documents = {}
         assets = {}  # type: Dict[str, JSON]
-        parameters = self.make_processing_parameters()
-        for index, (in_id, in_val) in enumerate(self.input_values):
-            href = get_any_value(in_val, file=True, data=False) if isinstance(in_val, dict) else None
-            if not isinstance(href, str) or not href:
-                continue
-            asset = self.make_reference_asset(in_val, f"Input [{in_id}]", "processing-input")
-            input_index = index + 1
-            key = f"input-{quote(str(in_id), safe='')}"
-            if key in assets:
-                key = f"{key}-{input_index}"
-            assets[key] = asset
-
-        for path, content, title, role in [
-            ("assets/results.json", self.results, "Complete job results document", "processing-results"),
-            ("assets/parameters.json", parameters, "Job execution parameters", "processing-parameters"),
-        ]:
-            if content:
-                self.asset_documents[path] = content
-                assets[os.path.basename(path).split(".", 1)[0]] = {
-                    "href": self.collection_asset_url(path),
-                    "type": ContentType.APP_JSON,
-                    "title": title,
-                    "roles": ["data", role],
-                }
+        if self.results:
+            path = "assets/results.json"
+            self.asset_documents[path] = self.results
+            assets["results"] = {
+                "href": self.collection_asset_url(path),
+                "type": ContentType.APP_JSON,
+                "profile": sd.OGC_API_PROC_PROFILE_RESULTS_URI,
+                "title": "Complete job results document",
+                "roles": ["data"],
+            }
+        prov_asset = self.make_provenance_asset()
+        if prov_asset:
+            assets["provenance"] = prov_asset
 
         for output_id, result in self.results.items():
             if not isinstance(result, list) or len(result) == self.item_count:
@@ -980,9 +985,7 @@ class JobCollection(object):
             for index, item in enumerate(result):
                 key = f"output-{quote(str(output_id), safe='')}-{index}"
                 if isinstance(item, dict) and ("href" in item or "reference" in item):
-                    assets[key] = self.make_reference_asset(
-                        item, out_def.get("title") or output_id, "processing-output", output_id
-                    )
+                    assets[key] = self.make_reference_asset(item, out_def.get("title") or output_id, output_id)
                 else:
                     path = f"assets/outputs/{quote(str(output_id), safe='')}-{index}.json"
                     value = get_any_value(item) if isinstance(item, dict) else item
@@ -997,7 +1000,7 @@ class JobCollection(object):
                         "href": self.collection_asset_url(path),
                         "type": media_type,
                         "title": f"{out_def.get('title') or output_id} [{index}]",
-                        "roles": ["data", "processing-output"],
+                        "roles": ["data"],
                     }
                     fmt = self.output_format(output_id, item)
                     profile = fmt.get("profile") if isinstance(fmt, dict) else None
@@ -1006,6 +1009,26 @@ class JobCollection(object):
                     assets[key].update(self.make_processing_properties(output_id))
         self.collection_assets = assets
         return assets
+
+    def make_provenance_asset(self):
+        # type: () -> Optional[JSON]
+        """
+        Generates the asset of the :term:`Provenance` record of the :term:`Job`, copied alongside the collection.
+        """
+        if not self.prov_enabled:
+            return None
+        prov_format = ProvenanceFormat.PROV_JSON
+        data, _ = self.job.prov_data(self.settings, ProvenancePathType.PROV, prov_format)
+        if not data:
+            return None
+        path = "assets/provenance.json"
+        self.asset_documents[path] = json.loads(data)
+        return {
+            "href": self.collection_asset_url(path),
+            "type": ProvenanceFormat.as_media_type(prov_format),
+            "title": "Job provenance record.",
+            "roles": ["metadata"],
+        }
 
     def write_asset_documents(self):
         # type: () -> None
@@ -1057,11 +1080,7 @@ class JobCollection(object):
             props["weaver:provider_id"] = self.job.service
         if values:
             props["weaver:value"] = values
-            props["processing:expression"] = {
-                "format": "results",
-                "expression": values,
-                "parameters": self.make_processing_parameters(),
-            }
+            props["processing:expression"] = {"format": "results", "expression": values}
         props.update(self.make_processing_properties(output_ids))
         props.update(self.make_application_properties())
 
@@ -1156,12 +1175,9 @@ class JobCollection(object):
             "url": self.weaver_url or __source_repository__,
         }  # type: JSON
         provider.update(self.make_processing_properties())
-        if isinstance(self.package, dict):
-            provider["processing:expression"] = {
-                "format": "cwl",
-                "expression": self.package,
-                "parameters": self.make_processing_parameters(),
-            }
+        expression = self.make_processing_expression()
+        if expression:
+            provider["processing:expression"] = expression
         provider.update(self.make_application_properties())
 
         extensions = [STAC_EXT_PROCESSING]

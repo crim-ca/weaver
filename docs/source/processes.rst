@@ -3263,7 +3263,7 @@ different formats. Therefore, certain formats might not be applicable to certain
 Job Collection Output Response
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. versionadded:: 6.19
+.. versionadded:: 6.20
 
 Results of a successful :term:`Job` can be represented as a :term:`STAC` Collection, offered as an alternate
 representation of the :ref:`Job Results <proc_op_job_results>`. This representation is generated only when
@@ -3374,11 +3374,13 @@ or an empty winning candidate returns ``HTTP 422`` because the results cannot be
 candidate array, one Item is produced. Scalar outputs repeat in each Item. Output arrays matching the selected
 cardinality align by index. Arrays of other lengths become Collection-level assets.
 
-The |stac-ext-processing|_ parameters contain the named execution inputs. File inputs are linked using
-``derived_from`` and exposed as Collection assets. Item assets carry aligned output data. Collection assets
-include complete results and parameter documents and any unaligned literal arrays. Assets retain their media type
-and declared format profile when available. Literal values are recorded by output ID in ``weaver:value`` and in
-``processing:expression`` using ``format: results``.
+The Collection provider contains a |stac-ext-processing|_ expression of the process description, using the
+``ogc-process-description`` profile. Its ``parameters`` contain the named execution ``inputs``. File inputs are
+linked using ``derived_from``. Item assets carry aligned output data with the ``data`` role. Collection assets
+include the complete results document, the :term:`Provenance` record of the :term:`Job` when available,
+and any unaligned literal arrays. Assets retain their media type and declared format profile when available.
+Literal values are recorded by output ID in ``weaver:value`` and in ``processing:expression`` using
+``format: results``.
 
 .. list-table:: Job Results Collection and Item Contents
     :name: table-job-collection-contents
@@ -3398,25 +3400,25 @@ and declared format profile when available. Literal values are recorded by outpu
       - Collection uses the Job UUID. Item uses the Job UUID and zero-based result index.
       - Identifies the Collection and each aligned Item.
     * - |stac-ext-processing|_: ``processing:software``, ``processing:version``, ``processing:datetime``,
-      ``processing:level``, ``processing:facility``, and ``processing:lineage``
+        ``processing:level``, ``processing:facility``, and ``processing:lineage``
       - Collection and Item
       - Software and process metadata, job completion time, ``L4`` processing level, configured service name
         or URL, and job input/output lineage.
       - Describes the process and facility and provides associated lineage.
     * - |stac-ext-processing|_: ``processing:expression``
       - Item
-      - ``format: cwl`` with the :term:`CWL` package or ``format: results`` with named literal values.
-        May include named ``parameters``.
-      - Records the application package or literal results and submitted inputs.
+      - Collection provider uses the ``ogc-process-description`` profile with the process description in
+        ``expression`` and the submitted ``inputs`` in ``parameters``. Item uses ``format: results`` with
+        named literal values.
+      - Records the process and submitted inputs, or the literal results.
     * - |stac-ext-application|_: ``application:languages`` and ``application:entrypoint``
       - Collection and Item
       - ``["CWL"]`` and package entrypoint when defined.
       - Identifies the application language and entrypoint.
     * - Asset: ``roles``
       - Collection and Item assets
-      - ``processing-input``, ``processing-output``, ``processing-parameters``, or ``processing-results``.
-        May include ``data``.
-      - Identifies input/output assets and supporting documents.
+      - ``data`` for results and ``metadata`` for the :term:`Provenance` record.
+      - Identifies result assets and supporting documents.
     * - Asset: ``type`` and ``profile``
       - Collection and Item assets
       - Resolved media type and declared format profile when available. Generated JSON uses
@@ -3436,9 +3438,11 @@ and declared format profile when available. Literal values are recorded by outpu
       - Identifies the job, process, outputs, and provider associated with the Item.
     * - Links
       - Collection and Item
-      - Links to Job status, provenance, process CWL package, source code, URL inputs, results, outputs, logs,
-        and process description.
-      - Connects documents to relevant execution, provenance, software, input, and result resources.
+      - Links to Job status using ``processing-execution``, the process description using
+        ``processing-expression``, the :term:`CWL` package using ``application``, submitted inputs using
+        ``application-input``, source code, URL inputs using ``derived_from``, provenance, results,
+        outputs, and logs.
+      - Connects documents to relevant execution, process, application, input, provenance, and result resources.
 
 .. _proc_op_job_collection_extents:
 

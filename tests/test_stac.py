@@ -172,7 +172,7 @@ def test_job_collection_generation():
         assert item_data["collection"] == str(job.id)
         assert item_data["properties"]["weaver:output_id"] == ["out", "value"]
         asset = item_data["assets"]["out"]
-        assert "processing-output" in asset["roles"]
+        assert asset["roles"] == ["data"]
         assert asset["file:size"] == 5
         assert asset["file:checksum"] == compute_file_checksum(
             os.path.join(tmp, str(job.id), "out", "result.txt"), "sha256"
@@ -182,9 +182,14 @@ def test_job_collection_generation():
         assert {"self", "root", "parent", "collection"} <= rels
 
         assert item_data["properties"]["weaver:value"] == {"value": 3}
-        assert coll_data["assets"]["parameters"]["roles"] == ["data", "processing-parameters"]
-        assert coll_data["assets"]["results"]["roles"] == ["data", "processing-results"]
-        assert os.path.isfile(os.path.join(coll_dir, "assets", "parameters.json"))
+        assert coll_data["assets"]["results"]["roles"] == ["data"]
+        assert coll_data["assets"]["results"]["profile"] == sd.OGC_API_PROC_PROFILE_RESULTS_URI
+        assert os.path.isfile(os.path.join(coll_dir, "assets", "results.json"))
+        assert not any(
+            role.startswith("processing-")
+            for asset in [*coll_data["assets"].values(), *item_data["assets"].values()]
+            for role in asset["roles"]
+        )
 
 
 @pytest.mark.collection
@@ -256,17 +261,33 @@ def test_job_collection_process_application_extension():
         settings = make_settings(tmp)
         job = make_job()
         results = make_results(settings, job)
-        process = Process(id="test-process", package=package, title="Test", version="1.2.3", keywords=["a"])
+        process = Process(
+            id="test-process",
+            package=package,
+            inputs=[{"id": "data"}],
+            outputs=[{"id": "out"}],
+            title="Test",
+            version="1.2.3",
+            keywords=["a"],
+        )
         path = generate_job_collection(job, settings, results, process)
         with open(path, mode="r", encoding="utf-8") as f:
             coll = json.load(f)
         assert STAC_EXT_APPLICATION in coll["stac_extensions"]
         assert coll["application:languages"] == ["CWL"]
         assert coll["application:entrypoint"] == "echo"
-        assert coll["providers"][0]["processing:expression"]["expression"] == package
-        assert coll["providers"][0]["processing:expression"]["parameters"] == {
-            "data": {"href": "https://example.com/input.txt"}
-        }
+        expression = coll["providers"][0]["processing:expression"]
+        assert expression["format"] == sd.OGC_API_PROC_PROFILE_PROC_DESC_URI
+        assert expression["expression"]["id"] == "test-process"
+        assert expression["parameters"] == {"inputs": {"data": {"href": "https://example.com/input.txt"}}}
+        links = {link["rel"]: link for link in coll["links"]}
+        assert links["application"]["href"].endswith("/processes/test-process/package")
+        assert links["processing-expression"]["href"].endswith("/processes/test-process")
+        assert links["processing-expression"]["profile"] == sd.OGC_API_PROC_PROFILE_PROC_DESC_URI
+        assert links["application-input"]["href"].endswith(f"/jobs/{job.id}/inputs")
+        assert [link["href"] for link in coll["links"] if link["rel"] == "processing-expression"] == [
+            links["processing-expression"]["href"]
+        ]
         assert "Test" in coll["description"]
 
 
@@ -293,11 +314,17 @@ def test_job_collection_processing_parameters_preserve_arrays(inputs):
         settings = make_settings(tmp)
         job = make_job()
         job.inputs = deepcopy(inputs)
-        path = generate_job_collection(job, settings, {"value": {"value": 1}})
+        process = Process(
+            id="test-process",
+            package={"cwlVersion": "v1.2", "class": "CommandLineTool"},
+            inputs=[{"id": "numbers"}, {"id": "text"}],
+            outputs=[{"id": "value"}],
+        )
+        path = generate_job_collection(job, settings, {"value": {"value": 1}}, process)
         assert path
-        with open(os.path.join(job.collection_path(settings), "assets", "parameters.json"), encoding="utf-8") as f:
-            params = json.load(f)
-        assert params == {"numbers": [1, 2, 3], "text": "sample"}
+        with open(path, encoding="utf-8") as f:
+            params = json.load(f)["providers"][0]["processing:expression"]["parameters"]
+        assert params == {"inputs": {"numbers": [1, 2, 3], "text": "sample"}}
         assert job.inputs == inputs
 
 
@@ -540,7 +567,7 @@ def test_job_collection_aligns_output_arrays_by_cardinality():
         assert first["assets"]["geo_a"]["href"].endswith(f"/assets/items/{job.id}-0/geo_a.json")
         assert len([key for key in collection["assets"] if key.startswith("output-geo_unmatched-")]) == 3
         assert all(
-            "processing-output" in asset["roles"]
+            asset["roles"] == ["data"]
             for key, asset in collection["assets"].items()
             if key.startswith("output-geo_unmatched-")
         )
@@ -568,6 +595,7 @@ def test_job_collection_rejects_ambiguous_output_arrays(lengths):
         process = Process(
             id=job.process,
             package={},
+            inputs=[{"id": "data"}],
             outputs=[{"id": out_id, "formats": [{"mediaType": "application/geo+json"}]} for out_id in results]
         )
         with pytest.raises(AmbiguousCollectionItems, match="cardinalit|no items"):
@@ -711,5 +739,25 @@ def test_job_collection_literal_expression():
         assert props["processing:expression"] == {
             "format": "results",
             "expression": {"value": 3},
-            "parameters": {"data": {"href": "https://example.com/input.txt"}},
         }
+
+
+@pytest.mark.collection
+@pytest.mark.stac
+def test_job_collection_provenance_asset():
+    """
+    Tests that the provenance record of the job is copied as a collection asset when available.
+    """
+    prov = {"prefix": {}, "entity": {"urn:uuid:test": {}}}
+    with tempfile.TemporaryDirectory() as tmp:
+        settings = make_settings(tmp)
+        job = make_job()
+        results = make_results(settings, job)
+        with mock.patch.object(Job, "prov_data", return_value=(json.dumps(prov), ContentType.APP_JSON)):
+            path = generate_job_collection(job, settings, results)
+        with open(path, encoding="utf-8") as f:
+            asset = json.load(f)["assets"]["provenance"]
+        assert asset["roles"] == ["metadata"]
+        assert asset["type"] == ContentType.APP_PROV_JSON
+        with open(os.path.join(job.collection_path(settings), "assets", "provenance.json"), encoding="utf-8") as f:
+            assert json.load(f) == prov

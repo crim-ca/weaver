@@ -13,13 +13,20 @@ from typing import TYPE_CHECKING, List, cast
 import mock
 import pytest
 from owslib.wps import BoundingBoxDataInput, ComplexDataInput, Input, Process
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotAcceptable
 
 from tests.utils import MockedRequest
 from weaver.datatype import Job
+from weaver.execute import ExecuteMode, ExecuteResponse
 from weaver.formats import ContentEncoding, ContentType
 from weaver.processes.constants import WPS_BOUNDINGBOX_DATA, WPS_COMPLEX_DATA, WPS_LITERAL, WPS_CategoryType
-from weaver.processes.execution import parse_kvp_inputs_outputs, parse_wps_inputs, submit_job, submit_job_from_kvp
+from weaver.processes.execution import (
+    parse_kvp_inputs_outputs,
+    parse_wps_inputs,
+    submit_job,
+    submit_job_from_kvp,
+    validate_job_accept_profile
+)
 from weaver.wps_restapi.swagger_definitions import OGC_API_PROC_BBOX_CRS
 
 if TYPE_CHECKING:
@@ -1323,56 +1330,37 @@ def test_kvp_format_precedence(f_param, format_param, expected_accept):
     assert expected_accept in req.headers["Accept"]
 
 
-# FIXME: remove when collection output supported (https://github.com/crim-ca/weaver/issues/683)
-def test_kvp_response_collection_validation():
+@pytest.mark.collection
+def test_kvp_response_collection_with_profile_in_submission():
     """
-    Validate that 'response=collection' raises HTTPNotImplemented.
-
-    The parameter is properly transferred to the body, but submit_job validates
-    it and raises an error since this feature is not yet implemented.
-    Related: https://github.com/crim-ca/weaver/issues/683
-    """
-    req = MockedRequest()
-    req.params = {"response": "collection"}
-    req.headers = {}
-
-    # Mock the body validation to return a simple body
-    with mock.patch("weaver.processes.execution.validate_job_json", return_value={"response": "collection"}):
-        with mock.patch("weaver.processes.execution.get_wps_output_context"):
-            with pytest.raises(HTTPNotImplemented) as exc_info:
-                submit_job(req, None)  # type: ignore
-
-    error_json = exc_info.value.json
-    assert "response=collection" in error_json.get("detail", "").lower()
-    assert "not yet supported" in error_json.get("detail", "").lower()
-
-
-# FIXME: remove when collection output supported (https://github.com/crim-ca/weaver/issues/683)
-def test_kvp_response_collection_in_submission():
-    """
-    Validate that response=collection from KVP is transferred to body and validated.
-
-    Ensures the complete flow: KVP -> body conversion -> validation -> error
+    Validate that ``response=collection`` and ``response[profile]`` from KVP are transferred to the execution body.
     """
     req = MockedRequest()
     req.params = {
         "response": "collection",
+        "response[profile]": "stac",
+        "response[prefer]": "respond-async",
         "input1": "test-value",
     }
     req.headers = {}
 
-    # The KVP submission should convert params to body, then submit_job should validate
-    with mock.patch("weaver.processes.execution.validate_job_json") as mock_validate_json:
-        with mock.patch("weaver.processes.execution.get_wps_output_context"):
-            # Capture what body is generated
-            def capture_body(request):
-                data = cast("bytes", request.body).decode("utf-8")
-                return json.loads(data)
+    with mock.patch("weaver.processes.execution.submit_job", return_value=None):
+        submit_job_from_kvp(req, None)  # type: ignore
 
-            mock_validate_json.side_effect = capture_body
+    body = json.loads(cast("bytes", req.body).decode("utf-8"))
+    assert body["response"] == "collection"
+    assert body["profile"] == "stac"
 
-            with pytest.raises(HTTPNotImplemented) as exc_info:
-                submit_job_from_kvp(req, None)  # type: ignore
 
-    error_json = exc_info.value.json
-    assert "response=collection" in error_json.get("detail", "").lower()
+@pytest.mark.collection
+def test_validate_job_accept_profile_collection_response():
+    """
+    Validate that sync execution with a collection response accepts only collection profiles in ``Accept-Profile``.
+    """
+    headers = {"Accept-Profile": "stac"}
+    assert validate_job_accept_profile(headers, ExecuteMode.SYNC, ExecuteResponse.COLLECTION) == "stac"
+    with pytest.raises(HTTPNotAcceptable):
+        validate_job_accept_profile({"Accept-Profile": "https://example.com/other"}, ExecuteMode.SYNC,
+                                    ExecuteResponse.COLLECTION)
+    with pytest.raises(HTTPNotAcceptable):
+        validate_job_accept_profile(headers, ExecuteMode.SYNC, ExecuteResponse.DOCUMENT)
