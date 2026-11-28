@@ -4757,7 +4757,8 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                         msg = "Failed with test variation '{}' with status '{}' using:\n{}"
                         code = [400, 422] if is_invalid else [201]
                         assert resp.status_code in code, msg.format(i, resp.status_code, data_json)
-                        assert resp.content_type == (ContentType.APP_PROBLEM_JSON if is_invalid else ContentType.APP_JSON), msg.format(i, resp.content_type)
+                        ctype = ContentType.APP_PROBLEM_JSON if is_invalid else ContentType.APP_JSON
+                        assert resp.content_type == ctype, msg.format(i, resp.content_type, data_json)
                 except stopit.TimeoutException:
                     # if required, not normal to have passed validation
                     # if optional, valid since omitting field does not raise missing field in schema
