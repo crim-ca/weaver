@@ -117,15 +117,15 @@ class GenericApiRoutesTestCase(WpsConfigBase):
     @pytest.mark.ogc_records
     def test_conformance_records_queryables(self):
         resp = self.app.get("/conformance", headers=self.json_headers)
-        records = "http://www.opengis.net/spec/ogcapi-records-1/1.0"
+        records = sd.OGC_API_RECORDS_PART1_BASE_URI
         for name in ["sorting", "filtering", "cql-filter"]:
             assert f"{records}/conf/{name}" in resp.json["conformsTo"]
 
     @pytest.mark.ogc_records
     def test_conformance_records_local_resources_catalog(self):
         resp = self.app.get("/conformance", headers=self.json_headers)
-        records = "http://www.opengis.net/spec/ogcapi-records-1/1.0"
-        cql2 = "http://www.opengis.net/spec/cql2/1.0"
+        records = sd.OGC_API_RECORDS_PART1_BASE_URI
+        cql2 = sd.OGC_API_CQL2_BASE_URI
         expected = [f"{records}/conf/{name}" for name in [
             "autodiscovery",
             "local-resources-catalog",
@@ -134,7 +134,7 @@ class GenericApiRoutesTestCase(WpsConfigBase):
             "local-resources-catalog-filtering",
         ]]
         expected += [f"{cql2}/conf/{name}" for name in ["basic-cql2", "cql2-json", "cql2-text"]]
-        expected.append("http://www.opengis.net/spec/ogcapi-common-2/1.0/conf/simple-query")
+        expected.append(f"{sd.OGC_API_COMMON_PART2_BASE_URI}/conf/simple-query")
         for conf in expected:
             assert conf in resp.json["conformsTo"]
 

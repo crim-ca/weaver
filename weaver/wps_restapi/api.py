@@ -79,8 +79,8 @@ def get_conformance(category, settings):
     """
     # pylint: disable=C0301,line-too-long  # many long comment links cannot be split
 
-    ows_wps1 = "http://schemas.opengis.net/wps/1.0.0"
-    ows_wps2 = "http://www.opengis.net/spec/WPS/2.0"
+    ows_wps1 = sd.OGC_WPS1_BASE_URI
+    ows_wps2 = sd.OGC_WPS2_BASE_URI
     ows_wps_enabled = asbool(settings.get("weaver.wps", True))
     ows_wps_conformance = [
         # "http://www.opengis.net/spec/wfs-1/3.0/req/core",
@@ -94,18 +94,18 @@ def get_conformance(category, settings):
         # ows_wps2 + "/req/service/binding/rest-json/html"
     ] if ows_wps_enabled else []
 
-    ogcapi_common = "http://www.opengis.net/spec/ogcapi-common-1/1.0"
-    ogcapi_proc_core1 = "http://www.opengis.net/spec/ogcapi-processes-1/1.0"  # core (v1.0)
-    ogcapi_proc_core2 = "http://www.opengis.net/spec/ogcapi-processes-1/2.0"  # core (v2.0)
-    ogcapi_proc_part2 = "http://www.opengis.net/spec/ogcapi-processes-2/1.0"  # deploy, replace, undeploy
-    ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/0.0"  # workflows and chaining
-    ogcapi_proc_part4 = "http://www.opengis.net/spec/ogcapi-processes-4/1.0"  # job management
-    ogcapi_proc_part5 = "http://www.opengis.net/spec/ogcapi-processes-5/1.0"  # provenance
-    ogcapi_proc_part6 = "http://www.opengis.net/spec/ogcapi-processes-6/1.0"  # versioning (proposal, not yet defined)
-    ogcapi_proc_apppkg = "http://www.opengis.net/spec/eoap-bp/1.0"
-    ogcapi_common2 = "http://www.opengis.net/spec/ogcapi-common-2/1.0"
-    ogcapi_cql2 = "http://www.opengis.net/spec/cql2/1.0"
-    ogcapi_records = "http://www.opengis.net/spec/ogcapi-records-1/1.0"  # discovery of processes and jobs
+    ogcapi_common = sd.OGC_API_COMMON_PART1_BASE_URI
+    ogcapi_proc_core1 = sd.OGC_API_PROC_PART1_BASE_URI
+    ogcapi_proc_core2 = sd.OGC_API_PROC_PART1_V2_BASE_URI
+    ogcapi_proc_part2 = sd.OGC_API_PROC_PART2_BASE_URI
+    ogcapi_proc_part3 = sd.OGC_API_PROC_PART3_BASE_URI
+    ogcapi_proc_part4 = sd.OGC_API_PROC_PART4_BASE_URI
+    ogcapi_proc_part5 = sd.OGC_API_PROC_PART5_BASE_URI
+    ogcapi_proc_part6 = sd.OGC_API_PROC_PART6_BASE_URI
+    ogcapi_proc_apppkg = sd.OGC_API_PROC_EOAP_BP_BASE_URI
+    ogcapi_common2 = sd.OGC_API_COMMON_PART2_BASE_URI
+    ogcapi_cql2 = sd.OGC_API_CQL2_BASE_URI
+    ogcapi_records = sd.OGC_API_RECORDS_PART1_BASE_URI  # discovery of processes and jobs
     # FIXME: https://github.com/crim-ca/weaver/issues/412
     # ogcapi_proc_part3 = "http://www.opengis.net/spec/ogcapi-processes-3/1.0"
     ogcapi_proc_enabled = asbool(settings.get("weaver.wps_restapi", True))

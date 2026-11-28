@@ -152,7 +152,7 @@ def get_processes(request):
             )
 
         listing = processes if detail else [get_any_id(p) for p in processes]
-        body = {"recordsArrayName": "processes", "processes": listing}  # type: JSON
+        body = {"processes": listing}  # type: JSON
         if not with_providers:
             paging = {  # remove other params
                 "page": paging.get("page"),

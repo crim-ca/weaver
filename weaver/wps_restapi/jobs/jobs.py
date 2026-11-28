@@ -217,7 +217,7 @@ def get_queried_jobs(request):
     else:
         jobs = _job_list(items)
         paging = {"page": filters["page"], "limit": filters["limit"], "count": len(jobs)}
-        body.update({"recordsArrayName": "jobs", "jobs": jobs, **paging})
+        body.update({"jobs": jobs, **paging})
     try:
         body.update({"links": get_job_list_links(total, filters, groups, request)})
     except IndexError as exc:

@@ -390,7 +390,7 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
 
     @pytest.mark.dependency(name="test_conformance_classes_dru")
     def test_conformance_classes_dru(self):
-        assert "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/deploy-replace-undeploy" in self.conforms_to
+        assert f"{sd.OGC_API_PROC_PART2_BASE_URI}/conf/deploy-replace-undeploy" in self.conforms_to
 
     @pytest.mark.skipif(
         TEST_SERVER_OAP_DRU_OGCAPPPKG_UNSUPPORTED,
@@ -401,7 +401,7 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         depends=["test_conformance_classes_dru"],
     )
     def test_conformance_classes_dru_ogcapppkg(self):
-        assert "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/ogcapppkg" in self.conforms_to
+        assert f"{sd.OGC_API_PROC_PART2_BASE_URI}/conf/ogcapppkg" in self.conforms_to
 
     @pytest.mark.skipif(
         TEST_SERVER_OAP_DRU_CWL_UNSUPPORTED,
@@ -412,7 +412,7 @@ class TestServerOGCAPIProcessesDRU(ServerOGCAPIProcessesBase):
         depends=["test_conformance_classes_dru"],
     )
     def test_conformance_classes_dru_cwl(self):
-        assert "http://www.opengis.net/spec/ogcapi-processes-2/1.0/conf/cwl" in self.conforms_to
+        assert f"{sd.OGC_API_PROC_PART2_BASE_URI}/conf/cwl" in self.conforms_to
 
     @pytest.mark.dependency(
         name="test_deploy_process_ogcapppkg",

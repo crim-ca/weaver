@@ -327,7 +327,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         path = "/conformance"
         resp = self.app.get(path, headers=self.json_headers)
         conf = resp.json["conformsTo"]
-        assert "http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/core/process-summary-links" in conf
+        assert f"{sd.OGC_API_PROC_PART1_BASE_URI}/conf/core/process-summary-links" in conf
 
     @pytest.mark.ogc_records
     def test_get_processes_queryables(self):
@@ -5552,7 +5552,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
                 "features[profile]": "http://www.opengis.net/spec/ogcapi-features-1/1.0",
                 "result[include]": "true",
                 "result[mediaType]": ContentType.APP_JSON,
-                "result[profile]": "http://www.opengis.net/spec/ogcapi-processes-1/1.0",
+                "result[profile]": sd.OGC_API_PROC_PART1_BASE_URI,
                 "response[prefer]": ExecuteControlOption.ASYNC,
             }
             resp = self.app.get(path, params=params, headers=self.json_headers)
@@ -5977,7 +5977,7 @@ class WpsRestApiProcessesTest(WpsConfigBase):
         ("name", "workflow", ["wf"]),
         ("case", "WPS,Builtin", ["wps1", "builtin"]),
         ("wps-uri", "http://www.opengis.net/def/serviceType/ogc/wps", ["wps1", "wps2"]),
-        ("ogcapi-uri", "http://www.opengis.net/spec/ogcapi-processes-1/1.0", ["app"]),
+        ("ogcapi-uri", sd.OGC_API_PROC_PART1_BASE_URI, ["app"]),
     ])
     @pytest.mark.ogc_records
     def test_get_processes_filter_by_type(self, _, value, expected):
